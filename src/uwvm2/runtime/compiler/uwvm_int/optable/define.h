@@ -60,8 +60,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     using wasm1_code = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
     using wasm1_code_version_type = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version;
 
+    // Keep the packed dispatch stream at a stable cache-line offset. Otherwise
+    // unrelated module allocations (for example a second memory) can move a hot
+    // branch-target load across a cache line without changing any Wasm opcode.
+    // This affects allocation only; opfunc/immediate offsets and musttail ABI
+    // are unchanged. Use the same allocator for temporary and final streams so
+    // moves transfer ownership without copying or invalidating fixed-up labels.
+    struct interpreter_bytecode_allocator
+    {
+        using upstream = ::fast_io::generic_allocator_adapter<::fast_io::native_global_allocator>;
+        static inline void* allocate(::std::size_t bytes) noexcept
+        { return upstream::allocate_aligned(64uz, bytes); }
+        static inline void deallocate(void* pointer) noexcept
+        { upstream::deallocate_aligned(pointer, 64uz); }
+    };
+    using interpreter_bytecode_vector = ::uwvm2::utils::container::vector<
+        ::std::byte, ::fast_io::generic_allocator_adapter<interpreter_bytecode_allocator>>;
+
     struct uwvm_interpreter_function_operands_t
-    { ::uwvm2::utils::container::vector<::std::byte> operands{}; };
+    { interpreter_bytecode_vector operands{}; };
+
+    class exception_function_metadata;
 
     struct local_func_storage_t
     {
@@ -74,6 +93,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::size_t operand_stack_max{};
         ::std::size_t operand_stack_byte_max{};
 
+        // Non-self return_call needs an owning activation to transfer arguments
+        // after releasing the current frame. Ordinary functions keep the old path.
+        bool has_tail_transfer{};
+        // Optional immutable EH descriptors; ordinary functions allocate no metadata owner.
+        ::std::shared_ptr<exception_function_metadata const> exception_metadata{};
         uwvm_interpreter_function_operands_t op{};
     };
 
@@ -382,6 +406,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @details Functions called when unreachable do not require the `noreturn` keyword, as some embedded plugin systems cannot utilize this option.
     /// @note These callbacks are invoked from interpreter opfuncs, so their function-pointer ABI must stay in lockstep with
     ///       `uwvm_interpreter_opfunc_t`: Windows x86_64 GNU/Clang uses SysV, and all i686 targets use fastcall.
+    using atomic_wait_trap_func_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(unsigned) noexcept;
     using unreachable_func_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)() noexcept;
 
     using memory_out_of_bounds_func_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::uwvm2::object::memory::error::memory_error_t const&) noexcept;
@@ -390,6 +415,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     ///          writes the return result back onto the operand stack, and returns the updated stack top.  Passing and returning the pointer by value keeps
     ///          tail-dispatch opfuncs from exposing the address of one of their parameters across a `musttail` boundary.
     /// @note `stack_top` and every pointer derived from it are borrowed only for the synchronous callback invocation and must not be retained.
+    // Copies arguments synchronously into the activation's transfer buffer. No
+    // pointer into the outgoing frame survives the callback. The frame owner
+    // enters the target only after the outgoing opfunc chain has returned.
+    using interpreter_indirect_tail_transfer_func_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(
+        void* activation, ::std::size_t module_id, ::std::size_t type_index, ::std::size_t table_index,
+        ::std::byte const* operand_top, ::std::size_t argument_bytes) noexcept;
+
+    /// A typed function reference carries its provider's storage identity on the operand stack.
+    /// The resolver consumes that reference after checking null and the caller's expected signature.
+    using interpreter_ref_tail_transfer_func_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(
+        void* activation, ::std::size_t module_id, ::std::size_t type_index,
+        ::std::byte const* operand_top, ::std::size_t argument_bytes) noexcept;
+
+    using interpreter_tail_transfer_func_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(
+        void* activation, ::std::size_t module_id, ::std::size_t function_index,
+        ::std::byte const* arguments, ::std::size_t argument_bytes) noexcept;
+
     using interpreter_call_func_t =
         ::std::byte*(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte* stack_top) UWVM_THROWS;
 
@@ -399,6 +441,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     using interpreter_call_indirect_func_t = ::std::byte*(
         UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte* stack_top)
         UWVM_THROWS;
+
+    /// The runtime checks the actual function-reference identity and signature before invocation.
+    /// The callback consumes the complete reference operand and returns the new operand-stack top.
+    using interpreter_call_ref_func_t = ::std::byte*(
+        UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::byte* stack_top) UWVM_THROWS;
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     inline constexpr ::std::uintptr_t interpreter_tiered_loop_osr_disabled_state_address{::std::numeric_limits<::std::uintptr_t>::max()};
@@ -410,7 +457,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                                          ::std::size_t result_bytes,
                                                                                          ::std::byte const* local_base,
                                                                                          ::std::size_t local_bytes,
-                                                                                         ::std::uintptr_t* compile_state_address_ptr) noexcept;
+                                                                                         ::std::uintptr_t* compile_state_address_ptr) UWVM_THROWS;
 
     struct interpreter_tiered_loop_osr_immediate_t
     {
@@ -552,6 +599,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 // safe
                 //                  ^^ typeref...[1u]
 
+                // operand pop: operand_base ... [validated live bytes] old_top ... frame_end
+                // [safe existing stack prefix                   ] unsafe (before operand_base)
+                // ^^ typeref...[1u] retreats by sizeof(GetType); the emitted stack effect proves those bytes are live.
                 typeref...[1u] -= sizeof(GetType);
 
                 // last_val top_val (end)
@@ -606,6 +656,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 using Type = ::std::remove_cvref_t<TypeRef...[1u]>;
                 static_assert(::std::same_as<Type, ::std::byte*>);
 
+                // operand pop: operand_base ... [validated live bytes] old_top ... frame_end
+                // [safe existing stack prefix                   ] unsafe (before operand_base)
+                // ^^ typeref...[1u] retreats by sizeof(GetType); the emitted stack effect proves those bytes are live.
                 typeref...[1u] -= sizeof(GetType);
 
                 GetType ret;  // no init
@@ -669,6 +722,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 using Type = ::std::remove_cvref_t<TypeRef...[1u]>;
                 static_assert(::std::same_as<Type, ::std::byte*>);
 
+                // operand pop: operand_base ... [validated live bytes] old_top ... frame_end
+                // [safe existing stack prefix                   ] unsafe (before operand_base)
+                // ^^ typeref...[1u] retreats by sizeof(GetType); the emitted stack effect proves those bytes are live.
                 typeref...[1u] -= sizeof(GetType);
 
                 GetType ret;  // no init
@@ -727,6 +783,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 using Type = ::std::remove_cvref_t<TypeRef...[1u]>;
                 static_assert(::std::same_as<Type, ::std::byte*>);
 
+                // operand pop: operand_base ... [validated live bytes] old_top ... frame_end
+                // [safe existing stack prefix                   ] unsafe (before operand_base)
+                // ^^ typeref...[1u] retreats by sizeof(GetType); the emitted stack effect proves those bytes are live.
                 typeref...[1u] -= sizeof(GetType);
 
                 GetType ret;  // no init
@@ -775,6 +834,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 using Type = ::std::remove_cvref_t<TypeRef...[1u]>;
                 static_assert(::std::same_as<Type, ::std::byte*>);
 
+                // operand pop: operand_base ... [validated live bytes] old_top ... frame_end
+                // [safe existing stack prefix                   ] unsafe (before operand_base)
+                // ^^ typeref...[1u] retreats by sizeof(GetType); the emitted stack effect proves those bytes are live.
                 typeref...[1u] -= sizeof(GetType);
 
                 GetType ret;  // no init
@@ -802,6 +864,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // safe
         //                  ^^ typeref...[1u]
 
+        // operand pop: operand_base ... [validated live bytes] old_top ... frame_end
+        // [safe existing stack prefix                   ] unsafe (before operand_base)
+        // ^^ typeref...[1u] retreats by sizeof(GetType); the emitted stack effect proves those bytes are live.
         typeref...[1u] -= sizeof(GetType);
 
         // last_val top_val (end)

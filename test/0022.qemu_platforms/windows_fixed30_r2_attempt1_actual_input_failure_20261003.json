@@ -1,0 +1,269 @@
+{
+  "SDK_or_product_failure_proved": false,
+  "actual_error_log": "Traceback (most recent call last):\n  File \"/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-source-20261003-r2/windows_raii_regular_launcher_r2_closure.py\", line 394, in <module>\n    main()\n    ~~~~^^\n  File \"/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-source-20261003-r2/windows_raii_regular_launcher_r2_closure.py\", line 242, in main\n    pp = args.plan.resolve(strict=True)\n  File \"/usr/lib/python3.14/pathlib/__init__.py\", line 939, in resolve\n    return self.with_segments(os.path.realpath(self, strict=strict))\n                              ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n  File \"<frozen posixpath>\", line 457, in realpath\nFileNotFoundError: [Errno 2] No such file or directory: '/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2'\n",
+  "actual_error_log_pin": {
+    "bytes": 963,
+    "sha256": "3a25e74eab133d6febbb14033a01750606d5c7475f1183be418ed31c960e1161"
+  },
+  "actual_executed_commands": 1,
+  "automatic_retry_performed": false,
+  "commands_sha256": "faf1380a382ec923a5731315cffaa5559e14d44757961acf14d0153fbeba7298",
+  "first_receipt": {
+    "Popen_child_environment": {
+      "capture_after_clear": {
+        "UWVM2_TEST_CAPTURE_NATIVE_JIT_OBJECT": null
+      },
+      "capture_keys_cleared": [
+        "UWVM2_TEST_CAPTURE_NATIVE_JIT_OBJECT"
+      ],
+      "capture_keys_removed": [],
+      "sha256": "c7ab0ff03bc66bfe39178ffbd16a96ce449b78de18431c8e4fe838ba96d85289"
+    },
+    "Popen_requested_cwd": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-paired-section-details-component-20261003-r2",
+    "Popen_root_pidfd_creation": {
+      "authority": "this exact unreaped direct Popen child, acquired before any metadata/admission asserts",
+      "pid": 414393
+    },
+    "Popen_root_pidfd_retirement": {
+      "actual_reaped_returncode": 1,
+      "pid": 414393,
+      "pidfd_readable": true
+    },
+    "actual_stopped_child_cwd": {
+      "birth": 6275219,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-paired-section-details-component-20261003-r2",
+      "pid": 414393
+    },
+    "actual_stopped_child_environment": {
+      "birth": 6275219,
+      "capture_presence": {
+        "UWVM2_TEST_CAPTURE_NATIVE_JIT_OBJECT": false
+      },
+      "pid": 414393,
+      "scope": "actual proc environ at stopped pre-exec anchor; native env argv also explicitly unsets capture variable",
+      "sha256": "0116f228d34a16575ceb0799e905aefa29bedc73f12aeabff7801cc311039bfa"
+    },
+    "aggregate_owned_rss_budget_bytes": 8589934592,
+    "aggregate_owned_rss_peak_bytes": 10059776,
+    "argv": [
+      "python3",
+      "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-source-20261003-r2/windows_raii_regular_launcher_r2_closure.py",
+      "--plan",
+      "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/plan.json",
+      "before"
+    ],
+    "argv_sha256": "36aca059e01898c6aff45e70d7c67ef3673f4bb48b71d3d40c4da4238ea1e6cf",
+    "build_output_file_limit_bytes": 536870912,
+    "cancelled": false,
+    "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope\n",
+    "command_file_sha256": "faf1380a382ec923a5731315cffaa5559e14d44757961acf14d0153fbeba7298",
+    "deadline_seconds": 600,
+    "error": "RuntimeError: Build command failed: 1",
+    "error_traceback": "Traceback (most recent call last):\n  File \"/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-source-20261003-r2/supervisor.proposal.py\", line 381, in main\n    if reaped[root_pid]:raise RuntimeError('Build command failed: '+str(reaped[root_pid]))\n                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: Build command failed: 1\n",
+    "init": {
+      "affinity": [
+        0,
+        2,
+        4,
+        6,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31
+      ],
+      "argv": [
+        "sleep",
+        "infinity"
+      ],
+      "birth": 21355,
+      "cg": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope\n",
+      "exe": "/usr/bin/sleep",
+      "pid": 10154,
+      "ppid": 10125,
+      "rss_bytes": 1527808,
+      "state": "S",
+      "uid": [
+        1000,
+        1000,
+        1000,
+        1000
+      ]
+    },
+    "init_exe_sha256": "83c0db85657e2cd1799b5e113317252d7865dd78157148d8757fab0ede52b1db",
+    "label": "input-before",
+    "log_limit_bytes": 33554432,
+    "log_sha256": "3a25e74eab133d6febbb14033a01750606d5c7475f1183be418ed31c960e1161",
+    "memory_current_after_observation": 11372892160,
+    "memory_events_after": {
+      "high": 0,
+      "low": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_group_kill": 0,
+      "oom_kill": 0
+    },
+    "memory_events_before": {
+      "high": 0,
+      "low": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_group_kill": 0,
+      "oom_kill": 0
+    },
+    "memory_max_bytes": 68719476736,
+    "passed": false,
+    "process_history": [
+      {
+        "affinity": [
+          16
+        ],
+        "argv": [
+          "/usr/bin/python3",
+          "-c",
+          "import os,signal,sys;os.sched_setaffinity(0,set(range(16,32)));os.kill(os.getpid(),signal.SIGSTOP);os.execvpe(sys.argv[1],sys.argv[1:],os.environ)",
+          "python3",
+          "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-source-20261003-r2/windows_raii_regular_launcher_r2_closure.py",
+          "--plan",
+          "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/plan.json",
+          "before"
+        ],
+        "birth": 6275219,
+        "cg": "0::/user.slice/user-1000.slice/session-1661.scope\n",
+        "exe": "/usr/bin/python3.14",
+        "parent_authority": {
+          "birth": 6275212,
+          "pid": 414385,
+          "reason": "actual direct child / adopted child of birth-bound subreaper"
+        },
+        "pid": 414393,
+        "ppid": 414385,
+        "rss_bytes": 4489216,
+        "state": "R",
+        "uid": [
+          1000,
+          1000,
+          1000,
+          1000
+        ]
+      },
+      {
+        "affinity": [
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ],
+        "argv": [
+          "/usr/bin/python3",
+          "-c",
+          "import os,signal,sys;os.sched_setaffinity(0,set(range(16,32)));os.kill(os.getpid(),signal.SIGSTOP);os.execvpe(sys.argv[1],sys.argv[1:],os.environ)",
+          "python3",
+          "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-source-20261003-r2/windows_raii_regular_launcher_r2_closure.py",
+          "--plan",
+          "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/plan.json",
+          "before"
+        ],
+        "argv_sha256": "5d9924519872c50696286cd1be801ebe358137c25b11082afc05f857345a25f9",
+        "birth": 6275219,
+        "cg": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope\n",
+        "exe": "/usr/bin/python3.14",
+        "pid": 414393,
+        "ppid": 414385,
+        "rss_bytes": 10059776,
+        "state": "R",
+        "uid": [
+          1000,
+          1000,
+          1000,
+          1000
+        ]
+      }
+    ],
+    "remaining_roster": [
+      10154
+    ],
+    "retirement": [
+      {
+        "birth": 6275219,
+        "pid": 414393,
+        "pidfd_readable": true,
+        "reaped_returncode": 1
+      }
+    ],
+    "returncode": 1,
+    "source_root": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-source-20261003-r1/source",
+    "supervisor_sha256": "16ade4cecc5b757f0b791d9129b1cc1d335871b77955df6ffe147967415c76df",
+    "swap_max_bytes": 0,
+    "wall_seconds": 0.36847280700021656
+  },
+  "followup_native_executed": false,
+  "followup_review_manifest_sha256": "ffca4c8b9b7552ce63ef266717a09e3012718074b7ca4758ef40394b4b793f57",
+  "guardian_sha256": "16ade4cecc5b757f0b791d9129b1cc1d335871b77955df6ffe147967415c76df",
+  "guest_executed": false,
+  "native_compilation_commands_executed": 0,
+  "original_failure_and_source_preserved": true,
+  "original_raw_packet": {
+    "12_original_raw_size_SHA_verified": true,
+    "archive": {
+      "bytes": 27893,
+      "sha256": "73f86e8be329cc055568d0dbbc3f566ecf06393acc06b8b4d47674d002f06fc4"
+    },
+    "manifest": {
+      "bytes": 3959,
+      "sha256": "8ce8947b25efdb807526deb55dfbb6987b39f7e14ae7c3dd7ed87f15c130f0d0"
+    },
+    "path": "/tmp/uwvm-windows-fixed30-r2-attempt1-failure-small-evidence-20261003-r1"
+  },
+  "original_retirement": {
+    "OOM_events_unchanged": true,
+    "bridge_pin": {
+      "bytes": 529,
+      "sha256": "8f99600ea4659a30210ba00f50a416a84d7c1bb21a6205a74591292d7c64b4fa"
+    },
+    "fresh_CG_after": [
+      10154
+    ],
+    "receipts_pin": {
+      "bytes": 7336,
+      "sha256": "9f1b31ebc8632cc972694887602b48c13fdaa84b83d9637deecc791fb096f534"
+    },
+    "state": "retired",
+    "ticket_id": "1ac186b30d4d4ccebf270d9a86193003",
+    "ticket_pin": {
+      "bytes": 3778,
+      "sha256": "49dc478ac63fb1e7b3c8022a6d6bdc513fb1cbf46e9eafbd99adb3a88d9cf567"
+    }
+  },
+  "passed": false,
+  "planned_commands": 30,
+  "root_cause": "Execution plan namespace was not materialized: fixed --plan windows-raii-launcher-cold-20261003-r2/plan.json did not exist. The frozen source plan existed separately under windows-raii-launcher-cold-source-20261003-r2.",
+  "schema": "windows-fixed30-r2-attempt1-actual-input-setup-failure-v1",
+  "scope": "Original approved finite30 standalone SDK crosscompile plan rejected at first metadata input command; no compiler, linker, COFF tool or guest executed",
+  "source_only_followup_packet": "/tmp/uwvm-windows-fixed30-execution-plan-setup-source-proposal-20261003-r2",
+  "source_only_followup_scope": "Exact staged plan/commands and four empty variant directories; plan evidence and four log paths use a fresh attempt2. Original 30 argv, helper, guardian, 16 source pins, 1516-leaf source archive and resource/PIDFD body stay unchanged.",
+  "source_recipe_manifest_sha256": "632779de33194b155eaad0fbbee6ec92030c762f020de9d4f48350a06839e50a"
+}

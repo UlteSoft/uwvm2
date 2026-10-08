@@ -1,0 +1,13 @@
+--- a/llvm/lib/ExecutionEngine/RuntimeDyld/Targets/RuntimeDyldCOFFX86_64.h
++++ b/llvm/lib/ExecutionEngine/RuntimeDyld/Targets/RuntimeDyldCOFFX86_64.h
+@@ -308,7 +308,9 @@
+       // Note unwind info is stored in .pdata but often points to .xdata
+       // with an IMAGE_REL_AMD64_ADDR32NB relocation. Using a memory manager
+       // that keeps sections ordered in relation to __ImageBase is necessary.
+-      if ((*NameOrErr) == ".pdata")
++      // COMDAT nonleaf helpers use .pdata$<symbol>; each carries a
++      // RUNTIME_FUNCTION that must be registered before JIT execution.
++      if ((*NameOrErr) == ".pdata" || NameOrErr->starts_with(".pdata$"))
+         UnregisteredEHFrameSections.push_back(SectionPair.second);
+     }
+     return Error::success();

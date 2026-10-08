@@ -182,6 +182,22 @@ public:
 		return this->id_ != nullptr;
 	}
 
+	// The real thread HANDLE stays owned throughout a zero-timeout kernel wait.
+	// A successful wait is actual OS termination, after TLS/DLL thread cleanup;
+	// only a successful close then retires this wrapper's owned handle and ID.
+	[[nodiscard]] inline ::fast_io::thread_join_result try_join() noexcept
+	{
+		if (!this->joinable()) { return {::fast_io::thread_join_status::not_joinable, 0u}; }
+		::std::uint_least64_t timeout{}; // exact zero: never wait for an active thread
+		auto const waited{::fast_io::win32::nt::nt_wait_for_single_object<zw>(this->handle_, false, __builtin_addressof(timeout))};
+		if (waited == 0x00000102u) { return {::fast_io::thread_join_status::pending, waited}; } // STATUS_TIMEOUT
+		if (waited != 0u) { return {::fast_io::thread_join_status::failed, waited}; }
+		auto const closed{::fast_io::win32::nt::nt_close<zw>(this->handle_)};
+		if (closed != 0u) { return {::fast_io::thread_join_status::failed, closed}; }
+		this->handle_ = nullptr; this->id_ = nullptr;
+		return {::fast_io::thread_join_status::joined, 0u};
+	}
+
 	inline constexpr void join()
 	{
 		if (!this->joinable()) [[unlikely]]

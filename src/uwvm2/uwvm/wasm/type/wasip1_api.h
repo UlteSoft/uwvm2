@@ -48,8 +48,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         - preload modules may export `uwvm_set_wasip1_host_api_v1()` to receive the table automatically;
         - weak-symbol plugins may also call `uwvm_get_wasip1_host_api_v1()` directly and must handle `nullptr`.
 
-        The functions below operate on UWVM's default WASI Preview 1 environment (`default_wasip1_env`),
-        so their pointer / length arguments use WASI linear-memory offsets exactly like imported WebAssembly calls.
+        The functions operate on the currently selected WASI Preview 1 environment.
+        Pointer / length arguments are linear-memory offsets in the immediate Wasm caller's memory[0].
+        Runtime-managed environments require an active caller binding; they never fall back to a stale raw memory pointer.
+
+        Each invocation checks the current preload target's exposure policy. Retaining a table pointer does not retain
+        another registration's permission. A shared native cache can remain populated for an enabled alias while calls
+        from a disabled alias are rejected with ENOTCAPABLE (proc_exit simply returns).
     */
 
     extern "C"

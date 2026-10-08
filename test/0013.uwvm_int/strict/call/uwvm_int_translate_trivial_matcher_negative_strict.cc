@@ -78,6 +78,19 @@ namespace
             UWVM2TEST_REQUIRE(expect_none(bad_tail) == 0);
         }
 
+        // A fifth LEB byte must fit the signed/unsigned 32-bit width.
+        // The old matcher silently discarded overflowing high payload bits.
+        for(unsigned last{}; last != 256u; ++last)
+        {
+            ::std::vector<wasm_byte> signed_body{op(wasm_op::i32_const), 0x80u, 0x80u, 0x80u, 0x80u,
+                                                static_cast<wasm_byte>(last), op(wasm_op::end)};
+            bool const valid_signed{last <= 7u || (last >= 0x78u && last <= 0x7fu)};
+            UWVM2TEST_REQUIRE(expect(signed_body, valid_signed ? kind_t::const_i32 : kind_t::none) == 0);
+            ::std::vector<wasm_byte> unsigned_body{op(wasm_op::local_get), 0x80u, 0x80u, 0x80u, 0x80u,
+                                                  static_cast<wasm_byte>(last), op(wasm_op::end)};
+            UWVM2TEST_REQUIRE(expect(unsigned_body, last == 0u ? kind_t::param0_i32 : kind_t::none) == 0);
+        }
+
         // param0_i32: local.get 0 ; end
         {
             ::std::vector<wasm_byte> ok{op(wasm_op::local_get), 0x00u, op(wasm_op::end)};

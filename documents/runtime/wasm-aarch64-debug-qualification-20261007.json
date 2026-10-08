@@ -1,0 +1,240 @@
+{
+  "schema": "uwvm-paired-aarch64-wasm-debug-qualification-v1",
+  "date": "2026-10-07",
+  "passed": true,
+  "source_cut": "source212",
+  "source_identities": {
+    "uwvm2": "sha256:c9052516f4bead683100a034f39d8c4b843ffda562c530e2702f366080bf6fa6",
+    "uwvm2-ros": "sha256:6a98e1dd7c2b4031cdd94f3c7a6b62146b83d70767794073e6dc2016442c2c58"
+  },
+  "latest_tree_qualified": false,
+  "SDK": {
+    "version": "23.1.1-uwvm-ros.11",
+    "target": "aarch64-linux-gnu",
+    "archives": 65,
+    "verified_AArch64_ELF_members": 1663
+  },
+  "actual_compiler_dependency_count": 4527,
+  "preexecution_input_hash_count": 39600,
+  "counts": {
+    "actual_VM_sessions": 360,
+    "cohort_sessions": 96,
+    "physical_workers": 192,
+    "cohort_pause_episodes": 192,
+    "cohort_pause_observations": 384,
+    "CLI_debug_wait_sessions": 64,
+    "ordinary_dbg_off_sessions": 16,
+    "typed_value_sessions": 160,
+    "exact_value_pauses": 4336,
+    "deep_stack_sessions": 24,
+    "maximum_actual_frames": 10000
+  },
+  "scope": {
+    "real_AArch64_host_LLVM_and_VM": true,
+    "actual_Wasm_operand_values": true,
+    "real_wait_helper_ASM_refusals": true,
+    "full_native_ASM_parity": false,
+    "all_Core3_features": false,
+    "whole_instance_restore": false,
+    "performance_qualification": false
+  },
+  "resource": {
+    "memory_max_bytes": 68719476736,
+    "swap_max_bytes": 0,
+    "sampled_owned_RSS_peak_bytes": 8052838400,
+    "observed_owned_folder_high_water_bytes": 14343884800,
+    "minimum_global_free_bytes": 68674772992,
+    "all_max_OOM_events_zero": true
+  },
+  "cases": [
+    "mixed-numeric-bits",
+    "gc-reference-kinds",
+    "if-mixed-prefix-1",
+    "if-mixed-prefix-0",
+    "loop-backedge-prefix",
+    "call-multivalue-frames",
+    "tail-call-frames",
+    "exception-payload-prefix",
+    "exception-reference-rethrow",
+    "nondefaultable-local-initialization",
+    "multi-memory-copy-values",
+    "memory64-load-store-values",
+    "memory64-atomic-wait-values",
+    "table64-reference-values",
+    "gc-cast-field-values",
+    "deep-300-pagination",
+    "deep-72-identity-preview",
+    "atomic-all-widths-i32-address",
+    "atomic-all-widths-i64-address",
+    "relaxed-simd-all-values"
+  ],
+  "stack_policies": [
+    "instruction",
+    "unwind"
+  ],
+  "value_JIT_policies": [
+    "default",
+    "max"
+  ],
+  "deep_frame_counts": [
+    63,
+    64,
+    65,
+    128,
+    1024,
+    10000
+  ],
+  "test_entry_fix": {
+    "path": "test/0018.debugger/run_wasm_blocked_wait_eh_cli.py",
+    "default_scenario": "quit",
+    "accepted_scenarios": [
+      "quit"
+    ],
+    "paired_sha256": "6a2d67c460be4fe108429233c6fcb50fa15de6cef22e558812e7640500a8f40e",
+    "old_default_failures": 2,
+    "old_default_started_VM": false,
+    "new_default_actual_VM_sessions": 16
+  },
+  "generated_Config_def_files": {
+    "observed_precompilation_hash": false,
+    "method": "Exact source-derived bytes from pre-pinned LLVM templates and AArch64 CMake configuration; 5 omitted generated-file hashes were discovered by failed audit307.",
+    "files": {
+      "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/aarch289/sdk/include/llvm/Config/Targets.def": {
+        "sha256": "86d51cb8274cb9c727fedc0441e21d41b18be9c8bd4d1b753b6e82dfb184cbfd",
+        "template": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/asm-dbg-r35/source/llvm-source/llvm/include/llvm/Config/Targets.def.in",
+        "template_sha256": "142c709d7c63fe165bc9aa77546673e909b338ef55e97db23df52d4db246386a",
+        "variable": "LLVM_ENUM_TARGETS",
+        "value": "LLVM_TARGET(AArch64)\n",
+        "method": "exact regeneration from pre-pinned LLVM source template and AArch64 CMake contract; not a pre-compilation observed generated-file hash"
+      },
+      "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/aarch289/sdk/include/llvm/Config/AsmPrinters.def": {
+        "sha256": "0c8724c4e6f98dc654649b90f80a7897db81542e71fa78016b53d8530a320922",
+        "template": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/asm-dbg-r35/source/llvm-source/llvm/include/llvm/Config/AsmPrinters.def.in",
+        "template_sha256": "461b7e9f55926270b9d4eb49e55b44aac85c580a2d0558ad686ca2cb1c0ed716",
+        "variable": "LLVM_ENUM_ASM_PRINTERS",
+        "value": "LLVM_ASM_PRINTER(AArch64)\n",
+        "method": "exact regeneration from pre-pinned LLVM source template and AArch64 CMake contract; not a pre-compilation observed generated-file hash"
+      },
+      "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/aarch289/sdk/include/llvm/Config/AsmParsers.def": {
+        "sha256": "a2905b55799189b1cc5f0c81e91eb08833342dccf3d716c5084d46bf22e44518",
+        "template": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/asm-dbg-r35/source/llvm-source/llvm/include/llvm/Config/AsmParsers.def.in",
+        "template_sha256": "e3bf3f1a6bbcfe583b2e0164a78c7b039cbf7929f73aaa459284d0f61f247d92",
+        "variable": "LLVM_ENUM_ASM_PARSERS",
+        "value": "LLVM_ASM_PARSER(AArch64)\n",
+        "method": "exact regeneration from pre-pinned LLVM source template and AArch64 CMake contract; not a pre-compilation observed generated-file hash"
+      },
+      "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/aarch289/sdk/include/llvm/Config/Disassemblers.def": {
+        "sha256": "9edc2154e0298bb2cebfdbbfcc5883848d908113931d276ac8c8b392571bf237",
+        "template": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/asm-dbg-r35/source/llvm-source/llvm/include/llvm/Config/Disassemblers.def.in",
+        "template_sha256": "dc17242895ea57ee3357e743ba9e2ec6395efee594805b3787e4509044656657",
+        "variable": "LLVM_ENUM_DISASSEMBLERS",
+        "value": "LLVM_DISASSEMBLER(AArch64)\n",
+        "method": "exact regeneration from pre-pinned LLVM source template and AArch64 CMake contract; not a pre-compilation observed generated-file hash"
+      },
+      "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/aarch289/sdk/include/llvm/Config/TargetMCAs.def": {
+        "sha256": "cc83d1724c96fe1b7a360d3f2974d11d42d27df78359f087a6dfee2307c32e62",
+        "template": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/asm-dbg-r35/source/llvm-source/llvm/include/llvm/Config/TargetMCAs.def.in",
+        "template_sha256": "b042381939cbeb937baa722a1323d827a1f4a4e430154d0cbcc6bbce7e0b4309",
+        "variable": "LLVM_ENUM_TARGETMCAS",
+        "value": "",
+        "method": "exact regeneration from pre-pinned LLVM source template and AArch64 CMake contract; not a pre-compilation observed generated-file hash"
+      }
+    }
+  },
+  "preserved_failed_audit": {
+    "stage": "audit307",
+    "actual_exit_code": 1,
+    "receipt_sha256": "252f95ed3c33fb2e958d1dd3ad40debb120e25f0d4dc699b9e05f4c361360b17"
+  },
+  "evidence": {
+    "linux_root": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1",
+    "local_root": "/Users/liyinan/Documents/MacroModel/wasm-core3-debug-audit-20261007-r1",
+    "qualification_file": "QUALIFIED308.json",
+    "qualification_sha256": "02d5199dd68adac2dec4e9a9d25711d8e6827e93e788ab79aca0bbddea15df58",
+    "archive_file": "delivery318.tar.gz",
+    "archive_sha256": "e68ca4bd2e27ab8ddb98f9750cbb3d026955b224e021b12a053469cc3060edf4",
+    "archive_bytes": 18677544,
+    "archive_members": 7519,
+    "manifest_sha256": "9397596d84636df9ea7de19f9e8d5801cc05e5e8399b15ec8d5949670612433c",
+    "delivery_closure_sha256": "437ea8d66cbcd4aa35f235bcc4359582af4cb6db51952f813af003937773094a",
+    "Mac_metadata_transport_verification_sha256": "6e917d91269995b3a0ddbf769d3883d7fde1a72b7dfd010bbdf9d21e92435d24"
+  },
+  "delivery_resource": {
+    "folder_high_water_bytes": 14355587072,
+    "final_free_bytes": 67946020864,
+    "memory_events_after": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  "exclusions": [
+    "Other ISA full-VM equivalence",
+    "Full physical native ASM stepping/finish parity on AArch64",
+    "Exhaustive Core 3 opcode/state combinations",
+    "Whole-instance checkpoint restoration and external-IO rollback",
+    "Debug-off performance benchmark",
+    "Concurrent production changes after source212"
+  ],
+  "combined_actual_VM_sessions": 366,
+  "post_reboot_deep_native_continuation": {
+    "passed": true,
+    "actual_VM_sessions": 6,
+    "native_instruction_stop_sessions": 2,
+    "actual_frames": 4097,
+    "policies": [
+      "instruction",
+      "unwind",
+      "instruction-native"
+    ],
+    "latest_tree_qualified": false,
+    "reboot": {
+      "boot": "c8d3550f-3a19-40d7-8507-a76c2045ace5",
+      "keeper_pid": 11166,
+      "keeper_birth": 22661,
+      "reused_existing_64GiB_swap_zero_cgroup": true,
+      "old_guard_refused_before_child_start": true
+    },
+    "observations": [
+      {
+        "repository": "uwvm2",
+        "actual_VM_sessions": 3,
+        "actual_frames": 4097,
+        "native_instruction_stop": true,
+        "stale_Wasm_operands_refused": true,
+        "last_Wasm_safepoint_notice": true,
+        "guest_exit_zero": true
+      },
+      {
+        "repository": "uwvm2-ros",
+        "actual_VM_sessions": 3,
+        "actual_frames": 4097,
+        "native_instruction_stop": true,
+        "stale_Wasm_operands_refused": true,
+        "last_Wasm_safepoint_notice": true,
+        "guest_exit_zero": true
+      }
+    ],
+    "resource": {
+      "owned_RSS_peak_bytes": 273342464,
+      "folder_high_water_bytes": 14371069952,
+      "minimum_global_free_bytes": 68643188736,
+      "all_max_OOM_events_zero": true
+    },
+    "delivery_resource": {
+      "folder_high_water_bytes": 14371196928,
+      "final_free_bytes": 70073245696
+    },
+    "qualification_sha256": "be36c44fe2f7fc1c41792e7b043258568cd9dba24efb9599f57452c5647bf8dd",
+    "parent_qualification_sha256": "02d5199dd68adac2dec4e9a9d25711d8e6827e93e788ab79aca0bbddea15df58",
+    "archive_file": "delivery329.tar.gz",
+    "archive_sha256": "6cd001072d1cbf060f881add213ca80de3eb3c4d087c32c59d8ad0734cffe41d",
+    "archive_bytes": 1299752,
+    "archive_members": 64,
+    "delivery_closure_sha256": "1dba1e83ebb47ca83ef35815e060368140c0a3fbc7d2879591b44119192df42c",
+    "Mac_metadata_transport_verification_sha256": "ffd2c9fb0e1e3468eff68286dd6cbaf0fe294ff86852467de8c08297194ca057"
+  }
+}

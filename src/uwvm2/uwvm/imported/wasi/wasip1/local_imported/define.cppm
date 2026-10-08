@@ -45,6 +45,7 @@ import uwvm2.parser.wasm.standard.wasm1.type;
 import uwvm2.imported.wasi.wasip1;
 import uwvm2.uwvm.imported.wasi.wasip1.storage;
 import uwvm2.uwvm.wasm.type;
+import uwvm2.uwvm.debugger.wasip1_calls;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

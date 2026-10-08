@@ -131,6 +131,9 @@ using ::fast_io::native_mutex;
 
 #if ((defined(_WIN32) && !defined(__WINE__)) && !defined(__CYGWIN__)) || (defined(__wasi__) && defined(__wasi_thread__)) || (!defined(__SINGLE_THREAD__) && !defined(__NEWLIB__) && !defined(__MSDOS__) && !defined(__DJGPP__) && __has_include(<pthread.h>))
 using ::fast_io::native_thread;
+// Public cold native-owner join result names used by module importers.
+using ::fast_io::thread_join_status;
+using ::fast_io::thread_join_result;
 #endif
 
 using ::fast_io::native_socklen_t;

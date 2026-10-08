@@ -1,0 +1,17 @@
+{
+  "schema": "uwvm-packed-numeric-array-WAT-SOURCE-oracles-v1",
+  "cases": [
+    {"file": "01_bits_and_packed.wat", "run_result": 1, "start_exit": 0, "UWVM_flags": ["-WFE-gc", "-WFE-simd"]},
+    {"file": "02_data_fill_copy.wat", "run_result": 1, "start_exit": 0, "UWVM_flags": ["-WFE-gc", "-WFE-simd", "-WFE-bulk-memory"]},
+    {"file": "03_reference_legacy.wat", "run_result": 1, "start_exit": 0, "UWVM_flags": ["-WFE-gc", "-WFE-function-references"]}
+  ],
+  "actual_Wasm_hashes": null,
+  "actual_official_validation": null,
+  "actual_Wasmtime_same_bytes": null,
+  "actual_UWVM_both_policy": null,
+  "actual_GC_collections": null,
+  "native_OFF_ON_San_OOM": null,
+  "BE_execution": null,
+  "full_GC_release": false,
+  "P_performance": null
+}

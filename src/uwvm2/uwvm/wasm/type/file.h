@@ -35,6 +35,7 @@
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
+# include <uwvm2/utils/control/owned_file_image.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
 # include <uwvm2/parser/wasm_custom/customs/impl.h>
@@ -82,6 +83,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 binfmt_ver{};
         // Memory-mapped or memory-copy (for platforms that don't support memory mapping) open wasm files
         ::fast_io::native_file_loader wasm_file{};
+    private:
+        // Exclusive stable source bytes, adopted only before parsing. No mutable
+        // view escapes; retaining this actual file retains every parsed borrow.
+        ::uwvm2::utils::control::owned_file_image::owner source_image_{};
+    public:
+        [[nodiscard]] bool adopt_unparsed_source_image(::uwvm2::utils::control::owned_file_image::owner image) noexcept
+        {
+            if(!image || source_image_ || binfmt_ver != 0u || !wasm_file.empty()) { return false; }
+            source_image_ = ::std::move(image); return true;
+        }
+        [[nodiscard]] bool has_owned_source_image() const noexcept { return source_image_ != nullptr; }
+        [[nodiscard]] char const* source_cbegin() const noexcept
+        { return source_image_ ? source_image_->cbegin() : wasm_file.cbegin(); }
+        [[nodiscard]] char const* source_cend() const noexcept
+        { return source_image_ ? source_image_->cend() : wasm_file.cend(); }
+        [[nodiscard]] ::std::size_t source_size() const noexcept
+        { return source_image_ ? source_image_->size() : wasm_file.size(); }
         // Module parsing results
         wasm_file_module_storage_u wasm_module_storage{};
         // wasm_parameter_t
@@ -114,7 +132,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
         inline constexpr wasm_file_t(wasm_file_t&& other) noexcept :
             file_name{::std::move(other.file_name)}, module_name{::std::move(other.module_name)}, binfmt_ver{::std::move(other.binfmt_ver)},
-            wasm_file{::std::move(other.wasm_file)}, wasm_parameter{::std::move(other.wasm_parameter)}, wasm_custom_name{::std::move(other.wasm_custom_name)}
+            wasm_file{::std::move(other.wasm_file)}, source_image_{::std::move(other.source_image_)}, wasm_parameter{::std::move(other.wasm_parameter)}, wasm_custom_name{::std::move(other.wasm_custom_name)}
         {
             switch(this->binfmt_ver)
             {
@@ -158,6 +176,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             this->module_name = ::std::move(other.module_name);
             this->binfmt_ver = ::std::move(other.binfmt_ver);
             this->wasm_file = ::std::move(other.wasm_file);
+            this->source_image_ = ::std::move(other.source_image_);
             this->wasm_parameter = ::std::move(other.wasm_parameter);
             this->wasm_custom_name = ::std::move(other.wasm_custom_name);
 

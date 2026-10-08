@@ -1,0 +1,22 @@
+{
+  "schema": "uwvm.memory-page-semantics.source-oracle.v1",
+  "wast_sha256": "25d2e3f25373c6c3ef9855675a5fa98f0fd6e4f304202fa0da2644e2a4ddca22",
+  "valid_modules": 3,
+  "assertions_per_module": [
+    3,
+    3,
+    4
+  ],
+  "invalid_modules": 8,
+  "unused_valid_polymorphic_bodies": 3,
+  "component_expected_checks": 22,
+  "numeric_address_widths": [
+    32,
+    64
+  ],
+  "maximum_pages_per_memory": 1,
+  "native_assembled": false,
+  "native_executed": false,
+  "all_Core3_modes_complete": false,
+  "zero_growth_contract": "Original address-width result is old size or all-ones, and memory.size stays one; portable nondeterministic-failure acceptance."
+}

@@ -8,6 +8,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#ifndef UWVM_MODULE
+# include <fast_io.h>
+# include <uwvm2/utils/macro/push_macros.h>
+#endif
 
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
@@ -46,27 +50,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
             return true;
         }
 
-        ::std::uint_least32_t decoded{};
-        for(unsigned byte_index{}; byte_index != 5u; ++byte_index)
+        if(cursor == code_end) [[unlikely]] { return false; }
+        // Bound the scanner to the five-byte WebAssembly u32 encoding limit.
+        auto const remaining{static_cast<::std::size_t>(code_end - cursor)};
+        auto const available{remaining < 5u ? remaining : 5u};
+        auto const scan{[&](unsigned char const* first) constexpr noexcept
         {
-            if(cursor == code_end) [[unlikely]] { return false; }
-
-            auto const octet{::std::to_integer<::std::uint_least8_t>(*cursor)};
-            ++cursor;
-            auto const payload{static_cast<::std::uint_least8_t>(octet & 0x7fu)};
-
-            // A u32 ULEB has at most five bytes; only four payload bits fit in its fifth byte.
-            if(byte_index == 4u && (payload & 0x70u) != 0u) [[unlikely]] { return false; }
-            decoded |= static_cast<::std::uint_least32_t>(payload) << (byte_index * 7u);
-
-            if((octet & 0x80u) == 0u)
-            {
-                table_index = decoded;
-                code_curr = cursor;
-                return true;
-            }
+            ::std::uint_least32_t decoded{};
+            auto const [next, code]{::fast_io::parse_by_scan(first, first + available, ::fast_io::mnp::leb128_get(decoded))};
+            if(code != ::fast_io::parse_code::ok || decoded > 0xffff'ffffu) [[unlikely]] { return false; }
+            table_index = decoded;
+            code_curr += next - first;
+            return true;
+        }};
+        if UWVM_IF_CONSTEVAL
+        {
+            unsigned char buffer[5]{};
+            for(::std::size_t i{}; i != available; ++i)
+            { buffer[i] = ::std::to_integer<unsigned char>(cursor[i]); }
+            return scan(buffer);
         }
-
-        return false;
+        else { return scan(reinterpret_cast<unsigned char const*>(cursor)); }
     }
 }
+
+#ifndef UWVM_MODULE
+# include <uwvm2/utils/macro/pop_macros.h>
+#endif

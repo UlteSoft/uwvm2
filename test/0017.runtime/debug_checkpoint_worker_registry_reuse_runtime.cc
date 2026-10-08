@@ -1,0 +1,288 @@
+// Actual setup then two read-only LLVM-full guests. New instance census under
+// one real pause/cohort/hostclose/N/publication, not a copied debugger VIEW.
+// The const graph is logical DATA; whole-instance restoration is not claimed.
+#include <uwvm2/uwvm/run/owned_source.h>
+#include <uwvm2/utils/control/owned_file_image.h>
+#include <uwvm2/runtime/checkpoint/materialization.h>
+#include <uwvm2/runtime/gc/entry_admission.h>
+#include <uwvm2/uwvm/debugger/checkpoint_state.h>
+#include <fast_io.h>
+#include <fast_io_unit/string.h>
+#include <atomic>
+#include <array>
+#include <barrier>
+#include <cstddef>
+#include <cstdint>
+#include <chrono>
+#include <condition_variable>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
+// Derive actual target/backend capabilities in this fixture's own balanced scope.
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/runtime/macro/push_macros.h>
+#if !defined(UWVM_RUNTIME_LLVM_JIT) || !defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) || !defined(UWVM_CPP_EXCEPTIONS)
+# error Actual checkpoint census fixture requires LLVM full/native threads/C++ EH
+#endif
+namespace cp = ::uwvm2::uwvm::debugger::checkpoint;
+namespace lib = ::uwvm2::runtime::lib;
+namespace mode = ::uwvm2::uwvm::runtime::runtime_mode;
+namespace threads = ::uwvm2::utils::thread;
+namespace checkpoint = ::uwvm2::runtime::checkpoint;
+namespace image = ::uwvm2::utils::control;
+namespace full = ::uwvm2::uwvm::runtime::full;
+using domain = threads::cooperative_pause_domain;
+static void require(bool valid, unsigned line)
+{
+    if(valid) { return; }
+    ::fast_io::print(::fast_io::err(), "debug_checkpoint_worker_registry_reuse_runtime FAIL line=", ::fast_io::mnp::dec(line), "\n");
+    ::fast_io::fast_terminate();
+}
+#define REQUIRE(x) require(bool(x), __LINE__)
+static auto deadline() { return ::std::chrono::steady_clock::now() + ::std::chrono::seconds{20}; }
+struct source_setup
+{
+    ::std::u8string path{};
+    image::owned_file_image::owner immutable{};
+    full::full_source_instance::mutable_owner source{};
+    bool ready{};
+    static bool prepare(void* pointer) noexcept
+    {
+        // [actual main-owned synchronous drained setup context] owner_end
+        // [safe] retained until replace_full_source_after_drain callback returns.
+        auto& state{*static_cast<source_setup*>(pointer)};
+        try
+        {
+            auto candidate{full::full_source_instance::create_unparsed(state.path, u8"checkpoint-instance")};
+            if(!full::select_unparsed_full_source_after_drain(candidate)) { return false; }
+            // SAME exclusive source image is adopted BEFORE magic/section parse,
+            // not copied from a mutable file mapping after compiler validation.
+            auto const loaded{::uwvm2::uwvm::wasm::loader::load_wasm_file(candidate->file_for_native_initialization(),
+                candidate->owned_file_name(), candidate->owned_rename(), ::uwvm2::uwvm::wasm::storage::wasm_parameter,
+                ::std::move(state.immutable))};
+            if(loaded != ::uwvm2::uwvm::wasm::loader::load_wasm_file_rtl::ok ||
+               ::uwvm2::uwvm::wasm::loader::construct_all_module_and_check_duplicate_module() !=
+                   ::uwvm2::uwvm::wasm::loader::load_and_check_modules_rtl::ok ||
+               ::uwvm2::uwvm::wasm::loader::check_import_exist_and_detect_cycles() !=
+                   ::uwvm2::uwvm::wasm::loader::load_and_check_modules_rtl::ok) { return false; }
+            // These modules have no start functions. Complete ordinary segment
+            // instantiation, including passive expression payloads, BEFORE any
+            // setup guest entry or source seal; true would leave it deferred.
+            ::uwvm2::uwvm::runtime::initializer::initialize_runtime(false);
+            if(!candidate->seal_actual_initializer()) { return false; }
+            state.source = ::std::move(candidate); state.ready = true; return true;
+        }
+        catch(...) { return false; }
+    }
+};
+
+struct held_cohort
+{
+    ::std::mutex mutex{};
+    ::std::condition_variable changed{};
+    ::std::size_t bodies{};
+    bool release_body{}, release_tls{};
+    ::std::atomic<::std::size_t> first_tls{SIZE_MAX}, tls_finished{};
+};
+struct tls_finish
+{
+    ::std::shared_ptr<held_cohort> cohort{};
+    ::std::size_t index{};
+    ~tls_finish()
+    {
+        if(!cohort) { return; }
+        ::std::size_t empty{SIZE_MAX};
+        cohort->first_tls.compare_exchange_strong(empty,index,::std::memory_order_release);
+        ::std::unique_lock lock{cohort->mutex};
+        cohort->changed.notify_all();
+        cohort->changed.wait(lock,[&] { return cohort->release_tls; });
+        cohort->tls_finished.fetch_add(1u,::std::memory_order_release);
+    }
+};
+struct held_launch
+{
+    ::std::shared_ptr<held_cohort> cohort{};
+    ::std::size_t index{};
+    static void body(void* pointer) noexcept
+    {
+        auto& self{*static_cast<held_launch*>(pointer)};
+        static thread_local tls_finish actual_tls{};
+        actual_tls.cohort=self.cohort;actual_tls.index=self.index;
+        ::std::unique_lock lock{self.cohort->mutex};
+        ++self.cohort->bodies;self.cohort->changed.notify_all();
+        self.cohort->changed.wait(lock,[&] { return self.cohort->release_body; });
+    }
+};
+struct run_once
+{
+    ::std::uint32_t result{0xa5a5a5a5u};
+    static void body(void* pointer) noexcept
+    {
+        auto& self{*static_cast<run_once*>(pointer)};
+        lib::full_compile_run_config run{};run.entry_function_index=1u;
+        run.entry_abi_buffers.result_buffer=reinterpret_cast<::std::byte*>(::std::addressof(self.result));
+        run.entry_abi_buffers.result_bytes=sizeof(self.result);
+        lib::full_compile_and_run_main_module(u8"checkpoint-instance",run);
+    }
+};
+static void point(void*,::std::uint_least64_t,threads::cooperative_pause_location) noexcept {}
+static void before_park(void*,::std::uint_least64_t,threads::cooperative_pause_location,lib::llvm_jit_debug_local_view) noexcept {}
+int main(int argc, char** argv)
+{
+    if(argc != 3) { return 64; }
+    auto const policy{::fast_io::concat_std(::fast_io::mnp::os_c_str(argv[2]))};
+    REQUIRE(policy == "instruction" || policy == "unwind");
+    mode::global_runtime_mode = mode::runtime_mode_t::full_compile;
+    mode::global_runtime_compiler = mode::runtime_compiler_t::llvm_jit_only;
+    mode::global_runtime_llvm_jit_call_stack = policy == "instruction" ?
+        mode::runtime_llvm_jit_call_stack_t::instruction : mode::runtime_llvm_jit_call_stack_t::unwind;
+    mode::global_runtime_compile_threads = 0u; mode::runtime_compile_threads_existed = true;
+    mode::global_runtime_llvm_jit_cache_path_mode = mode::runtime_llvm_jit_cache_path_mode_t::disabled;
+    auto& features{::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_wasm1p1_parameter(::uwvm2::uwvm::wasm::storage::wasm_parameter.binfmt1_para)};
+    features.disable_gc = false; features.explicit_enable_gc = true;
+    features.disable_function_references = false; features.explicit_enable_function_references = true;
+    features.disable_reference_types = false; features.explicit_enable_reference_types = true;
+    features.disable_memory64 = false; features.explicit_enable_memory64 = true;
+    features.disable_table64 = false; features.explicit_enable_table64 = true;
+    features.disable_table_instructions = false; features.explicit_enable_table_instructions = true;
+    features.disable_multiple_tables = false; features.explicit_enable_multiple_tables = true;
+    features.disable_table_initializer = false; features.explicit_enable_table_initializer = true;
+    features.disable_exceptions = false; features.explicit_enable_exceptions = true;
+    features.disable_simd = false; features.explicit_enable_simd = true;
+    features.disable_bulk_memory = false; features.explicit_enable_bulk_memory = true;
+    source_setup setup{};
+    setup.path = ::fast_io::u8concat_std(::fast_io::mnp::code_cvt(::fast_io::mnp::os_c_str(argv[1])));
+    auto& arguments{::uwvm2::uwvm::cmdline::parsing_result};
+    ::uwvm2::uwvm::cmdline::wasm_file_ppos = nullptr; arguments.clear();
+    arguments.emplace_back(::uwvm2::utils::cmdline::parameter_parsing_results{
+        u8"debug-checkpoint-complete-instance", nullptr, ::uwvm2::utils::cmdline::parameter_parsing_results_type::dir});
+    arguments.emplace_back(::uwvm2::utils::cmdline::parameter_parsing_results{
+        ::uwvm2::utils::container::u8cstring_view{::fast_io::mnp::os_c_str(setup.path.c_str())}, nullptr,
+        ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg});
+    // [actual finalized global CLI argument allocation] end
+    // [safe] cursor installed AFTER all vector growth, retained through reset.
+    ::uwvm2::uwvm::cmdline::wasm_file_ppos = ::std::addressof(arguments.back());
+    // Explicit pure Core policy: no visible WASIp1 environment to omit.
+    ::uwvm2::uwvm::wasm::storage::local_preload_wasip1=false;
+    auto bytes{image::owned_file_image::read(setup.path, 1048576u)}; REQUIRE(bytes);
+    auto const original{bytes.image->bytes()}; REQUIRE(original.size() >= 8u && original.size() <= PTRDIFF_MAX);
+    setup.immutable = ::std::move(bytes.image);
+    REQUIRE(lib::replace_full_source_after_drain_host_api(source_setup::prepare, ::std::addressof(setup)) &&
+        setup.ready && setup.source && setup.source->file().has_owned_source_image());
+
+    auto control{::std::make_shared<domain>(256u)};
+    auto configuration{::std::make_shared<int>(0)};
+    auto profile{checkpoint::compilation_profile::create_for_trusted_manager()};
+    REQUIRE(profile && profile->purpose()==checkpoint::compilation_purpose::resumable);
+    REQUIRE(lib::llvm_jit_configure_debug_session_host_api(control,{configuration,point,before_park},
+        lib::llvm_jit_debug_safe_point_granularity::instruction)==lib::llvm_jit_debug_configure_result::ok);
+    REQUIRE(lib::llvm_jit_configure_checkpoint_recording_host_api(profile)==lib::llvm_jit_debug_configure_result::ok);
+    REQUIRE(lib::llvm_jit_prepare_debug_host_api());
+    lib::full_compile_run_config initialize{};initialize.entry_function_index=0u;
+    lib::full_compile_and_run_main_module(u8"checkpoint-instance",initialize);
+    auto cohort{::std::make_shared<held_cohort>()};
+    ::std::vector<lib::llvm_jit_debug_guest_worker_owner> retained{};retained.reserve(265u);
+    for(::std::size_t index{};index!=256u;++index)
+    {
+        auto launch{::std::make_shared<held_launch>()};launch->cohort=cohort;launch->index=index;
+        auto actual{lib::runtime_launch_llvm_jit_debug_guest_worker_host_api(control,launch,held_launch::body)};
+        REQUIRE(actual.status==lib::llvm_jit_debug_guest_worker_launch_status::started && actual.worker);
+        retained.push_back(::std::move(actual.worker));
+    }
+    {
+        ::std::unique_lock lock{cohort->mutex};
+        REQUIRE(cohort->changed.wait_until(lock,deadline(),[&] { return cohort->bodies==256u; }));
+    }
+    auto forbidden{::std::make_shared<run_once>()};
+    auto quota=[&]
+    {
+        auto result{lib::runtime_launch_llvm_jit_debug_guest_worker_host_api(control,forbidden,run_once::body)};
+        REQUIRE(result.status==lib::llvm_jit_debug_guest_worker_launch_status::quota && !result.worker);
+        REQUIRE(forbidden->result==0xa5a5a5a5u);
+    };
+    quota();
+    {
+        ::std::lock_guard lock{cohort->mutex};cohort->release_body=true;cohort->changed.notify_all();
+    }
+    ::std::size_t first{};
+    {
+        ::std::unique_lock lock{cohort->mutex};
+        REQUIRE(cohort->changed.wait_until(lock,deadline(),[&] { return cohort->first_tls.load(::std::memory_order_acquire)!=SIZE_MAX; }));
+        first=cohort->first_tls.load(::std::memory_order_acquire);REQUIRE(first<256u);
+    }
+    auto pending{lib::runtime_join_llvm_jit_debug_guest_worker_until_host_api(retained[first],
+        ::std::chrono::steady_clock::now()+::std::chrono::milliseconds{10})};
+    REQUIRE(pending.actual.status==::fast_io::thread_join_status::pending);
+    quota(); // A finished body or released execution lease does not free an OS/TLS owner.
+    lib::llvm_jit_debug_guest_worker_owner bad_address{retained[first],
+        reinterpret_cast<lib::llvm_jit_debug_guest_worker const*>(::std::uintptr_t{1u})};
+    lib::llvm_jit_debug_guest_worker_owner bad_control_block{retained[first].get(),[](auto*) noexcept {}};
+    for(auto const& fake:{bad_address,bad_control_block})
+    {
+        REQUIRE(!lib::runtime_llvm_jit_debug_guest_worker_matches_control_host_api(fake,control));
+        REQUIRE(lib::runtime_join_llvm_jit_debug_guest_worker_until_host_api(fake,deadline()).actual.status==
+            ::fast_io::thread_join_status::failed);
+    }
+    {
+        ::std::lock_guard lock{cohort->mutex};cohort->release_tls=true;cohort->changed.notify_all();
+    }
+    REQUIRE(lib::runtime_join_llvm_jit_debug_guest_worker_until_host_api(retained[first],deadline()).actual.status==
+        ::fast_io::thread_join_status::joined);
+    // All 256 old control blocks are STILL retained. Only one has actually been
+    // OS joined. Reuse that single live slot while keeping its retry identity.
+    auto fresh{::std::make_shared<run_once>()};
+    auto reuse{lib::runtime_launch_llvm_jit_debug_guest_worker_host_api(control,fresh,run_once::body)};
+    ::fast_io::print(::fast_io::out(),"REGISTRY first_actual_join_slot_reuse_status=",
+        ::fast_io::mnp::dec(static_cast<unsigned>(reuse.status))," retained_old_handles=256\n");
+    REQUIRE(reuse.status==lib::llvm_jit_debug_guest_worker_launch_status::started && reuse.worker);
+    REQUIRE(lib::runtime_join_llvm_jit_debug_guest_worker_until_host_api(reuse.worker,deadline()).actual.status==
+        ::fast_io::thread_join_status::joined);
+    REQUIRE(fresh->result==42u);retained.push_back(::std::move(reuse.worker));
+    for(::std::size_t index{};index!=256u;++index)
+    {
+        REQUIRE(lib::runtime_join_llvm_jit_debug_guest_worker_until_host_api(retained[index],deadline()).actual.status==
+            ::fast_io::thread_join_status::joined);
+        REQUIRE(lib::runtime_llvm_jit_debug_guest_worker_matches_control_host_api(retained[index],control));
+    }
+    REQUIRE(cohort->tls_finished.load(::std::memory_order_acquire)==256u);
+    for(::std::size_t index{};index!=8u;++index)
+    {
+        auto state{::std::make_shared<run_once>()};
+        auto actual{lib::runtime_launch_llvm_jit_debug_guest_worker_host_api(control,state,run_once::body)};
+        REQUIRE(actual.status==lib::llvm_jit_debug_guest_worker_launch_status::started && actual.worker);
+        REQUIRE(lib::runtime_join_llvm_jit_debug_guest_worker_until_host_api(actual.worker,deadline()).actual.status==
+            ::fast_io::thread_join_status::joined);
+        REQUIRE(state->result==42u);retained.push_back(::std::move(actual.worker));
+    }
+    REQUIRE(retained.size()==265u);
+    // Expired weak history is reusable too; oldest completed handles remain
+    // independently retryable while hundreds of new allocations reuse holes.
+    auto oldest{retained.front()};auto newest{retained.back()};retained.clear();
+    for(::std::size_t index{};index!=320u;++index)
+    {
+        auto state{::std::make_shared<run_once>()};
+        auto actual{lib::runtime_launch_llvm_jit_debug_guest_worker_host_api(control,state,run_once::body)};
+        REQUIRE(actual.status==lib::llvm_jit_debug_guest_worker_launch_status::started && actual.worker);
+        REQUIRE(lib::runtime_join_llvm_jit_debug_guest_worker_until_host_api(actual.worker,deadline()).actual.status==
+            ::fast_io::thread_join_status::joined);
+        REQUIRE(state->result==42u);
+    }
+    for(auto const& old:{oldest,newest})
+    {
+        REQUIRE(lib::runtime_llvm_jit_debug_guest_worker_matches_control_host_api(old,control));
+        REQUIRE(lib::runtime_join_llvm_jit_debug_guest_worker_until_host_api(old,deadline()).actual.status==
+            ::fast_io::thread_join_status::joined);
+    }
+    REQUIRE(!lib::runtime_llvm_jit_debug_guest_worker_matches_control_host_api(bad_address,control));
+    REQUIRE(!lib::runtime_llvm_jit_debug_guest_worker_matches_control_host_api(bad_control_block,control));
+    lib::reset_runtime_state_host_api();::uwvm2::uwvm::cmdline::wasm_file_ppos=nullptr;
+    ::fast_io::print(::fast_io::out(),"WORKER_REGISTRY policy=",policy,
+        " live_limit=256 body_exit_not_reused=1 tls_pending_not_reused=1",
+        " retained_old_handles=256 actual_os_join_frees_one_slot=1",
+        " canonical_retry_preserved=1 invalid_address_rejected=1 wrong_control_block_rejected=1",
+        " actual_workers=585 actual_guest_returns_42=329 weak_holes_reused=320 PASS\n");
+}
+#include <uwvm2/uwvm/runtime/macro/pop_macros.h>
+#include <uwvm2/utils/macro/pop_macros.h>

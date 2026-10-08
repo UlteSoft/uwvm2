@@ -1,0 +1,11 @@
+(module
+  (tag $a (param i32))
+  (tag $b (param i32))
+  (func $throw_b (result i32) i32.const 37 throw $b)
+  (func (export "run") (result i32)
+    (block $wrong (result i32)
+      (block $right (result i32)
+        (try_table (result i32) (catch $a $wrong) (catch $b $right)
+          call $throw_b))
+      i32.const 1000 i32.add))
+)

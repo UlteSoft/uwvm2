@@ -26,6 +26,7 @@
 // std
 # include <cstddef>
 # include <cstdint>
+# include <cerrno>
 # include <climits>
 # include <cstring>
 # include <limits>
@@ -52,6 +53,7 @@
 # include <uwvm2/uwvm_predefine/io/impl.h>
 # include <uwvm2/utils/mutex/impl.h>
 # include <uwvm2/utils/debug/impl.h>
+# include <uwvm2/utils/control/impl.h>
 # include <uwvm2/object/memory/linear/impl.h>
 # include <uwvm2/imported/wasi/wasip1/abi/impl.h>
 # include <uwvm2/imported/wasi/wasip1/fd_manager/impl.h>
@@ -101,14 +103,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t fdflags,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t fd_ptrsz) noexcept
     {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-        if(env.wasip1_memory == nullptr) [[unlikely]]
-        {
-            // Security issues inherent to virtual machines
-            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-        }
-# endif
-        auto& memory{*env.wasip1_memory};
+        auto const memory_pointer{env.get_memory()};
+        if(memory_pointer == nullptr) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault; }
+        auto& memory{*memory_pointer};
 
         // The path remains ConstPointer<u8>; fd remains a 32-bit handle in the mirrored wasm64 ABI.
         check_wasip1_guest_pointer_alignment<4uz>(fd_ptrsz, u8"path_open_wasm64.fd (fd)");
@@ -150,6 +147,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         // storage, This is new file descriptor; no need to lock it.
         ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t new_wasi_fd{};
+        // Final-file creation only: ordinary paths retain their existing native
+        // open and make no additional OS calls. Debug startup publishes a sealed
+        // host input identity before any guest can enter this function.
+        auto const open_guest_native_file{[](auto const& directory, auto const& name, ::fast_io::open_mode mode)
+        {
+# if defined(__linux__) || (defined(__APPLE__) && defined(__MACH__))
+            if(::uwvm2::utils::control::console_input_sealed()) [[unlikely]]
+            {
+                auto const flags{::fast_io::details::calculate_posix_open_mode(mode)};
+                // name is a validated owning host path component, including its
+                // terminal zero; this view cannot outlive the synchronous call.
+                // Darwin must use the same pre-truncation descriptor identity check:
+                // guest path_open cannot reopen or overwrite the host's debug input.
+                auto const opened{::uwvm2::utils::control::open_guest_path_sealed_host_api(
+                    directory.native_handle(), reinterpret_cast<char const*>(name.c_str()), flags, 436u)};
+                if(opened.descriptor == -1) [[unlikely]] { ::fast_io::throw_posix_error(opened.error); }
+                // Exclusive fd ownership transfers to native_file exactly once.
+                return ::fast_io::native_file{opened.descriptor};
+            }
+# endif
+# if defined(_WIN32) && !defined(__CYGWIN__)
+            if(::uwvm2::utils::control::console_input_sealed()) [[unlikely]]
+            {
+                auto opened{::fast_io::native_file{at(directory), name, mode}};
+                // Authenticate the actual opened kernel object before it
+                // becomes guest-visible; device aliases are not path-stable.
+                if(::uwvm2::utils::control::inspect_guest_native_handle_host_api(opened.native_handle()) !=
+                   ::uwvm2::utils::control::sealed_input_decision::allow)
+                {
+#  ifdef UWVM_CPP_EXCEPTIONS
+                    throw ::fast_io::error{::fast_io::win32_domain_value, 5uz /*ERROR_ACCESS_DENIED*/};
+#  else
+                    ::fast_io::fast_terminate();
+#  endif
+                }
+                return opened;
+            }
+# endif
+            return ::fast_io::native_file{at(directory), name, mode};
+        }};
+
 
         {
             // Subsequent operations involving the file descriptor require locking. curr_fd_release_guard release when return.
@@ -329,6 +367,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t_const_may_alias_ptr>(path_begin), static_cast<::std::size_t>(path_len)});
             }
 
+            // Bound metadata before allocating a second copy of guest paths.
+            ::uwvm2::imported::wasi::wasip1::fd_manager::record_checkpoint_path(*new_wasi_fd.fd_p->wasi_fd.ptr,
+                curr_dir_stack.dir_stack,::uwvm2::utils::container::u8string_view{path.data(),path.size()},symlink_follow);
             if(path.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval; }
 
             // WASI does not guarantee that strings are null-terminated, so you must check for zero characters in the middle and construct one yourself.
@@ -378,12 +419,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 # endif
 
-            // The new base permissions must be a subset of the old base permissions.
-            // Both base permissions and inherited permissions must be secured simultaneously to prevent access via inherited permissions. After scanning base
-            // permissions, operations should proceed.
-            //
-            if((fs_rights_base & ~curr_fd.rights_base) != ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t{} ||
-               (fs_rights_base & ~curr_fd.rights_inherit) != ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t{})
+            // Parent base rights authorize path operations. Both rights sets
+            // installed on the child are bounded by the parent's inheriting rights.
+            if((fs_rights_base & ~curr_fd.rights_inherit) != ::uwvm2::imported::wasi::wasip1::abi::rights_t{})
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable;
             }
@@ -437,7 +475,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
             if(is_excl && !is_creat) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval; }
 
-            ::fast_io::open_mode fast_io_oflags{};
+            // Check every requested operation before opening a native object.
+            // A child FD's write rights do not grant its parent create/truncate rights.
+            using operation_rights = ::uwvm2::imported::wasi::wasip1::abi::rights_t;
+            auto required = operation_rights::right_path_open;
+            if(is_creat) { required |= operation_rights::right_path_create_file; }
+            if(is_trunc) { required |= operation_rights::right_path_filestat_set_size; }
+            if(is_sync || is_rsync) { required |= operation_rights::right_fd_sync; }
+            if((required & ~curr_fd.rights_base) != operation_rights{} ||
+               (is_dsync && (curr_fd.rights_base & (operation_rights::right_fd_datasync | operation_rights::right_fd_sync)) == operation_rights{}))
+            { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable; }
+
+# if defined(_WIN32) && !defined(__CYGWIN__)
+            // Win32 directory handles cannot preserve NONBLOCK flags.
+            if(is_dir && is_nonblock) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotsup; }
+            // The Win32 provider cannot preserve WASI SYNC semantics/flags.
+            if(is_sync) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup; }
+# endif
+
+            // WASI access rights never imply O_CREAT/O_TRUNC (or their NT equivalents).
+            ::fast_io::open_mode fast_io_oflags{::fast_io::open_mode::explicit_disposition};
             if(is_creat) { fast_io_oflags |= ::fast_io::open_mode::creat; }
             if(is_dir) { fast_io_oflags |= ::fast_io::open_mode::directory; }
             if(is_excl) { fast_io_oflags |= ::fast_io::open_mode::excl; }
@@ -519,6 +576,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir;
                             }
 
+                            auto& selected_directory{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
+                            auto const open_error{::uwvm2::imported::wasi::wasip1::func::path_open_independent_directory(selected_directory, fast_io_oflags)};
+                            if(open_error != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess) [[unlikely]] { return open_error; }
+
                             break;
                         }
                         case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::prev:
@@ -546,6 +607,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             {
                                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir;
                             }
+
+                            auto& selected_directory{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
+                            auto const open_error{::uwvm2::imported::wasi::wasip1::func::path_open_independent_directory(selected_directory, fast_io_oflags)};
+                            if(open_error != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess) [[unlikely]] { return open_error; }
 
                             break;
                         }
@@ -682,7 +747,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # if defined(_WIN32) && !defined(__CYGWIN__)
                                                         .file
 # endif
-                                                        = ::fast_io::native_file{at(curr_fd_native_file), open_file_name, fast_io_oflags};
+                                                        = open_guest_native_file(curr_fd_native_file, open_file_name, fast_io_oflags);
                                                 }
 # ifdef UWVM_CPP_EXCEPTIONS
                                                 catch(::fast_io::error e)
@@ -776,7 +841,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # if defined(_WIN32) && !defined(__CYGWIN__)
                                                         .file
 # endif
-                                                        = ::fast_io::native_file{at(path_stack.back_unchecked().file), open_file_name, fast_io_oflags};
+                                                        = open_guest_native_file(path_stack.back_unchecked().file, open_file_name, fast_io_oflags);
                                                 }
 # ifdef UWVM_CPP_EXCEPTIONS
                                                 catch(::fast_io::error e)
@@ -872,7 +937,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # if defined(_WIN32) && !defined(__CYGWIN__)
                                                 .file
 # endif
-                                                = ::fast_io::native_file{at(curr_fd_native_file), open_file_name, fast_io_oflags};
+                                                = open_guest_native_file(curr_fd_native_file, open_file_name, fast_io_oflags);
                                         }
 # ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error e)
@@ -1008,7 +1073,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # if defined(_WIN32) && !defined(__CYGWIN__)
                                                         .file
 # endif
-                                                        = ::fast_io::native_file{at(curr_fd_native_file), open_file_name, fast_io_oflags};
+                                                        = open_guest_native_file(curr_fd_native_file, open_file_name, fast_io_oflags);
                                                 }
 # ifdef UWVM_CPP_EXCEPTIONS
                                                 catch(::fast_io::error e)
@@ -1102,7 +1167,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # if defined(_WIN32) && !defined(__CYGWIN__)
                                                         .file
 # endif
-                                                        = ::fast_io::native_file{at(path_stack.back_unchecked().file), open_file_name, fast_io_oflags};
+                                                        = open_guest_native_file(path_stack.back_unchecked().file, open_file_name, fast_io_oflags);
                                                 }
 # ifdef UWVM_CPP_EXCEPTIONS
                                                 catch(::fast_io::error e)
@@ -1198,7 +1263,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # if defined(_WIN32) && !defined(__CYGWIN__)
                                                 .file
 # endif
-                                                = ::fast_io::native_file{at(path_stack.back_unchecked().file), open_file_name, fast_io_oflags};
+                                                = open_guest_native_file(path_stack.back_unchecked().file, open_file_name, fast_io_oflags);
                                         }
 # ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error e)

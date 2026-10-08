@@ -1,0 +1,11 @@
+(module
+ (type $S (struct (field (mut i32)) (field (mut f32)) (field (mut i8)) (field (mut i16)) (field (mut i64))))
+ (func (export "_start") (local $x (ref $S))
+  (local.set $x (struct.new $S (i32.const -2147483647) (f32.reinterpret_i32 (i32.const 2143363909)) (i32.const 255) (i32.const 65535) (i64.const -9223372036854775807)))
+  (if (i32.ne (struct.get $S 0 (local.get $x)) (i32.const -2147483647)) (then unreachable))
+  (if (i32.ne (i32.reinterpret_f32 (struct.get $S 1 (local.get $x))) (i32.const 2143363909)) (then unreachable))
+  (if (i32.ne (struct.get_s $S 2 (local.get $x)) (i32.const -1)) (then unreachable))
+  (if (i32.ne (struct.get_u $S 3 (local.get $x)) (i32.const 65535)) (then unreachable))
+  (if (i64.ne (struct.get $S 4 (local.get $x)) (i64.const -9223372036854775807)) (then unreachable))
+  (struct.set $S 4 (local.get $x) (i64.const 9223372036854775806))
+  (if (i64.ne (struct.get $S 4 (local.get $x)) (i64.const 9223372036854775806)) (then unreachable))))

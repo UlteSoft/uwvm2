@@ -42,29 +42,35 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm3::type
 {
-/// @brief      The abstract type i31 denotes unboxed scalars, that is, integers injected into references. Their observable value range is limited to 31 bits
-/// @see        WebAssembly Release 3.0 (Draft 2024-09-21) § 2.2.3
-/// @note       The i31 type specification in Wasm does not mandate whether tags must reside in the high or low byte. Therefore, bit fields are used here for
-///             implementation, with access optimizations applied for certain big-endian systems.
-#if defined(__BIG_ENDIAN__)
-    // GCC, LLVM: Big Endian
-
+/// Core 3 ref.i31 retains precisely the low 31 bits of an i32. The host reference-kind
+/// tag belongs to the enclosing runtime reference; no C++ bit-field layout or byte order
+/// is part of the guest value. In particular, a signed 31-bit C++ bit-field has different
+/// layout and even size across MSVC and GCC, so it cannot define the VM's cross-platform ABI.
+/// https://webassembly.github.io/spec/core/exec/instructions.html#exec-ref.i31
     struct wasm_i31
     {
-        bool tag : 1;
-        ::std::int_least32_t value : 31;
-    };
-#else
-    // GCC, LLVM: Little Endian
-    // GCC: PDP11 Endian
-    // MSVC: MS Platform (msabi: sizeof(wasm_i31) == 2uz * sizeof(::std::int_least32_t))
+        static constexpr ::std::uint32_t value_mask{0x7fff'ffffu};
+        static constexpr ::std::uint32_t sign_bit{0x4000'0000u};
+        ::std::uint32_t bits;
 
-    struct wasm_i31
-    {
-        ::std::int_least32_t value : 31;
-        bool tag : 1;
+        [[nodiscard]] static constexpr wasm_i31 from_i32(::std::int32_t value) noexcept
+        { return {::std::bit_cast<::std::uint32_t>(value) & value_mask}; }
+
+        [[nodiscard]] constexpr ::std::uint32_t get_u() const noexcept
+        { return bits & value_mask; }
+
+        [[nodiscard]] constexpr ::std::int32_t get_s() const noexcept
+        {
+            auto const low{get_u()};
+            // Unsigned arithmetic wraps modulo 2^32, then bit_cast preserves the
+            // two's-complement result without an implementation-defined signed cast.
+            return ::std::bit_cast<::std::int32_t>((low ^ sign_bit) - sign_bit);
+        }
     };
-#endif
+    static_assert(sizeof(wasm_i31) == sizeof(::std::uint32_t));
+    static_assert(alignof(wasm_i31) == alignof(::std::uint32_t));
+    static_assert(wasm_i31::from_i32(-1).get_s() == -1);
+    static_assert(wasm_i31::from_i32(-1).get_u() == 0x7fff'ffffu);
 }
 
 #ifndef UWVM_MODULE

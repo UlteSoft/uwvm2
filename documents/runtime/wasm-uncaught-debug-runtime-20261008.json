@@ -1,0 +1,609 @@
+{
+  "schema": "uwvm-uncaught-pre-unwind-debug-qualification-v1",
+  "passed": true,
+  "source_cut": "uncaught-r6-build frozen paired source; uncaught-r2-runtime exact-product continuation",
+  "source_identities": {
+    "uwvm2": "sha256:0da3c78e71713c5accf9ac7c6f2617973641d2cc1c0d05d681ae6b44aab06579",
+    "uwvm2-ros": "sha256:8625755315e420b73b0a4bb17c83aa476b2d12d11527623ace6b315ab4df1b8c"
+  },
+  "production_CPP_changed_in_this_followup": true,
+  "latest_mutable_working_tree_qualified": false,
+  "architectures": [
+    "native x86_64",
+    "QEMU RISC-V64",
+    "QEMU AArch64"
+  ],
+  "repositories": [
+    "uwvm2",
+    "uwvm2-ros"
+  ],
+  "JIT_policies": [
+    "default",
+    "max"
+  ],
+  "call_stack_policies": [
+    "instruction",
+    "unwind"
+  ],
+  "actual_matrix_VM_sessions": 600,
+  "actual_native_producer_smoke_sessions": 10,
+  "distinct_actual_VM_lifetimes": 610,
+  "matrix_exact_value_pauses": 1104,
+  "smoke_exact_value_pauses": 16,
+  "total_exact_value_pauses": 1120,
+  "actual_matrix_uncaught_retirements": 144,
+  "actual_matrix_handled_zero_exit_controls": 96,
+  "actual_matrix_trap_regression_retirements": 360,
+  "beyond_64_frame_matrix_pauses": 48,
+  "producer_compiler_link_roots": 24,
+  "producer_protocol_tests": 100,
+  "protocol_tests_are_detached_packets": true,
+  "all_actual_compile_dependencies_prebound": true,
+  "actual_compile_dependency_path_count": 6660,
+  "new_precompiled_external_dependency_count": 2674,
+  "scope": {
+    "actual_thrown_guest_exception_before_generated_Wasm_unwind": true,
+    "exact_numeric_SIMD_GC_reference_payloads": true,
+    "recursive_72_frame_operands_and_locals_at_64_70_71": true,
+    "retired_tail_activation_absent": true,
+    "same_signature_different_tag_identity": true,
+    "throw_ref_current_activation_identity": true,
+    "handled_leaf_caller_tag_and_catch_all_ref_controls": true,
+    "terminal_continue_preserves_actual_fatal_semantics": true,
+    "terminal_VM_helper_ASM_requests_denied": true,
+    "DAP_actual_throwing_thread_only_scope_label": true,
+    "imported_or_host_origin_uncaught_runtime_qualified": false,
+    "quota_exhaustion_uncaught_runtime_qualified": false,
+    "threaded_uncaught_runtime_qualified": false,
+    "all_Wasm3_debugging_qualified": false,
+    "all_architectures_qualified": false,
+    "debug_off_performance_measured": false
+  },
+  "groups": [
+    {
+      "label": "uncaught-native-uwvm2-default",
+      "sessions": 20,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/uncaught-native-uwvm2-default/results.json",
+      "result_sha256": "8f95f5a8758260a9c7cc846edae86e724d4d142f6e8ed1c0594fa4dd6543085d",
+      "exact_value_pauses": 32,
+      "actual_exit_counts": {
+        "-4": 12,
+        "0": 8
+      }
+    },
+    {
+      "label": "traps-native-uwvm2-default",
+      "sessions": 30,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/traps-native-uwvm2-default/results.json",
+      "result_sha256": "d0e969ce55174625e64b703b1898f25adb64ec139ea8eb2f9062482acfe08682",
+      "exact_value_pauses": 60,
+      "actual_exit_counts": {
+        "-4": 30
+      }
+    },
+    {
+      "label": "uncaught-native-uwvm2-max",
+      "sessions": 20,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/uncaught-native-uwvm2-max/results.json",
+      "result_sha256": "7fadb9f4d2c970ef7f3e052a8852ac3ee7cb31d67f65f436b1417f3a8fd6880c",
+      "exact_value_pauses": 32,
+      "actual_exit_counts": {
+        "-4": 12,
+        "0": 8
+      }
+    },
+    {
+      "label": "traps-native-uwvm2-max",
+      "sessions": 30,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/traps-native-uwvm2-max/results.json",
+      "result_sha256": "66541f1b840fb80bd774693cf0e32a9e5ee44f637d43adff0f7fed5ed3361dde",
+      "exact_value_pauses": 60,
+      "actual_exit_counts": {
+        "-4": 30
+      }
+    },
+    {
+      "label": "uncaught-native-uwvm2-ros-default",
+      "sessions": 20,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/uncaught-native-uwvm2-ros-default/results.json",
+      "result_sha256": "a1be6cb772d6ffc08f8cdf37f04f49f26f7a7c38c2343dfb4f72287b3d02ffdc",
+      "exact_value_pauses": 32,
+      "actual_exit_counts": {
+        "-4": 12,
+        "0": 8
+      }
+    },
+    {
+      "label": "traps-native-uwvm2-ros-default",
+      "sessions": 30,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/traps-native-uwvm2-ros-default/results.json",
+      "result_sha256": "bdaf0c9a22dc79cf42b938a2c12f78fb51373f970bb9f130d5ad4c57181d3bb1",
+      "exact_value_pauses": 60,
+      "actual_exit_counts": {
+        "-4": 30
+      }
+    },
+    {
+      "label": "uncaught-native-uwvm2-ros-max",
+      "sessions": 20,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/uncaught-native-uwvm2-ros-max/results.json",
+      "result_sha256": "caad563370c6e1616ae738f6b2b32ec0588f470b1c197193f6764723eb52bd0c",
+      "exact_value_pauses": 32,
+      "actual_exit_counts": {
+        "-4": 12,
+        "0": 8
+      }
+    },
+    {
+      "label": "traps-native-uwvm2-ros-max",
+      "sessions": 30,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/traps-native-uwvm2-ros-max/results.json",
+      "result_sha256": "621b882e6d6b6f5dc9cfbfa6dcee46ea7fd68568ee3ddfc12f4403ae9271c661",
+      "exact_value_pauses": 60,
+      "actual_exit_counts": {
+        "-4": 30
+      }
+    },
+    {
+      "label": "uncaught-riscv64-uwvm2-default",
+      "sessions": 20,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/uncaught-riscv64-uwvm2-default/results.json",
+      "result_sha256": "a0beb50720924af8b45d667351d77bf51612b3a726b4d6699c13dcf683b5cff5",
+      "exact_value_pauses": 32,
+      "actual_exit_counts": {
+        "-4": 12,
+        "0": 8
+      }
+    },
+    {
+      "label": "traps-riscv64-uwvm2-default",
+      "sessions": 30,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/traps-riscv64-uwvm2-default/results.json",
+      "result_sha256": "3f9c836bc612032fccdb128e417daf9284950348b43b1c40bcd50dfa05c49c89",
+      "exact_value_pauses": 60,
+      "actual_exit_counts": {
+        "-4": 30
+      }
+    },
+    {
+      "label": "uncaught-riscv64-uwvm2-max",
+      "sessions": 20,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/uncaught-riscv64-uwvm2-max/results.json",
+      "result_sha256": "30663068b5b9084afb6c4c2856221f5f39df90cad69890bcaae5a7988a3a2fd6",
+      "exact_value_pauses": 32,
+      "actual_exit_counts": {
+        "-4": 12,
+        "0": 8
+      }
+    },
+    {
+      "label": "traps-riscv64-uwvm2-max",
+      "sessions": 30,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/traps-riscv64-uwvm2-max/results.json",
+      "result_sha256": "9f1731eff1ed27994d1932405f2c452e6f294181e0fea12e1a9543ae9edadb7a",
+      "exact_value_pauses": 60,
+      "actual_exit_counts": {
+        "-4": 30
+      }
+    },
+    {
+      "label": "uncaught-riscv64-uwvm2-ros-default",
+      "sessions": 20,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/uncaught-riscv64-uwvm2-ros-default/results.json",
+      "result_sha256": "fd9b3fa47e2b33ecddcbeee5aa3a8280541524be2d11f6587c6f40ebaa6d4767",
+      "exact_value_pauses": 32,
+      "actual_exit_counts": {
+        "-4": 12,
+        "0": 8
+      }
+    },
+    {
+      "label": "traps-riscv64-uwvm2-ros-default",
+      "sessions": 30,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/traps-riscv64-uwvm2-ros-default/results.json",
+      "result_sha256": "943458dfb1099a60e82abdc32ae3053b1a435a4ce5e60b7571ae47016489e079",
+      "exact_value_pauses": 60,
+      "actual_exit_counts": {
+        "-4": 30
+      }
+    },
+    {
+      "label": "uncaught-riscv64-uwvm2-ros-max",
+      "sessions": 20,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/uncaught-riscv64-uwvm2-ros-max/results.json",
+      "result_sha256": "3b79255412c2a7ac13ccf6be10a8ff0521a74239aee2e5a9afaf433b44e5d8e6",
+      "exact_value_pauses": 32,
+      "actual_exit_counts": {
+        "-4": 12,
+        "0": 8
+      }
+    },
+    {
+      "label": "traps-riscv64-uwvm2-ros-max",
+      "sessions": 30,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/traps-riscv64-uwvm2-ros-max/results.json",
+      "result_sha256": "ee0d55a31f6e26c2fe7d526ce6c2857c15119ea3522bcfd5fab6c6e95842a4fe",
+      "exact_value_pauses": 60,
+      "actual_exit_counts": {
+        "-4": 30
+      }
+    },
+    {
+      "label": "uncaught-aarch64-uwvm2-default",
+      "sessions": 20,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/uncaught-aarch64-uwvm2-default/results.json",
+      "result_sha256": "dcfa4f7ba566f18f0d58c255b941d48dc6b945a373c2e403678deb108c6721d2",
+      "exact_value_pauses": 32,
+      "actual_exit_counts": {
+        "-5": 12,
+        "0": 8
+      }
+    },
+    {
+      "label": "traps-aarch64-uwvm2-default",
+      "sessions": 30,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/traps-aarch64-uwvm2-default/results.json",
+      "result_sha256": "cbd09ce5dcff6d4d75506829cbff4464b46bed34016154717437a7993a7cdb8f",
+      "exact_value_pauses": 60,
+      "actual_exit_counts": {
+        "-5": 30
+      }
+    },
+    {
+      "label": "uncaught-aarch64-uwvm2-max",
+      "sessions": 20,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/uncaught-aarch64-uwvm2-max/results.json",
+      "result_sha256": "2b2300e79b24fb9cb942e15dcd5663f2c16553a5bec9a9515b101a2c5b141e65",
+      "exact_value_pauses": 32,
+      "actual_exit_counts": {
+        "-5": 12,
+        "0": 8
+      }
+    },
+    {
+      "label": "traps-aarch64-uwvm2-max",
+      "sessions": 30,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/traps-aarch64-uwvm2-max/results.json",
+      "result_sha256": "e65aae8abe1dd125f8c62135d323fab2a52aeb8ab19527f28be93713e1ccde3b",
+      "exact_value_pauses": 60,
+      "actual_exit_counts": {
+        "-5": 30
+      }
+    },
+    {
+      "label": "uncaught-aarch64-uwvm2-ros-default",
+      "sessions": 20,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/uncaught-aarch64-uwvm2-ros-default/results.json",
+      "result_sha256": "89b0c2394f5f1ecc161dd79eeb0120f5ad7501f55c675a789482f143129e26cf",
+      "exact_value_pauses": 32,
+      "actual_exit_counts": {
+        "-5": 12,
+        "0": 8
+      }
+    },
+    {
+      "label": "traps-aarch64-uwvm2-ros-default",
+      "sessions": 30,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/traps-aarch64-uwvm2-ros-default/results.json",
+      "result_sha256": "1787c83c8e3e3d48d3d696eea001c54bf94bc00ea9444c75f17b921ab88ee869",
+      "exact_value_pauses": 60,
+      "actual_exit_counts": {
+        "-5": 30
+      }
+    },
+    {
+      "label": "uncaught-aarch64-uwvm2-ros-max",
+      "sessions": 20,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/uncaught-aarch64-uwvm2-ros-max/results.json",
+      "result_sha256": "16197a40f75ebfe9a8bf64ed6adeecbf2dc7d9008a7c8a57587d94eb6eb972f5",
+      "exact_value_pauses": 32,
+      "actual_exit_counts": {
+        "-5": 12,
+        "0": 8
+      }
+    },
+    {
+      "label": "traps-aarch64-uwvm2-ros-max",
+      "sessions": 30,
+      "result_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/results/traps-aarch64-uwvm2-ros-max/results.json",
+      "result_sha256": "9b625d97e9ae19264fa2a6d474006a5f87875326df5bc3b728c7305b4962aca0",
+      "exact_value_pauses": 60,
+      "actual_exit_counts": {
+        "-5": 30
+      }
+    }
+  ],
+  "native_smoke_cases": [
+    {
+      "case": "uncaught-numeric",
+      "policy": "instruction",
+      "passed": true,
+      "actual_uncaught_stop": true,
+      "actual_process_exit": -4
+    },
+    {
+      "case": "uncaught-gc-tuple",
+      "policy": "instruction",
+      "passed": true,
+      "actual_uncaught_stop": true,
+      "actual_process_exit": -4
+    },
+    {
+      "case": "uncaught-recursive-72",
+      "policy": "instruction",
+      "passed": true,
+      "actual_uncaught_stop": true,
+      "actual_process_exit": -4
+    },
+    {
+      "case": "uncaught-retired-tail",
+      "policy": "instruction",
+      "passed": true,
+      "actual_uncaught_stop": true,
+      "actual_process_exit": -4
+    },
+    {
+      "case": "uncaught-distinct-tag-caller",
+      "policy": "instruction",
+      "passed": true,
+      "actual_uncaught_stop": true,
+      "actual_process_exit": -4
+    },
+    {
+      "case": "uncaught-throw-ref",
+      "policy": "instruction",
+      "passed": true,
+      "actual_uncaught_stop": true,
+      "actual_process_exit": -4
+    },
+    {
+      "case": "handled-leaf-tag",
+      "policy": "instruction",
+      "passed": true,
+      "actual_uncaught_stop": false,
+      "actual_process_exit": 0
+    },
+    {
+      "case": "handled-caller-tag",
+      "policy": "instruction",
+      "passed": true,
+      "actual_uncaught_stop": false,
+      "actual_process_exit": 0
+    },
+    {
+      "case": "handled-leaf-all-ref",
+      "policy": "instruction",
+      "passed": true,
+      "actual_uncaught_stop": false,
+      "actual_process_exit": 0
+    },
+    {
+      "case": "handled-caller-all-ref",
+      "policy": "instruction",
+      "passed": true,
+      "actual_uncaught_stop": false,
+      "actual_process_exit": 0
+    }
+  ],
+  "products": {
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/native/uwvm2/uwvm": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/native/uwvm2/uwvm",
+      "bytes": 178938192,
+      "sha256": "6585adc13c7616e4c8e84d8456f9e2dce117a69f75de69a84c05aeb0289ceb22",
+      "compressed_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/native/uwvm2/uwvm.gz",
+      "compressed_sha256": "1c7f4e5736e61ac15052b26d0dcc89a39bb7ece5fc8c5142b1082f29873692b0"
+    },
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/native/uwvm2-ros/uwvm": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/native/uwvm2-ros/uwvm",
+      "bytes": 144494264,
+      "sha256": "ba644ad3e305d9f17a23c3ac331cab84db506e2f5a869591b1a730e1857bab1f",
+      "compressed_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/native/uwvm2-ros/uwvm.gz",
+      "compressed_sha256": "48e902134ef2785683803d4009088fd587c0b7bf2da8ba57182553b63d25e832"
+    },
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/riscv64/uwvm2/uwvm": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/riscv64/uwvm2/uwvm",
+      "bytes": 176202056,
+      "sha256": "cc408508a9c3000cc3aeb55cc5d83a7f5cca73a81317578d7f16a813fd8df9f6",
+      "compressed_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/riscv64/uwvm2/uwvm.gz",
+      "compressed_sha256": "e74a545923c9871e35abf53659f2bec70d97f0b838c0ce547e030b5e4665d48d"
+    },
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/riscv64/uwvm2-ros/uwvm": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/riscv64/uwvm2-ros/uwvm",
+      "bytes": 140992360,
+      "sha256": "e384e99079b71057fed06afc7a1811e4ddf9574fed9e663792fde3a83218f1ec",
+      "compressed_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/riscv64/uwvm2-ros/uwvm.gz",
+      "compressed_sha256": "8d3be0745f26e6a21a9fae50f617bc7d358c6353a2ce08d894482b9384b64ca3"
+    },
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/aarch64/uwvm2/uwvm": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/aarch64/uwvm2/uwvm",
+      "bytes": 204026728,
+      "sha256": "104eed417b056d13bd98dfa8835750b9c26fea0c6db4ddb27460f9e7c164b51c",
+      "compressed_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/aarch64/uwvm2/uwvm.gz",
+      "compressed_sha256": "cde5e51e10635d2145708cd92058698a39ec69d886e2b51cbcfd3c80f9b2a3a3"
+    },
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/aarch64/uwvm2-ros/uwvm": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/aarch64/uwvm2-ros/uwvm",
+      "bytes": 155467760,
+      "sha256": "6c47847e866c7bdd87367fff764aab0323e4e7eefc72b5b999e3687169a5f19d",
+      "compressed_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/products/aarch64/uwvm2-ros/uwvm.gz",
+      "compressed_sha256": "f26e2f9c9fa29f5003146b873748969fd371f963ac2cd6d6c954ba610b88f6d1"
+    }
+  },
+  "producer_qualification": {
+    "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/PRODUCER-QUALIFIED.json",
+    "sha256": "2f266cc9eac892052ff704d31c55d0a4a9e168c5968782684fb62e47c41bbc2f",
+    "actual_dependency_bindings_and_complete_PIDFD_proofs_in_archive": true
+  },
+  "runtime_qualification": {
+    "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/QUALIFIED.json",
+    "sha256": "fca3d6cca5b9af2d2ca547c7f3f6a720ce0d40a37db7349d4f8f8d911dab2a9b",
+    "complete_600_VM_PIDFD_proofs_in_archive": true
+  },
+  "supervisor_closures": {
+    "uncaught-r6-build": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r6-build/batch-evidence/receipts.json",
+      "sha256": "05e3ad57e8ff91461ec23318c35313768701b46c3b1ee6a3414e7271ff7385df",
+      "roots": [
+        {
+          "label": "uncaught-producer",
+          "passed": true,
+          "returncode": 0,
+          "Popen_root_pidfd_retirement": {
+            "pid": 916006,
+            "pidfd_readable": true,
+            "actual_reaped_returncode": 0
+          },
+          "cgroup": "0::/system.slice/docker-d3b12e6d323a0f28c2408989fff41a1ca1a991e19945919bc870337dd0afae03.scope\n",
+          "memory_max_bytes": 68719476736,
+          "swap_max_bytes": 0,
+          "memory_events_before": {
+            "low": 0,
+            "high": 0,
+            "max": 0,
+            "oom": 0,
+            "oom_kill": 0,
+            "oom_group_kill": 0
+          },
+          "memory_events_after": {
+            "low": 0,
+            "high": 0,
+            "max": 0,
+            "oom": 0,
+            "oom_kill": 0,
+            "oom_group_kill": 0
+          },
+          "aggregate_owned_rss_peak_bytes": 9054146560,
+          "maximum_observed_folder_bytes": 2543337472,
+          "minimum_observed_actual_free_bytes": 43760017408,
+          "foreign_processes_signalled": false,
+          "foreign_processes_adopted": false
+        },
+        {
+          "label": "uncaught-producer-metadata",
+          "passed": true,
+          "returncode": 0,
+          "Popen_root_pidfd_retirement": {
+            "pid": 943477,
+            "pidfd_readable": true,
+            "actual_reaped_returncode": 0
+          },
+          "cgroup": "0::/system.slice/docker-d3b12e6d323a0f28c2408989fff41a1ca1a991e19945919bc870337dd0afae03.scope\n",
+          "memory_max_bytes": 68719476736,
+          "swap_max_bytes": 0,
+          "memory_events_before": {
+            "low": 0,
+            "high": 0,
+            "max": 0,
+            "oom": 0,
+            "oom_kill": 0,
+            "oom_group_kill": 0
+          },
+          "memory_events_after": {
+            "low": 0,
+            "high": 0,
+            "max": 0,
+            "oom": 0,
+            "oom_kill": 0,
+            "oom_group_kill": 0
+          },
+          "aggregate_owned_rss_peak_bytes": 120958976,
+          "maximum_observed_folder_bytes": 2399363072,
+          "minimum_observed_actual_free_bytes": 44014108672,
+          "foreign_processes_signalled": false,
+          "foreign_processes_adopted": false
+        }
+      ]
+    },
+    "uncaught-r2-runtime": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-r2-runtime/batch-evidence/receipts.json",
+      "sha256": "3eb4cac550f821d30579f00ae7bade089babd432777794c36b205ea4c3ef7980",
+      "roots": [
+        {
+          "label": "uncaught-runtime",
+          "passed": true,
+          "returncode": 0,
+          "Popen_root_pidfd_retirement": {
+            "pid": 954483,
+            "pidfd_readable": true,
+            "actual_reaped_returncode": 0
+          },
+          "cgroup": "0::/system.slice/docker-d3b12e6d323a0f28c2408989fff41a1ca1a991e19945919bc870337dd0afae03.scope\n",
+          "memory_max_bytes": 68719476736,
+          "swap_max_bytes": 0,
+          "memory_events_before": {
+            "low": 0,
+            "high": 0,
+            "max": 0,
+            "oom": 0,
+            "oom_kill": 0,
+            "oom_group_kill": 0
+          },
+          "memory_events_after": {
+            "low": 0,
+            "high": 0,
+            "max": 0,
+            "oom": 0,
+            "oom_kill": 0,
+            "oom_group_kill": 0
+          },
+          "aggregate_owned_rss_peak_bytes": 544153600,
+          "maximum_observed_folder_bytes": 2656673792,
+          "minimum_observed_actual_free_bytes": 42617487360,
+          "foreign_processes_signalled": false,
+          "foreign_processes_adopted": false
+        },
+        {
+          "label": "uncaught-runtime-metadata",
+          "passed": true,
+          "returncode": 0,
+          "Popen_root_pidfd_retirement": {
+            "pid": 1004083,
+            "pidfd_readable": true,
+            "actual_reaped_returncode": 0
+          },
+          "cgroup": "0::/system.slice/docker-d3b12e6d323a0f28c2408989fff41a1ca1a991e19945919bc870337dd0afae03.scope\n",
+          "memory_max_bytes": 68719476736,
+          "swap_max_bytes": 0,
+          "memory_events_before": {
+            "low": 0,
+            "high": 0,
+            "max": 0,
+            "oom": 0,
+            "oom_kill": 0,
+            "oom_group_kill": 0
+          },
+          "memory_events_after": {
+            "low": 0,
+            "high": 0,
+            "max": 0,
+            "oom": 0,
+            "oom_kill": 0,
+            "oom_group_kill": 0
+          },
+          "aggregate_owned_rss_peak_bytes": 112402432,
+          "maximum_observed_folder_bytes": 2458349568,
+          "minimum_observed_actual_free_bytes": 42760024064,
+          "foreign_processes_signalled": false,
+          "foreign_processes_adopted": false
+        }
+      ]
+    }
+  },
+  "evidence_archive": {
+    "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/bundles-uncaught-r1/wasm-uncaught-20261008-evidence.tar.gz",
+    "bytes": 20446688,
+    "sha256": "65a612c2c17d317f28d4cca823e175f8658668f937790a620ca1c810d9536f19",
+    "members": 2031,
+    "manifest_sha256": "4122f33cce3786be1e2209fb04ffb4c9639c7dd47ce56119a7960c238e85c6a8",
+    "remote_per_member_file_verification": true
+  },
+  "local_evidence_archive": "/Users/liyinan/Documents/MacroModel/wasm-core3-debug-audit-20261007-r1/wasm-trap-stop-20261007-r1/bundles-uncaught-r1/wasm-uncaught-20261008-evidence.tar.gz",
+  "failed_predecessors_retained": [
+    "uncaught-r1-build protocol argv",
+    "uncaught-r2-build ROS accessor",
+    "uncaught-r3-build controlled cancellation after wrong host-wrapper target diagnosis",
+    "uncaught-r4-build metadata prebinding failure",
+    "uncaught-r5-producer-audit missing precompiled stdlib headers",
+    "uncaught-r1-runtime syntax error before first VM"
+  ]
+}

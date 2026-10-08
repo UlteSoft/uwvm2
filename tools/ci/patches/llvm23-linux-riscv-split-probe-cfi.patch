@@ -1,0 +1,30 @@
+--- a/llvm/lib/Target/RISCV/RISCVFrameLowering.cpp
++++ b/llvm/lib/Target/RISCV/RISCVFrameLowering.cpp
+@@ -872,6 +872,9 @@
+   // Emit a variable-length allocation probing loop.
+   uint64_t RoundedSize = alignDown(Offset, ProbeSize);
+   uint64_t Residual = Offset - RoundedSize;
++  // Offset is only this allocation. A split prologue may already have
++  // allocated the CSR-save area, so the CFA must include that earlier part.
++  uint64_t CFAAdjust = RealStackSize - Offset;
+ 
+   Register TargetReg = RISCV::X6;
+   // SUB TargetReg, SP, RoundedSize
+@@ -880,7 +883,7 @@
+ 
+   if (EmitCFI) {
+     // Set the CFA register to TargetReg.
+-    CFIBuilder.buildDefCFA(TargetReg, RoundedSize);
++    CFIBuilder.buildDefCFA(TargetReg, RoundedSize + CFAAdjust);
+   }
+ 
+   // It will be expanded to a probe loop in `inlineStackProbe`.
+@@ -905,7 +908,7 @@
+   }
+ 
+   if (EmitCFI)
+-    CFIBuilder.buildDefCFAOffset(Offset);
++    CFIBuilder.buildDefCFAOffset(RealStackSize);
+ }
+ 
+ static bool isPush(unsigned Opcode) {

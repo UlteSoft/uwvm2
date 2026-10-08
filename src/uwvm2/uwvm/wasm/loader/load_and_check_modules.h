@@ -84,7 +84,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 #endif
 
         // preloaded wasm
-        for(auto const& lwc: ::uwvm2::uwvm::wasm::storage::preloaded_wasm)
+        for(auto const& lwc: ::uwvm2::uwvm::wasm::storage::active_preloaded_wasm())
         {
             if(!::uwvm2::uwvm::wasm::storage::all_module
                     .try_emplace(lwc.module_name,
@@ -93,17 +93,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                     .second) [[unlikely]]
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                     u8"[error] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"Duplicate WASM module names: \"",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                     lwc.module_name,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"\".\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                 return load_and_check_modules_rtl::duplicate_module_name;
             }
         }
@@ -120,17 +120,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                     .second) [[unlikely]]
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                     u8"[error] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"Duplicate WASM module names: \"",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                     ldc.module_name,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"\".\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                 return load_and_check_modules_rtl::duplicate_module_name;
             }
         }
@@ -147,17 +147,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                     .second) [[unlikely]]
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                     u8"[error] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"Duplicate WASM module names: \"",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                     lwws.module_name,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"\".\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                 return load_and_check_modules_rtl::duplicate_module_name;
             }
         }
@@ -173,17 +173,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                 if(!lim.init_local_imported_module()) [[unlikely]]
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                         u8"uwvm: ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                         u8"[error] ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                         u8"Initialize local imported module \"",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                         module_name,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                         u8"\" failed.\n\n",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                     return load_and_check_modules_rtl::local_imported_module_init_error;
                 }
 
@@ -194,17 +194,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                         .second) [[unlikely]]
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                         u8"uwvm: ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                         u8"[error] ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                         u8"Duplicate WASM module names: \"",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                         module_name,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                         u8"\".\n\n",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                     return load_and_check_modules_rtl::duplicate_module_name;
                 }
             }
@@ -214,23 +214,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         {
             if(!::uwvm2::uwvm::wasm::storage::all_module
                     .try_emplace(
-                        ::uwvm2::uwvm::wasm::storage::execute_wasm.module_name,
-                        ::uwvm2::uwvm::wasm::type::all_module_t{.module_storage_ptr = {.wf = ::std::addressof(::uwvm2::uwvm::wasm::storage::execute_wasm)},
+                        ::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name,
+                        ::uwvm2::uwvm::wasm::type::all_module_t{.module_storage_ptr = {.wf = ::std::addressof(::uwvm2::uwvm::wasm::storage::active_execute_wasm())},
                                                                 .type = ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm})
                     .second) [[unlikely]]
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                     u8"[error] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"Duplicate WASM module names: \"",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                    ::uwvm2::uwvm::wasm::storage::execute_wasm.module_name,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name,
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"\".\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                 return load_and_check_modules_rtl::duplicate_module_name;
             }
         }
@@ -239,19 +239,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_GREEN),
                                 u8"[info]  ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8"All modules have been loaded. ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_GREEN),
                                 u8"[",
                                 ::uwvm2::uwvm::io::get_local_realtime(),
                                 u8"] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                 u8"(verbose)\n",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
         }
 
         return load_and_check_modules_rtl::ok;
@@ -287,8 +287,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
     ///             In the WASM standard, importing module A name B type C and importing module A name B type D simultaneously
     ///             satisfies syntactic validity (binary format validity) but fails validation.
     /// @return     Adjacency list representation of the dependency graph
+    template<typename GraphContext>
     inline constexpr build_dependency_graph_and_check_import_exist_ret_t
-        build_dependency_graph_and_check_import_exist_and_construct_all_module_export() noexcept
+        build_dependency_graph_and_check_import_exist_and_construct_all_module_export_in_context(GraphContext& world) noexcept
     {
 #ifdef UWVM_TIMER
         ::uwvm2::utils::debug::timer build_dependency_graph_and_check_import_exist_timer{u8"build dependency graph and check import exist"};
@@ -297,21 +298,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         using module_name_t = ::uwvm2::utils::container::u8string_view;
         using adjacency_list_t = ::uwvm2::utils::container::unordered_flat_map<module_name_t, ::uwvm2::utils::container::vector<module_name_t>>;
 
-        auto const all_module_size{::uwvm2::uwvm::wasm::storage::all_module.size()};
+        auto const all_module_size{world.declarations().size()};
 
         adjacency_list_t adjacency_list{};
         adjacency_list.reserve(all_module_size);  // Reserve space for all modules
 
         // Initialize all module nodes
-        for(auto const& module: ::uwvm2::uwvm::wasm::storage::all_module)
+        for(auto const& module: world.declarations())
         {
             adjacency_list.emplace(module.first, ::uwvm2::utils::container::vector<module_name_t>{});
         }
 
         // Used to record the contents exported by each module. Persist globally.
         // Rebuild every run to avoid stale `u8string_view` keys and mismatched module sets.
-        ::uwvm2::uwvm::wasm::storage::all_module_export.clear();
-        ::uwvm2::uwvm::wasm::storage::all_module_export.reserve(all_module_size);  // Reserve space for all modules to avoid reallocations
+        world.exports().clear();
+        world.exports().reserve(all_module_size);  // Reserve space for all modules to avoid reallocations
 
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
@@ -358,7 +359,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 #endif
 
         // Build dependency relationships
-        for(auto const& curr_module: ::uwvm2::uwvm::wasm::storage::all_module)
+        for(auto const& curr_module: world.declarations())
         {
             auto const curr_module_name{curr_module.first};
 
@@ -389,7 +390,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                 auto const& exec_wasm_module_storage_exportsec{
                                     get_exec_wasm_module_storage_exportsec_from_feature_tuple(::uwvm2::uwvm::wasm::feature::all_features)};
 
-                                auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(curr_module_name)};
+                                auto [curr_exported_module, inserted]{world.exports().try_emplace(curr_module_name)};
                                 if(inserted) [[unlikely]]
                                 {
                                     curr_exported_module->second.reserve(exec_wasm_module_storage_exportsec.exports.size());  // Reserve space for exports
@@ -428,7 +429,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
                                 // Keep parser storage untouched. Early dependency diagnostics still need to observe
                                 // the same import binding view that runtime initialization will apply later.
-                                if(auto const import_reset{::uwvm2::uwvm::wasm::storage::find_configured_import_reset_const(curr_module_name,
+                                if(auto const import_reset{world.find_import_rewrite(curr_module_name,
                                                                                                                             import_module_name,
                                                                                                                             import_extern_name)};
                                    import_reset != nullptr) [[unlikely]]
@@ -462,46 +463,46 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                    !wasip1_import_visible_for_module(curr_module.second.type, curr_module_name)) [[unlikely]]
                                 {
                                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                                         u8"uwvm: ",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                                         u8"[error] ",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                         u8"Missing module dependency: \"",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                                         import_module_name,
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                         u8"\" required by \"",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                                         curr_module_name,
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                         u8"\". The module-specific WASI Preview 1 setting disables this import.\n\n",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
 
                                     return {load_and_check_modules_rtl::module_dependency_error, ::std::move(adjacency_list)};
                                 }
 # endif
 #endif
-                                auto const import_module{::uwvm2::uwvm::wasm::storage::all_module.find(import_module_name)};
-                                if(import_module == ::uwvm2::uwvm::wasm::storage::all_module.end()) [[unlikely]]
+                                auto const import_module{world.declarations().find(import_module_name)};
+                                if(import_module == world.declarations().end()) [[unlikely]]
                                 {
                                     // Output missing module dependency error
                                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                                         u8"uwvm: ",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                                         u8"[error] ",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                         u8"Missing module dependency: \"",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                                         import_module_name,
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                         u8"\" required by \"",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                                         curr_module_name,
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                         u8"\".\n\n",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
 
                                     return {load_and_check_modules_rtl::module_dependency_error, ::std::move(adjacency_list)};
                                 }
@@ -509,7 +510,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                 // export -> import
                                 auto const& imported_module{*import_module};
 
-                                using exported_iterator = decltype(::uwvm2::uwvm::wasm::storage::all_module_export)::iterator;
+                                using exported_iterator = typename ::std::remove_reference_t<decltype(world.exports())>::iterator;
 
                                 exported_iterator curr_exported;  // No init
 
@@ -539,7 +540,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
                                                 // Check if there is an exported map. If not, build one.
                                                 auto [curr_exported_module,
-                                                      inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(import_module_name)};
+                                                      inserted]{world.exports().try_emplace(import_module_name)};
                                                 if(inserted) [[unlikely]]
                                                 {
                                                     curr_exported_module->second.reserve(
@@ -580,7 +581,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                         auto const imported_dl_ptr{imported_module.second.module_storage_ptr.wd};
 
                                         // Check if there is an exported map. If not, build one.
-                                        auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(import_module_name)};
+                                        auto [curr_exported_module, inserted]{world.exports().try_emplace(import_module_name)};
                                         if(inserted) [[unlikely]]
                                         {
                                             auto const dl_func{imported_dl_ptr->wasm_dl_storage.capi_function_vec};
@@ -616,7 +617,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                         auto const weak_symbol_ptr{imported_module.second.module_storage_ptr.wws};
 
                                         // Check if there is an exported map. If not, build one.
-                                        auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(import_module_name)};
+                                        auto [curr_exported_module, inserted]{world.exports().try_emplace(import_module_name)};
                                         if(inserted) [[unlikely]]
                                         {
                                             auto const wws_func{weak_symbol_ptr->wasm_wws_storage.capi_function_vec};
@@ -650,7 +651,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                     {
                                         auto const imported_local_ptr{imported_module.second.module_storage_ptr.li};
 
-                                        auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(import_module_name)};
+                                        auto [curr_exported_module, inserted]{world.exports().try_emplace(import_module_name)};
 
                                         if(inserted) [[unlikely]]
                                         {
@@ -715,7 +716,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
 // curr_exported should never be end() here
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                if(curr_exported == ::uwvm2::uwvm::wasm::storage::all_module_export.end()) [[unlikely]]
+                                if(curr_exported == world.exports().end()) [[unlikely]]
                                 {
                                     ::uwvm2::utils::debug::trap_and_inform_bug_pos();
                                 }
@@ -726,25 +727,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                 {
                                     // Output missing export error in module a, dependency from module b
                                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                                         u8"uwvm: ",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                                         u8"[error] ",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                         u8"Missing export \"",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                                         import_extern_name,
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                         u8"\" in module \"",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                                         import_module_name,
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                         u8"\" required by \"",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                                         curr_module_name,
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                         u8"\".\n\n",
-                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
 
                                     return {load_and_check_modules_rtl::module_dependency_error, ::std::move(adjacency_list)};
                                 }
@@ -773,7 +774,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                         auto const dl_ptr{curr_module.second.module_storage_ptr.wd};
                         if(dl_ptr != nullptr)
                         {
-                            auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(curr_module_name)};
+                            auto [curr_exported_module, inserted]{world.exports().try_emplace(curr_module_name)};
                             if(inserted) [[unlikely]]
                             {
                                 auto const dl_func_vec{dl_ptr->wasm_dl_storage.capi_function_vec};
@@ -809,7 +810,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                         auto const weak_symbol_ptr{curr_module.second.module_storage_ptr.wws};
                         if(weak_symbol_ptr != nullptr)
                         {
-                            auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(curr_module_name)};
+                            auto [curr_exported_module, inserted]{world.exports().try_emplace(curr_module_name)};
                             if(inserted) [[unlikely]]
                             {
                                 auto const wws_func{weak_symbol_ptr->wasm_wws_storage.capi_function_vec};
@@ -846,7 +847,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                         auto const imported_local_ptr{curr_module.second.module_storage_ptr.li};
                         if(imported_local_ptr != nullptr)
                         {
-                            auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(curr_module_name)};
+                            auto [curr_exported_module, inserted]{world.exports().try_emplace(curr_module_name)};
                             if(inserted) [[unlikely]]
                             {
                                 auto const fn_all{imported_local_ptr->get_all_function_information()};
@@ -908,6 +909,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         return {load_and_check_modules_rtl::ok, ::std::move(adjacency_list)};
     }
 
+    namespace details
+    {
+        // Ordinary loader view: borrow the existing globals, never a source seal.
+        struct ordinary_module_graph_context
+        {
+            [[nodiscard]] static constexpr auto& declarations() noexcept
+            { return ::uwvm2::uwvm::wasm::storage::all_module; }
+            [[nodiscard]] static constexpr auto& exports() noexcept
+            { return ::uwvm2::uwvm::wasm::storage::all_module_export; }
+            [[nodiscard]] static constexpr auto const* find_import_rewrite(
+                ::uwvm2::utils::container::u8string_view name,
+                ::uwvm2::utils::container::u8string_view imported_module,
+                ::uwvm2::utils::container::u8string_view imported_name) noexcept
+            { return ::uwvm2::uwvm::wasm::storage::find_configured_import_reset_const(name, imported_module, imported_name); }
+        };
+    }
+
+    inline constexpr build_dependency_graph_and_check_import_exist_ret_t
+        build_dependency_graph_and_check_import_exist_and_construct_all_module_export() noexcept
+    {
+        details::ordinary_module_graph_context world{};
+        return build_dependency_graph_and_check_import_exist_and_construct_all_module_export_in_context(world);
+    }
+
     inline constexpr load_and_check_modules_rtl check_import_exist_and_detect_cycles() noexcept
     {
         // Build dependency graph and detect cyclic dependencies
@@ -915,19 +940,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_GREEN),
                                 u8"[info]  ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8"Start checking whether the import exists. ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_GREEN),
                                 u8"[",
                                 ::uwvm2::uwvm::io::get_local_realtime(),
                                 u8"] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                 u8"(verbose)\n",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
         }
 
         auto const [ok, dependency_graph]{build_dependency_graph_and_check_import_exist_and_construct_all_module_export()};
@@ -942,19 +967,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_GREEN),
                                     u8"[info]  ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"Start Detecting Cycles. ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_GREEN),
                                     u8"[",
                                     ::uwvm2::uwvm::io::get_local_realtime(),
                                     u8"] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                     u8"(verbose)\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
             }
 
             // timer
@@ -997,19 +1022,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
                 // verbose
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_GREEN),
                                     u8"[info]  ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"Detecting Cycles done. (time=",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_GREEN),
                                     end_time - start_time,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"s). ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                     u8"(verbose)\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
             }
 
             // Output cyclic dependency warnings
@@ -1029,17 +1054,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
                     // output warning
                     ::fast_io::io::perr(u8log_output_ul,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                         u8"uwvm: ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                         u8"[warn]  ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                         u8"Detected ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                         cycles.size(),
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                         u8" cyclic dependencies: ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                         u8"(depend)\n");
 
                     ::std::size_t counter{};
@@ -1047,7 +1072,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                     for(auto const& cycle: cycles)
                     {
                         ::fast_io::io::perr(u8log_output_ul,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                             u8"              ",
                                             ++counter,
                                             u8": ");
@@ -1058,15 +1083,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                             if(is_not_first) [[likely]]
                             {
                                 ::fast_io::io::perr(u8log_output_ul,
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                     u8" -> ");
                             }
                             is_not_first = true;
 
-                            ::fast_io::io::perr(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN), cycle_curr);
+                            ::fast_io::io::perr(u8log_output_ul, ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN), cycle_curr);
                         }
 
-                        ::fast_io::io::perrln(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::io::perrln(u8log_output_ul, ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                     }
 
                     // Here, guard will perform destructors.
@@ -1075,15 +1100,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                 if(::uwvm2::uwvm::io::depend_warning_fatal) [[unlikely]]
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                         u8"uwvm: ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                                         u8"[fatal] ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                         u8"Convert warnings to fatal errors. ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                         u8"(depend)\n\n",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                     ::fast_io::fast_terminate();
                 }
             }

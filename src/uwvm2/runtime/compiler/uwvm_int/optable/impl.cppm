@@ -29,16 +29,26 @@ export module uwvm2.runtime.compiler.uwvm_int.optable;
 export import :define;
 export import :storage;
 export import :call;
+export import :exception;
+export import :exception_throw;
+export import :exception_metadata;
 export import :compare;
 export import :constop;
 export import :control;
 export import :convert;
 export import :lazy;
 export import :memory;
+export import :memory64;
+export import :memory64_simd;
+export import :memory64_bulk;
 // The public selector API is declared by :register_ring and is consumed through
 // this primary interface by the full and lazy translators.
 export import :register_ring;
 export import :wasm1p1;
+export import :gc;
+export import :table64;
+export import :threads;
+export import :memory64_atomic;
 export import :numeric;
 export import :stack;
 export import :variable;

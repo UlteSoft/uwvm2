@@ -1,0 +1,17 @@
+--- a/linux-user/loongarch64/vdso.S
++++ b/linux-user/loongarch64/vdso.S
+@@ -44,11 +44,11 @@
+ #define B_GR	offsetof_sigcontext_gr
+ #define B_FR	sizeof_sigcontext + sizeof_sctx_info + offsetof_fpucontext_fr
+ 
+-	.cfi_def_cfa	2, offsetof_sigcontext
++	.cfi_def_cfa	3, offsetof_sigcontext
+ 
+ 	/* Return address */
+-	.cfi_return_column 64
+-	.cfi_offset	64, offsetof_sigcontext_pc	/* pc */
++	.cfi_return_column 0
++	.cfi_offset	0, offsetof_sigcontext_pc	/* pc */
+ 	/* Integer registers */
+ 	.cfi_offset	1, B_GR + 1 * 8
+ 	.cfi_offset	2, B_GR + 2 * 8

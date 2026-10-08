@@ -25,5 +25,6 @@
 #ifndef UWVM_MODULE
 # include "retval.h"
 # include "loader.h"
+# include "owned_source.h"
 # include "run.h"
 #endif

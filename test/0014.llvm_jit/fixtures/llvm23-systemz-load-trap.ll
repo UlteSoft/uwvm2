@@ -1,0 +1,106 @@
+; RUN: llc -mtriple=s390x-linux-gnu -mcpu=z14 -O2 -verify-machineinstrs < %s | FileCheck %s
+; A real interpreter's pointer/cursor updates originally left a killed base
+; register in a sunk LGAT and crossed intervening stores. Keep machine checking.
+; CHECK-LABEL: load_trap_with_intervening_store:
+; CHECK-NOT: lgat
+; CHECK: br %r14
+; CHECK-LABEL: load_before_alias_store:
+; CHECK-NOT: lgat
+; CHECK: br %r14
+; CHECK-LABEL: adjacent_load_and_trap:
+; CHECK: lgat
+
+target datalayout = "E-S64-m:e-i1:8:16-i8:8:16-i64:64-f128:64-v128:64-a:8:16-n32:64"
+target triple = "s390x-unknown-linux-gnu"
+
+
+; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.lifetime.start.p0(ptr captures(none)) #0
+
+; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.lifetime.end.p0(ptr captures(none)) #0
+
+; Function Attrs: cold noreturn nounwind memory(inaccessiblemem: write)
+declare void @llvm.trap() #1
+
+; Function Attrs: hot inlinehint mustprogress nounwind
+define void @load_trap_with_intervening_store(ptr noundef nonnull align 8 dereferenceable(8) %0, ptr noundef nonnull align 8 dereferenceable(8) %1, ptr noundef nonnull align 8 dereferenceable(8) %2) #2 {
+  %4 = alloca i32, align 4
+  %5 = load ptr, ptr %0, align 8, !tbaa !8
+  %6 = getelementptr inbounds nuw i8, ptr %5, i64 8
+  store ptr %6, ptr %0, align 8, !tbaa !8
+  %7 = load ptr, ptr %6, align 1
+  %8 = getelementptr inbounds nuw i8, ptr %5, i64 16
+  store ptr %8, ptr %0, align 8, !tbaa !8
+  %9 = load i64, ptr %8, align 1
+  %10 = getelementptr inbounds nuw i8, ptr %5, i64 24
+  store ptr %10, ptr %0, align 8, !tbaa !8
+  call void @llvm.lifetime.start.p0(ptr nonnull %4) #4
+  %11 = icmp eq ptr %7, null
+  br i1 %11, label %12, label %13, !prof !10
+
+12:                                               ; preds = %3
+  tail call void @llvm.trap()
+  unreachable
+
+13:                                               ; preds = %3
+  call void @observe(ptr noundef nonnull %7, i64 noundef %9, ptr noundef nonnull align 4 dereferenceable(4) %4) #4
+  %14 = load ptr, ptr %1, align 8, !tbaa !8
+  %15 = load i32, ptr %4, align 4
+  store i32 %15, ptr %14, align 1
+  %16 = load ptr, ptr %1, align 8, !tbaa !8
+  %17 = getelementptr inbounds nuw i8, ptr %16, i64 4
+  store ptr %17, ptr %1, align 8, !tbaa !8
+  call void @llvm.lifetime.end.p0(ptr nonnull %4) #4
+  ret void
+}
+
+; Function Attrs: mustprogress noinline nounwind
+declare dso_local void @observe(ptr noundef, i64 noundef, ptr noundef) local_unnamed_addr #3
+
+attributes #0 = { nocallback nofree nosync nounwind willreturn memory(argmem: readwrite) }
+attributes #1 = { cold noreturn nounwind memory(inaccessiblemem: write) }
+attributes #2 = { hot inlinehint mustprogress nounwind "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="z14" "target-features"="+transactional-execution,+vector,+vector-enhancements-1" }
+attributes #3 = { mustprogress noinline nounwind "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="z14" "target-features"="+transactional-execution,+vector,+vector-enhancements-1" }
+attributes #4 = { nounwind }
+
+!llvm.module.flags = !{!0, !1, !2}
+!llvm.ident = !{!3}
+!llvm.errno.tbaa = !{!4}
+
+!0 = !{i32 2, !"s390x-visible-vector-ABI", i32 1}
+!1 = !{i32 8, !"PIC Level", i32 2}
+!2 = !{i32 7, !"PIE Level", i32 2}
+!3 = !{!"clang version 23.0.0git (https://github.com/llvm/llvm-project.git 4c4c1db7c69a6fda6cfa6bc6066bb09a433edc89)"}
+!4 = !{!5, !5, i64 0}
+!5 = !{!"int", !6, i64 0}
+!6 = !{!"omnipotent char", !7, i64 0}
+!7 = !{!"Simple C++ TBAA"}
+!8 = !{!9, !9, i64 0}
+!9 = !{!"any pointer", !6, i64 0}
+!10 = !{!"branch_weights", !"expected", i32 1, i32 2000}
+
+; The store may alias the load. Trapping on the reloaded zero changes behavior.
+define i64 @load_before_alias_store(ptr %p) {
+  %value = load i64, ptr %p
+  store i64 0, ptr %p
+  %zero = icmp eq i64 %value, 0
+  br i1 %zero, label %trap, label %done
+trap:
+  call void @llvm.trap()
+  unreachable
+done:
+  ret i64 %value
+}
+
+; Preserve the profitable case: no memory barrier or address change is crossed.
+define i64 @adjacent_load_and_trap(ptr %p) {
+  %value = load i64, ptr %p
+  %zero = icmp eq i64 %value, 0
+  br i1 %zero, label %trap, label %done
+trap:
+  call void @llvm.trap()
+  unreachable
+done:
+  ret i64 %value
+}

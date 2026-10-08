@@ -33,6 +33,7 @@ export module uwvm2.object.global:ref;
 
 import fast_io;
 import uwvm2.parser.wasm.standard.wasm1.type;
+import uwvm2.parser.wasm.standard.wasm3.type;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

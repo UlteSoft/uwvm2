@@ -40,4 +40,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 {
     inline ::uwvm2::uwvm::wasm::type::wasm_file_t execute_wasm{};  // [global] No global variable dependencies from other translation units
 
+    namespace details
+    {
+        // Borrow only into the selected nonmoving native full_source_instance.
+        // This low-layer selector avoids loader importing runtime storage.
+        inline ::uwvm2::uwvm::wasm::type::wasm_file_t* selected_execute_wasm{};
+        inline bool selected_execute_wasm_initialized{};
+    }
+    [[nodiscard]] inline constexpr ::uwvm2::uwvm::wasm::type::wasm_file_t& active_execute_wasm() noexcept
+    { return details::selected_execute_wasm ? *details::selected_execute_wasm : execute_wasm; }
+
 }  // namespace uwvm2::uwvm::wasm::storage

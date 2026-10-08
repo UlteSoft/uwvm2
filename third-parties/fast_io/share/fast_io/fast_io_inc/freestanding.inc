@@ -47,6 +47,8 @@ using ::fast_io::freestanding::find_first_not_of;
 using ::fast_io::freestanding::find_last_of;
 using ::fast_io::freestanding::find_last_not_of;
 using ::fast_io::freestanding::nonoverlapped_bytes_copy_n;
+using ::fast_io::freestanding::type_punning_from_bytes;
+using ::fast_io::freestanding::type_punning_to_bytes;
 using ::fast_io::freestanding::bytes_clear_n;
 
 using ::fast_io::freestanding::errc;

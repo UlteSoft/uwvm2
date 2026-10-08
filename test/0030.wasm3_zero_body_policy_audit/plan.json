@@ -1,0 +1,321 @@
+{
+  "schema": "uwvm-core3-zero-body-two-phase-plan-r2",
+  "source_only": true,
+  "official_oracle_passed": false,
+  "native_execution_passed": false,
+  "official_spec_commit": "2e44bf79e68cc4fe689f43eea8e7d25b6fdfbce1",
+  "phase_one": "genuine original binary owner -> actual enabled parser -> actual enabled initializer -> zero imported and defined functions",
+  "phase_two": "copy independent validation policy only; disable only gc or only exceptions; retain original parsed/runtime metadata and source owner",
+  "cli_shape": [
+    "{fixture}",
+    "gc|eh",
+    "accept|reject",
+    "none|function|table|global|element|tag",
+    "{oracle.wasm}"
+  ],
+  "first_short_before_cases": [
+    [
+      "gc",
+      "reject",
+      "function",
+      "gc_type.wasm"
+    ],
+    [
+      "gc",
+      "reject",
+      "table",
+      "gc_table.wasm"
+    ],
+    [
+      "gc",
+      "accept",
+      "none",
+      "function_type_control.wasm"
+    ],
+    [
+      "gc",
+      "accept",
+      "none",
+      "extern_control.wasm"
+    ],
+    [
+      "gc",
+      "accept",
+      "none",
+      "eh_table.wasm"
+    ],
+    [
+      "eh",
+      "reject",
+      "function",
+      "eh_type.wasm"
+    ],
+    [
+      "eh",
+      "reject",
+      "table",
+      "eh_table.wasm"
+    ]
+  ],
+  "oracle_argv": [
+    [
+      "{wasm_tools}",
+      "parse",
+      "{wat}",
+      "-o",
+      "{wasm}"
+    ],
+    [
+      "{wasm_tools}",
+      "validate",
+      "--features",
+      "all",
+      "{wasm}"
+    ]
+  ],
+  "tool_pin": "sole keeper must record actual existing official wasm-tools path/version/SHA and raw WAT/binary SHA",
+  "before_pin": "immutable R7 source including GC31/EH44; actual matching R7 headers and SDK/runtime. Do not mix R6 or newer headers with R7 runtime",
+  "after_pin": "Held genericmodule-gate R4 source (r1/r2/r3 preserve unresolved convenience emptyreturn) plus parent-approved matching actual headers/SDK/runtime",
+  "build_notes": [
+    "reuse keeper known-green strict common component compile/link setup; no local native compile",
+    "define UWVM2TEST_RUNNER_USE_LLVM_JIT only for actual matching LLVM runtime/SDK",
+    "ordinary __has_include exposes real int/LLVM lazy entry; ROS intentionally contains only full",
+    "UWVM_CPP_EXCEPTIONS actual profile is required for pure API bool negatives; nonexception terminating profile cannot qualify bool contract"
+  ],
+  "observations": "actual pure-whole-module bool plus actual full and available ordinary lazy module admission, no function materialization/guest execution/codegen verification claim",
+  "pure_diagnostic_rule": "pure bool alone cannot qualify exact diagnostic; retain raw stderr and check actual feature, subject, safe offset0/memory indication for each negative; unavailable log wiring, unrelated error/crash not PASS",
+  "compiler_diagnostic_rule": "require caught parse invalid plus feature_required with independent fixture-specified feature and subject; all unrelated exceptions rethrow",
+  "cases": [
+    {
+      "name": "gc_type",
+      "disabled": "gc",
+      "expected": "reject",
+      "subject": "function",
+      "oracle": "valid",
+      "source_before_prediction": "all existing no-body per-function GC checks are skipped; actual execution pending"
+    },
+    {
+      "name": "gc_table",
+      "disabled": "gc",
+      "expected": "reject",
+      "subject": "table",
+      "oracle": "valid",
+      "source_before_prediction": "all existing no-body per-function GC checks are skipped; actual execution pending"
+    },
+    {
+      "name": "gc_global",
+      "disabled": "gc",
+      "expected": "reject",
+      "subject": "global",
+      "oracle": "valid",
+      "source_before_prediction": "all existing no-body per-function GC checks are skipped; actual execution pending"
+    },
+    {
+      "name": "gc_element",
+      "disabled": "gc",
+      "expected": "reject",
+      "subject": "element",
+      "oracle": "valid",
+      "source_before_prediction": "all existing no-body per-function GC checks are skipped; actual execution pending"
+    },
+    {
+      "name": "gc_eh_type",
+      "disabled": "gc",
+      "expected": "reject",
+      "subject": "function",
+      "oracle": "valid",
+      "source_before_prediction": "all existing no-body per-function GC checks are skipped; actual execution pending"
+    },
+    {
+      "name": "empty_control",
+      "disabled": "gc",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "function_type_control",
+      "disabled": "gc",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "extern_control",
+      "disabled": "gc",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "defined_function_control",
+      "disabled": "gc",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "eh_type",
+      "disabled": "gc",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "eh_nonnull_noexn_type",
+      "disabled": "gc",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "eh_table",
+      "disabled": "gc",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "eh_global",
+      "disabled": "gc",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "eh_element",
+      "disabled": "gc",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "eh_tag",
+      "disabled": "gc",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "eh_type",
+      "disabled": "eh",
+      "expected": "reject",
+      "subject": "function",
+      "oracle": "valid",
+      "source_before_prediction": "EH44 fused module admission already rejects; pure empty-code loop still skips; actual execution pending"
+    },
+    {
+      "name": "eh_nonnull_noexn_type",
+      "disabled": "eh",
+      "expected": "reject",
+      "subject": "function",
+      "oracle": "valid",
+      "source_before_prediction": "EH44 fused module admission already rejects; pure empty-code loop still skips; actual execution pending"
+    },
+    {
+      "name": "eh_table",
+      "disabled": "eh",
+      "expected": "reject",
+      "subject": "table",
+      "oracle": "valid",
+      "source_before_prediction": "EH44 fused module admission already rejects; pure empty-code loop still skips; actual execution pending"
+    },
+    {
+      "name": "eh_global",
+      "disabled": "eh",
+      "expected": "reject",
+      "subject": "global",
+      "oracle": "valid",
+      "source_before_prediction": "EH44 fused module admission already rejects; pure empty-code loop still skips; actual execution pending"
+    },
+    {
+      "name": "eh_element",
+      "disabled": "eh",
+      "expected": "reject",
+      "subject": "element",
+      "oracle": "valid",
+      "source_before_prediction": "EH44 fused module admission already rejects; pure empty-code loop still skips; actual execution pending"
+    },
+    {
+      "name": "eh_tag",
+      "disabled": "eh",
+      "expected": "reject",
+      "subject": "tag",
+      "oracle": "valid",
+      "source_before_prediction": "EH44 fused module admission already rejects; pure empty-code loop still skips; actual execution pending"
+    },
+    {
+      "name": "gc_eh_type",
+      "disabled": "eh",
+      "expected": "reject",
+      "subject": "function",
+      "oracle": "valid",
+      "source_before_prediction": "EH44 fused module admission already rejects; pure empty-code loop still skips; actual execution pending"
+    },
+    {
+      "name": "empty_control",
+      "disabled": "eh",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "function_type_control",
+      "disabled": "eh",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "extern_control",
+      "disabled": "eh",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "defined_function_control",
+      "disabled": "eh",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "gc_type",
+      "disabled": "eh",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "gc_table",
+      "disabled": "eh",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "gc_global",
+      "disabled": "eh",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    },
+    {
+      "name": "gc_element",
+      "disabled": "eh",
+      "expected": "accept",
+      "subject": "none",
+      "oracle": "valid"
+    }
+  ],
+  "limits": "sole Linux keeper shared <=64GiB cgroup; no Mac native/SSH lane spawned by owner",
+  "results_rule": "BEFORE forbidden declaration acceptance remains a failing regression; distinguish oracle, native admission, diagnostic and source-fit; zero guest functions means no execution evidence",
+  "r1_preserved_manifest_sha256": "ec7a56b7ae318d9ab868cc02948ab57c0743ed9f77e288c01a86d9ada5e3d157",
+  "llvm_additional_public_entrances": [
+    "compile_all_from_uwvm::validate_all_wasm_code_for_module parsedmodule explicitpolicy bool (default/globalwalker forward)",
+    "compile_all_from_uwvm::validate_runtime_wasm_code_for_module runtime explicitpolicy -> details::validate_runtime_module_all_local_funcs",
+    "compile_all_from_uwvm::compile_all_from_uwvm_single_func convenience emptyreturn + existingpending-plan validation-only route"
+  ],
+  "r2_delta": "Same15 WATs byte-for-byte; real optionalLLVM three public side entrances plus colored parser bool diagnostics; no production apply/actual qualification"
+}

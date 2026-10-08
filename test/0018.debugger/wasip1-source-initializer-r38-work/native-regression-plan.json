@@ -1,0 +1,586 @@
+{
+  "cases": [
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "scenario": "core-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "scenario": "core-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "scenario": "core-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "scenario": "core-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "scenario": "wasip1-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "scenario": "wasip1-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "scenario": "wasip1-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "scenario": "wasip1-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "scenario": "instance",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "scenario": "instance",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "scenario": "preload",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "scenario": "preload",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "scenario": "core-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "scenario": "core-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "scenario": "core-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "scenario": "core-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "scenario": "wasip1-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "scenario": "wasip1-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "scenario": "wasip1-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "scenario": "wasip1-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "scenario": "instance",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "scenario": "instance",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "scenario": "preload",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "scenario": "preload",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "scenario": "core-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "scenario": "core-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "scenario": "core-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "scenario": "core-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "scenario": "wasip1-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "scenario": "wasip1-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "scenario": "wasip1-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "scenario": "wasip1-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "scenario": "instance",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "scenario": "instance",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "scenario": "preload",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "scenario": "preload",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "scenario": "core-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "scenario": "core-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "scenario": "core-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "scenario": "core-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "scenario": "wasip1-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "scenario": "wasip1-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "scenario": "wasip1-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "scenario": "wasip1-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "scenario": "instance",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "scenario": "instance",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "scenario": "preload",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "scenario": "preload",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "scenario": "core-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "scenario": "core-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "scenario": "core-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "scenario": "core-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "scenario": "wasip1-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "scenario": "wasip1-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "scenario": "wasip1-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "scenario": "wasip1-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "scenario": "instance",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "scenario": "instance",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "scenario": "preload",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "scenario": "preload",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "scenario": "core-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "scenario": "core-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "scenario": "core-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "scenario": "core-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "scenario": "wasip1-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "scenario": "wasip1-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "scenario": "wasip1-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "scenario": "wasip1-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "scenario": "instance",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "scenario": "instance",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "scenario": "preload",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "scenario": "preload",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "scenario": "core-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "scenario": "core-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "scenario": "core-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "scenario": "core-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "scenario": "wasip1-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "scenario": "wasip1-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "scenario": "wasip1-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "scenario": "wasip1-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "scenario": "instance",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "scenario": "instance",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "scenario": "preload",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "scenario": "preload",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "scenario": "core-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "scenario": "core-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "scenario": "core-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "scenario": "core-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "scenario": "wasip1-normal",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "scenario": "wasip1-normal",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "scenario": "wasip1-indirect",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "scenario": "wasip1-indirect",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "scenario": "instance",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "scenario": "instance",
+      "policy": "unwind"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "scenario": "preload",
+      "policy": "instruction"
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "scenario": "preload",
+      "policy": "unwind"
+    }
+  ],
+  "planned": 96,
+  "source_manifest_sha256": "0e04d0d03d9450019d2b401796dd66279c6473874af40b89247aa0fa22cc9848",
+  "macos_aggregate_memory_limit_bytes": 2147483648,
+  "linux_windows_freebsd_only_in_original_64gib_cgroup": true,
+  "original_persistent_full_suite_disk_policy_unchanged": true,
+  "linux_tmpfs_runner_maximum_bytes": 805306368
+}

@@ -17,7 +17,7 @@ inline constexpr auto k512scalar{create_k512scalar()};
 inline ::std::uint_least64_t sha512_load_be64_unaligned(::std::byte const *p) noexcept
 {
 	::std::uint_least64_t word{};
-	::std::memcpy(__builtin_addressof(word), p, sizeof(word));
+	::fast_io::details::my_memcpy(__builtin_addressof(word), p, sizeof(word));
 	return ::fast_io::big_endian(word);
 }
 

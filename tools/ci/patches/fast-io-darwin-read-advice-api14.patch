@@ -1,0 +1,73 @@
+--- a/third-parties/fast_io/include/fast_io_hosted/filesystem/posix_nothrow.h
++++ b/third-parties/fast_io/include/fast_io_hosted/filesystem/posix_nothrow.h
+@@ -172,6 +172,12 @@
+ extern int fd_set_flags(int, int, ...) noexcept __asm__("fcntl64");
+ #else
+ extern int fd_set_flags(int, int, ...) noexcept __asm__("fcntl");
++#endif
++#if defined(__APPLE__) && defined(__MACH__) && defined(F_RDAHEAD) && defined(F_RDADVISE)
++// These two SDK commands use distinct scalar and owned-radvisory payloads.
++// The public methods below expose neither arbitrary fcntl commands nor pointers.
++// Keep the exact target SDK cancellation/UNIX conformance symbol suffixes.
++extern int fd_read_advice(int, int, ...) noexcept __DARWIN_ALIAS_C(fcntl);
+ #endif
+ inline int last_error() noexcept { int const error{errno}; return error == 0 ? EIO : error; }
+ inline int checked_at_status(int directory, char const* path, struct ::stat* output, int flags) noexcept
+@@ -458,6 +464,43 @@
+ 		static_cast<native_offset_type>(offset), static_cast<native_offset_type>(length), native_advice)};
+ }
+ #endif
++#if defined(__APPLE__) && defined(__MACH__) && defined(F_RDAHEAD) && defined(F_RDADVISE)
++template <::fast_io::posix_family family, ::std::integral char_type>
++inline posix_operation_result posix_readahead_nothrow(basic_posix_family_io_observer<family, char_type> file,
++	bool enabled) noexcept
++{
++	// ONE SDK F_RDAHEAD borrows only the caller-pinned descriptor number and
++	// an int 0/1 switch. The observer never owns, closes or duplicates the FD.
++	// This modifies the shared open file description's native read-ahead flag;
++	// no allocation, retry, verification, software emulation or cache guarantee.
++	auto const result{details::posix_nothrow_abi::fd_read_advice(file.native_handle(), F_RDAHEAD, static_cast<int>(enabled))};
++	if (result < 0) return {details::posix_nothrow_abi::last_error()};
++	return {};
++}
++template <::fast_io::posix_family family, ::std::integral char_type>
++requires (::std::numeric_limits<::off_t>::is_signed &&
++	::std::numeric_limits<::off_t>::digits >= ::std::numeric_limits<::fast_io::intfpos_t>::digits)
++inline posix_operation_result posix_readadvise_nothrow(basic_posix_family_io_observer<family, char_type> file,
++	::fast_io::intfpos_t offset, int byte_count) noexcept
++{
++	// Both signed arguments reach the real SDK unchanged. Do not pre-check
++	// negatives or clamp ranges: the native descriptor error has its own order.
++	// Clear the complete real SDK cell with fast_io before assigning fields;
++	// [safe complete owned native radvisory cell]
++	//       ^ ONE F_RDADVISE borrows this cell only until synchronous return.
++	// No pointer advances, escapes, arbitrary command/payload is accepted, FD
++	// ownership changes, allocation, retry or throwing adapter is introduced.
++	struct ::radvisory native{};
++	// [safe native byte representation, exactly sizeof(native) bytes]
++	//       ^ fast_io clears this one owned cell; its returned end is unused.
++	::fast_io::freestanding::bytes_clear_n(reinterpret_cast<::std::byte*>(__builtin_addressof(native)), sizeof(native));
++	native.ra_offset = static_cast<::off_t>(offset);
++	native.ra_count = byte_count;
++	auto const result{details::posix_nothrow_abi::fd_read_advice(file.native_handle(), F_RDADVISE, __builtin_addressof(native))};
++	if (result < 0) return {details::posix_nothrow_abi::last_error()};
++	return {};
++}
++#endif
+ template <::fast_io::posix_family family, ::std::integral char_type>
+ inline posix_operation_result posix_close_nothrow(basic_posix_family_file<family, char_type>& file) noexcept
+ {
+--- a/third-parties/fast_io/share/fast_io/fast_io_inc/host/posix.inc
++++ b/third-parties/fast_io/share/fast_io/fast_io_inc/host/posix.inc
+@@ -33,6 +33,11 @@
+     using ::fast_io::posix_fadvise_nothrow;
+ #endif
+ 
++#if defined(__APPLE__) && defined(__MACH__) && defined(F_RDAHEAD) && defined(F_RDADVISE)
++    using ::fast_io::posix_readahead_nothrow;
++    using ::fast_io::posix_readadvise_nothrow;
++#endif
++
+ #if ((!defined(_WIN32) || defined(__WINE__)) || defined(__CYGWIN__))
+     namespace posix
+     {

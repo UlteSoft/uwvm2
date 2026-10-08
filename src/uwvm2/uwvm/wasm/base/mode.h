@@ -32,7 +32,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::base
     {
         section_details,
         run,  // non-img
-        validation
+        validation,
+        debug_jit
     };
 
 }  // namespace uwvm2::uwvm::wasm::base

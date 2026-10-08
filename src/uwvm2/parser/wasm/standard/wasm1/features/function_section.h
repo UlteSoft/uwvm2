@@ -4649,51 +4649,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                                                 ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32& out_value,
                                                                 unsigned& out_len) constexpr UWVM_THROWS -> bool
                                          {
-                                             using wasm_byte = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte;
-
+                                             if(p == end) [[unlikely]] { return false; }
                                              auto const remaining{static_cast<::std::size_t>(end - p)};
-                                             if(remaining == 0uz) [[unlikely]] { return false; }
-
-                                             // This provides a maximum of 2 bytes for data storage. You can use `unsigned short`, but it will be type-promoted
-                                             // to `int` or `unsigned int` in expressions. To avoid type promotion, use `unsigned int` (i.e., `unsigned`)
-                                             // directly, which will not be promoted. According to the C standard, `short` is at least 16 bits, and `int` is at
-                                             // least as large as `short`. Therefore, the size of `unsigned int` is typically ≥ 2 bytes.
-                                             if(remaining < sizeof(unsigned)) [[unlikely]] { return false; }
-
-                                             // wasm_byte is uint_least8_t, so it is safe to reinterpret_cast
-                                             auto bytes{reinterpret_cast<wasm_byte const*>(p)};
-
-                                             unsigned word{};
-                                             ::std::memcpy(::std::addressof(word), bytes, sizeof(word));
-
-                                             // Bits 7, 15, 23, ... are zero for the terminating byte.
-                                             // The unsigned standard does not specify a size; 64 bits are provided here to ensure absolute safety.
-                                             constexpr unsigned msb_mask{~static_cast<unsigned>(0x7F7F'7F7F'7F7F'7F7Fu)};
-                                             unsigned const msbs{~word & msb_mask};
-
-                                             if(msbs == 0u) [[unlikely]]
-                                             {
-                                                 // No terminating byte in the first 8 bytes: extremely long or
-                                                 // malformed LEB128. Defer to the scalar implementation, which
-                                                 // will raise the appropriate parse error.
-                                                 return false;
-                                             }
-
-                                             unsigned const len_bits{static_cast<unsigned>(::std::countr_zero(msbs)) + 1u};
-                                             unsigned const len_bytes{len_bits / 8u};
-
-                                             // This can only hold up to 2 bytes.
-                                             if(len_bytes == 0u || len_bytes > 2u || static_cast<::std::size_t>(len_bytes) > remaining) [[unlikely]]
-                                             {
-                                                 return false;
-                                             }
-
-                                             // Scalar reconstruction from the packed bytes in 'word'.
-                                             unsigned value{word & 0x7Fu};
-                                             if(len_bytes == 2u) { value |= ((word >> 8u) & 0x7Fu) << 7u; }
-
-                                             out_value = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(value);
-                                             out_len = len_bytes;
+                                             auto const first{reinterpret_cast<unsigned char const*>(p)};
+                                             auto const last{first + (remaining < 2uz ? remaining : 2uz)};
+                                             ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 value{};
+                                             auto const [next, code]{::fast_io::parse_by_scan(first, last, ::fast_io::mnp::leb128_get(value))};
+                                             if(code != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                             out_value = value;
+                                             out_len = static_cast<unsigned>(next - first);
                                              return true;
                                          }};
 
@@ -8645,6 +8609,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             err.err_selectable.u32arr[1] = func_count;
             err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::func_section_resolved_not_match_the_actual_number;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        }
+
+        if(!typesec.core3_type_kinds.empty())
+        {
+            // The SIMD/zero-copy scanners above proved all stored type indices are in `typesec.types`.
+            // A Core 3 aggregate occupies a flat index but is not a legal function signature.
+            for(::std::size_t index{}; index != static_cast<::std::size_t>(func_count); ++index)
+            {
+                auto const type_index{static_cast<::std::size_t>(functionsec.funcs.index_unchecked(index))};
+                if(type_index >= typesec.core3_type_kinds.size() ||
+                   typesec.core3_type_kinds.index_unchecked(type_index) !=
+                       ::uwvm2::parser::wasm::standard::wasm3::type::composite_kind::function) [[unlikely]]
+                {
+                    // [section_begin ... checked type-index vector ... section_end]
+                    // [safe                                          ] unsafe (section_end is one-past)
+                    // ^^ err_curr: the section begin is diagnostic only; no byte is dereferenced.
+                    err.err_curr = section_begin;
+                    err.err_selectable.u32 = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(type_index);
+                    err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::illegal_type_index;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+            }
         }
 
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)

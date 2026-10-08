@@ -1,0 +1,628 @@
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime.h
+@@ -587,7 +587,7 @@
+     enum class llvm_jit_checkpoint_prepare_status : unsigned char
+     { prepared_and_discarded, requires_llvm_jit_full, not_selected, invalid_request,
+       unavailable_capture, resource_preparation_declined, engine_preparation_declined, allocation_failed,
+-      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained };
++      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained, dispatch_binding_preparation_declined };
+     struct llvm_jit_checkpoint_prepare_request
+     {
+         ::std::array<::std::byte,16u> recording_label{};
+@@ -603,6 +603,8 @@
+         // Prepare every visible distinct WASIp1 environment in this SAME stop.
+         // These bounded candidates are discarded with the candidate Wasm world.
+         bool include_wasip1{}, require_managed_wasip1_resources{true};
++        // Combined final defined/import cache entries; checked before allocation.
++        ::std::size_t maximum_private_dispatch_bindings{1048576u};
+     };
+     struct llvm_jit_checkpoint_prepare_result
+     {
+@@ -641,6 +643,9 @@
+         bool wasip1_dispatch_prepared{};
+         ::std::size_t verified_wasip1_dispatch_workers{}, verified_wasip1_dispatch_module_visits{};
+         bool wasip1_dispatch_tls_restored{}; // Verification only; no execution credential.
++        ::std::size_t prepared_runtime_defined_bindings{}, prepared_runtime_import_bindings{};
++        ::std::size_t prepared_runtime_defined_pointer_ranges{};
++        bool runtime_dispatch_bindings_prepared{}; // Private new-source caches; no publication.
+     };
+     struct llvm_jit_checkpoint_native_retirement_result
+     {
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_resources.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_resources.h
+@@ -1195,6 +1195,7 @@
+                          // native range/CFI permission and VM epoch NOT published.
+         }
+ # include "uwvm_runtime_checkpoint_world_frames.h"
++# include "uwvm_runtime_checkpoint_world_function_bindings.h"
+ # include "uwvm_runtime_checkpoint_world_roots.h"
+ # include "uwvm_runtime_checkpoint_world_root_workers.h"
+     public:
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_preparation_api.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_preparation_api.h
+@@ -64,6 +64,9 @@
+             if(!prepared->prepare_all_world_frames())
+             { out.frame_diagnostic=static_cast<unsigned>(prepared->phase_);out.native_payload_bytes=prepared->native_bytes_;return; }
+             out.prepared_threads=prepared->prepared_threads_.size();out.prepared_frames=prepared->prepared_frames_;
++            out.status=llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined;
++            if(!prepared->prepare_world_dispatch_bindings(source,request.maximum_private_dispatch_bindings,out))
++            { out.native_payload_bytes=prepared->native_bytes_;out.resource_diagnostic=static_cast<unsigned>(prepared->phase_);return; }
+             out.prepared_root_carriers=prepared->prepared_root_carriers_;
+             out.native_payload_bytes=prepared->native_bytes_;
+             out.status=llvm_jit_checkpoint_prepare_status::root_preparation_declined;
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_function_bindings.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_function_bindings.h
+@@ -0,0 +1,189 @@
++// Private member fragment of the complete candidate world. These final caches
++// borrow ONLY the new source's authenticated records and its actual staged
++// engines. Preparing them grants no world publication or execution permission.
++#pragma once
++decltype(g_runtime.defined_func_cache) defined_dispatch_bindings_{};
++decltype(g_import_call_cache) import_dispatch_bindings_{};
++decltype(g_runtime.defined_func_ptr_ranges) defined_dispatch_pointer_ranges_{};
++::std::size_t prepared_defined_bindings_{}, prepared_import_bindings_{};
++bool dispatch_bindings_prepared_{};
++
++[[nodiscard]] bool prepare_world_dispatch_bindings(source_owner const& original,
++    ::std::size_t maximum_bindings, llvm_jit_checkpoint_prepare_result& out)
++{
++    namespace in=checkpoint_world_data::in;
++    using imported_kind=checkpoint_world_data::st::imported_function_link_kind;
++    if(phase_!=preparation_status::resources_prepared || !source_type::has_canonical_owner(original) ||
++       !original->initialized_from_actual_state() || !actual_prepared_profile_ ||
++       engines_.size()!=modules_.size() || actual_dense_module_owners_.size()!=modules_.size() ||
++       dispatch_bindings_prepared_ || !defined_dispatch_bindings_.empty() || !import_dispatch_bindings_.empty() ||
++       !defined_dispatch_pointer_ranges_.empty())
++    { return fail(preparation_status::source_mismatch); }
++    ::std::size_t defined{},imports{},ranges{};
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        if(owner>=modules_.size() || modules_[owner].actual==nullptr ||
++           context_->unpublished_file_for_module(modules_[owner].actual)!=modules_[owner].file)
++        { return fail(preparation_status::source_mismatch); }
++        auto const& module=*modules_[owner].actual;
++        auto const locals=module.local_defined_function_vec_storage.size();
++        auto const external=module.imported_function_vec_storage.size();
++        if(defined>maximum_bindings || imports>maximum_bindings-defined ||
++           locals>maximum_bindings-defined-imports)
++        { return fail(preparation_status::quota_exceeded); }
++        defined+=locals;
++        if(external>maximum_bindings-defined-imports) { return fail(preparation_status::quota_exceeded); }
++        imports+=external; // every sum bounded BEFORE increment
++        if(locals!=0u) { ++ranges; } // at most the authenticated module count
++    }
++    using defined_vector=decltype(defined_dispatch_bindings_)::value_type;
++    using import_vector=decltype(import_dispatch_bindings_)::value_type;
++    if(!charge_native(modules_.size(),sizeof(defined_vector)+sizeof(import_vector)) ||
++       !charge_native(defined,sizeof(compiled_defined_func_info)) ||
++       !charge_native(imports,sizeof(cached_import_target)) ||
++       !charge_native(ranges,sizeof(defined_func_ptr_range))) { return false; }
++    defined_dispatch_bindings_.resize(modules_.size());
++    import_dispatch_bindings_.resize(modules_.size());
++    defined_dispatch_pointer_ranges_.reserve(ranges);
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto const& bound=modules_[owner];auto const dense=bound.new_actual_id;
++        if(dense>=engines_.size() || !engines_[dense] || dense>=defined_dispatch_bindings_.size() ||
++           dense>=import_dispatch_bindings_.size()) { return fail(preparation_status::source_mismatch); }
++        auto const& module=*bound.actual;auto const& engine=*engines_[dense];
++        auto const locals=module.local_defined_function_vec_storage.size();
++        auto const imported=module.imported_function_vec_storage.size();
++        if(engine.module_id_!=dense || engine.owner_.module()!=bound.actual || engine.owner_.file()!=bound.file ||
++           engine.locals_.size()!=locals || engine.entries_.size()!=locals || engine.typed_targets_.size()!=locals ||
++           engine.generations_.size()!=locals || !engine.engine_ || !engine.context_)
++        { return fail(preparation_status::source_mismatch); }
++        auto& cache=defined_dispatch_bindings_.index_unchecked(dense);cache.resize(locals);
++        import_dispatch_bindings_.index_unchecked(dense).resize(imported);
++        if(locals!=0u)
++        {
++            // Final new-source storage is nonmoving. The pointer-range cache is
++            // required by table/funcref dispatch as well as the direct cache.
++            auto const* first=module.local_defined_function_vec_storage.data();
++            constexpr auto width=sizeof(runtime_local_func_storage_t);
++            if(first==nullptr || locals>(::std::numeric_limits<::std::uintptr_t>::max)()/width)
++            { return fail(preparation_status::source_mismatch); }
++            auto const begin=reinterpret_cast<::std::uintptr_t>(first);
++            auto const bytes=static_cast<::std::uintptr_t>(locals*width);
++            if(begin>(::std::numeric_limits<::std::uintptr_t>::max)()-bytes)
++            { return fail(preparation_status::source_mismatch); }
++            defined_dispatch_pointer_ranges_.push_back(defined_func_ptr_range{begin,begin+bytes,dense});
++        }
++        for(::std::size_t local{};local<locals;++local)
++        {
++            auto const* function=::std::addressof(module.local_defined_function_vec_storage.index_unchecked(local));
++            auto const& entry=engine.entries_[local];auto const& plan=engine.locals_[local].checkpoint_plan;
++            // The real fresh engine, final source member, sealed profile and
++            // function generation all agree. No old entry/cache is reused.
++            if(function->function_type_ptr==nullptr || imported>SIZE_MAX-local ||
++               entry.typed==0u || entry.raw==0u || engine.typed_targets_.index_unchecked(local)!=entry.typed ||
++               !plan || plan->get().module!=dense || plan->get().function!=imported+local ||
++               plan->get().function_generation!=engine.generations_[local] ||
++               plan->get().profile.get()!=actual_prepared_profile_.get() ||
++               plan->get().profile.owner_before(actual_prepared_profile_) ||
++               actual_prepared_profile_.owner_before(plan->get().profile))
++            { return fail(preparation_status::source_mismatch); }
++            auto const sig=func_sig_from_defined(function);
++            auto const parameters=total_abi_bytes(sig.params);auto const results=total_abi_bytes(sig.results);
++            if((parameters==0u && sig.params.size!=0u) || (results==0u && sig.results.size!=0u))
++            { return fail(preparation_status::type_mismatch); }
++            auto& next=cache.index_unchecked(local);
++            next.module_id=dense;next.function_index=imported+local;next.runtime_func=function;
++            next.param_bytes=parameters;next.result_bytes=results;
++            next.reference_params=signature_has_reference_carrier(sig.params);
++            next.reference_results=signature_has_reference_carrier(sig.results);
++        }
++    }
++    ::std::sort(defined_dispatch_pointer_ranges_.begin(),defined_dispatch_pointer_ranges_.end(),
++        [](defined_func_ptr_range const& left,defined_func_ptr_range const& right) noexcept { return left.begin<right.begin; });
++    for(::std::size_t n{1u};n<defined_dispatch_pointer_ranges_.size();++n)
++    {
++        if(defined_dispatch_pointer_ranges_.index_unchecked(n-1u).end>
++           defined_dispatch_pointer_ranges_.index_unchecked(n).begin)
++        { return fail(preparation_status::source_mismatch); }
++    }
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto const& bound=modules_[owner];auto const dense=bound.new_actual_id;
++        auto const& module=*bound.actual;auto& cache=import_dispatch_bindings_.index_unchecked(dense);
++        for(::std::size_t index{};index<module.imported_function_vec_storage.size();++index)
++        {
++            auto const* function=::std::addressof(module.imported_function_vec_storage.index_unchecked(index));
++            // Contextual resolver authenticates every hop against the NEW final
++            // vectors before a union read. Cycles and foreign addresses refuse.
++            auto const leaf=in::details::resolve_linked_imported_function_leaf_in_context(context_->world_,function);
++            if(leaf.imported==nullptr) { return fail(preparation_status::invalid_import); }
++            cached_import_target next{};next.frame.module_id=dense;next.frame.function_index=index;
++            next.origin_module_id=dense;
++            if(leaf.defined!=nullptr)
++            {
++                ::std::size_t target_owner{SIZE_MAX};
++                for(::std::size_t n{};n<modules_.size();++n)
++                { if(modules_[n].actual==leaf.defined_location.module) { target_owner=n;break; } }
++                if(target_owner>=modules_.size()) { return fail(preparation_status::invalid_import); }
++                auto const target=modules_[target_owner].new_actual_id;
++                auto const local=leaf.defined_location.index;
++                if(target>=defined_dispatch_bindings_.size() ||
++                   local>=defined_dispatch_bindings_.index_unchecked(target).size())
++                { return fail(preparation_status::invalid_import); }
++                auto const& resolved=defined_dispatch_bindings_.index_unchecked(target).index_unchecked(local);
++                if(resolved.runtime_func!=leaf.defined) { return fail(preparation_status::invalid_import); }
++                next.k=cached_import_target::kind::defined;next.frame.module_id=target;
++                next.frame.function_index=resolved.function_index;next.u.defined.runtime_func=resolved.runtime_func;
++                next.sig=func_sig_from_defined(resolved.runtime_func);
++                next.param_bytes=resolved.param_bytes;next.result_bytes=resolved.result_bytes;
++            }
++            else
++            {
++#if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
++                if(leaf.imported->link_kind!=imported_kind::local_imported ||
++                   original->builtin_wasip1_member_==nullptr ||
++                   leaf.imported->target.local_imported.module_ptr!=original->builtin_wasip1_member_ ||
++                   dense>=wasip1_dispatch_contexts_.size())
++                { return fail(preparation_status::unavailable_adapter); }
++                auto const& environment=wasip1_dispatch_contexts_.index_unchecked(dense);
++                if(!environment.import_visible || environment.env==nullptr)
++                { return fail(preparation_status::invalid_import); }
++                // Only the authenticated immutable builtin can supply native
++                // signature metadata. No arbitrary provider callback is invoked.
++                next.k=cached_import_target::kind::local_imported;
++                next.u.local_imported=leaf.imported->target.local_imported;
++                // The ordinary runtime helper terminates on invalid provider
++                // metadata. Candidate preparation must decline without changing
++                // the paused original world, including an invalid builtin index.
++                if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_function_signature(
++                    next.u.local_imported.module_ptr,next.u.local_imported.index,next.local_imported_signature.owned))
++                { return fail(preparation_status::invalid_import); }
++                // The primary cache retains a per-import FP policy. The ROS
++                // full-only cache has no such member; preserve its native ABI.
++                []<typename target_type>(target_type& target)
++                {
++                    if constexpr(requires { target.local_imported_wasm_fp_control_policy; })
++                    {
++                        target.local_imported_wasm_fp_control_policy=query_local_imported_function_wasm_fp_control_policy(
++                            target.u.local_imported.module_ptr,target.u.local_imported.index);
++                    }
++                }(next);
++                auto const sig=next.signature();
++                next.param_bytes=total_abi_bytes(sig.params);next.result_bytes=total_abi_bytes(sig.results);
++                if((next.param_bytes==0u && sig.params.size!=0u) || (next.result_bytes==0u && sig.results.size!=0u))
++                { return fail(preparation_status::type_mismatch); }
++#else
++                return fail(preparation_status::unavailable_adapter);
++#endif
++            }
++            next.reference_params=signature_has_reference_carrier(next.signature().params);
++            next.reference_results=signature_has_reference_carrier(next.signature().results);
++            cache.index_unchecked(index)=::std::move(next);
++        }
++    }
++    prepared_defined_bindings_=defined;prepared_import_bindings_=imports;dispatch_bindings_prepared_=true;
++    out.prepared_runtime_defined_bindings=defined;out.prepared_runtime_import_bindings=imports;
++    out.prepared_runtime_defined_pointer_ranges=defined_dispatch_pointer_ranges_.size();
++    out.runtime_dispatch_bindings_prepared=true;
++    return true; // private DATA only: global cache/source/epoch untouched
++}
+--- a/uwvm2/test/0017.runtime/debug_checkpoint_prepared_retirement_runtime.cc
++++ b/uwvm2/test/0017.runtime/debug_checkpoint_prepared_retirement_runtime.cc
+@@ -358,6 +358,10 @@
+     auto invalid{prepare_request};invalid.recording_label={};
+     auto denied{lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline())};
+     REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::invalid_request && !denied.operation);
++    invalid=prepare_request;invalid.maximum_private_dispatch_bindings=1u;
++    denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
++    REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined && !denied.operation && !denied.candidate_world_retained);
++    REQUIRE(state->control->capture(state->ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch);
+     invalid=prepare_request;invalid.maximum_private_root_workers=0u;
+     denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
+     ::fast_io::print(::fast_io::err(),"PREPARE_PREFLIGHT denied status=",::fast_io::mnp::dec(static_cast<unsigned>(denied.status)),
+@@ -375,6 +379,10 @@
+         pending.preparation.data_error==::uwvm2::uwvm::debugger::checkpoint::error::none &&
+         pending.preparation.modules==1u && pending.preparation.engines==1u && pending.preparation.prepared_threads==2u &&
+         pending.preparation.started_private_root_workers==2u && pending.preparation.joined_private_root_workers==2u);
++    REQUIRE(pending.preparation.runtime_dispatch_bindings_prepared &&
++        pending.preparation.prepared_runtime_defined_bindings==pending.preparation.functions &&
++        pending.preparation.prepared_runtime_defined_bindings==3u && pending.preparation.prepared_runtime_import_bindings==0u &&
++        pending.preparation.prepared_runtime_defined_pointer_ranges==1u);
+     auto operation{pending.operation};
+     { ::std::unique_lock lock{windows->mutex};
+       auto const bodies_ready{windows->changed.wait_until(lock,deadline(),[&] { return windows->body_waiters == 2u; })};
+--- a/uwvm2/test/0017.runtime/debug_wasip1_prepared_retirement_runtime.cc
++++ b/uwvm2/test/0017.runtime/debug_wasip1_prepared_retirement_runtime.cc
+@@ -147,10 +147,15 @@
+     require(strict.status==outcome::preparation_declined && strict.preparation.wasip1_status==lib::llvm_jit_wasip1_environment_capsule_status::unsupported_resource && !strict.operation,"strict policy refuses retained original stdio before retirement");
+     require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"preparation failures leave old guest paused and unchanged");
+     request.require_managed_wasip1_resources=false;
++    auto limited=request;limited.maximum_private_dispatch_bindings=1u;
++    auto bindings_refused=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,limited,deadline());
++    require(bindings_refused.status==outcome::preparation_declined && bindings_refused.preparation.status==lib::llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined && !bindings_refused.operation,"private dispatch budget refuses before old worker retirement");
++    require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"dispatch failure leaves original WASI guest unchanged");
+     auto pending{lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,request,short_deadline())};
+     ::fast_io::print(::fast_io::out(),"WASIP1_PREPARED_RETIREMENT stage=execution status=",::fast_io::mnp::dec(static_cast<unsigned>(pending.status))," prepare=",::fast_io::mnp::dec(static_cast<unsigned>(pending.preparation.status)),"\n");
+     require(pending.status==outcome::pending_execution && pending.operation && pending.candidate_world_retained,"candidate survives pending execution drain");
+     require(pending.preparation.status==lib::llvm_jit_checkpoint_prepare_status::prepared_and_retained && pending.preparation.data_error==::uwvm2::uwvm::debugger::checkpoint::error::none && pending.preparation.wasip1_installed_privately && pending.preparation.wasip1_prepared_together && pending.preparation.wasip1_environments==1u && pending.preparation.prepared_wasip1_memories==1u && pending.preparation.joined_private_root_workers==1u,"new WASI memory and complete private candidate retained together");
++    require(pending.preparation.runtime_dispatch_bindings_prepared && pending.preparation.prepared_runtime_defined_bindings==pending.preparation.functions && pending.preparation.prepared_runtime_import_bindings>0u && pending.preparation.prepared_runtime_defined_pointer_ranges>0u,"new source owns complete defined and builtin WASI dispatch bindings");
+     auto operation{pending.operation};
+     { ::std::unique_lock lock{windows->mutex};require(windows->changed.wait_until(lock,deadline(),[&] { return windows->body_waiters==1u; }),"old native body waits outside guest entry");windows->release_body=true;windows->changed.notify_all();require(windows->changed.wait_until(lock,deadline(),[&] { return windows->tls_waiters==1u; }),"real old TLS destructor delays physical death"); }
+     auto tls{lib::llvm_jit_checkpoint_continue_native_retirement_host_api(operation,short_deadline())};
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime.h
+@@ -587,7 +587,7 @@
+     enum class llvm_jit_checkpoint_prepare_status : unsigned char
+     { prepared_and_discarded, requires_llvm_jit_full, not_selected, invalid_request,
+       unavailable_capture, resource_preparation_declined, engine_preparation_declined, allocation_failed,
+-      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained };
++      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained, dispatch_binding_preparation_declined };
+     struct llvm_jit_checkpoint_prepare_request
+     {
+         ::std::array<::std::byte,16u> recording_label{};
+@@ -603,6 +603,8 @@
+         // Prepare every visible distinct WASIp1 environment in this SAME stop.
+         // These bounded candidates are discarded with the candidate Wasm world.
+         bool include_wasip1{}, require_managed_wasip1_resources{true};
++        // Combined final defined/import cache entries; checked before allocation.
++        ::std::size_t maximum_private_dispatch_bindings{1048576u};
+     };
+     struct llvm_jit_checkpoint_prepare_result
+     {
+@@ -641,6 +643,9 @@
+         bool wasip1_dispatch_prepared{};
+         ::std::size_t verified_wasip1_dispatch_workers{}, verified_wasip1_dispatch_module_visits{};
+         bool wasip1_dispatch_tls_restored{}; // Verification only; no execution credential.
++        ::std::size_t prepared_runtime_defined_bindings{}, prepared_runtime_import_bindings{};
++        ::std::size_t prepared_runtime_defined_pointer_ranges{};
++        bool runtime_dispatch_bindings_prepared{}; // Private new-source caches; no publication.
+     };
+     struct llvm_jit_checkpoint_native_retirement_result
+     {
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_resources.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_resources.h
+@@ -1195,6 +1195,7 @@
+                          // native range/CFI permission and VM epoch NOT published.
+         }
+ # include "uwvm_runtime_checkpoint_world_frames.h"
++# include "uwvm_runtime_checkpoint_world_function_bindings.h"
+ # include "uwvm_runtime_checkpoint_world_roots.h"
+ # include "uwvm_runtime_checkpoint_world_root_workers.h"
+     public:
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_preparation_api.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_preparation_api.h
+@@ -64,6 +64,9 @@
+             if(!prepared->prepare_all_world_frames())
+             { out.frame_diagnostic=static_cast<unsigned>(prepared->phase_);out.native_payload_bytes=prepared->native_bytes_;return; }
+             out.prepared_threads=prepared->prepared_threads_.size();out.prepared_frames=prepared->prepared_frames_;
++            out.status=llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined;
++            if(!prepared->prepare_world_dispatch_bindings(source,request.maximum_private_dispatch_bindings,out))
++            { out.native_payload_bytes=prepared->native_bytes_;out.resource_diagnostic=static_cast<unsigned>(prepared->phase_);return; }
+             out.prepared_root_carriers=prepared->prepared_root_carriers_;
+             out.native_payload_bytes=prepared->native_bytes_;
+             out.status=llvm_jit_checkpoint_prepare_status::root_preparation_declined;
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_function_bindings.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_function_bindings.h
+@@ -0,0 +1,189 @@
++// Private member fragment of the complete candidate world. These final caches
++// borrow ONLY the new source's authenticated records and its actual staged
++// engines. Preparing them grants no world publication or execution permission.
++#pragma once
++decltype(g_runtime.defined_func_cache) defined_dispatch_bindings_{};
++decltype(g_import_call_cache) import_dispatch_bindings_{};
++decltype(g_runtime.defined_func_ptr_ranges) defined_dispatch_pointer_ranges_{};
++::std::size_t prepared_defined_bindings_{}, prepared_import_bindings_{};
++bool dispatch_bindings_prepared_{};
++
++[[nodiscard]] bool prepare_world_dispatch_bindings(source_owner const& original,
++    ::std::size_t maximum_bindings, llvm_jit_checkpoint_prepare_result& out)
++{
++    namespace in=checkpoint_world_data::in;
++    using imported_kind=checkpoint_world_data::st::imported_function_link_kind;
++    if(phase_!=preparation_status::resources_prepared || !source_type::has_canonical_owner(original) ||
++       !original->initialized_from_actual_state() || !actual_prepared_profile_ ||
++       engines_.size()!=modules_.size() || actual_dense_module_owners_.size()!=modules_.size() ||
++       dispatch_bindings_prepared_ || !defined_dispatch_bindings_.empty() || !import_dispatch_bindings_.empty() ||
++       !defined_dispatch_pointer_ranges_.empty())
++    { return fail(preparation_status::source_mismatch); }
++    ::std::size_t defined{},imports{},ranges{};
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        if(owner>=modules_.size() || modules_[owner].actual==nullptr ||
++           context_->unpublished_file_for_module(modules_[owner].actual)!=modules_[owner].file)
++        { return fail(preparation_status::source_mismatch); }
++        auto const& module=*modules_[owner].actual;
++        auto const locals=module.local_defined_function_vec_storage.size();
++        auto const external=module.imported_function_vec_storage.size();
++        if(defined>maximum_bindings || imports>maximum_bindings-defined ||
++           locals>maximum_bindings-defined-imports)
++        { return fail(preparation_status::quota_exceeded); }
++        defined+=locals;
++        if(external>maximum_bindings-defined-imports) { return fail(preparation_status::quota_exceeded); }
++        imports+=external; // every sum bounded BEFORE increment
++        if(locals!=0u) { ++ranges; } // at most the authenticated module count
++    }
++    using defined_vector=decltype(defined_dispatch_bindings_)::value_type;
++    using import_vector=decltype(import_dispatch_bindings_)::value_type;
++    if(!charge_native(modules_.size(),sizeof(defined_vector)+sizeof(import_vector)) ||
++       !charge_native(defined,sizeof(compiled_defined_func_info)) ||
++       !charge_native(imports,sizeof(cached_import_target)) ||
++       !charge_native(ranges,sizeof(defined_func_ptr_range))) { return false; }
++    defined_dispatch_bindings_.resize(modules_.size());
++    import_dispatch_bindings_.resize(modules_.size());
++    defined_dispatch_pointer_ranges_.reserve(ranges);
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto const& bound=modules_[owner];auto const dense=bound.new_actual_id;
++        if(dense>=engines_.size() || !engines_[dense] || dense>=defined_dispatch_bindings_.size() ||
++           dense>=import_dispatch_bindings_.size()) { return fail(preparation_status::source_mismatch); }
++        auto const& module=*bound.actual;auto const& engine=*engines_[dense];
++        auto const locals=module.local_defined_function_vec_storage.size();
++        auto const imported=module.imported_function_vec_storage.size();
++        if(engine.module_id_!=dense || engine.owner_.module()!=bound.actual || engine.owner_.file()!=bound.file ||
++           engine.locals_.size()!=locals || engine.entries_.size()!=locals || engine.typed_targets_.size()!=locals ||
++           engine.generations_.size()!=locals || !engine.engine_ || !engine.context_)
++        { return fail(preparation_status::source_mismatch); }
++        auto& cache=defined_dispatch_bindings_.index_unchecked(dense);cache.resize(locals);
++        import_dispatch_bindings_.index_unchecked(dense).resize(imported);
++        if(locals!=0u)
++        {
++            // Final new-source storage is nonmoving. The pointer-range cache is
++            // required by table/funcref dispatch as well as the direct cache.
++            auto const* first=module.local_defined_function_vec_storage.data();
++            constexpr auto width=sizeof(runtime_local_func_storage_t);
++            if(first==nullptr || locals>(::std::numeric_limits<::std::uintptr_t>::max)()/width)
++            { return fail(preparation_status::source_mismatch); }
++            auto const begin=reinterpret_cast<::std::uintptr_t>(first);
++            auto const bytes=static_cast<::std::uintptr_t>(locals*width);
++            if(begin>(::std::numeric_limits<::std::uintptr_t>::max)()-bytes)
++            { return fail(preparation_status::source_mismatch); }
++            defined_dispatch_pointer_ranges_.push_back(defined_func_ptr_range{begin,begin+bytes,dense});
++        }
++        for(::std::size_t local{};local<locals;++local)
++        {
++            auto const* function=::std::addressof(module.local_defined_function_vec_storage.index_unchecked(local));
++            auto const& entry=engine.entries_[local];auto const& plan=engine.locals_[local].checkpoint_plan;
++            // The real fresh engine, final source member, sealed profile and
++            // function generation all agree. No old entry/cache is reused.
++            if(function->function_type_ptr==nullptr || imported>SIZE_MAX-local ||
++               entry.typed==0u || entry.raw==0u || engine.typed_targets_.index_unchecked(local)!=entry.typed ||
++               !plan || plan->get().module!=dense || plan->get().function!=imported+local ||
++               plan->get().function_generation!=engine.generations_[local] ||
++               plan->get().profile.get()!=actual_prepared_profile_.get() ||
++               plan->get().profile.owner_before(actual_prepared_profile_) ||
++               actual_prepared_profile_.owner_before(plan->get().profile))
++            { return fail(preparation_status::source_mismatch); }
++            auto const sig=func_sig_from_defined(function);
++            auto const parameters=total_abi_bytes(sig.params);auto const results=total_abi_bytes(sig.results);
++            if((parameters==0u && sig.params.size!=0u) || (results==0u && sig.results.size!=0u))
++            { return fail(preparation_status::type_mismatch); }
++            auto& next=cache.index_unchecked(local);
++            next.module_id=dense;next.function_index=imported+local;next.runtime_func=function;
++            next.param_bytes=parameters;next.result_bytes=results;
++            next.reference_params=signature_has_reference_carrier(sig.params);
++            next.reference_results=signature_has_reference_carrier(sig.results);
++        }
++    }
++    ::std::sort(defined_dispatch_pointer_ranges_.begin(),defined_dispatch_pointer_ranges_.end(),
++        [](defined_func_ptr_range const& left,defined_func_ptr_range const& right) noexcept { return left.begin<right.begin; });
++    for(::std::size_t n{1u};n<defined_dispatch_pointer_ranges_.size();++n)
++    {
++        if(defined_dispatch_pointer_ranges_.index_unchecked(n-1u).end>
++           defined_dispatch_pointer_ranges_.index_unchecked(n).begin)
++        { return fail(preparation_status::source_mismatch); }
++    }
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto const& bound=modules_[owner];auto const dense=bound.new_actual_id;
++        auto const& module=*bound.actual;auto& cache=import_dispatch_bindings_.index_unchecked(dense);
++        for(::std::size_t index{};index<module.imported_function_vec_storage.size();++index)
++        {
++            auto const* function=::std::addressof(module.imported_function_vec_storage.index_unchecked(index));
++            // Contextual resolver authenticates every hop against the NEW final
++            // vectors before a union read. Cycles and foreign addresses refuse.
++            auto const leaf=in::details::resolve_linked_imported_function_leaf_in_context(context_->world_,function);
++            if(leaf.imported==nullptr) { return fail(preparation_status::invalid_import); }
++            cached_import_target next{};next.frame.module_id=dense;next.frame.function_index=index;
++            next.origin_module_id=dense;
++            if(leaf.defined!=nullptr)
++            {
++                ::std::size_t target_owner{SIZE_MAX};
++                for(::std::size_t n{};n<modules_.size();++n)
++                { if(modules_[n].actual==leaf.defined_location.module) { target_owner=n;break; } }
++                if(target_owner>=modules_.size()) { return fail(preparation_status::invalid_import); }
++                auto const target=modules_[target_owner].new_actual_id;
++                auto const local=leaf.defined_location.index;
++                if(target>=defined_dispatch_bindings_.size() ||
++                   local>=defined_dispatch_bindings_.index_unchecked(target).size())
++                { return fail(preparation_status::invalid_import); }
++                auto const& resolved=defined_dispatch_bindings_.index_unchecked(target).index_unchecked(local);
++                if(resolved.runtime_func!=leaf.defined) { return fail(preparation_status::invalid_import); }
++                next.k=cached_import_target::kind::defined;next.frame.module_id=target;
++                next.frame.function_index=resolved.function_index;next.u.defined.runtime_func=resolved.runtime_func;
++                next.sig=func_sig_from_defined(resolved.runtime_func);
++                next.param_bytes=resolved.param_bytes;next.result_bytes=resolved.result_bytes;
++            }
++            else
++            {
++#if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
++                if(leaf.imported->link_kind!=imported_kind::local_imported ||
++                   original->builtin_wasip1_member_==nullptr ||
++                   leaf.imported->target.local_imported.module_ptr!=original->builtin_wasip1_member_ ||
++                   dense>=wasip1_dispatch_contexts_.size())
++                { return fail(preparation_status::unavailable_adapter); }
++                auto const& environment=wasip1_dispatch_contexts_.index_unchecked(dense);
++                if(!environment.import_visible || environment.env==nullptr)
++                { return fail(preparation_status::invalid_import); }
++                // Only the authenticated immutable builtin can supply native
++                // signature metadata. No arbitrary provider callback is invoked.
++                next.k=cached_import_target::kind::local_imported;
++                next.u.local_imported=leaf.imported->target.local_imported;
++                // The ordinary runtime helper terminates on invalid provider
++                // metadata. Candidate preparation must decline without changing
++                // the paused original world, including an invalid builtin index.
++                if(!::uwvm2::runtime::lib::details::invoke_local_imported_provider_function_signature(
++                    next.u.local_imported.module_ptr,next.u.local_imported.index,next.local_imported_signature.owned))
++                { return fail(preparation_status::invalid_import); }
++                // The primary cache retains a per-import FP policy. The ROS
++                // full-only cache has no such member; preserve its native ABI.
++                []<typename target_type>(target_type& target)
++                {
++                    if constexpr(requires { target.local_imported_wasm_fp_control_policy; })
++                    {
++                        target.local_imported_wasm_fp_control_policy=query_local_imported_function_wasm_fp_control_policy(
++                            target.u.local_imported.module_ptr,target.u.local_imported.index);
++                    }
++                }(next);
++                auto const sig=next.signature();
++                next.param_bytes=total_abi_bytes(sig.params);next.result_bytes=total_abi_bytes(sig.results);
++                if((next.param_bytes==0u && sig.params.size!=0u) || (next.result_bytes==0u && sig.results.size!=0u))
++                { return fail(preparation_status::type_mismatch); }
++#else
++                return fail(preparation_status::unavailable_adapter);
++#endif
++            }
++            next.reference_params=signature_has_reference_carrier(next.signature().params);
++            next.reference_results=signature_has_reference_carrier(next.signature().results);
++            cache.index_unchecked(index)=::std::move(next);
++        }
++    }
++    prepared_defined_bindings_=defined;prepared_import_bindings_=imports;dispatch_bindings_prepared_=true;
++    out.prepared_runtime_defined_bindings=defined;out.prepared_runtime_import_bindings=imports;
++    out.prepared_runtime_defined_pointer_ranges=defined_dispatch_pointer_ranges_.size();
++    out.runtime_dispatch_bindings_prepared=true;
++    return true; // private DATA only: global cache/source/epoch untouched
++}
+--- a/uwvm2-ros/test/0017.runtime/debug_checkpoint_prepared_retirement_runtime.cc
++++ b/uwvm2-ros/test/0017.runtime/debug_checkpoint_prepared_retirement_runtime.cc
+@@ -358,6 +358,10 @@
+     auto invalid{prepare_request};invalid.recording_label={};
+     auto denied{lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline())};
+     REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::invalid_request && !denied.operation);
++    invalid=prepare_request;invalid.maximum_private_dispatch_bindings=1u;
++    denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
++    REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined && !denied.operation && !denied.candidate_world_retained);
++    REQUIRE(state->control->capture(state->ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch);
+     invalid=prepare_request;invalid.maximum_private_root_workers=0u;
+     denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
+     ::fast_io::print(::fast_io::err(),"PREPARE_PREFLIGHT denied status=",::fast_io::mnp::dec(static_cast<unsigned>(denied.status)),
+@@ -375,6 +379,10 @@
+         pending.preparation.data_error==::uwvm2::uwvm::debugger::checkpoint::error::none &&
+         pending.preparation.modules==1u && pending.preparation.engines==1u && pending.preparation.prepared_threads==2u &&
+         pending.preparation.started_private_root_workers==2u && pending.preparation.joined_private_root_workers==2u);
++    REQUIRE(pending.preparation.runtime_dispatch_bindings_prepared &&
++        pending.preparation.prepared_runtime_defined_bindings==pending.preparation.functions &&
++        pending.preparation.prepared_runtime_defined_bindings==3u && pending.preparation.prepared_runtime_import_bindings==0u &&
++        pending.preparation.prepared_runtime_defined_pointer_ranges==1u);
+     auto operation{pending.operation};
+     { ::std::unique_lock lock{windows->mutex};
+       auto const bodies_ready{windows->changed.wait_until(lock,deadline(),[&] { return windows->body_waiters == 2u; })};
+--- a/uwvm2-ros/test/0017.runtime/debug_wasip1_prepared_retirement_runtime.cc
++++ b/uwvm2-ros/test/0017.runtime/debug_wasip1_prepared_retirement_runtime.cc
+@@ -147,10 +147,15 @@
+     require(strict.status==outcome::preparation_declined && strict.preparation.wasip1_status==lib::llvm_jit_wasip1_environment_capsule_status::unsupported_resource && !strict.operation,"strict policy refuses retained original stdio before retirement");
+     require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"preparation failures leave old guest paused and unchanged");
+     request.require_managed_wasip1_resources=false;
++    auto limited=request;limited.maximum_private_dispatch_bindings=1u;
++    auto bindings_refused=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,limited,deadline());
++    require(bindings_refused.status==outcome::preparation_declined && bindings_refused.preparation.status==lib::llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined && !bindings_refused.operation,"private dispatch budget refuses before old worker retirement");
++    require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"dispatch failure leaves original WASI guest unchanged");
+     auto pending{lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,request,short_deadline())};
+     ::fast_io::print(::fast_io::out(),"WASIP1_PREPARED_RETIREMENT stage=execution status=",::fast_io::mnp::dec(static_cast<unsigned>(pending.status))," prepare=",::fast_io::mnp::dec(static_cast<unsigned>(pending.preparation.status)),"\n");
+     require(pending.status==outcome::pending_execution && pending.operation && pending.candidate_world_retained,"candidate survives pending execution drain");
+     require(pending.preparation.status==lib::llvm_jit_checkpoint_prepare_status::prepared_and_retained && pending.preparation.data_error==::uwvm2::uwvm::debugger::checkpoint::error::none && pending.preparation.wasip1_installed_privately && pending.preparation.wasip1_prepared_together && pending.preparation.wasip1_environments==1u && pending.preparation.prepared_wasip1_memories==1u && pending.preparation.joined_private_root_workers==1u,"new WASI memory and complete private candidate retained together");
++    require(pending.preparation.runtime_dispatch_bindings_prepared && pending.preparation.prepared_runtime_defined_bindings==pending.preparation.functions && pending.preparation.prepared_runtime_import_bindings>0u && pending.preparation.prepared_runtime_defined_pointer_ranges>0u,"new source owns complete defined and builtin WASI dispatch bindings");
+     auto operation{pending.operation};
+     { ::std::unique_lock lock{windows->mutex};require(windows->changed.wait_until(lock,deadline(),[&] { return windows->body_waiters==1u; }),"old native body waits outside guest entry");windows->release_body=true;windows->changed.notify_all();require(windows->changed.wait_until(lock,deadline(),[&] { return windows->tls_waiters==1u; }),"real old TLS destructor delays physical death"); }
+     auto tls{lib::llvm_jit_checkpoint_continue_native_retirement_host_api(operation,short_deadline())};
+--- a/uwvm2/src/uwvm2/uwvm/debugger/wasip1_checkpoint.md
++++ b/uwvm2/src/uwvm2/uwvm/debugger/wasip1_checkpoint.md
+@@ -238,6 +238,25 @@
+ Every candidate resource, engine, frame and private worker context must succeed
+ before any original guest retirement is activated. Aliased capture pointers,
+ incomplete cohorts and unregistered native workers cannot authorize retirement.
++
++The candidate also prepares final defined-function and import dispatch caches.
++The final sorted pointer ranges also bind table/funcref lookup to new-source
++storage, with checked extents and no overlapping ranges.
++Each defined entry borrows the new source member and the fresh engine's sealed
++resume plan, typed entry and function generation. Import resolution validates
++all new-source alias hops and keeps the caller module as the value namespace.
++Only the authenticated builtin WASIp1 provider can supply native dispatch
++metadata; it selects the candidate environment and its new memory binding.
++Dynamic or unknown providers still require an explicit restoration adapter.
++
++`maximum_private_dispatch_bindings` bounds the combined number of defined and
++imported slots before cache allocation (default 1048576). Payload accounting
++also includes the outer vectors and every cache entry. A refusal returns
++`dispatch_binding_preparation_declined` before old-worker retirement. Successful
++preparation reports `runtime_dispatch_bindings_prepared` and the defined/import
++counts. These fields describe private data; publishing the world, starting
++restored guest workers and replaying guest frames remain separate unfinished
++steps. No global source, dispatch cache or Wasm epoch is changed by preparation.
+ 
+ If WASIp1 is visible to any module, set `request.include_wasip1 = true`.
+ Omitting it returns `preparation_declined` with
+--- a/uwvm2-ros/src/uwvm2/uwvm/debugger/wasip1_checkpoint.md
++++ b/uwvm2-ros/src/uwvm2/uwvm/debugger/wasip1_checkpoint.md
+@@ -238,6 +238,25 @@
+ Every candidate resource, engine, frame and private worker context must succeed
+ before any original guest retirement is activated. Aliased capture pointers,
+ incomplete cohorts and unregistered native workers cannot authorize retirement.
++
++The candidate also prepares final defined-function and import dispatch caches.
++The final sorted pointer ranges also bind table/funcref lookup to new-source
++storage, with checked extents and no overlapping ranges.
++Each defined entry borrows the new source member and the fresh engine's sealed
++resume plan, typed entry and function generation. Import resolution validates
++all new-source alias hops and keeps the caller module as the value namespace.
++Only the authenticated builtin WASIp1 provider can supply native dispatch
++metadata; it selects the candidate environment and its new memory binding.
++Dynamic or unknown providers still require an explicit restoration adapter.
++
++`maximum_private_dispatch_bindings` bounds the combined number of defined and
++imported slots before cache allocation (default 1048576). Payload accounting
++also includes the outer vectors and every cache entry. A refusal returns
++`dispatch_binding_preparation_declined` before old-worker retirement. Successful
++preparation reports `runtime_dispatch_bindings_prepared` and the defined/import
++counts. These fields describe private data; publishing the world, starting
++restored guest workers and replaying guest frames remain separate unfinished
++steps. No global source, dispatch cache or Wasm epoch is changed by preparation.
+ 
+ If WASIp1 is visible to any module, set `request.include_wasip1 = true`.
+ Omitting it returns `preparation_declined` with

@@ -1,0 +1,1 @@
+(module (table 4 eqref) (func (export "_start") ref.null eq i32.const 2 table.grow 0 drop i32.const 0 i32.const 77 ref.i31 i32.const 2 table.fill 0 i32.const 2 i32.const 0 i32.const 2 table.copy 0 0 i32.const 3 table.get 0 ref.cast (ref i31) i31.get_s i32.const 77 i32.ne if unreachable end))

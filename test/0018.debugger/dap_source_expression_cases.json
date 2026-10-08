@@ -1,0 +1,5520 @@
+{
+  "scope": "finite syntax and owned scalar DATA; no real stop/memory authority",
+  "positive": [
+    {
+      "expression": "value + 2 * 3",
+      "status": 0,
+      "bits": 13,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "(value + 2) * 3",
+      "status": 0,
+      "bits": 27,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "pair.0 + pair.1",
+      "status": 0,
+      "bits": 33,
+      "width": 32,
+      "unsigned": true,
+      "floating": false
+    },
+    {
+      "expression": "p.* + 1",
+      "status": 0,
+      "bits": 43,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "0xff & 15",
+      "status": 0,
+      "bits": 15,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "0xffffffff + 1",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": true,
+      "floating": false
+    },
+    {
+      "expression": "true && !false",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "0b101010 + 0o12 + 010",
+      "status": 0,
+      "bits": 60,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "1'000 + 1_000",
+      "status": 0,
+      "bits": 2000,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "0x_2a + 0b_10 + 0o_10",
+      "status": 0,
+      "bits": 52,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "255 &^ 3 * 4",
+      "status": 0,
+      "bits": 1008,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "-7 / 2",
+      "status": 0,
+      "bits": 4294967293,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "-7 % 2",
+      "status": 0,
+      "bits": 4294967295,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "~0 & 255",
+      "status": 0,
+      "bits": 255,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "1 << 4 + 1",
+      "status": 0,
+      "bits": 32,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "' ' + 1",
+      "status": 0,
+      "bits": 33,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "'A' + '\\n'",
+      "status": 0,
+      "bits": 75,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "4294967295u + 1u",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": true,
+      "floating": false
+    },
+    {
+      "expression": "value as i64",
+      "status": 0,
+      "bits": 7,
+      "width": 64,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "(unsigned char)257",
+      "status": 0,
+      "bits": 1,
+      "width": 8,
+      "unsigned": true,
+      "floating": false
+    },
+    {
+      "expression": "int32(real64)",
+      "status": 0,
+      "bits": 4294967294,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "(unsigned int)-0.5",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": true,
+      "floating": false
+    },
+    {
+      "expression": "0 && missing",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "1 || missing",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0 && (missing / 0)",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "1 || *ptr",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "1 || (1 / 0)",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2a",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42u",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2au",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010u",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52u",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052u",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42U",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2aU",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010U",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52U",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052U",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42l",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2al",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010l",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52l",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052l",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42L",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2aL",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010L",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52L",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052L",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42ll",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2all",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010ll",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52ll",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052ll",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42LL",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2aLL",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010LL",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52LL",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052LL",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42ul",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2aul",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010ul",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52ul",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052ul",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42UL",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2aUL",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010UL",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52UL",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052UL",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42ull",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2aull",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010ull",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52ull",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052ull",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42ULL",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2aULL",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010ULL",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52ULL",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052ULL",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42lu",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2alu",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010lu",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52lu",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052lu",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42LU",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2aLU",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010LU",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52LU",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052LU",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42llu",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2allu",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010llu",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52llu",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052llu",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "42LLU",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0x2aLLU",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0b101010LLU",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0o52LLU",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "052LLU",
+      "status": 0,
+      "bits": 42,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof(unsigned long)",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false
+    },
+    {
+      "expression": "sizeof(long)",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false
+    },
+    {
+      "expression": "sizeof(value) + sizeof(packet)",
+      "status": 0,
+      "bits": 32,
+      "width": 32,
+      "unsigned": true,
+      "floating": false
+    },
+    {
+      "expression": "sizeof(double)",
+      "status": 0,
+      "bits": 8,
+      "width": 32,
+      "unsigned": true,
+      "floating": false
+    },
+    {
+      "expression": "sizeof(*p)",
+      "status": 4,
+      "width": 32
+    },
+    {
+      "expression": "ns::value + 1",
+      "status": 4
+    },
+    {
+      "expression": "ptr->field[1] + 2",
+      "status": 4
+    },
+    {
+      "expression": "*ptr + 1",
+      "status": 4
+    },
+    {
+      "expression": "*ptr[1] + 2",
+      "status": 4
+    },
+    {
+      "expression": "(*ptr) + 2",
+      "status": 4
+    },
+    {
+      "expression": "ptr+1",
+      "status": 4
+    },
+    {
+      "expression": "value[1] + 2",
+      "status": 4
+    },
+    {
+      "expression": "@as(i64, value)",
+      "status": 0,
+      "bits": 7,
+      "width": 64,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "1.25e2 / .5",
+      "status": 0,
+      "bits": 4643000109586448384,
+      "width": 64,
+      "unsigned": false,
+      "floating": true
+    },
+    {
+      "expression": "static_cast<double>(real32) + 0.25",
+      "status": 0,
+      "bits": 4615626668101337088,
+      "width": 64,
+      "unsigned": false,
+      "floating": true
+    },
+    {
+      "expression": "real32 as f64",
+      "status": 0,
+      "bits": 4615063718147915776,
+      "width": 64,
+      "unsigned": false,
+      "floating": true
+    },
+    {
+      "expression": "float64(real32)",
+      "status": 0,
+      "bits": 4615063718147915776,
+      "width": 64,
+      "unsigned": false,
+      "floating": true
+    },
+    {
+      "expression": "16777216.0f + 1",
+      "status": 0,
+      "bits": 1266679808,
+      "width": 32,
+      "unsigned": false,
+      "floating": true
+    },
+    {
+      "expression": "-0.0",
+      "status": 0,
+      "bits": 9223372036854775808,
+      "width": 64,
+      "unsigned": false,
+      "floating": true
+    },
+    {
+      "expression": "1 / 0",
+      "status": 5
+    },
+    {
+      "expression": "2147483647 + 1",
+      "status": 5
+    },
+    {
+      "expression": "1 << 32",
+      "status": 5
+    },
+    {
+      "expression": "(int)2147483648.0",
+      "status": 5
+    },
+    {
+      "expression": "real32 & 1",
+      "status": 2
+    },
+    {
+      "expression": "~real64",
+      "status": 2
+    },
+    {
+      "expression": "@as(u8, value)",
+      "status": 2
+    },
+    {
+      "expression": "1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1",
+      "status": 0,
+      "bits": 32,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "-7",
+      "status": 0,
+      "bits": 4294967289,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "!value",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "~value",
+      "status": 0,
+      "bits": 4294967288,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "*p",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "value + +2",
+      "status": 0,
+      "bits": 9,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "value - -2",
+      "status": 0,
+      "bits": 9,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "- -7",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "'+' + 1",
+      "status": 0,
+      "bits": 44,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "1 ? 42 : 1 / 0",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0 ? 1 / 0 : 7",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : 2147483647 + 1",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 0 ? 2 : 3 : 4",
+      "status": 0,
+      "bits": 3,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0 ? 1 : 0 ? 2 : 3",
+      "status": 0,
+      "bits": 3,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0 || 1 ? 2 + 3 * 4 : 5",
+      "status": 0,
+      "bits": 14,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? -1 : 0u",
+      "status": 0,
+      "bits": 4294967295,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0 ? 0u : -1",
+      "status": 0,
+      "bits": 4294967295,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? -1LL : 0u",
+      "status": 0,
+      "bits": 18446744073709551615,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? value : 42",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "value > 0 ? value : 42",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 2
+    },
+    {
+      "expression": "1 ? real32 : real64",
+      "status": 0,
+      "bits": 4615063718147915776,
+      "width": 64,
+      "unsigned": false,
+      "floating": true,
+      "reads": 1
+    },
+    {
+      "expression": "0 ? real32 : value",
+      "status": 0,
+      "bits": 1088421888,
+      "width": 32,
+      "unsigned": false,
+      "floating": true,
+      "reads": 1
+    },
+    {
+      "expression": "1 ? pair.0 : pair.1",
+      "status": 0,
+      "bits": 4294967287,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "1 ? *p : value",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "1 ? missing : 42",
+      "status": 4,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? (char)1 : (char)2",
+      "status": 2,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? true : false",
+      "status": 2,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 1/0 : 2",
+      "status": 5,
+      "reads": 0
+    },
+    {
+      "expression": "value ? 1 : 2",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 1
+    },
+    {
+      "expression": "1 ? value : sizeof(absent)",
+      "status": 4,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : sizeof(packet)",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0 ? 7 : sizeof(packet)",
+      "status": 0,
+      "bits": 28,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "1 ? 7 : sizeof(p)",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : sizeof(*p)",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : sizeof(missing)",
+      "status": 4,
+      "reads": 0
+    },
+    {
+      "expression": "@as(i8, -128)",
+      "status": 0,
+      "bits": 128,
+      "width": 8,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "@as(i16, -32768)",
+      "status": 0,
+      "bits": 32768,
+      "width": 16,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "@as(i64, -0xffffffff)",
+      "status": 0,
+      "bits": 18446744069414584321,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "@as(i64, -9223372036854775808)",
+      "status": 0,
+      "bits": 9223372036854775808,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "@as(u64, -0)",
+      "status": 0,
+      "bits": 0,
+      "width": 64,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "@as(f32, -0.0)",
+      "status": 0,
+      "bits": 2147483648,
+      "width": 32,
+      "unsigned": false,
+      "floating": true,
+      "reads": 0
+    },
+    {
+      "expression": "@as(f64, -0.0)",
+      "status": 0,
+      "bits": 9223372036854775808,
+      "width": 64,
+      "unsigned": false,
+      "floating": true,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : @as(i8, -128)",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "0 ? 7 : @as(i16, -32768)",
+      "status": 0,
+      "bits": 4294934528,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : @as(i8, -129)",
+      "status": 5,
+      "bits": 0,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "@as(u8, -1)",
+      "status": 5,
+      "bits": 0,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "@as(i64, -18446744073709551615)",
+      "status": 5,
+      "bits": 0,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "@as(i64, +1)",
+      "status": 2,
+      "bits": 0,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "@as(i64, -value)",
+      "status": 2,
+      "bits": 0,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "@as(i8, -'A')",
+      "status": 0,
+      "bits": 191,
+      "width": 8,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "@as(i16, @as(i8, -128))",
+      "status": 0,
+      "reads": 0,
+      "bits": 65408,
+      "width": 16,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "@as(i64, @as(u8, 255))",
+      "status": 0,
+      "reads": 0,
+      "bits": 255,
+      "width": 64,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "@as(u64, @as(u8, 255))",
+      "status": 0,
+      "reads": 0,
+      "bits": 255,
+      "width": 64,
+      "unsigned": true,
+      "floating": false
+    },
+    {
+      "expression": "@as(i8, @as(i8, -128))",
+      "status": 0,
+      "reads": 0,
+      "bits": 128,
+      "width": 8,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "@as(u8, @as(u8, 255))",
+      "status": 0,
+      "reads": 0,
+      "bits": 255,
+      "width": 8,
+      "unsigned": true,
+      "floating": false
+    },
+    {
+      "expression": "@as(i32, @as(i8, -1))",
+      "status": 0,
+      "reads": 0,
+      "bits": 4294967295,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "0 ? 9 : @as(u16, @as(u8, 255))",
+      "status": 0,
+      "reads": 0,
+      "bits": 255,
+      "width": 32,
+      "unsigned": false,
+      "floating": false
+    },
+    {
+      "expression": "@as(u64, @as(i8, -1))",
+      "status": 2,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : @as(u64, @as(i8, -1))",
+      "status": 2,
+      "reads": 0
+    },
+    {
+      "expression": "@as(i16, @as(u8, 256))",
+      "status": 5,
+      "reads": 0
+    },
+    {
+      "expression": "(int)flag",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "static_cast<unsigned char>(flag)",
+      "status": 0,
+      "bits": 1,
+      "width": 8,
+      "unsigned": true,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "(float)flag",
+      "status": 0,
+      "bits": 1065353216,
+      "width": 32,
+      "unsigned": false,
+      "floating": true,
+      "reads": 1
+    },
+    {
+      "expression": "static_cast<double>(flag)",
+      "status": 0,
+      "bits": 4607182418800017408,
+      "width": 64,
+      "unsigned": false,
+      "floating": true,
+      "reads": 1
+    },
+    {
+      "expression": "flag as i64",
+      "status": 0,
+      "bits": 1,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "f32(flag)",
+      "status": 0,
+      "bits": 1065353216,
+      "width": 32,
+      "unsigned": false,
+      "floating": true,
+      "reads": 1
+    },
+    {
+      "expression": "(int)(double)flag + 1",
+      "status": 0,
+      "bits": 2,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "(double)(u8)flag",
+      "status": 0,
+      "bits": 4607182418800017408,
+      "width": 64,
+      "unsigned": false,
+      "floating": true,
+      "reads": 1
+    },
+    {
+      "expression": "1 ? (double)flag : 7",
+      "status": 0,
+      "bits": 4607182418800017408,
+      "width": 64,
+      "unsigned": false,
+      "floating": true,
+      "reads": 1
+    },
+    {
+      "expression": "0 ? (double)flag : 7",
+      "status": 0,
+      "bits": 4619567317775286272,
+      "width": 64,
+      "unsigned": false,
+      "floating": true,
+      "reads": 0
+    },
+    {
+      "expression": "(double)off",
+      "status": 0,
+      "bits": 0,
+      "width": 64,
+      "unsigned": false,
+      "floating": true,
+      "reads": 1
+    },
+    {
+      "expression": "(bool)flag",
+      "status": 0,
+      "bits": 1,
+      "width": 8,
+      "unsigned": true,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "0 && (int)flag",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "@as(u64, flag)",
+      "status": 2,
+      "bits": 0,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "1'234.5",
+      "status": 0,
+      "bits": 4653144203864309760,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1_234.5",
+      "status": 0,
+      "bits": 4653144203864309760,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": ".1'25f",
+      "status": 0,
+      "bits": 1040187392,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": ".1_25f",
+      "status": 0,
+      "bits": 1040187392,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "0.15e+0'2",
+      "status": 0,
+      "bits": 4624633867356078080,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "0.15e+0_2",
+      "status": 0,
+      "bits": 4624633867356078080,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1'5.",
+      "status": 0,
+      "bits": 4624633867356078080,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1_5.",
+      "status": 0,
+      "bits": 4624633867356078080,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "-1_234.5",
+      "status": 0,
+      "bits": 13876516240719085568,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "(float)1_234.5",
+      "status": 0,
+      "bits": 1150963712,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "float64(1_234.5)",
+      "status": 0,
+      "bits": 4653144203864309760,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "static_cast<double>(.1_25f)",
+      "status": 0,
+      "bits": 4593671619917905920,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 1_234.5 : 7.0",
+      "status": 0,
+      "bits": 4653144203864309760,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "0 ? 1_234.5 : 7.0",
+      "status": 0,
+      "bits": 4619567317775286272,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "real32 + 1_000.5f",
+      "status": 0,
+      "bits": 1148911616,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 1
+    },
+    {
+      "expression": "1_000.5 + real64",
+      "status": 0,
+      "bits": 4651989716655144960,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 1
+    },
+    {
+      "expression": "1_000.5 == 1'000.5",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "0 && (1_234.5 + missing)",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || (.1_25f + missing)",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "340282356779733661637539395458142568447.0f",
+      "status": 0,
+      "bits": 2139095039,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "340282356779733661637539395458142568447.0F",
+      "status": 0,
+      "bits": 2139095039,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "3.40282356779733661637539395458142568447e38f",
+      "status": 0,
+      "bits": 2139095039,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "3.4028235e38f",
+      "status": 0,
+      "bits": 2139095039,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "3.402'823'5e3'8F",
+      "status": 0,
+      "bits": 2139095039,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "3.402_823_5e3_8f",
+      "status": 0,
+      "bits": 2139095039,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "0.0e999f",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "3.5e38",
+      "status": 0,
+      "bits": 5183771782906367355,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1e39",
+      "status": 0,
+      "bits": 5190260616003865117,
+      "width": 64,
+      "unsigned": 0,
+      "floating": 1,
+      "reads": 0
+    },
+    {
+      "expression": "(pair).0 + 1",
+      "status": 0,
+      "bits": 4294967288,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 1
+    },
+    {
+      "expression": "((pair)).1 * 2",
+      "status": 0,
+      "bits": 84,
+      "width": 32,
+      "unsigned": 1,
+      "floating": 0,
+      "reads": 1
+    },
+    {
+      "expression": "((p)).* + 1",
+      "status": 0,
+      "bits": 43,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 1
+    },
+    {
+      "expression": "(pair).0",
+      "status": 0,
+      "bits": 4294967287,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 1
+    },
+    {
+      "expression": "0 && ((*p).field + missing)",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || ((pair).0 + missing)",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "(*p).field + 1",
+      "status": 4,
+      "reads": 1
+    },
+    {
+      "expression": "(pair)[-1].field + 1",
+      "status": 4,
+      "reads": 1
+    },
+    {
+      "expression": "(value) - 1",
+      "status": 0,
+      "bits": 6,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 1
+    },
+    {
+      "expression": "static_cast < int > (value)",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "@as (i32, value)",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "static_cast < unsigned   char > (flag)",
+      "status": 0,
+      "bits": 1,
+      "width": 8,
+      "unsigned": true,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "(signed   char)(value)",
+      "status": 0,
+      "bits": 7,
+      "width": 8,
+      "unsigned": false,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "sizeof(unsigned   char)",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "( unsigned   long )(value)",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "static_cast < double > (real32)",
+      "status": 0,
+      "bits": 4615063718147915776,
+      "width": 64,
+      "unsigned": false,
+      "floating": true,
+      "reads": 1
+    },
+    {
+      "expression": "@as (u8, 255)",
+      "status": 0,
+      "bits": 255,
+      "width": 8,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "(signed)(value)",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "(unsigned short int)(value)",
+      "status": 0,
+      "bits": 7,
+      "width": 16,
+      "unsigned": true,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "static_cast<long unsigned int>(value)",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "sizeof(unsigned long long int)",
+      "status": 0,
+      "bits": 8,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "(int long signed)(value)",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "(short unsigned int)(-1)",
+      "status": 0,
+      "bits": 65535,
+      "width": 16,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "static_cast<char signed>(-73)",
+      "status": 0,
+      "bits": 183,
+      "width": 8,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "static_cast<long long signed>(value)",
+      "status": 0,
+      "bits": 7,
+      "width": 64,
+      "unsigned": false,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "1 ? (signed char)(value) : (short)2",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 1
+    },
+    {
+      "expression": "0 ? (signed char)(value) : (short)2",
+      "status": 0,
+      "bits": 2,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? (unsigned short)65535 : (short)-1",
+      "status": 0,
+      "bits": 65535,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "0 ? (unsigned short)65535 : (short)-1",
+      "status": 0,
+      "bits": 4294967295,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? true : (unsigned char)255",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "0 ? true : (unsigned char)255",
+      "status": 0,
+      "bits": 255,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? (bool)255 : (signed char)-1",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? (0 ? (signed char)1 : (short)2) : 0",
+      "status": 0,
+      "bits": 2,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof(1 + 2)",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof(value + shadow)",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof(value / 0)",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof(real32 + real64)",
+      "status": 0,
+      "bits": 8,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof(1 << -1)",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof((short)value)",
+      "status": 0,
+      "bits": 2,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof((bool)value)",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof(true)",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof(false)",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof('(' + ')')",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof('\\\\' + 1)",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof(1'0 + (short)value)",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof(sizeof(packet) + 1)",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof(value ? 1 : real64)",
+      "status": 0,
+      "bits": 8,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : sizeof(value / 0)",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": true,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof(value + missing)",
+      "status": 4
+    },
+    {
+      "expression": "sizeof 1",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof-1",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof +value",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof ~value",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof !value",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof !!value",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof !flag",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof !off",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof sizeof +value",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof sizeof packet",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof -1 + 2",
+      "status": 0,
+      "bits": 6,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof -1 * 2",
+      "status": 0,
+      "bits": 8,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof -1 / 2",
+      "status": 0,
+      "bits": 2,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof -1 == 4",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "!sizeof value",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "sizeof packet + 1",
+      "status": 0,
+      "bits": 29,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "sizeof value + 1",
+      "status": 0,
+      "bits": 5,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 1
+    },
+    {
+      "expression": "sizeof +real32",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof -real64",
+      "status": 0,
+      "bits": 8,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof '('",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof-1e3f",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof sizeof -real64",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof 1 ? 2 : 3",
+      "status": 0,
+      "bits": 2,
+      "width": 32,
+      "unsigned": false,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof +*p",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": true,
+      "floating": false,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof_value",
+      "status": 4,
+      "reads": 1
+    },
+    {
+      "expression": "sizeofValue",
+      "status": 4,
+      "reads": 1
+    },
+    {
+      "expression": "'\\x00'",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x01'",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x02'",
+      "status": 0,
+      "bits": 2,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x03'",
+      "status": 0,
+      "bits": 3,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x04'",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x05'",
+      "status": 0,
+      "bits": 5,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x06'",
+      "status": 0,
+      "bits": 6,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x07'",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x08'",
+      "status": 0,
+      "bits": 8,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x09'",
+      "status": 0,
+      "bits": 9,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x0a'",
+      "status": 0,
+      "bits": 10,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x0b'",
+      "status": 0,
+      "bits": 11,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x0c'",
+      "status": 0,
+      "bits": 12,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x0d'",
+      "status": 0,
+      "bits": 13,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x0e'",
+      "status": 0,
+      "bits": 14,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x0f'",
+      "status": 0,
+      "bits": 15,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x10'",
+      "status": 0,
+      "bits": 16,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x11'",
+      "status": 0,
+      "bits": 17,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x12'",
+      "status": 0,
+      "bits": 18,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x13'",
+      "status": 0,
+      "bits": 19,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x14'",
+      "status": 0,
+      "bits": 20,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x15'",
+      "status": 0,
+      "bits": 21,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x16'",
+      "status": 0,
+      "bits": 22,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x17'",
+      "status": 0,
+      "bits": 23,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x18'",
+      "status": 0,
+      "bits": 24,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x19'",
+      "status": 0,
+      "bits": 25,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x1a'",
+      "status": 0,
+      "bits": 26,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x1b'",
+      "status": 0,
+      "bits": 27,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x1c'",
+      "status": 0,
+      "bits": 28,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x1d'",
+      "status": 0,
+      "bits": 29,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x1e'",
+      "status": 0,
+      "bits": 30,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x1f'",
+      "status": 0,
+      "bits": 31,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x20'",
+      "status": 0,
+      "bits": 32,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x21'",
+      "status": 0,
+      "bits": 33,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x22'",
+      "status": 0,
+      "bits": 34,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x23'",
+      "status": 0,
+      "bits": 35,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x24'",
+      "status": 0,
+      "bits": 36,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x25'",
+      "status": 0,
+      "bits": 37,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x26'",
+      "status": 0,
+      "bits": 38,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x27'",
+      "status": 0,
+      "bits": 39,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x28'",
+      "status": 0,
+      "bits": 40,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x29'",
+      "status": 0,
+      "bits": 41,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x2a'",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x2b'",
+      "status": 0,
+      "bits": 43,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x2c'",
+      "status": 0,
+      "bits": 44,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x2d'",
+      "status": 0,
+      "bits": 45,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x2e'",
+      "status": 0,
+      "bits": 46,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x2f'",
+      "status": 0,
+      "bits": 47,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x30'",
+      "status": 0,
+      "bits": 48,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x31'",
+      "status": 0,
+      "bits": 49,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x32'",
+      "status": 0,
+      "bits": 50,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x33'",
+      "status": 0,
+      "bits": 51,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x34'",
+      "status": 0,
+      "bits": 52,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x35'",
+      "status": 0,
+      "bits": 53,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x36'",
+      "status": 0,
+      "bits": 54,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x37'",
+      "status": 0,
+      "bits": 55,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x38'",
+      "status": 0,
+      "bits": 56,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x39'",
+      "status": 0,
+      "bits": 57,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x3a'",
+      "status": 0,
+      "bits": 58,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x3b'",
+      "status": 0,
+      "bits": 59,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x3c'",
+      "status": 0,
+      "bits": 60,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x3d'",
+      "status": 0,
+      "bits": 61,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x3e'",
+      "status": 0,
+      "bits": 62,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x3f'",
+      "status": 0,
+      "bits": 63,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x40'",
+      "status": 0,
+      "bits": 64,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x41'",
+      "status": 0,
+      "bits": 65,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x42'",
+      "status": 0,
+      "bits": 66,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x43'",
+      "status": 0,
+      "bits": 67,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x44'",
+      "status": 0,
+      "bits": 68,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x45'",
+      "status": 0,
+      "bits": 69,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x46'",
+      "status": 0,
+      "bits": 70,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x47'",
+      "status": 0,
+      "bits": 71,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x48'",
+      "status": 0,
+      "bits": 72,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x49'",
+      "status": 0,
+      "bits": 73,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x4a'",
+      "status": 0,
+      "bits": 74,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x4b'",
+      "status": 0,
+      "bits": 75,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x4c'",
+      "status": 0,
+      "bits": 76,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x4d'",
+      "status": 0,
+      "bits": 77,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x4e'",
+      "status": 0,
+      "bits": 78,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x4f'",
+      "status": 0,
+      "bits": 79,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x50'",
+      "status": 0,
+      "bits": 80,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x51'",
+      "status": 0,
+      "bits": 81,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x52'",
+      "status": 0,
+      "bits": 82,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x53'",
+      "status": 0,
+      "bits": 83,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x54'",
+      "status": 0,
+      "bits": 84,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x55'",
+      "status": 0,
+      "bits": 85,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x56'",
+      "status": 0,
+      "bits": 86,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x57'",
+      "status": 0,
+      "bits": 87,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x58'",
+      "status": 0,
+      "bits": 88,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x59'",
+      "status": 0,
+      "bits": 89,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x5a'",
+      "status": 0,
+      "bits": 90,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x5b'",
+      "status": 0,
+      "bits": 91,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x5c'",
+      "status": 0,
+      "bits": 92,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x5d'",
+      "status": 0,
+      "bits": 93,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x5e'",
+      "status": 0,
+      "bits": 94,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x5f'",
+      "status": 0,
+      "bits": 95,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x60'",
+      "status": 0,
+      "bits": 96,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x61'",
+      "status": 0,
+      "bits": 97,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x62'",
+      "status": 0,
+      "bits": 98,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x63'",
+      "status": 0,
+      "bits": 99,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x64'",
+      "status": 0,
+      "bits": 100,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x65'",
+      "status": 0,
+      "bits": 101,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x66'",
+      "status": 0,
+      "bits": 102,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x67'",
+      "status": 0,
+      "bits": 103,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x68'",
+      "status": 0,
+      "bits": 104,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x69'",
+      "status": 0,
+      "bits": 105,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x6a'",
+      "status": 0,
+      "bits": 106,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x6b'",
+      "status": 0,
+      "bits": 107,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x6c'",
+      "status": 0,
+      "bits": 108,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x6d'",
+      "status": 0,
+      "bits": 109,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x6e'",
+      "status": 0,
+      "bits": 110,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x6f'",
+      "status": 0,
+      "bits": 111,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x70'",
+      "status": 0,
+      "bits": 112,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x71'",
+      "status": 0,
+      "bits": 113,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x72'",
+      "status": 0,
+      "bits": 114,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x73'",
+      "status": 0,
+      "bits": 115,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x74'",
+      "status": 0,
+      "bits": 116,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x75'",
+      "status": 0,
+      "bits": 117,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x76'",
+      "status": 0,
+      "bits": 118,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x77'",
+      "status": 0,
+      "bits": 119,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x78'",
+      "status": 0,
+      "bits": 120,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x79'",
+      "status": 0,
+      "bits": 121,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x7a'",
+      "status": 0,
+      "bits": 122,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x7b'",
+      "status": 0,
+      "bits": 123,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x7c'",
+      "status": 0,
+      "bits": 124,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x7d'",
+      "status": 0,
+      "bits": 125,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x7e'",
+      "status": 0,
+      "bits": 126,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x7f'",
+      "status": 0,
+      "bits": 127,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\000'",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\001'",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\002'",
+      "status": 0,
+      "bits": 2,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\003'",
+      "status": 0,
+      "bits": 3,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\004'",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\005'",
+      "status": 0,
+      "bits": 5,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\006'",
+      "status": 0,
+      "bits": 6,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\007'",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\010'",
+      "status": 0,
+      "bits": 8,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\011'",
+      "status": 0,
+      "bits": 9,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\012'",
+      "status": 0,
+      "bits": 10,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\013'",
+      "status": 0,
+      "bits": 11,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\014'",
+      "status": 0,
+      "bits": 12,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\015'",
+      "status": 0,
+      "bits": 13,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\016'",
+      "status": 0,
+      "bits": 14,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\017'",
+      "status": 0,
+      "bits": 15,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\020'",
+      "status": 0,
+      "bits": 16,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\021'",
+      "status": 0,
+      "bits": 17,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\022'",
+      "status": 0,
+      "bits": 18,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\023'",
+      "status": 0,
+      "bits": 19,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\024'",
+      "status": 0,
+      "bits": 20,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\025'",
+      "status": 0,
+      "bits": 21,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\026'",
+      "status": 0,
+      "bits": 22,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\027'",
+      "status": 0,
+      "bits": 23,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\030'",
+      "status": 0,
+      "bits": 24,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\031'",
+      "status": 0,
+      "bits": 25,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\032'",
+      "status": 0,
+      "bits": 26,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\033'",
+      "status": 0,
+      "bits": 27,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\034'",
+      "status": 0,
+      "bits": 28,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\035'",
+      "status": 0,
+      "bits": 29,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\036'",
+      "status": 0,
+      "bits": 30,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\037'",
+      "status": 0,
+      "bits": 31,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\040'",
+      "status": 0,
+      "bits": 32,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\041'",
+      "status": 0,
+      "bits": 33,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\042'",
+      "status": 0,
+      "bits": 34,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\043'",
+      "status": 0,
+      "bits": 35,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\044'",
+      "status": 0,
+      "bits": 36,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\045'",
+      "status": 0,
+      "bits": 37,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\046'",
+      "status": 0,
+      "bits": 38,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\047'",
+      "status": 0,
+      "bits": 39,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\050'",
+      "status": 0,
+      "bits": 40,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\051'",
+      "status": 0,
+      "bits": 41,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\052'",
+      "status": 0,
+      "bits": 42,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\053'",
+      "status": 0,
+      "bits": 43,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\054'",
+      "status": 0,
+      "bits": 44,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\055'",
+      "status": 0,
+      "bits": 45,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\056'",
+      "status": 0,
+      "bits": 46,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\057'",
+      "status": 0,
+      "bits": 47,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\060'",
+      "status": 0,
+      "bits": 48,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\061'",
+      "status": 0,
+      "bits": 49,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\062'",
+      "status": 0,
+      "bits": 50,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\063'",
+      "status": 0,
+      "bits": 51,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\064'",
+      "status": 0,
+      "bits": 52,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\065'",
+      "status": 0,
+      "bits": 53,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\066'",
+      "status": 0,
+      "bits": 54,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\067'",
+      "status": 0,
+      "bits": 55,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\070'",
+      "status": 0,
+      "bits": 56,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\071'",
+      "status": 0,
+      "bits": 57,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\072'",
+      "status": 0,
+      "bits": 58,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\073'",
+      "status": 0,
+      "bits": 59,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\074'",
+      "status": 0,
+      "bits": 60,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\075'",
+      "status": 0,
+      "bits": 61,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\076'",
+      "status": 0,
+      "bits": 62,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\077'",
+      "status": 0,
+      "bits": 63,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\100'",
+      "status": 0,
+      "bits": 64,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\101'",
+      "status": 0,
+      "bits": 65,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\102'",
+      "status": 0,
+      "bits": 66,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\103'",
+      "status": 0,
+      "bits": 67,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\104'",
+      "status": 0,
+      "bits": 68,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\105'",
+      "status": 0,
+      "bits": 69,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\106'",
+      "status": 0,
+      "bits": 70,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\107'",
+      "status": 0,
+      "bits": 71,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\110'",
+      "status": 0,
+      "bits": 72,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\111'",
+      "status": 0,
+      "bits": 73,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\112'",
+      "status": 0,
+      "bits": 74,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\113'",
+      "status": 0,
+      "bits": 75,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\114'",
+      "status": 0,
+      "bits": 76,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\115'",
+      "status": 0,
+      "bits": 77,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\116'",
+      "status": 0,
+      "bits": 78,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\117'",
+      "status": 0,
+      "bits": 79,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\120'",
+      "status": 0,
+      "bits": 80,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\121'",
+      "status": 0,
+      "bits": 81,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\122'",
+      "status": 0,
+      "bits": 82,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\123'",
+      "status": 0,
+      "bits": 83,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\124'",
+      "status": 0,
+      "bits": 84,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\125'",
+      "status": 0,
+      "bits": 85,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\126'",
+      "status": 0,
+      "bits": 86,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\127'",
+      "status": 0,
+      "bits": 87,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\130'",
+      "status": 0,
+      "bits": 88,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\131'",
+      "status": 0,
+      "bits": 89,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\132'",
+      "status": 0,
+      "bits": 90,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\133'",
+      "status": 0,
+      "bits": 91,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\134'",
+      "status": 0,
+      "bits": 92,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\135'",
+      "status": 0,
+      "bits": 93,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\136'",
+      "status": 0,
+      "bits": 94,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\137'",
+      "status": 0,
+      "bits": 95,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\140'",
+      "status": 0,
+      "bits": 96,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\141'",
+      "status": 0,
+      "bits": 97,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\142'",
+      "status": 0,
+      "bits": 98,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\143'",
+      "status": 0,
+      "bits": 99,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\144'",
+      "status": 0,
+      "bits": 100,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\145'",
+      "status": 0,
+      "bits": 101,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\146'",
+      "status": 0,
+      "bits": 102,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\147'",
+      "status": 0,
+      "bits": 103,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\150'",
+      "status": 0,
+      "bits": 104,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\151'",
+      "status": 0,
+      "bits": 105,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\152'",
+      "status": 0,
+      "bits": 106,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\153'",
+      "status": 0,
+      "bits": 107,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\154'",
+      "status": 0,
+      "bits": 108,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\155'",
+      "status": 0,
+      "bits": 109,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\156'",
+      "status": 0,
+      "bits": 110,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\157'",
+      "status": 0,
+      "bits": 111,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\160'",
+      "status": 0,
+      "bits": 112,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\161'",
+      "status": 0,
+      "bits": 113,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\162'",
+      "status": 0,
+      "bits": 114,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\163'",
+      "status": 0,
+      "bits": 115,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\164'",
+      "status": 0,
+      "bits": 116,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\165'",
+      "status": 0,
+      "bits": 117,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\166'",
+      "status": 0,
+      "bits": 118,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\167'",
+      "status": 0,
+      "bits": 119,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\170'",
+      "status": 0,
+      "bits": 120,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\171'",
+      "status": 0,
+      "bits": 121,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\172'",
+      "status": 0,
+      "bits": 122,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\173'",
+      "status": 0,
+      "bits": 123,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\174'",
+      "status": 0,
+      "bits": 124,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\175'",
+      "status": 0,
+      "bits": 125,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\176'",
+      "status": 0,
+      "bits": 126,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\177'",
+      "status": 0,
+      "bits": 127,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\0'",
+      "status": 0,
+      "bits": 0,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\1'",
+      "status": 0,
+      "bits": 1,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\2'",
+      "status": 0,
+      "bits": 2,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\3'",
+      "status": 0,
+      "bits": 3,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\4'",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\5'",
+      "status": 0,
+      "bits": 5,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\6'",
+      "status": 0,
+      "bits": 6,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\7'",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\10'",
+      "status": 0,
+      "bits": 8,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\11'",
+      "status": 0,
+      "bits": 9,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\12'",
+      "status": 0,
+      "bits": 10,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\13'",
+      "status": 0,
+      "bits": 11,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\14'",
+      "status": 0,
+      "bits": 12,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\15'",
+      "status": 0,
+      "bits": 13,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\16'",
+      "status": 0,
+      "bits": 14,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\17'",
+      "status": 0,
+      "bits": 15,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\a'",
+      "status": 0,
+      "bits": 7,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\b'",
+      "status": 0,
+      "bits": 8,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\f'",
+      "status": 0,
+      "bits": 12,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\n'",
+      "status": 0,
+      "bits": 10,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\r'",
+      "status": 0,
+      "bits": 13,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\t'",
+      "status": 0,
+      "bits": 9,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\v'",
+      "status": 0,
+      "bits": 11,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\\\'",
+      "status": 0,
+      "bits": 92,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\''",
+      "status": 0,
+      "bits": 39,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\\"'",
+      "status": 0,
+      "bits": 34,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\?'",
+      "status": 0,
+      "bits": 63,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof('\\x28' + '\\x29')",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": 1,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof '\\101'",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": 1,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x41' + value",
+      "status": 0,
+      "bits": 72,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 1
+    },
+    {
+      "expression": "1 ? '\\101' : value",
+      "status": 0,
+      "bits": 65,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x0000000041'",
+      "status": 0,
+      "bits": 65,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\x7F'",
+      "status": 0,
+      "bits": 127,
+      "width": 32,
+      "unsigned": 0,
+      "floating": 0,
+      "reads": 0
+    },
+    {
+      "expression": "sizeof('\\'' + '\\x29')",
+      "status": 0,
+      "bits": 4,
+      "width": 32,
+      "unsigned": 1,
+      "floating": 0,
+      "reads": 0
+    }
+  ],
+  "negative": [
+    "0 && call()",
+    "1 || (value=2)",
+    "0 && *(value + 1)",
+    "1 || *0x1000",
+    "0 && (int*)value",
+    "1 || ++value",
+    "0 && value++",
+    "0 && value;continue",
+    "1 || value\nstatus",
+    "sizeof(call())",
+    "@as(*i32, value)",
+    "(void*)value",
+    "value, 1",
+    "a b + 1",
+    "ns ::value + 1",
+    "ns:: value + 1",
+    "0x10000000000000000",
+    "18446744073709551616",
+    "1e999",
+    "1e2e3",
+    "1.0ff",
+    "1uu",
+    "1lL",
+    "0b102",
+    "09",
+    "1__0",
+    "1''0",
+    "123_",
+    "value[01] + 1",
+    "value[+1] + 1",
+    "1 + value\t",
+    "1 + \u03bb",
+    "value+=1",
+    "1 || $pc",
+    "&value",
+    "*(1+2)",
+    "*(int32(value))",
+    "1 + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1",
+    "((((((((((((((((1))))))))))))))))",
+    "p.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*.*+1",
+    "p.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x+1",
+    "value++1",
+    "value--1",
+    "++1",
+    "--1",
+    "0 && value--1",
+    "1 || ++value",
+    "1 ?",
+    "1 ? 2",
+    "1 ? : 2",
+    "1 ? 2 :",
+    "1 ? 2 : 3 : 4",
+    "1 ?: 2",
+    "1 ? value++ : 2",
+    "1 ? 2 : run()",
+    "1 ? 2 : value = 8",
+    "1 ? 2 : &value",
+    "1 ? 2 : (int*)value",
+    "1 ? 2,3 : 4",
+    "1_.5",
+    "1._5",
+    "1.5_e1",
+    "1.5e_1",
+    "1.5e1_",
+    "1.5e+_1",
+    "1.5e-_1",
+    "1__2.5",
+    "1''2.5",
+    "1'_2.5",
+    "1_'2.5",
+    "1'.5",
+    "1.'5",
+    "1.5'e1",
+    "1.5e'1",
+    "1.5e1'",
+    "1.5e+'1",
+    ".1__2",
+    ".1''2",
+    "1.2f_",
+    "1.2f'",
+    "1_2e",
+    "1_2e+",
+    "1_2e-",
+    "0 && (1_.5)",
+    "0 && (1._5)",
+    "0 && (1.5_e1)",
+    "0 && (1.5e_1)",
+    "0 && (1.5e1_)",
+    "0 && (1.5e+_1)",
+    "0 && (1.5e-_1)",
+    "0 && (1__2.5)",
+    "0 && (1''2.5)",
+    "0 && (1'_2.5)",
+    "0 && (1_'2.5)",
+    "0 && (1'.5)",
+    "0 && (1.'5)",
+    "0 && (1.5'e1)",
+    "0 && (1.5e'1)",
+    "0 && (1.5e1')",
+    "0 && (1.5e+'1)",
+    "0 && (.1__2)",
+    "0 && (.1''2)",
+    "0 && (1.2f_)",
+    "0 && (1.2f')",
+    "0 && (1_2e)",
+    "0 && (1_2e+)",
+    "0 && (1_2e-)",
+    "1 ? 7.0 : 1_.5",
+    "1 ? 7.0 : 1._5",
+    "1 ? 7.0 : 1.5_e1",
+    "1 ? 7.0 : 1.5e_1",
+    "1 ? 7.0 : 1.5e1_",
+    "1 ? 7.0 : 1.5e+_1",
+    "1 ? 7.0 : 1.5e-_1",
+    "1 ? 7.0 : 1__2.5",
+    "1 ? 7.0 : 1''2.5",
+    "1 ? 7.0 : 1'_2.5",
+    "1 ? 7.0 : 1_'2.5",
+    "1 ? 7.0 : 1'.5",
+    "1 ? 7.0 : 1.'5",
+    "1 ? 7.0 : 1.5'e1",
+    "1 ? 7.0 : 1.5e'1",
+    "1 ? 7.0 : 1.5e1'",
+    "1 ? 7.0 : 1.5e+'1",
+    "1 ? 7.0 : .1__2",
+    "1 ? 7.0 : .1''2",
+    "1 ? 7.0 : 1.2f_",
+    "1 ? 7.0 : 1.2f'",
+    "1 ? 7.0 : 1_2e",
+    "1 ? 7.0 : 1_2e+",
+    "1 ? 7.0 : 1_2e-",
+    "3.5e38f",
+    "0 && 3.5e38f",
+    "1 || 3.5e38f",
+    "1 ? 7.0 : 3.5e38f",
+    "1e39F",
+    "0 && 1e39F",
+    "1 || 1e39F",
+    "1 ? 7.0 : 1e39F",
+    "340282356779733661637539395458142568448.0f",
+    "0 && 340282356779733661637539395458142568448.0f",
+    "1 || 340282356779733661637539395458142568448.0f",
+    "1 ? 7.0 : 340282356779733661637539395458142568448.0f",
+    "340282356779733661637539395458142568449.0F",
+    "0 && 340282356779733661637539395458142568449.0F",
+    "1 || 340282356779733661637539395458142568449.0F",
+    "1 ? 7.0 : 340282356779733661637539395458142568449.0F",
+    "3.40282356779733661637539395458142568448e38f",
+    "0 && 3.40282356779733661637539395458142568448e38f",
+    "1 || 3.40282356779733661637539395458142568448e38f",
+    "1 ? 7.0 : 3.40282356779733661637539395458142568448e38f",
+    "3.40282356779733661637539395458142568449e38f",
+    "0 && 3.40282356779733661637539395458142568449e38f",
+    "1 || 3.40282356779733661637539395458142568449e38f",
+    "1 ? 7.0 : 3.40282356779733661637539395458142568449e38f",
+    "3.5_0e3_8f",
+    "0 && 3.5_0e3_8f",
+    "1 || 3.5_0e3_8f",
+    "1 ? 7.0 : 3.5_0e3_8f",
+    "3.5'0e3'8F",
+    "0 && 3.5'0e3'8F",
+    "1 || 3.5'0e3'8F",
+    "1 ? 7.0 : 3.5'0e3'8F",
+    "1e-999f",
+    "0 && 1e-999f",
+    "1 ? 7.0 : 1e-999f",
+    "1e-999",
+    "0 && 1e-999",
+    "1 ? 7.0 : 1e-999",
+    "1e-46f",
+    "0 && 1e-46f",
+    "1 ? 7.0 : 1e-46f",
+    "7e-46F",
+    "0 && 7e-46F",
+    "1 ? 7.0 : 7e-46F",
+    "2e-324",
+    "0 && 2e-324",
+    "1 ? 7.0 : 2e-324",
+    "1.0e-999f",
+    "0 && 1.0e-999f",
+    "1 ? 7.0 : 1.0e-999f",
+    "(p + 1)->field + 1",
+    "(42).field + 1",
+    "(true).field + 1",
+    "(sizeof(p)).field + 1",
+    "(int(p)).field + 1",
+    "(p as i32).field + 1",
+    "(1 ? p : p).field + 1",
+    "0 && ((p+1)->field + 1)",
+    "1 || ((true).field + 1)",
+    "(packet)[1+1] + 1",
+    "(packet)[01] + 1",
+    "(packet). * + 1",
+    "(packet)-> + 1",
+    "(packet)[9223372036854775808] + 1",
+    "(packet)[-9223372036854775809] + 1",
+    "(packet).field = 1",
+    "(packet).field++",
+    "(ns ::packet).field + 1",
+    "(ns:: packet).field + 1",
+    "static_castx<int>(value, 1)",
+    "sta tic_cast<int>(value)",
+    "@asx (i32, value)",
+    "static_cast < int* > (value)",
+    "@as ( *i32, value)",
+    "static_cast < unsignedchar > (value)",
+    "(unsignedchar)(value)",
+    "@as (u 8, 1)",
+    "static_cast < int > (value = 8)",
+    "@as (u8, value++)",
+    "static_cast<signed unsigned>(value)",
+    "(short long)(value)",
+    "(int int)(value)",
+    "static_cast<long long long>(value)",
+    "(char int)(value)",
+    "static_cast<unsigned i32>(value)",
+    "(unsigned short int int)(value)",
+    "@as(signed, 1)",
+    "0 && static_cast<signed signed>(value)",
+    "sizeof(unsigned short long)",
+    "static_cast<long unsigned int>(value = 8)",
+    "(signed)(value++)",
+    "sizeof(value + call())",
+    "sizeof(value = 2)",
+    "sizeof(++value)",
+    "sizeof(value++)",
+    "sizeof(*(value + 1))",
+    "sizeof(1, 2)",
+    "sizeof((value + 1).field)",
+    "sizeof(value + 2) trailing",
+    "sizeof",
+    "sizeof +",
+    "sizeof ++value",
+    "sizeof value++",
+    "sizeof --value",
+    "sizeof value--",
+    "sizeof call()",
+    "sizeof *(value + 1)",
+    "sizeof *0x1000",
+    "sizeof (int*)value",
+    "sizeof value;continue",
+    "sizeof value\nstatus",
+    "sizeof 1 ? 2 : call()",
+    "sizeof...value",
+    "sizeof sizeof ",
+    "sizeof.field",
+    "*sizeof",
+    "(sizeof)",
+    "sizeof::field",
+    "'\\x'",
+    "0 && '\\x'",
+    "1 ? 7 : '\\x'",
+    "sizeof('\\x')",
+    "'\\X41'",
+    "0 && '\\X41'",
+    "1 ? 7 : '\\X41'",
+    "sizeof('\\X41')",
+    "'\\x80'",
+    "0 && '\\x80'",
+    "1 ? 7 : '\\x80'",
+    "sizeof('\\x80')",
+    "'\\200'",
+    "0 && '\\200'",
+    "1 ? 7 : '\\200'",
+    "sizeof('\\200')",
+    "'\\400'",
+    "0 && '\\400'",
+    "1 ? 7 : '\\400'",
+    "sizeof('\\400')",
+    "'\\x100'",
+    "0 && '\\x100'",
+    "1 ? 7 : '\\x100'",
+    "sizeof('\\x100')",
+    "'\\x41g'",
+    "0 && '\\x41g'",
+    "1 ? 7 : '\\x41g'",
+    "sizeof('\\x41g')",
+    "'\\08'",
+    "0 && '\\08'",
+    "1 ? 7 : '\\08'",
+    "sizeof('\\08')",
+    "'\\0000'",
+    "0 && '\\0000'",
+    "1 ? 7 : '\\0000'",
+    "sizeof('\\0000')",
+    "'\\1234'",
+    "0 && '\\1234'",
+    "1 ? 7 : '\\1234'",
+    "sizeof('\\1234')",
+    "'\\q'",
+    "0 && '\\q'",
+    "1 ? 7 : '\\q'",
+    "sizeof('\\q')",
+    "'\\u0041'",
+    "0 && '\\u0041'",
+    "1 ? 7 : '\\u0041'",
+    "sizeof('\\u0041')",
+    "'\\x41 '",
+    "0 && '\\x41 '",
+    "1 ? 7 : '\\x41 '",
+    "sizeof('\\x41 ')",
+    "'\\1 '",
+    "0 && '\\1 '",
+    "1 ? 7 : '\\1 '",
+    "sizeof('\\1 ')",
+    "'\\x41",
+    "0 && '\\x41",
+    "1 ? 7 : '\\x41",
+    "sizeof('\\x41)",
+    "'\\x41''a'",
+    "0 && '\\x41''a'",
+    "1 ? 7 : '\\x41''a'",
+    "sizeof('\\x41''a')",
+    "L'\\x41'",
+    "0 && L'\\x41'",
+    "1 ? 7 : L'\\x41'",
+    "sizeof(L'\\x41')",
+    "u8'\\x100'",
+    "0 && u8'\\x100'",
+    "1 ? 7 : u8'\\x100'",
+    "sizeof(u8'\\x100')",
+    "'\\x41';continue",
+    "0 && '\\x41';continue",
+    "1 ? 7 : '\\x41';continue",
+    "sizeof('\\x41';continue)",
+    "'\\x41' + call()",
+    "0 && '\\x41' + call()",
+    "1 ? 7 : '\\x41' + call()",
+    "sizeof('\\x41' + call())"
+  ]
+}

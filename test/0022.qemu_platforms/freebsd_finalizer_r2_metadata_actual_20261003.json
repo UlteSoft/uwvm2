@@ -1,0 +1,56 @@
+{
+  "ROS_bundled_LLVM23_product_qualified": false,
+  "actual_returncode": 0,
+  "guest_executed": false,
+  "guest_runtime_rows_verified": 7,
+  "local_full_output": "/tmp/uwvm-qemu-freebsd-oracle-finalizer-source-only-20261003-r2/cold-qualified-r2-actual.json",
+  "native_tool_executed": false,
+  "original_R1_metadata_rejection_retained": true,
+  "original_guard_receipts_sha256": "bfc2bd8e6e53572bd284feb1ebe71024f0024b178aa178fc6ea8b0b3c8e23ad8",
+  "original_guard_retirement_sha256": "cd9a94675ddc72fa204d3ae84a64792b1a1b4f915d1984bd57a64b854575cc91",
+  "original_successful_stages_verified": 27,
+  "platform_kernel_qualified": false,
+  "qualified_input_bytes": 9935,
+  "qualified_input_sha256": "e6a0f31823819ca265eab8b206e7778fae77627198ac93d1146e6ef145f92d97",
+  "remote_output": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/freebsd-sdk-oracle-cold-20261003-r2-planfix/cold-qualified-r2.json",
+  "schema": "uwvm-freebsd151-finalizer-r2-metadata-actual-v1",
+  "source_sha256": "484b145492bf6777665897815c56bc8e484cca37b5faa8e2977b74dd0e343c22",
+  "target_runtime": [
+    {
+      "bytes": 1010608,
+      "guest_path": "/lib/libc++.so.1",
+      "sha256": "6a7313890db59d32abba032a37d42cc66b93c76d789081c7c2d6322eddbaa0d2"
+    },
+    {
+      "bytes": 2075224,
+      "guest_path": "/lib/libc.so.7",
+      "sha256": "c172ed8034bcdda439f117fe59456ad7a33ef1a89c31e5f88bc94444cdf50867"
+    },
+    {
+      "bytes": 105944,
+      "guest_path": "/lib/libcxxrt.so.1",
+      "sha256": "a0ff512599a163ba61cddf9a841992e189ef577904a7ae7900c4afdad67df5ed"
+    },
+    {
+      "bytes": 132672,
+      "guest_path": "/lib/libgcc_s.so.1",
+      "sha256": "85bc49d2239e51377b66109bbf8fa7485592f96744fb25a5aad7500a989d8526"
+    },
+    {
+      "bytes": 237384,
+      "guest_path": "/lib/libm.so.5",
+      "sha256": "e2e305ba93b76670df4373a7665a0a56daa9e1913715694cdf4d0b5e7becbcfb"
+    },
+    {
+      "bytes": 111392,
+      "guest_path": "/lib/libsys.so.7",
+      "sha256": "9f8b058e0acf4136efb54817ffc4403535c50d026d385c3209390b0ec9ceb239"
+    },
+    {
+      "bytes": 120400,
+      "guest_path": "/libexec/ld-elf.so.1",
+      "sha256": "305a0b7947a890c653e32a1ed9fc50c100416658dc422f2ca8de9ebcda9ddb6f"
+    }
+  ],
+  "whole_VM_restore_qualified": false
+}

@@ -1,0 +1,49 @@
+{
+  "schema": "uwvm-core3-GC-two-phase-declaration-controls-source-v2",
+  "source_only": true,
+  "production_changed_paths": [],
+  "native_passed": false,
+  "parent_before_manifest": "ccf0f8d34b16dce7a60788d293a1acb9b1d12774da33ef6bbf5d8cbe8dcd3c6e",
+  "component": "test/0013.uwvm_int/wasm3/gc_two_phase_policy_declarations.cc",
+  "ordinary_args_shape": "[--provider PROVIDER.wasm] accept|reject type-gc|type-no-gc FILE.wasm (repeated triples)",
+  "cases": [
+    {
+      "name": "signature_any",
+      "gc_off": "reject",
+      "type_section_gc": true
+    },
+    {
+      "name": "signature_exn",
+      "gc_off": "accept",
+      "type_section_gc": false
+    },
+    {
+      "name": "nondefaultable_any",
+      "gc_off": "reject",
+      "type_section_gc": false
+    },
+    {
+      "name": "import_table_any",
+      "gc_off": "reject",
+      "type_section_gc": false,
+      "provider": "import_provider"
+    },
+    {
+      "name": "import_global_any",
+      "gc_off": "reject",
+      "type_section_gc": false,
+      "provider": "import_provider"
+    },
+    {
+      "name": "zero_count_any",
+      "gc_off": "reject",
+      "type_section_gc": false,
+      "full_binary_source": "test/0013.uwvm_int/wasm3/gc_two_phase_zero_count_source.json"
+    }
+  ],
+  "features_parse_init": "fully GC/functionrefs/EH/reference-types enabled for execute and actual linked provider",
+  "validation_changes": "only disable_gc; do not mutate retained source/type/owner",
+  "oracle_first": true,
+  "zero_count_oracle": "validate original full bytes; WAT printer may normalize away zero-count run, so do not claim byte-roundtrip equality",
+  "original_before_v1_unchanged": true
+}

@@ -23,6 +23,7 @@ module;
 
 // std
 #include <concepts>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -33,6 +34,7 @@ module;
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/runtime/macro/push_macros.h>
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+#include <uwvm2/runtime/lib/uwvm_runtime_generated_wasm_bridge.h>
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
 #endif
@@ -40,6 +42,8 @@ module;
 export module uwvm2.uwvm.runtime.initializer:init;
 
 import fast_io;
+import uwvm2.runtime.gc.entry_admission;
+import uwvm2.runtime.gc.instance_phase;
 import uwvm2.utils.container;
 import uwvm2.utils.debug;
 import uwvm2.parser.wasm.base;
@@ -52,6 +56,10 @@ import uwvm2.parser.wasm.standard.wasm1p1.type;
 import uwvm2.parser.wasm.standard.wasm1p1.features;
 import uwvm2.parser.wasm.standard.wasm2.features;
 import uwvm2.parser.wasm.standard.wasm3.type;
+import uwvm2.validation.standard.wasm3.constant_expression;
+import uwvm2.validation.standard.wasm3.reference_policy;
+import uwvm2.validation.standard.wasm3.value_immediate;
+import uwvm2.validation.standard.wasm3.declaration_policy;
 import uwvm2.parser.wasm.binfmt.binfmt_ver1;
 import uwvm2.object;
 import uwvm2.uwvm.io;

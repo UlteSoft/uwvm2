@@ -26,6 +26,8 @@ def main():
     parser.add_argument("--trap-stub", type=Path, default=Path(__file__).parent / "fixtures/memory_address_trap_stub.cpp")
     parser.add_argument("--cxx", default="clang++")
     parser.add_argument("--llvm-config", default="llvm-config")
+    parser.add_argument("--llvm-build", type=Path, help="bundled LLVM build with consumer-link.rsp")
+    parser.add_argument("--llvm-source", type=Path, help="matching LLVM source tree (contains include/llvm)")
     parser.add_argument("--compile-flag", action="append", default=[])
     parser.add_argument("--link-flag", action="append", default=[])
     parser.add_argument("--negative-sentinel-control", action="store_true")
@@ -71,16 +73,34 @@ def main():
             raise RuntimeError(f"{label}: got {status}, expected {expected}; evidence: {out}")
         return (out / (label + ".log")).read_text()
 
-    version = run([args.llvm_config, "--version"], "llvm-version").strip()
-    include = run([args.llvm_config, "--includedir"], "llvm-includedir").strip()
-    links = shlex.split(run([args.llvm_config, "--link-shared", "--ldflags", "--libs",
-        "core", "support", "executionengine", "mcjit", "native", "passes", "--system-libs"], "llvm-links"))
+    extra_includes=[]
+    if (args.llvm_build is None) != (args.llvm_source is None):
+        parser.error("--llvm-build and --llvm-source must be supplied together")
+    if args.llvm_build is not None:
+        build=args.llvm_build.resolve(); source=args.llvm_source.resolve()
+        config=build/"include/llvm/Config/llvm-config.h"
+        response=build/"consumer-link.rsp"
+        import re
+        match=re.search(r'#define LLVM_VERSION_STRING "([^"]+)"',config.read_text())
+        if match is None: raise RuntimeError("LLVM version missing from generated configuration")
+        version=match[1];include=str(build/"include")
+        extra_includes=["-I"+str(source/"include")]
+        links=["@"+str(response)]
+        for file in (config,response):
+            hashes[str(file)]=hashlib.sha256(file.read_bytes()).hexdigest()
+            inputs.append(file)
+        (out/"llvm-provider.json").write_text(json.dumps(dict(build=str(build),source=str(source),version=version),indent=2)+"\n")
+    else:
+        version = run([args.llvm_config, "--version"], "llvm-version").strip()
+        include = run([args.llvm_config, "--includedir"], "llvm-includedir").strip()
+        links = shlex.split(run([args.llvm_config, "--link-shared", "--ldflags", "--libs",
+            "core", "support", "executionengine", "mcjit", "native", "passes", "--system-libs"], "llvm-links"))
     flags = ["-std=c++26", "-O3", "-fno-rtti", "-ffp-model=precise",
         "-Wno-deprecated-declarations", "-Wno-undefined-inline", "-DUWVM=2", "-DUWVM_TEST=2",
         "-DUWVM_USE_UWVM_INT", "-DUWVM_USE_LLVM_JIT", "-DUWVM_USE_THREAD_LOCAL",
         "-include", "uwvm2/uwvm/io/impl.h", "-Isrc", "-Ithird-parties/fast_io/include",
         "-Ithird-parties/bizwen/include", "-Ithird-parties/boost_unordered/include",
-        "-I" + include, *args.compile_flag]
+        "-I" + include, *extra_includes, *args.compile_flag]
     stub_object = out / "trap-stub.o"
     run([args.cxx, "-std=c++26", *args.compile_flag, "-c", stub, "-o", stub_object], "stub-compile")
 
@@ -99,7 +119,7 @@ def main():
                 if ("address=ffffffffffffffff length=ffffffffffffffff" not in output or
                     "actual=ffffffffffffffff/0 expected=ffffffffffffffff/1" not in output):
                     raise RuntimeError("negative control failed for an unexpected reason")
-            elif "210 configurations, 454650 boundary/random cases" not in output or "IR=" + mode not in output:
+            elif "294 configurations, 636510 boundary/random cases" not in output or "IR=" + mode not in output:
                 raise RuntimeError("incomplete address-decision matrix")
             results.append(dict(profile=profile, mode=mode, expected_returncode=expected,
                                 passed=True, output=output))
@@ -136,7 +156,7 @@ def main():
         raise RuntimeError("test inputs changed during verification")
     summary = dict(source_root=str(root), llvm_version=version, sha256=hashes,
         binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(), results=results,
-        original_configurations=210, original_cases_per_mode=454650,
+        original_configurations=294, original_cases_per_mode=636510,
         negative_sentinel_control=args.negative_sentinel_control,
         production_emitter_modified=False, real_linear_memory_access=False)
     (out / "results.json").write_text(json.dumps(summary, indent=2) + "\n")

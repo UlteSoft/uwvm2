@@ -98,11 +98,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                   currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg)) [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                 u8"[error] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8"Usage: ",
                                 ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::runtime_compile_threads),
                                 u8"\n\n");
@@ -140,31 +140,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return ::uwvm2::utils::cmdline::parameter_return_type::def;
         }
 
-        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                            u8"uwvm: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
-                            u8"[error] ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8"Invalid runtime compile thread setting: \"",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                            currp1_str,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8"\". Expected ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                            u8"default",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8" (adaptive), ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                            u8"aggressive",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8" (adaptive), or a ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                            u8"ssize_t",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8". Usage: ",
-                            ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::runtime_compile_threads),
-                            u8"\n\n");
+        // Keep the diagnostic one atomic output operation while bounding the
+        // conditional formatter's template graph. All chunks own their bytes
+        // before perr borrows them; the valid numeric path allocates nothing.
+        auto const heading{::uwvm2::utils::container::u8concat_uwvm(
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE), u8"uwvm: ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED), u8"[error] ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE), u8"Invalid runtime compile thread setting: \"")};
+        auto const setting{::uwvm2::utils::container::u8concat_uwvm(
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN), currp1_str,
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE), u8"\". Expected ")};
+        auto const policies{::uwvm2::utils::container::u8concat_uwvm(
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN), u8"default",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE), u8" (adaptive), ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN), u8"aggressive",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE), u8" (adaptive), or a ")};
+        auto const usage{::uwvm2::utils::container::u8concat_uwvm(
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN), u8"ssize_t",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE), u8". Usage: ",
+            ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::runtime_compile_threads), u8"\n\n")};
+        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output, heading, setting, policies, usage);
         return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
     }
 #endif

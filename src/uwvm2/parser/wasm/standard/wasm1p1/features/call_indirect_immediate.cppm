@@ -9,7 +9,10 @@ module;
 #include <cstddef>
 #include <cstdint>
 
+#include <uwvm2/utils/macro/push_macros.h>
 export module uwvm2.parser.wasm.standard.wasm1p1.features:call_indirect_immediate;
+
+import fast_io;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

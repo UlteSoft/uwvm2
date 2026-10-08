@@ -55,7 +55,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::opcode
 
         // Prefixed instruction spaces
         numeric_prefix = 0xfc,
-        simd_prefix = 0xfd
+        simd_prefix = 0xfd,
+        atomic_prefix = 0xfe
     };
 
     enum class op_numeric : ::uwvm2::parser::wasm::standard::wasm1::type::op_exten_type
@@ -327,7 +328,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::opcode
         i32x4_trunc_sat_f64x2_s_zero = 0xfc,
         i32x4_trunc_sat_f64x2_u_zero = 0xfd,
         f64x2_convert_low_i32x4_s = 0xfe,
-        f64x2_convert_low_i32x4_u = 0xff
+        f64x2_convert_low_i32x4_u = 0xff,
+        // Core 3.0 relaxed SIMD uses the same 0xfd prefix and u32 subopcode.
+        i8x16_relaxed_swizzle = 0x100,
+        i32x4_relaxed_trunc_f32x4_s = 0x101,
+        i32x4_relaxed_trunc_f32x4_u = 0x102,
+        i32x4_relaxed_trunc_f64x2_s_zero = 0x103,
+        i32x4_relaxed_trunc_f64x2_u_zero = 0x104,
+        f32x4_relaxed_madd = 0x105,
+        f32x4_relaxed_nmadd = 0x106,
+        f64x2_relaxed_madd = 0x107,
+        f64x2_relaxed_nmadd = 0x108,
+        i8x16_relaxed_laneselect = 0x109,
+        i16x8_relaxed_laneselect = 0x10a,
+        i32x4_relaxed_laneselect = 0x10b,
+        i64x2_relaxed_laneselect = 0x10c,
+        f32x4_relaxed_min = 0x10d,
+        f32x4_relaxed_max = 0x10e,
+        f64x2_relaxed_min = 0x10f,
+        f64x2_relaxed_max = 0x110,
+        i16x8_relaxed_q15mulr_s = 0x111,
+        i16x8_relaxed_dot_i8x16_i7x16_s = 0x112,
+        i32x4_relaxed_dot_i8x16_i7x16_add_s = 0x113
     };
 }
 

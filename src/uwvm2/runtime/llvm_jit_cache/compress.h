@@ -70,14 +70,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             // The 16-bit token stores a 12-bit backward distance and a 4-bit length delta to cap decoder work.
             auto const token{static_cast<::std::uint_least16_t>(((length - lzss_min_match) << 12uz) | (offset - 1uz))};
-            out.push_back(static_cast<::std::byte>(token & 0xffu));
-            out.push_back(static_cast<::std::byte>((token >> 8u) & 0xffu));
+            append_le<16>(out, token);
         }
 
         [[nodiscard]] inline constexpr ::std::uint_least32_t native_lz_read_u32(::std::byte const* ptr) noexcept
         {
             ::std::uint32_t value{};
-            ::std::memcpy(::std::addressof(value), ptr, sizeof(value));
+            ::fast_io::freestanding::type_punning_from_bytes(ptr, value);
             return ::fast_io::little_endian(value);
         }
 
@@ -117,8 +116,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             if(has_match)
             {
                 // Offsets are little-endian because the cache format must be independent of host alignment and endian.
-                out.push_back(static_cast<::std::byte>(offset & 0xffuz));
-                out.push_back(static_cast<::std::byte>((offset >> 8uz) & 0xffuz));
+                append_le<16>(out, static_cast<::std::uint_least16_t>(offset));
                 auto const encoded_match_size{match_size - native_lz_min_match};
                 if(encoded_match_size >= 15uz) { append_native_lz_length(out, encoded_match_size - 15uz); }
             }
@@ -231,11 +229,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 if((flags & (1u << bit)) != 0u)
                 {
                     if(static_cast<::std::size_t>(last - first) < 2uz) [[unlikely]] { return false; }
-                    auto const lo{::std::to_integer<::std::uint_least16_t>(first[0])};
-                    auto const hi{::std::to_integer<::std::uint_least16_t>(first[1])};
+                    ::std::uint_least16_t token{};
+                    auto const chars{reinterpret_cast<unsigned char const*>(first)};
+                    auto const result{::fast_io::parse_by_scan(chars, chars + 2uz, ::fast_io::mnp::le_get<16>(token))};
+                    if(result.code != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
                     first += 2uz;
-
-                    auto const token{static_cast<::std::uint_least16_t>(lo | (hi << 8u))};
                     auto const length{static_cast<::std::size_t>((token >> 12u) + details::lzss_min_match)};
                     auto const offset{static_cast<::std::size_t>((token & 0x0fffu) + 1u)};
                     // Back references must point into already-produced bytes to avoid reading uninitialized output.
@@ -328,8 +326,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             if(out.size() == expected_size) { return first == last; }
 
             if(static_cast<::std::size_t>(last - first) < 2uz) [[unlikely]] { return false; }
-            auto const offset{static_cast<::std::size_t>(::std::to_integer<unsigned>(first[0])) |
-                              (static_cast<::std::size_t>(::std::to_integer<unsigned>(first[1])) << 8uz)};
+            ::std::uint_least16_t decoded_offset{};
+            auto const chars{reinterpret_cast<unsigned char const*>(first)};
+            auto const result{::fast_io::parse_by_scan(chars, chars + 2uz, ::fast_io::mnp::le_get<16>(decoded_offset))};
+            if(result.code != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+            auto const offset{static_cast<::std::size_t>(decoded_offset)};
             first += 2uz;
             // Matches copy from the existing output buffer, so offset zero and forward references are invalid.
             if(offset == 0uz || offset > out.size()) [[unlikely]] { return false; }

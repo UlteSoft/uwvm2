@@ -1,0 +1,77 @@
+// REVIEW-ONLY PROPOSAL. This file is not included by any production or test TU.
+// Do not apply until the actual two-phase before counterexample is recorded.
+// The GC metadata owner independently adds core3_value_requires_gc and its flags.
+// This proposal adds only exception classification/requirements to that interface.
+
+namespace uwvm2::validation::standard::wasm3
+{
+    [[nodiscard]] inline constexpr bool core3_value_requires_exceptions(
+        ::uwvm2::parser::wasm::standard::wasm3::type::core_value_type value) noexcept
+    {
+        namespace t = ::uwvm2::parser::wasm::standard::wasm3::type;
+        // Abstract exn/noexn are the exception hierarchy. Defined function or GC
+        // heaps never classify as exception heaps, regardless of nullability.
+        return value.kind == t::value_kind::reference &&
+            (value.heap.code == static_cast<::std::int_least64_t>(t::abstract_heap_type::exn) ||
+             value.heap.code == static_cast<::std::int_least64_t>(t::abstract_heap_type::noexn));
+    }
+
+    // Requirements are aggregated in EXISTING successful parser walks from
+    // core_type, then copied through initializer/runtime/shared validation rebuild.
+    // These flags cover UNUSED declared types and IMPORTED table/global types.
+    // They do not add a body pass, copy the module, or walk fully-enabled functions.
+    inline constexpr void require_exception_declaration_policy(bool enabled,
+        bool types_require_exceptions, bool tables_require_exceptions,
+        bool globals_require_exceptions, bool elements_require_exceptions,
+        ::std::byte const* diagnostic,
+        ::uwvm2::validation::error::code_validation_error_impl& error) UWVM_THROWS
+    {
+        if(enabled) { return; }
+        using feature = ::uwvm2::parser::wasm::base::wasm1p1_feature_kind;
+        using subject = ::uwvm2::parser::wasm::base::wasm1p1_error_subject;
+        auto const fail = [&](subject site) constexpr UWVM_THROWS
+        {
+            // [caller-owned function expression ...] | code_end
+            // [safe                                ] | unsafe (one-past)
+            // ^^ diagnostic: borrow only, including an empty expression at end.
+            // No byte is read, no bytecode cursor moves, and flags own no pointers.
+            error.err_curr = diagnostic;
+            error.err_code = ::uwvm2::validation::error::code_validation_error_code::wasm1p1_feature_required;
+            error.err_selectable.wasm1p1_feature_required = {
+                .value = 0x69u, .feature = feature::exceptions, .subject = site};
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        };
+        if(types_require_exceptions) { fail(subject::function_type); }
+        if(tables_require_exceptions) { fail(subject::table_type); }
+        if(globals_require_exceptions) { fail(subject::global_type); }
+        if(elements_require_exceptions) { fail(subject::element_segment); }
+    }
+}
+
+// Integration contract (root reviews/applies only after actual before evidence):
+// 1. type_section_storage_t and runtime type_section_storage gain
+//    requires_exceptions. In successful function signature projection, OR the
+//    classifier over EVERY decoded parameter/result, including unused function
+//    types and imported-function signatures. The complete GC type parser also
+//    ORs over every nonpacked struct/array field value during its existing walk.
+//    Function-only/GC-disabled signature parser uses the same classifier.
+// 2. table/global/element section storage gain requires_exceptions. OR only
+//    after the declaration's bounded decoder and full declaration validation
+//    succeed, using its actual core_type when has_core_type. Imported table/global
+//    scanner hooks already update the owning section's function-reference flag;
+//    add the exception bit in the same successful path, including noexn spelling.
+// 3. initializer copies section flags into existing runtime ownership:
+//    table/global/element_declarations_require_exceptions. The shared synthetic
+//    validation-module rebuild copies flags unchanged. Copy/move/reset paths
+//    preserve or clear all flags just as their existing requires_gc counterparts.
+// 4. All pure Core3, int fused, LLVM fused and runtime-policy-facade entrances
+//    call this single helper with the same flags and strict effective policy.
+//    Lazy first-use materialization consumes the same flags via the full fused
+//    compiler. Do not delegate a declaration rejection to an opcode-only scan.
+// 5. Existing check_value(local.type) already rejects 0x69 with EH disabled,
+//    including zero-count exn/noexn local runs. Keep this walk only under strict
+//    feature policy; if changing it, use has_core_type plus the same classifier.
+//    Nullability and uninhabited nonnull noexn do not remove the syntax requirement.
+// 6. Leave old pure wasm1p1/wasm2 validators unchanged; the Core3 facade owns
+//    strict prechecks before any legacy delegation. No generated memory-access
+//    guard, guest instruction, whole-body prevalidation or EH hot-path walk added.

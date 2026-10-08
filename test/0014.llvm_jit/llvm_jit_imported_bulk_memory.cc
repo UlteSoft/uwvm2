@@ -246,8 +246,9 @@ namespace
         LLVM_IMPORTED_BULK_REQUIRE(actual == expected, "host memory bulk result differs from memmove/memset/memory.init semantics");
         LLVM_IMPORTED_BULK_REQUIRE(prepared.mod->local_defined_data_vec_storage.size() == 1uz, "missing passive data instance");
         auto const& dropped_data{prepared.mod->local_defined_data_vec_storage.index_unchecked(0uz).data};
-        LLVM_IMPORTED_BULK_REQUIRE(dropped_data.byte_begin == nullptr && dropped_data.byte_end == nullptr,
-                                   "data.drop did not clear the passive data payload");
+        auto const dropped_payload{::uwvm2::uwvm::runtime::storage::load_wasm_data_segment_payload(dropped_data)};
+        LLVM_IMPORTED_BULK_REQUIRE(dropped_payload.byte_begin == nullptr && dropped_payload.byte_end == nullptr,
+                                   "data.drop did not make the passive data instance empty");
 
         // This executes the same local-imported memory.init bridge after the preceding function dropped the data instance.
         ::uwvm2::runtime::lib::llvm_jit_call_raw_host_api(prepared.mod, 1u, nullptr, 0uz, nullptr, 0uz);

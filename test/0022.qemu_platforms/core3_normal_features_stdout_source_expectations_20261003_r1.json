@@ -1,0 +1,57 @@
+{
+  "base_fixture": {
+    "bytes": 1991,
+    "path": "test/0022.qemu_platforms/fixtures/core3_gc_mem64_table64_eh_typed_tail_cli.wat",
+    "sha256": "f553c7fa95f7d127d2cc25f4d0aa1fe8e184a35e87f6bef6e5ff0dae7313111f"
+  },
+  "before_actual_result_required": [
+    "Current official wasm-tools parse and validate --features all return0, exact current Wasm SHA pinned. A source review does not substitute for this oracle.",
+    "Use an actual freshly compiled product and matching target LLVM/C++ ABI/libc/loader closure under the Linux keeper original 64GiB/swap0 cgroup guardian and exclusive ticket. No old object/current-cut identity reuse.",
+    "For each product/OS/ISA/libc/runtime mode record exact stdout18 bytes and exit0 with original raw stdout/stderr, wait, RSS and safe original-PIDFD retirement. Unavailable import/feature/runtime, 77 or arbitrary nonzero cannot be PASS.",
+    "The initial normal9 scalar recipes are immutable and are not expanded by this fixture. A later finite parse/validate/run recipe requires its own source and input bindings.",
+    "No Mac native compilation or run; no privilege elevation, debugger stepping, host-memory operation, benchmark or checkpoint qualification."
+  ],
+  "expected": {
+    "exit_code": 0,
+    "guest_fd_write_errno": 0,
+    "guest_fd_write_nwritten": 18,
+    "stderr": "No additional guest diagnostic; product logging judged separately from guest stdout.",
+    "stdout_bytes": 18,
+    "stdout_sha256": "24cf596f90d4dda53562250141f60363a3d86d233ecf447ddec66620c9d9b89f",
+    "stdout_utf8": "uwvm-core3-normal\n"
+  },
+  "fixture": {
+    "bytes": 3022,
+    "path": "test/0022.qemu_platforms/fixtures/core3_normal_features_stdout.wat",
+    "sha256": "6f56cb7c8da94e0173576fa16fe9942cbc595c7ed4dc2144189ea8dac85e4b42"
+  },
+  "guest_memory": {
+    "GC_objects": 1,
+    "count": 2,
+    "created_threads": 0,
+    "growth": false,
+    "memory0": "memory32 exported as memory; existing WASIp1 ciovec pointer32 length18, write-count at8",
+    "memory1": "memory64 one page; no host syscall pointer derives from it",
+    "shared": false,
+    "total_initial_bytes": 131072
+  },
+  "modern_assertions": [
+    "struct.new/ref.as_non_null/struct.get before and after cross-function throw/catch",
+    "memory1 i64-address i32.store/load and v128.store/load lane check",
+    "table64 i64 get/index, declared ref.func, ref.cast, call_ref and return_call_ref",
+    "try_table named tag catch across a real function call; caught payload42 plus return_call plus7 result49",
+    "separate typed ref direct/table result42",
+    "table.size i64 and memory64 memory.size i64 both1; memory32 memory.size i32 equals1"
+  ],
+  "official_oracle_executed": false,
+  "primary_sources": [
+    "https://webassembly.github.io/spec/core/text/instructions.html",
+    "https://webassembly.github.io/spec/core/text/modules.html",
+    "https://webassembly.github.io/spec/core/exec/instructions.html",
+    "https://raw.githubusercontent.com/WebAssembly/wasi-libc/main/libc-bottom-half/sources/__wasilibc_real.c"
+  ],
+  "schema": "uwvm.qemu.normal-Core3-output-source-expectations.v1",
+  "scope": "A successful normal Wasm program exercises Core3 GC, memory64, table64, typed function references, tail calls, exceptions, multi-memory and standard SIMD, then checks the existing WASIp1 fd_write ABI. This introduces no new WASI implementation or debugger operation.",
+  "source_only": true,
+  "target_executed": false
+}

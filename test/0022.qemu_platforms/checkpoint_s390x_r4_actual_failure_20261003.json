@@ -1,0 +1,29 @@
+{
+  "actual_guards_retired": true,
+  "checkpoint_format_version": 3,
+  "checkpoint_source_revision": "r4",
+  "compile_owned_rss_peak_bytes": 432410624,
+  "compile_result": "failed",
+  "cpuset": "0,2,4,6,16-31",
+  "diagnostics": [
+    {
+      "owner": "/root/qemu_platform_tests",
+      "problem": "No available targets are compatible with triple s390x-unknown-linux-gnu",
+      "source": "installed Clang23 backend configuration"
+    }
+  ],
+  "fixture_or_vm_execution_accepted": false,
+  "memory_scope_note": "Failed compilation peak is observed only; it is not a successful build/runtime maximum or Mac safety qualification.",
+  "outer_memory_max_bytes": 68719476736,
+  "outer_swap_max_bytes": 0,
+  "paired_runtime_or_product_qualification": false,
+  "previous_source_diagnostics_absent": true,
+  "qemu_executed": false,
+  "raw_evidence_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-checkpoint-s390x-r4-attempt1",
+  "raw_small_manifest_sha256": "276fab7d3208aa597d4d014f972ca5bcae0632b45f5d79738709b53a10e8396e",
+  "raw_small_packet_sha256": "f2b6c8626c55ab053d509247712c37caadbe9e374ee311250219660e5e6002c6",
+  "schema": "uwvm-qemu-cold-failure-record-v1",
+  "shared_ticket_id": "c64d3bce16b54f54ac7453b11ae394d9",
+  "target": "s390x-linux-gnu",
+  "ticket_state": "retired"
+}

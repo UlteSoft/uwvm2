@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <memory>
 #include <unwind.h>
+#include <uwvm2/runtime/lib/uwvm_runtime_native_function_address.h>
 
 namespace
 {

@@ -1,0 +1,22 @@
+--- a/third-parties/fast_io/include/fast_io_crypto/hash/sha256_scalar.h
++++ b/third-parties/fast_io/include/fast_io_crypto/hash/sha256_scalar.h
+@@ -17,7 +17,7 @@
+ inline ::std::uint_least32_t sha256_load_be32_unaligned(::std::byte const *p) noexcept
+ {
+ 	::std::uint_least32_t word{};
+-	::std::memcpy(__builtin_addressof(word), p, sizeof(word));
++	::fast_io::details::my_memcpy(__builtin_addressof(word), p, sizeof(word));
+ 	return ::fast_io::big_endian(word);
+ }
+ 
+--- a/third-parties/fast_io/include/fast_io_crypto/hash/sha512_scalar.h
++++ b/third-parties/fast_io/include/fast_io_crypto/hash/sha512_scalar.h
+@@ -17,7 +17,7 @@
+ inline ::std::uint_least64_t sha512_load_be64_unaligned(::std::byte const *p) noexcept
+ {
+ 	::std::uint_least64_t word{};
+-	::std::memcpy(__builtin_addressof(word), p, sizeof(word));
++	::fast_io::details::my_memcpy(__builtin_addressof(word), p, sizeof(word));
+ 	return ::fast_io::big_endian(word);
+ }
+ 

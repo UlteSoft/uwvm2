@@ -1,0 +1,52 @@
+{
+  "cases": [
+    {
+      "file": "01_mixed_bits.wat",
+      "internal_packed_bytes": 24,
+      "run_i32": 1,
+      "semantic_check": "integer equality only, signaling NaNs transported through real typed f32/f64 catches",
+      "tuple_bits_hex": [
+        "fedcba98",
+        "fedcba9876543210",
+        "7fa12345",
+        "7ff123456789abcd"
+      ],
+      "tuple_export": "caught_bits"
+    },
+    {
+      "file": "02_empty_tuple.wat",
+      "internal_packed_bytes": 0,
+      "run_i32": 31415,
+      "semantic_check": "take success with address0/bytes0; no GEP/load"
+    },
+    {
+      "file": "03_distinct_same_shape.wat",
+      "run_i32": 1037,
+      "semantic_check": "first A no_match leaves pending unchanged; later distinct B matches",
+      "wrong_identity_result": 37
+    },
+    {
+      "file": "04_nested_lexical.wat",
+      "run_i32": 41,
+      "semantic_check": "inner A rejects B; outer B handles before continuation",
+      "wrong_inner_result": 941
+    },
+    {
+      "file": "05_two_throws.wat",
+      "run_i32": 33,
+      "semantic_check": "same internal context clears after first11 and accepts second22"
+    },
+    {
+      "file": "06_catch_all_fallback.wat",
+      "run_i32": 1,
+      "semantic_check": "A no_match then original catch_all clears B; no typed payload consumed",
+      "wrong_identity_result": 0
+    }
+  ],
+  "mixed_also": [
+    "multi-value"
+  ],
+  "required_features": [
+    "exceptions"
+  ]
+}

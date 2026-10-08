@@ -1,0 +1,1877 @@
+{
+  "schema": "uwvm-linux-native-step-qualification-v1",
+  "date": "2026-10-05 Asia/Shanghai",
+  "repositories": [
+    "uwvm2",
+    "uwvm2-ros"
+  ],
+  "result": {
+    "non_x86_64_linux_native_signal_step_backends_implemented": true,
+    "backend_groups_passed": 48,
+    "full_wasm_runtime_target_repository_combinations_passed": 6,
+    "full_wasm_runtime_policy_numeric_groups_passed": 24,
+    "actual_loaded_owner_mapping_groups_passed": 6,
+    "actual_shutdown_policy_profile_scenario_groups_passed": 72,
+    "actual_target_mc_instruction_and_numeric_origin_groups_passed": 12,
+    "x86_64_component_groups_passed": 12,
+    "x86_64_fresh_runtime_policy_numeric_groups_passed": 4,
+    "DAP_protocol_groups_passed": 8,
+    "all_architecture_full_product_qualified": false
+  },
+  "execution_scope": {
+    "host": "ssh linux",
+    "emulation": "QEMU Linux user mode executing target native instructions; not physical-device hardware qualification",
+    "all_actual_compilers_tools_and_tests_admitted_to_original_cgroup": true,
+    "cpu_affinity": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "effective_cgroup_cpus": "0,2,4,6,16-31",
+    "memory_limit_bytes": 68719476736,
+    "swap_limit_bytes": 0,
+    "local_work": "mechanical source edits, freeze/archive/hash and evidence collection only",
+    "concurrent_work": "no reset/stash/commit/push; unrelated edits preserved; integration tests cover named immutable cuts"
+  },
+  "implementation": {
+    "native_step": "architecture-specific software breakpoints, actual selected-thread Linux signal frames, sealed owned-function successor plans, trap revisions, exact original byte restoration and actual worker retirement",
+    "numeric_registers": "actual GPR/FP bits copied only through authenticated compiler-emitted numeric register-only locations; unqualified GPR and FP bytes cleared; unproved upper bits masked",
+    "code_origin": "only actual validated numeric definitions and the exact compiler-created empty tied numeric identity qualify column 1; foreign inline assembly, pointers, loads/stores and SP/FP operands remain hidden",
+    "i686": "debug-provenance builds reserve EBP using frame-pointer=all; numeric identity origin avoids zero-byte assembly column conflicts",
+    "decoder": "actual MCTargetOptions lifetime retained with MC decoder; AArch64 numeric shifted-register operand forms recognized without permitting memory/SP/FP",
+    "shutdown": "Monotonic process-lifetime atomic byte is only a hint; requested path rechecks Acquire and ownership under the original host poll mutex before a Wasm effect",
+    "io": "new C++ output/formatting uses fast_io; native syscall backend uses fast_io::system_call",
+    "build_opt_in": "--linux-native-debug=y with Linux LLVM/Clang JIT and an actually qualified native-owner-table-v2 SDK; --linux-x64-native-debug=y remains x86_64 only"
+  },
+  "isolation_contract": {
+    "raw_vm_registers_exposed": false,
+    "native_stack_CFA_return_address_or_spill_bytes_exposed": false,
+    "native_memory_read_write_or_register_assignment_capability": false,
+    "public_values_grant_native_addresses": false,
+    "native_stop_retires_cooperative_frames_locals_and_memory_packets": true,
+    "thread_session_owner_generation_epoch_revision_bound": true,
+    "forged_foreign_stale_ids_refused": true,
+    "calls_returns_unproved_indirect_delayed_branches_and_self_loops_refused": true,
+    "code_pages_never_RWX": true,
+    "other_wasm_participants_parked_during_patch_publication": true,
+    "coverage_note": "Assertions and source checks establish the recorded scenarios; this record is not a proof covering arbitrary future code or every opcode."
+  },
+  "architectures": [
+    {
+      "profile": "aarch64",
+      "triple": "aarch64-linux-gnu",
+      "ELF": {
+        "class": 2,
+        "machine": 183,
+        "byte_order": "little"
+      },
+      "backend_test_groups": 4,
+      "all_backend_groups_passed": true,
+      "actual_native_stop_count_per_fixture": 3,
+      "actual_instructions_executed_per_fixture": 2,
+      "actual_gpr_values": [
+        42,
+        43
+      ],
+      "actual_f64_value": "42.0",
+      "actual_kernel_numeric_projection_and_unqualified_byte_clearing": true,
+      "full_wasm_runtime_integration_passed_in_both_repos": true,
+      "full_product_including_cli_modules_and_xmake_qualified": false,
+      "binaries": [
+        {
+          "repository": "uwvm2",
+          "test": "native_step_linux_software",
+          "sha256": "ad6c871b793ea998fb2e951a82929d0325c925b8edbd3c1209782704230741f0"
+        },
+        {
+          "repository": "uwvm2",
+          "test": "native_linux_register_projection",
+          "sha256": "9af345300dd59c1f5d088c46d8d2cb048e8f27382c8f27878243310f01617a48"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_step_linux_software",
+          "sha256": "ad6c871b793ea998fb2e951a82929d0325c925b8edbd3c1209782704230741f0"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_linux_register_projection",
+          "sha256": "9af345300dd59c1f5d088c46d8d2cb048e8f27382c8f27878243310f01617a48"
+        }
+      ]
+    },
+    {
+      "profile": "armhf",
+      "triple": "arm-linux-gnueabihf",
+      "ELF": {
+        "class": 1,
+        "machine": 40,
+        "byte_order": "little"
+      },
+      "backend_test_groups": 4,
+      "all_backend_groups_passed": true,
+      "actual_native_stop_count_per_fixture": 3,
+      "actual_instructions_executed_per_fixture": 2,
+      "actual_gpr_values": [
+        42,
+        43
+      ],
+      "actual_f64_value": "42.0",
+      "actual_kernel_numeric_projection_and_unqualified_byte_clearing": true,
+      "full_wasm_runtime_integration_passed_in_both_repos": false,
+      "full_product_including_cli_modules_and_xmake_qualified": false,
+      "binaries": [
+        {
+          "repository": "uwvm2",
+          "test": "native_step_linux_software",
+          "sha256": "74df7f68455c02bd29f567868b7d27a994fbc17cf03709203d24d3c05041a5fc"
+        },
+        {
+          "repository": "uwvm2",
+          "test": "native_linux_register_projection",
+          "sha256": "609c7ac8933c9453179e778042181f9c901392e8e9f945cdc43d38898267d7d1"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_step_linux_software",
+          "sha256": "74df7f68455c02bd29f567868b7d27a994fbc17cf03709203d24d3c05041a5fc"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_linux_register_projection",
+          "sha256": "609c7ac8933c9453179e778042181f9c901392e8e9f945cdc43d38898267d7d1"
+        }
+      ]
+    },
+    {
+      "profile": "i686",
+      "triple": "i686-linux-gnu",
+      "ELF": {
+        "class": 1,
+        "machine": 3,
+        "byte_order": "little"
+      },
+      "backend_test_groups": 4,
+      "all_backend_groups_passed": true,
+      "actual_native_stop_count_per_fixture": 3,
+      "actual_instructions_executed_per_fixture": 2,
+      "actual_gpr_values": [
+        42,
+        43
+      ],
+      "actual_f64_value": "42.0",
+      "actual_kernel_numeric_projection_and_unqualified_byte_clearing": true,
+      "full_wasm_runtime_integration_passed_in_both_repos": true,
+      "full_product_including_cli_modules_and_xmake_qualified": false,
+      "binaries": [
+        {
+          "repository": "uwvm2",
+          "test": "native_step_linux_software",
+          "sha256": "f65a68244f5710551e54cc30fe4c66164f8a4c1e5041bb547d6937d76c4bd932"
+        },
+        {
+          "repository": "uwvm2",
+          "test": "native_linux_register_projection",
+          "sha256": "d622d6db26a4bc27009068bb88ffe2811b214670a4a7d845c717f637dd0d15eb"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_step_linux_software",
+          "sha256": "f65a68244f5710551e54cc30fe4c66164f8a4c1e5041bb547d6937d76c4bd932"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_linux_register_projection",
+          "sha256": "d622d6db26a4bc27009068bb88ffe2811b214670a4a7d845c717f637dd0d15eb"
+        }
+      ]
+    },
+    {
+      "profile": "loongarch64",
+      "triple": "loongarch64-linux-gnu",
+      "ELF": {
+        "class": 2,
+        "machine": 258,
+        "byte_order": "little"
+      },
+      "backend_test_groups": 4,
+      "all_backend_groups_passed": true,
+      "actual_native_stop_count_per_fixture": 3,
+      "actual_instructions_executed_per_fixture": 2,
+      "actual_gpr_values": [
+        42,
+        43
+      ],
+      "actual_f64_value": "42.0",
+      "actual_kernel_numeric_projection_and_unqualified_byte_clearing": true,
+      "full_wasm_runtime_integration_passed_in_both_repos": false,
+      "full_product_including_cli_modules_and_xmake_qualified": false,
+      "binaries": [
+        {
+          "repository": "uwvm2",
+          "test": "native_step_linux_software",
+          "sha256": "79527bdb9d4d3731cb32ce61f5fedd90f79ff937b23b18310245a2007e3f6280"
+        },
+        {
+          "repository": "uwvm2",
+          "test": "native_linux_register_projection",
+          "sha256": "a58bc78c322bca9e3b4853f9f3c6c396c85e4d0fd3f13b7029041ff5cb9b83ec"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_step_linux_software",
+          "sha256": "79527bdb9d4d3731cb32ce61f5fedd90f79ff937b23b18310245a2007e3f6280"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_linux_register_projection",
+          "sha256": "a58bc78c322bca9e3b4853f9f3c6c396c85e4d0fd3f13b7029041ff5cb9b83ec"
+        }
+      ]
+    },
+    {
+      "profile": "mips64",
+      "triple": "mips64-linux-gnuabi64",
+      "ELF": {
+        "class": 2,
+        "machine": 8,
+        "byte_order": "big"
+      },
+      "backend_test_groups": 4,
+      "all_backend_groups_passed": true,
+      "actual_native_stop_count_per_fixture": 3,
+      "actual_instructions_executed_per_fixture": 2,
+      "actual_gpr_values": [
+        42,
+        43
+      ],
+      "actual_f64_value": "42.0",
+      "actual_kernel_numeric_projection_and_unqualified_byte_clearing": true,
+      "full_wasm_runtime_integration_passed_in_both_repos": false,
+      "full_product_including_cli_modules_and_xmake_qualified": false,
+      "binaries": [
+        {
+          "repository": "uwvm2",
+          "test": "native_step_linux_software",
+          "sha256": "d446ef28bdbf60241e62e8efbbd45b4392aeff395aafd22f751a9331640b0375"
+        },
+        {
+          "repository": "uwvm2",
+          "test": "native_linux_register_projection",
+          "sha256": "c06395482bb8564ced751edc610c5dcd713c87aa2b2c17170c37494bfe829123"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_step_linux_software",
+          "sha256": "d446ef28bdbf60241e62e8efbbd45b4392aeff395aafd22f751a9331640b0375"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_linux_register_projection",
+          "sha256": "c06395482bb8564ced751edc610c5dcd713c87aa2b2c17170c37494bfe829123"
+        }
+      ]
+    },
+    {
+      "profile": "mips64el",
+      "triple": "mips64el-linux-gnuabi64",
+      "ELF": {
+        "class": 2,
+        "machine": 8,
+        "byte_order": "little"
+      },
+      "backend_test_groups": 4,
+      "all_backend_groups_passed": true,
+      "actual_native_stop_count_per_fixture": 3,
+      "actual_instructions_executed_per_fixture": 2,
+      "actual_gpr_values": [
+        42,
+        43
+      ],
+      "actual_f64_value": "42.0",
+      "actual_kernel_numeric_projection_and_unqualified_byte_clearing": true,
+      "full_wasm_runtime_integration_passed_in_both_repos": false,
+      "full_product_including_cli_modules_and_xmake_qualified": false,
+      "binaries": [
+        {
+          "repository": "uwvm2",
+          "test": "native_step_linux_software",
+          "sha256": "32215629cce93920e2e26927f15a5d0aca05961bf8e556968a61434674c8ba13"
+        },
+        {
+          "repository": "uwvm2",
+          "test": "native_linux_register_projection",
+          "sha256": "c88e08abe22e53a423aa9e70ceb09e9e57bd7da9ef3f7cbfc3b939c2e8636d02"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_step_linux_software",
+          "sha256": "32215629cce93920e2e26927f15a5d0aca05961bf8e556968a61434674c8ba13"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_linux_register_projection",
+          "sha256": "c88e08abe22e53a423aa9e70ceb09e9e57bd7da9ef3f7cbfc3b939c2e8636d02"
+        }
+      ]
+    },
+    {
+      "profile": "ppc32",
+      "triple": "powerpc-linux-gnu",
+      "ELF": {
+        "class": 1,
+        "machine": 20,
+        "byte_order": "big"
+      },
+      "backend_test_groups": 4,
+      "all_backend_groups_passed": true,
+      "actual_native_stop_count_per_fixture": 3,
+      "actual_instructions_executed_per_fixture": 2,
+      "actual_gpr_values": [
+        42,
+        43
+      ],
+      "actual_f64_value": "42.0",
+      "actual_kernel_numeric_projection_and_unqualified_byte_clearing": true,
+      "full_wasm_runtime_integration_passed_in_both_repos": false,
+      "full_product_including_cli_modules_and_xmake_qualified": false,
+      "binaries": [
+        {
+          "repository": "uwvm2",
+          "test": "native_step_linux_software",
+          "sha256": "88fa46c74f1685e50d6f4376b96739874b92c8fac1bb26264fde34197332bbb6"
+        },
+        {
+          "repository": "uwvm2",
+          "test": "native_linux_register_projection",
+          "sha256": "6b80517de8f094296e9e33ea87c45779ce5cee15501d91c997bc2c37ea89aca7"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_step_linux_software",
+          "sha256": "88fa46c74f1685e50d6f4376b96739874b92c8fac1bb26264fde34197332bbb6"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_linux_register_projection",
+          "sha256": "6b80517de8f094296e9e33ea87c45779ce5cee15501d91c997bc2c37ea89aca7"
+        }
+      ]
+    },
+    {
+      "profile": "ppc64",
+      "triple": "powerpc64-linux-gnu",
+      "ELF": {
+        "class": 2,
+        "machine": 21,
+        "byte_order": "big"
+      },
+      "backend_test_groups": 4,
+      "all_backend_groups_passed": true,
+      "actual_native_stop_count_per_fixture": 3,
+      "actual_instructions_executed_per_fixture": 2,
+      "actual_gpr_values": [
+        42,
+        43
+      ],
+      "actual_f64_value": "42.0",
+      "actual_kernel_numeric_projection_and_unqualified_byte_clearing": true,
+      "full_wasm_runtime_integration_passed_in_both_repos": false,
+      "full_product_including_cli_modules_and_xmake_qualified": false,
+      "binaries": [
+        {
+          "repository": "uwvm2",
+          "test": "native_step_linux_software",
+          "sha256": "4eb7598e777b1ec5289fe921c03ece34c3f0c563d64456dd453ed71103180bbc"
+        },
+        {
+          "repository": "uwvm2",
+          "test": "native_linux_register_projection",
+          "sha256": "9e19f70b7327d54aaa247d5010907ba13f824c9a08005dda4dd325de3880a7b0"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_step_linux_software",
+          "sha256": "4eb7598e777b1ec5289fe921c03ece34c3f0c563d64456dd453ed71103180bbc"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_linux_register_projection",
+          "sha256": "9e19f70b7327d54aaa247d5010907ba13f824c9a08005dda4dd325de3880a7b0"
+        }
+      ]
+    },
+    {
+      "profile": "ppc64le",
+      "triple": "powerpc64le-linux-gnu",
+      "ELF": {
+        "class": 2,
+        "machine": 21,
+        "byte_order": "little"
+      },
+      "backend_test_groups": 4,
+      "all_backend_groups_passed": true,
+      "actual_native_stop_count_per_fixture": 3,
+      "actual_instructions_executed_per_fixture": 2,
+      "actual_gpr_values": [
+        42,
+        43
+      ],
+      "actual_f64_value": "42.0",
+      "actual_kernel_numeric_projection_and_unqualified_byte_clearing": true,
+      "full_wasm_runtime_integration_passed_in_both_repos": false,
+      "full_product_including_cli_modules_and_xmake_qualified": false,
+      "binaries": [
+        {
+          "repository": "uwvm2",
+          "test": "native_step_linux_software",
+          "sha256": "dfe2c59758d2b4b349ac6f76d97fab9a717e0ecdde9b9d5d8f6fdcc4d003f93c"
+        },
+        {
+          "repository": "uwvm2",
+          "test": "native_linux_register_projection",
+          "sha256": "0871c020765ad0adde543d593913364f7a525e26b3212c799799bcb06057757c"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_step_linux_software",
+          "sha256": "dfe2c59758d2b4b349ac6f76d97fab9a717e0ecdde9b9d5d8f6fdcc4d003f93c"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_linux_register_projection",
+          "sha256": "0871c020765ad0adde543d593913364f7a525e26b3212c799799bcb06057757c"
+        }
+      ]
+    },
+    {
+      "profile": "riscv64",
+      "triple": "riscv64-linux-gnu",
+      "ELF": {
+        "class": 2,
+        "machine": 243,
+        "byte_order": "little"
+      },
+      "backend_test_groups": 4,
+      "all_backend_groups_passed": true,
+      "actual_native_stop_count_per_fixture": 3,
+      "actual_instructions_executed_per_fixture": 2,
+      "actual_gpr_values": [
+        42,
+        43
+      ],
+      "actual_f64_value": "42.0",
+      "actual_kernel_numeric_projection_and_unqualified_byte_clearing": true,
+      "full_wasm_runtime_integration_passed_in_both_repos": true,
+      "full_product_including_cli_modules_and_xmake_qualified": false,
+      "binaries": [
+        {
+          "repository": "uwvm2",
+          "test": "native_step_linux_software",
+          "sha256": "732ad87dbbdea9174bf2972972559136b5a91bab25b9d03939da47587a76444b"
+        },
+        {
+          "repository": "uwvm2",
+          "test": "native_linux_register_projection",
+          "sha256": "bce2eada35f1b0e45c3b57994ea434d41edf19eeb22d6413935ee4fa3404a1ec"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_step_linux_software",
+          "sha256": "732ad87dbbdea9174bf2972972559136b5a91bab25b9d03939da47587a76444b"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_linux_register_projection",
+          "sha256": "bce2eada35f1b0e45c3b57994ea434d41edf19eeb22d6413935ee4fa3404a1ec"
+        }
+      ]
+    },
+    {
+      "profile": "s390x",
+      "triple": "s390x-linux-gnu",
+      "ELF": {
+        "class": 2,
+        "machine": 22,
+        "byte_order": "big"
+      },
+      "backend_test_groups": 4,
+      "all_backend_groups_passed": true,
+      "actual_native_stop_count_per_fixture": 3,
+      "actual_instructions_executed_per_fixture": 2,
+      "actual_gpr_values": [
+        42,
+        43
+      ],
+      "actual_f64_value": "42.0",
+      "actual_kernel_numeric_projection_and_unqualified_byte_clearing": true,
+      "full_wasm_runtime_integration_passed_in_both_repos": false,
+      "full_product_including_cli_modules_and_xmake_qualified": false,
+      "binaries": [
+        {
+          "repository": "uwvm2",
+          "test": "native_step_linux_software",
+          "sha256": "5c0a833f98c11c020fcdde74f9048a522547a31011df65474fe81bc0cd58bce8"
+        },
+        {
+          "repository": "uwvm2",
+          "test": "native_linux_register_projection",
+          "sha256": "371537e2c90508e520cd07a98823a30c22fa9ae7f4aed5ee8bd2c09b115a7a8f"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_step_linux_software",
+          "sha256": "5c0a833f98c11c020fcdde74f9048a522547a31011df65474fe81bc0cd58bce8"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_linux_register_projection",
+          "sha256": "371537e2c90508e520cd07a98823a30c22fa9ae7f4aed5ee8bd2c09b115a7a8f"
+        }
+      ]
+    },
+    {
+      "profile": "sparc64",
+      "triple": "sparc64-linux-gnu",
+      "ELF": {
+        "class": 2,
+        "machine": 43,
+        "byte_order": "big"
+      },
+      "backend_test_groups": 4,
+      "all_backend_groups_passed": true,
+      "actual_native_stop_count_per_fixture": 3,
+      "actual_instructions_executed_per_fixture": 2,
+      "actual_gpr_values": [
+        42,
+        43
+      ],
+      "actual_f64_value": "42.0",
+      "actual_kernel_numeric_projection_and_unqualified_byte_clearing": true,
+      "full_wasm_runtime_integration_passed_in_both_repos": false,
+      "full_product_including_cli_modules_and_xmake_qualified": false,
+      "binaries": [
+        {
+          "repository": "uwvm2",
+          "test": "native_step_linux_software",
+          "sha256": "519be28f61246680d1f66be7316f06f8ba480391e6afcd1f2cf7c145b43f343f"
+        },
+        {
+          "repository": "uwvm2",
+          "test": "native_linux_register_projection",
+          "sha256": "101aa8354a574a45e2eb6023bb8bcfd6fcf3ba60b90d221562f3de81419b195d"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_step_linux_software",
+          "sha256": "519be28f61246680d1f66be7316f06f8ba480391e6afcd1f2cf7c145b43f343f"
+        },
+        {
+          "repository": "uwvm2-ros",
+          "test": "native_linux_register_projection",
+          "sha256": "101aa8354a574a45e2eb6023bb8bcfd6fcf3ba60b90d221562f3de81419b195d"
+        }
+      ]
+    }
+  ],
+  "full_runtime_results": [
+    {
+      "arch": "i386",
+      "repository": "uwvm2",
+      "native_product_passed": true,
+      "instruction": 0,
+      "instruction-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/i386-uwvm2-instruction-actual-object.o",
+        "sha256": "dd3691c0644d572de671e25e81797a8683889a3a144aeb85975003e7c8907d7c"
+      },
+      "unwind": 0,
+      "unwind-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/i386-uwvm2-unwind-actual-object.o",
+        "sha256": "d24ffda73acbb19472bf984b2235ec6f680af4b62ae15165137f340847d7ac9b"
+      },
+      "all-numeric-instruction": 0,
+      "all-numeric-instruction-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/i386-uwvm2-all-numeric-instruction-actual-object.o",
+        "sha256": "05005dbfa4bb4e4570943983473912994ed1fd61ee5ad6f8f24a4b7d4bbd7831"
+      },
+      "all-numeric-unwind": 0,
+      "all-numeric-unwind-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/i386-uwvm2-all-numeric-unwind-actual-object.o",
+        "sha256": "b93cb4f9adb3712c73155459cbbc0059ef13087289d2123f595f82a9b2f44787"
+      },
+      "mapping-probe": 0,
+      "shutdown": {
+        "instruction-none-parked-loop": 0,
+        "instruction-none-host-block": 0,
+        "instruction-observe-parked-loop": 0,
+        "instruction-observe-host-block": 0,
+        "instruction-resumable-parked-loop": 0,
+        "instruction-resumable-host-block": 0,
+        "unwind-none-parked-loop": 0,
+        "unwind-none-host-block": 0,
+        "unwind-observe-parked-loop": 0,
+        "unwind-observe-host-block": 0,
+        "unwind-resumable-parked-loop": 0,
+        "unwind-resumable-host-block": 0
+      }
+    },
+    {
+      "arch": "i386",
+      "repository": "uwvm2-ros",
+      "native_product_passed": true,
+      "instruction": 0,
+      "instruction-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/i386-uwvm2-ros-instruction-actual-object.o",
+        "sha256": "af3a60b54de064a74ba29167c80ee208fcb8931c342b677ae4867209e171f1e3"
+      },
+      "unwind": 0,
+      "unwind-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/i386-uwvm2-ros-unwind-actual-object.o",
+        "sha256": "075527b9aec0849049ddc7e57f6402990ddd87c7ccac0a6e7d81878ec714b359"
+      },
+      "all-numeric-instruction": 0,
+      "all-numeric-instruction-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/i386-uwvm2-ros-all-numeric-instruction-actual-object.o",
+        "sha256": "306ad76d012bf8af989c731454775213c0d7f0d0a263ee7301b043a87d25e26c"
+      },
+      "all-numeric-unwind": 0,
+      "all-numeric-unwind-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/i386-uwvm2-ros-all-numeric-unwind-actual-object.o",
+        "sha256": "a5921e1aff5de9ef405ef6ddbd16e2601c3f6c98862815ef5430105a8a704660"
+      },
+      "mapping-probe": 0,
+      "shutdown": {
+        "instruction-none-parked-loop": 0,
+        "instruction-none-host-block": 0,
+        "instruction-observe-parked-loop": 0,
+        "instruction-observe-host-block": 0,
+        "instruction-resumable-parked-loop": 0,
+        "instruction-resumable-host-block": 0,
+        "unwind-none-parked-loop": 0,
+        "unwind-none-host-block": 0,
+        "unwind-observe-parked-loop": 0,
+        "unwind-observe-host-block": 0,
+        "unwind-resumable-parked-loop": 0,
+        "unwind-resumable-host-block": 0
+      }
+    },
+    {
+      "arch": "aarch64",
+      "repository": "uwvm2",
+      "native_product_passed": true,
+      "instruction": 0,
+      "instruction-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/aarch64-uwvm2-instruction-actual-object.o",
+        "sha256": "85b993b2466ea936974e4edc4e4bea06095bdb9e24de220f3454c7f2ec8a2c38"
+      },
+      "unwind": 0,
+      "unwind-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/aarch64-uwvm2-unwind-actual-object.o",
+        "sha256": "e363eeb0f48bfa9b4c4d405845ddf36e5ed0ed27890934c50656cd8222adc511"
+      },
+      "all-numeric-instruction": 0,
+      "all-numeric-instruction-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/aarch64-uwvm2-all-numeric-instruction-actual-object.o",
+        "sha256": "3c405b2a98ee33b38760d7b9c9cb5c060ad0b1b6c828d8d4226e149b116a9258"
+      },
+      "all-numeric-unwind": 0,
+      "all-numeric-unwind-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/aarch64-uwvm2-all-numeric-unwind-actual-object.o",
+        "sha256": "87bc1e5a7ef5a259bf0a4c1bcccaeccb6e31598e646468249221cce131799dbe"
+      },
+      "mapping-probe": 0,
+      "shutdown": {
+        "instruction-none-parked-loop": 0,
+        "instruction-none-host-block": 0,
+        "instruction-observe-parked-loop": 0,
+        "instruction-observe-host-block": 0,
+        "instruction-resumable-parked-loop": 0,
+        "instruction-resumable-host-block": 0,
+        "unwind-none-parked-loop": 0,
+        "unwind-none-host-block": 0,
+        "unwind-observe-parked-loop": 0,
+        "unwind-observe-host-block": 0,
+        "unwind-resumable-parked-loop": 0,
+        "unwind-resumable-host-block": 0
+      }
+    },
+    {
+      "arch": "aarch64",
+      "repository": "uwvm2-ros",
+      "native_product_passed": true,
+      "instruction": 0,
+      "instruction-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/aarch64-uwvm2-ros-instruction-actual-object.o",
+        "sha256": "dd9cfa1099187d78d4498cdd89c051ee738f959c7febecb329cde7e1e6ce3992"
+      },
+      "unwind": 0,
+      "unwind-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/aarch64-uwvm2-ros-unwind-actual-object.o",
+        "sha256": "55dd2c5ee3a6ba4ab777022e6994258885a54aaf923f29669c13b94662634780"
+      },
+      "all-numeric-instruction": 0,
+      "all-numeric-instruction-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/aarch64-uwvm2-ros-all-numeric-instruction-actual-object.o",
+        "sha256": "a89e2bd89fedf728a7e78c29c837fdaafb363ebdeaffe474b469e2150c3c3fa6"
+      },
+      "all-numeric-unwind": 0,
+      "all-numeric-unwind-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/aarch64-uwvm2-ros-all-numeric-unwind-actual-object.o",
+        "sha256": "2559ae9acf674f4c9876c3b946f9a05bcd6a7017eb1c1fd0d4862a6ebdbca743"
+      },
+      "mapping-probe": 0,
+      "shutdown": {
+        "instruction-none-parked-loop": 0,
+        "instruction-none-host-block": 0,
+        "instruction-observe-parked-loop": 0,
+        "instruction-observe-host-block": 0,
+        "instruction-resumable-parked-loop": 0,
+        "instruction-resumable-host-block": 0,
+        "unwind-none-parked-loop": 0,
+        "unwind-none-host-block": 0,
+        "unwind-observe-parked-loop": 0,
+        "unwind-observe-host-block": 0,
+        "unwind-resumable-parked-loop": 0,
+        "unwind-resumable-host-block": 0
+      }
+    },
+    {
+      "arch": "riscv64",
+      "repository": "uwvm2",
+      "native_product_passed": true,
+      "instruction": 0,
+      "instruction-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/riscv64-uwvm2-instruction-actual-object.o",
+        "sha256": "42abca5834a65bb24ca45a6b1f3ffe24816bde5d535e44f30ef35cc9969259cf"
+      },
+      "unwind": 0,
+      "unwind-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/riscv64-uwvm2-unwind-actual-object.o",
+        "sha256": "3798035d302dedd3a5c13821abc81242bb3ac402eef1f599365e0ef24a2cb79c"
+      },
+      "all-numeric-instruction": 0,
+      "all-numeric-instruction-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/riscv64-uwvm2-all-numeric-instruction-actual-object.o",
+        "sha256": "02552945b6e8290b14520e2cc4df4c87eac37b125bd51a101794a546de193b01"
+      },
+      "all-numeric-unwind": 0,
+      "all-numeric-unwind-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/riscv64-uwvm2-all-numeric-unwind-actual-object.o",
+        "sha256": "c36fa9fc73dbfdea4d9b556db913eced1ae2aad1e88a92d2c4ce4c54bfc35e9e"
+      },
+      "mapping-probe": 0,
+      "shutdown": {
+        "instruction-none-parked-loop": 0,
+        "instruction-none-host-block": 0,
+        "instruction-observe-parked-loop": 0,
+        "instruction-observe-host-block": 0,
+        "instruction-resumable-parked-loop": 0,
+        "instruction-resumable-host-block": 0,
+        "unwind-none-parked-loop": 0,
+        "unwind-none-host-block": 0,
+        "unwind-observe-parked-loop": 0,
+        "unwind-observe-host-block": 0,
+        "unwind-resumable-parked-loop": 0,
+        "unwind-resumable-host-block": 0
+      }
+    },
+    {
+      "arch": "riscv64",
+      "repository": "uwvm2-ros",
+      "native_product_passed": true,
+      "instruction": 0,
+      "instruction-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/riscv64-uwvm2-ros-instruction-actual-object.o",
+        "sha256": "c3f1967666a83b21137700a1d8f9befecc4f26c0d6c26101cb0bb724d2997b75"
+      },
+      "unwind": 0,
+      "unwind-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/riscv64-uwvm2-ros-unwind-actual-object.o",
+        "sha256": "f5ceb2c90a2c3abdc1328b967448ed1c41ae1e4bf199c940a5820e25b26c4db6"
+      },
+      "all-numeric-instruction": 0,
+      "all-numeric-instruction-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/riscv64-uwvm2-ros-all-numeric-instruction-actual-object.o",
+        "sha256": "b1339f689524d90b2e36b2d9cc6289f0e73ed2276fbaebe13c9c8934dd76d5c5"
+      },
+      "all-numeric-unwind": 0,
+      "all-numeric-unwind-object": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606/work/riscv64-uwvm2-ros-all-numeric-unwind-actual-object.o",
+        "sha256": "49684c61076d9be9c9cf941b96b2cfc9356c715c0ce0306168e0ee614a6069e4"
+      },
+      "mapping-probe": 0,
+      "shutdown": {
+        "instruction-none-parked-loop": 0,
+        "instruction-none-host-block": 0,
+        "instruction-observe-parked-loop": 0,
+        "instruction-observe-host-block": 0,
+        "instruction-resumable-parked-loop": 0,
+        "instruction-resumable-host-block": 0,
+        "unwind-none-parked-loop": 0,
+        "unwind-none-host-block": 0,
+        "unwind-observe-parked-loop": 0,
+        "unwind-observe-host-block": 0,
+        "unwind-resumable-parked-loop": 0,
+        "unwind-resumable-host-block": 0
+      }
+    }
+  ],
+  "runtime_observations": [
+    {
+      "phase": "runtime",
+      "label": "i386-uwvm2-live-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 8,
+          "numeric": 1,
+          "visible": 1,
+          "hidden": 35,
+          "retained": 1,
+          "transitions": 8,
+          "i64": 0,
+          "f32": 0,
+          "f64": 0,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "d1feadf8caeb5ee6f472f4df2e8d6c1d529ebac12429031309b75f0bd967221b"
+    },
+    {
+      "phase": "runtime",
+      "label": "i386-uwvm2-live-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 8,
+          "numeric": 1,
+          "visible": 1,
+          "hidden": 35,
+          "retained": 1,
+          "transitions": 8,
+          "i64": 0,
+          "f32": 0,
+          "f64": 0,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "d73e465965ec487f2d04fe1efe4ebabf02df2c86947f0eb4cecc81afdc431abe"
+    },
+    {
+      "phase": "runtime",
+      "label": "i386-uwvm2-all-numeric-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 120,
+          "numeric": 14,
+          "visible": 7,
+          "hidden": 545,
+          "retained": 18,
+          "transitions": 120,
+          "i64": 0,
+          "f32": 8,
+          "f64": 8,
+          "v128": 1
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "f19fcf79c58e1d86cad145a36a459b18ec9277ead0dd4f7b9574101786e3045f"
+    },
+    {
+      "phase": "runtime",
+      "label": "i386-uwvm2-all-numeric-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 120,
+          "numeric": 14,
+          "visible": 7,
+          "hidden": 545,
+          "retained": 18,
+          "transitions": 120,
+          "i64": 0,
+          "f32": 8,
+          "f64": 8,
+          "v128": 1
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "839cac3ce1d821fad40e059e1ee900b40b6851eb9674d97e35a131c43c284e73"
+    },
+    {
+      "phase": "runtime",
+      "label": "i386-uwvm2-ros-live-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 8,
+          "numeric": 1,
+          "visible": 1,
+          "hidden": 35,
+          "retained": 1,
+          "transitions": 8,
+          "i64": 0,
+          "f32": 0,
+          "f64": 0,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "d1feadf8caeb5ee6f472f4df2e8d6c1d529ebac12429031309b75f0bd967221b"
+    },
+    {
+      "phase": "runtime",
+      "label": "i386-uwvm2-ros-live-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 8,
+          "numeric": 1,
+          "visible": 1,
+          "hidden": 35,
+          "retained": 1,
+          "transitions": 8,
+          "i64": 0,
+          "f32": 0,
+          "f64": 0,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "d73e465965ec487f2d04fe1efe4ebabf02df2c86947f0eb4cecc81afdc431abe"
+    },
+    {
+      "phase": "runtime",
+      "label": "i386-uwvm2-ros-all-numeric-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 120,
+          "numeric": 14,
+          "visible": 7,
+          "hidden": 545,
+          "retained": 18,
+          "transitions": 120,
+          "i64": 0,
+          "f32": 8,
+          "f64": 8,
+          "v128": 1
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "f19fcf79c58e1d86cad145a36a459b18ec9277ead0dd4f7b9574101786e3045f"
+    },
+    {
+      "phase": "runtime",
+      "label": "i386-uwvm2-ros-all-numeric-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 120,
+          "numeric": 14,
+          "visible": 7,
+          "hidden": 545,
+          "retained": 18,
+          "transitions": 120,
+          "i64": 0,
+          "f32": 8,
+          "f64": 8,
+          "v128": 1
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "839cac3ce1d821fad40e059e1ee900b40b6851eb9674d97e35a131c43c284e73"
+    },
+    {
+      "phase": "runtime",
+      "label": "aarch64-uwvm2-live-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 13,
+          "numeric": 1,
+          "visible": 1,
+          "hidden": 55,
+          "retained": 1,
+          "transitions": 13,
+          "i64": 0,
+          "f32": 0,
+          "f64": 0,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "61eff7b93345d2b338b9fa481549dea038918b5cdea48631406be5af3d338f6b"
+    },
+    {
+      "phase": "runtime",
+      "label": "aarch64-uwvm2-live-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 13,
+          "numeric": 1,
+          "visible": 1,
+          "hidden": 55,
+          "retained": 1,
+          "transitions": 13,
+          "i64": 0,
+          "f32": 0,
+          "f64": 0,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "7058a27586048a226a3894418e266a3a9314b050bc493d1bbc9ec17b257509ba"
+    },
+    {
+      "phase": "runtime",
+      "label": "aarch64-uwvm2-all-numeric-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 243,
+          "numeric": 10,
+          "visible": 13,
+          "hidden": 1027,
+          "retained": 17,
+          "transitions": 243,
+          "i64": 4,
+          "f32": 4,
+          "f64": 4,
+          "v128": 1
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "ce8fac1351007262bf6dd4c9d0095955712bb10c6e647146fcb5c8beceae5c56"
+    },
+    {
+      "phase": "runtime",
+      "label": "aarch64-uwvm2-all-numeric-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 243,
+          "numeric": 10,
+          "visible": 13,
+          "hidden": 1027,
+          "retained": 17,
+          "transitions": 243,
+          "i64": 4,
+          "f32": 4,
+          "f64": 4,
+          "v128": 1
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "3fa85c5ef74569eb553458cc3c674951c7923c1cb5288eae1402c3e10f79fcd0"
+    },
+    {
+      "phase": "runtime",
+      "label": "aarch64-uwvm2-ros-live-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 13,
+          "numeric": 1,
+          "visible": 1,
+          "hidden": 55,
+          "retained": 1,
+          "transitions": 13,
+          "i64": 0,
+          "f32": 0,
+          "f64": 0,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "61eff7b93345d2b338b9fa481549dea038918b5cdea48631406be5af3d338f6b"
+    },
+    {
+      "phase": "runtime",
+      "label": "aarch64-uwvm2-ros-live-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 13,
+          "numeric": 1,
+          "visible": 1,
+          "hidden": 55,
+          "retained": 1,
+          "transitions": 13,
+          "i64": 0,
+          "f32": 0,
+          "f64": 0,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "7058a27586048a226a3894418e266a3a9314b050bc493d1bbc9ec17b257509ba"
+    },
+    {
+      "phase": "runtime",
+      "label": "aarch64-uwvm2-ros-all-numeric-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 243,
+          "numeric": 10,
+          "visible": 13,
+          "hidden": 1027,
+          "retained": 17,
+          "transitions": 243,
+          "i64": 4,
+          "f32": 4,
+          "f64": 4,
+          "v128": 1
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "ce8fac1351007262bf6dd4c9d0095955712bb10c6e647146fcb5c8beceae5c56"
+    },
+    {
+      "phase": "runtime",
+      "label": "aarch64-uwvm2-ros-all-numeric-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 243,
+          "numeric": 10,
+          "visible": 13,
+          "hidden": 1027,
+          "retained": 17,
+          "transitions": 243,
+          "i64": 4,
+          "f32": 4,
+          "f64": 4,
+          "v128": 1
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "3fa85c5ef74569eb553458cc3c674951c7923c1cb5288eae1402c3e10f79fcd0"
+    },
+    {
+      "phase": "runtime",
+      "label": "riscv64-uwvm2-live-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 7,
+          "numeric": 1,
+          "visible": 1,
+          "hidden": 31,
+          "retained": 1,
+          "transitions": 7,
+          "i64": 0,
+          "f32": 0,
+          "f64": 0,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": true,
+      "log_sha256": "061789c1c76ee9fc258acb95dc2e5073e25226c4604a349fecef6ef57f22a02f"
+    },
+    {
+      "phase": "runtime",
+      "label": "riscv64-uwvm2-live-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 7,
+          "numeric": 1,
+          "visible": 1,
+          "hidden": 31,
+          "retained": 1,
+          "transitions": 7,
+          "i64": 0,
+          "f32": 0,
+          "f64": 0,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": true,
+      "log_sha256": "ccd5f6d9492bf58584e0c66403d99cc6a495e1d852d694325120c085bbd3ec78"
+    },
+    {
+      "phase": "runtime",
+      "label": "riscv64-uwvm2-all-numeric-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 66,
+          "numeric": 11,
+          "visible": 5,
+          "hidden": 315,
+          "retained": 14,
+          "transitions": 66,
+          "i64": 6,
+          "f32": 9,
+          "f64": 2,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": true,
+      "log_sha256": "85bf914e32235b77a6fd9d95f7b40d3e273d88d684cdc442250264ca0764aab5"
+    },
+    {
+      "phase": "runtime",
+      "label": "riscv64-uwvm2-all-numeric-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 66,
+          "numeric": 11,
+          "visible": 5,
+          "hidden": 315,
+          "retained": 14,
+          "transitions": 66,
+          "i64": 6,
+          "f32": 9,
+          "f64": 2,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": true,
+      "log_sha256": "536e621c8811119d77ece8c64133309ed00be1cb608201bfcd438a372e48a4eb"
+    },
+    {
+      "phase": "runtime",
+      "label": "riscv64-uwvm2-ros-live-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 7,
+          "numeric": 1,
+          "visible": 1,
+          "hidden": 31,
+          "retained": 1,
+          "transitions": 7,
+          "i64": 0,
+          "f32": 0,
+          "f64": 0,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": true,
+      "log_sha256": "061789c1c76ee9fc258acb95dc2e5073e25226c4604a349fecef6ef57f22a02f"
+    },
+    {
+      "phase": "runtime",
+      "label": "riscv64-uwvm2-ros-live-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 7,
+          "numeric": 1,
+          "visible": 1,
+          "hidden": 31,
+          "retained": 1,
+          "transitions": 7,
+          "i64": 0,
+          "f32": 0,
+          "f64": 0,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": true,
+      "log_sha256": "ccd5f6d9492bf58584e0c66403d99cc6a495e1d852d694325120c085bbd3ec78"
+    },
+    {
+      "phase": "runtime",
+      "label": "riscv64-uwvm2-ros-all-numeric-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 66,
+          "numeric": 11,
+          "visible": 5,
+          "hidden": 315,
+          "retained": 14,
+          "transitions": 66,
+          "i64": 6,
+          "f32": 9,
+          "f64": 2,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": true,
+      "log_sha256": "85bf914e32235b77a6fd9d95f7b40d3e273d88d684cdc442250264ca0764aab5"
+    },
+    {
+      "phase": "runtime",
+      "label": "riscv64-uwvm2-ros-all-numeric-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 66,
+          "numeric": 11,
+          "visible": 5,
+          "hidden": 315,
+          "retained": 14,
+          "transitions": 66,
+          "i64": 6,
+          "f32": 9,
+          "f64": 2,
+          "v128": 0
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": true,
+      "log_sha256": "536e621c8811119d77ece8c64133309ed00be1cb608201bfcd438a372e48a4eb"
+    },
+    {
+      "phase": "host-full",
+      "label": "uwvm2-live-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 95,
+          "numeric": 2,
+          "visible": 1,
+          "hidden": 452,
+          "retained": 18,
+          "transitions": 95,
+          "i64": 2,
+          "f32": 10,
+          "f64": 10,
+          "v128": 1
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "a14e3537bce68edf1def6ffe66310a1dfbe8187ffd2655d76bd29ba866c0eef9"
+    },
+    {
+      "phase": "host-full",
+      "label": "uwvm2-live-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 95,
+          "numeric": 2,
+          "visible": 1,
+          "hidden": 452,
+          "retained": 18,
+          "transitions": 95,
+          "i64": 2,
+          "f32": 10,
+          "f64": 10,
+          "v128": 1
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "9d4739e15361579e6379cbb7c93adb590a003dc20ea44a1695505746423a28ec"
+    },
+    {
+      "phase": "host-full",
+      "label": "uwvm2-ros-live-instruction",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 95,
+          "numeric": 2,
+          "visible": 3,
+          "hidden": 450,
+          "retained": 18,
+          "transitions": 95,
+          "i64": 2,
+          "f32": 10,
+          "f64": 10,
+          "v128": 1
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=instruction"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "d9065d57f4f87f13ee4e9d0ae8f06f9e106ea5f1d034e069f715853b009052df"
+    },
+    {
+      "phase": "host-full",
+      "label": "uwvm2-ros-live-unwind",
+      "returncode": 0,
+      "coverage": [
+        {
+          "traps": 95,
+          "numeric": 2,
+          "visible": 3,
+          "hidden": 450,
+          "retained": 18,
+          "transitions": 95,
+          "i64": 2,
+          "f32": 10,
+          "f64": 10,
+          "v128": 1
+        }
+      ],
+      "pass_banners": [
+        "PASS actual Wasm JIT numeric registers, masked upper bits, hidden runtime code, forged/retired identity rejection policy=unwind"
+      ],
+      "SDK_unknown_negative_feature_warning": false,
+      "log_sha256": "85a2a2b3172e11c504440625ebc450aa1390957408f8fd673c0fd778593e5c0b"
+    }
+  ],
+  "MC_results": [
+    {
+      "arch": "aarch64",
+      "repository": "uwvm2",
+      "native_product_passed": true,
+      "compile": 0,
+      "qemu": 0,
+      "origin-compile": 0,
+      "origin-qemu": 0
+    },
+    {
+      "arch": "aarch64",
+      "repository": "uwvm2-ros",
+      "native_product_passed": true,
+      "compile": 0,
+      "qemu": 0,
+      "origin-compile": 0,
+      "origin-qemu": 0
+    },
+    {
+      "arch": "i386",
+      "repository": "uwvm2",
+      "native_product_passed": true,
+      "compile": 0,
+      "qemu": 0,
+      "origin-compile": 0,
+      "origin-qemu": 0
+    },
+    {
+      "arch": "i386",
+      "repository": "uwvm2-ros",
+      "native_product_passed": true,
+      "compile": 0,
+      "qemu": 0,
+      "origin-compile": 0,
+      "origin-qemu": 0
+    },
+    {
+      "arch": "riscv64",
+      "repository": "uwvm2",
+      "native_product_passed": true,
+      "compile": 0,
+      "qemu": 0,
+      "origin-compile": 0,
+      "origin-qemu": 0
+    },
+    {
+      "arch": "riscv64",
+      "repository": "uwvm2-ros",
+      "native_product_passed": true,
+      "compile": 0,
+      "qemu": 0,
+      "origin-compile": 0,
+      "origin-qemu": 0
+    }
+  ],
+  "source_hashes": [
+    {
+      "path": "src/uwvm2/uwvm/debugger/native_linux_platform.h",
+      "sha256": "2b1748b5849f5b16a9a8258472eeb88ebf12169cb017899e472707b8bd00bdd5",
+      "identical_in_both_repositories": true,
+      "matches_tested_cut": "asm-linux-final-1791143662606"
+    },
+    {
+      "path": "src/uwvm2/uwvm/debugger/native_step_linux.h",
+      "sha256": "520ab238bff9e46b8590dff2acbf0557e6e5898d7f7c6c7ed07c0fa326a76888",
+      "identical_in_both_repositories": true,
+      "matches_tested_cut": "asm-linux-final-1791143662606"
+    },
+    {
+      "path": "src/uwvm2/uwvm/debugger/native_linux_context.h",
+      "sha256": "5f865d0c1da4445ebe726300135ffd929346d04717025be42ccba7431d1f4266",
+      "identical_in_both_repositories": true,
+      "matches_tested_cut": "asm-linux-final-1791143662606"
+    },
+    {
+      "path": "src/uwvm2/uwvm/debugger/native_registers.h",
+      "sha256": "5499dcd3c31f95ba8948dc7cce48fd84c91841e101cd07b280e3fb166ce5f251",
+      "identical_in_both_repositories": true,
+      "matches_tested_cut": "asm-linux-final-1791143662606"
+    },
+    {
+      "path": "src/uwvm2/runtime/compiler/llvm_jit/native_provenance.h",
+      "sha256": "8152d67c5c555d02e116d4fc95e7adae88b6a16bcd8d4f950b4872f576605d82",
+      "identical_in_both_repositories": true,
+      "matches_tested_cut": "asm-linux-final-1791143662606"
+    },
+    {
+      "path": "src/uwvm2/runtime/lib/uwvm_runtime_native_owner_function_claims.h",
+      "sha256": "f22688015a8056f4791d3e4993e6e16a7f292cd2eceda88a7dcbeaa0429aaeb3",
+      "identical_in_both_repositories": true,
+      "matches_tested_cut": "asm-linux-final-1791143662606"
+    },
+    {
+      "path": "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_debug_shutdown_emit.h",
+      "sha256": "1012f035c940209176a54defb007f2bc06c5a1cbb3677abf708ac685c4556127",
+      "identical_in_both_repositories": true,
+      "matches_tested_cut": "asm-linux-final-1791143662606"
+    },
+    {
+      "path": "test/0017.runtime/native_step_linux_software.cc",
+      "sha256": "2e6068b6ab615ce34ea53c81c06e6493f382cb2b4a8e16cc4ffa38c77901f7e3",
+      "identical_in_both_repositories": true,
+      "matches_tested_cut": "asm-linux-backend-1791144422744"
+    },
+    {
+      "path": "test/0017.runtime/native_numeric_identity_origin.cc",
+      "sha256": "f079fea3955e06053732c4004d5b650c1591f807278de2768abada58b5b1fca1",
+      "identical_in_both_repositories": true,
+      "matches_tested_cut": "asm-linux-final-1791143662606"
+    }
+  ],
+  "receipts": {
+    "fresh_full_build": {
+      "tag": "asm-linux-final-1791143662606",
+      "receipt_sha256": "2d15f0833abd664ff0c9b85d218f45775fece92d628f603e5c58b89ca2f16281",
+      "schema": "uwvm-shared-original-cgroup-owned-pidfd-v1",
+      "source_manifest_sha256": "7d658d042d282611042b9ac63be7b5527a74035aa76a4061134d41eeed3f7e61",
+      "supervisor_sha256": "2d1e1267327148fb2283ce167014ff136aa1c515202468e1228350b4deb02a6d",
+      "commands_sha256": "e9410d2c3d5ca6ece10527ccc319a0c311fb5ebaee0832a4a8b9a61135497034",
+      "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope\n",
+      "memory_max": 68719476736,
+      "swap_max": 0,
+      "all_test_outputs_in_tmpfs": true,
+      "original_exclusive_disk_floor_qualified": false,
+      "owned_rss_budget": 8589934592,
+      "rss_peak": 7551201280,
+      "elapsed": 2855.228731463998,
+      "memory_events_before": {
+        "low": 0,
+        "high": 0,
+        "max": 442649,
+        "oom": 60,
+        "oom_kill": 12,
+        "oom_group_kill": 0
+      },
+      "memory_events_after": {
+        "low": 0,
+        "high": 0,
+        "max": 448415,
+        "oom": 60,
+        "oom_kill": 12,
+        "oom_group_kill": 0
+      },
+      "returncode": 0,
+      "error": null,
+      "passed": false,
+      "owned_tasks_retired": 305,
+      "all_owned_pidfds_retired": true
+    },
+    "fresh_backend_build": {
+      "tag": "asm-linux-backend-1791144422744",
+      "receipt_sha256": "9a440c56f51f4f9fd5e2e210502149100e5141bf3f4825ac934cbeecb5495ab7",
+      "schema": "uwvm-shared-original-cgroup-owned-pidfd-v1",
+      "source_manifest_sha256": "13e4a211e01171ad8269b3935c84726d51664700fa254d7765cfb04e28755ecf",
+      "supervisor_sha256": "1c968170957485fa30140371861b59650cf0e9ec11537736505ec288b9b50e8f",
+      "commands_sha256": "eeb63ba3bf7db5b9e6b036090c2734b7628dd37173da4c531135aae92837df01",
+      "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope\n",
+      "memory_max": 68719476736,
+      "swap_max": 0,
+      "all_test_outputs_in_tmpfs": true,
+      "original_exclusive_disk_floor_qualified": false,
+      "owned_rss_budget": 8589934592,
+      "rss_peak": 484192256,
+      "elapsed": 400.7779949760006,
+      "memory_events_before": {
+        "low": 0,
+        "high": 0,
+        "max": 442649,
+        "oom": 60,
+        "oom_kill": 12,
+        "oom_group_kill": 0
+      },
+      "memory_events_after": {
+        "low": 0,
+        "high": 0,
+        "max": 445428,
+        "oom": 60,
+        "oom_kill": 12,
+        "oom_group_kill": 0
+      },
+      "returncode": 0,
+      "error": null,
+      "passed": false,
+      "owned_tasks_retired": 261,
+      "all_owned_pidfds_retired": true
+    },
+    "backend_execution_replay": {
+      "tag": "asm-linux-backend-replay-1791145312128",
+      "receipt_sha256": "41795a6f3e1738972626487e89388504ef2676749080dc7ded74a912e822f2bc",
+      "schema": "uwvm-shared-original-cgroup-owned-pidfd-v1",
+      "source_manifest_sha256": "13e4a211e01171ad8269b3935c84726d51664700fa254d7765cfb04e28755ecf",
+      "supervisor_sha256": "5cae84cc517dcd931e53d2ae537dda238c69ea79b526f6243be02e1c4c934960",
+      "commands_sha256": "d3edf3770dcf4d8322e85c8c5e3580b3828e0a21d301f6d08e85c68920541730",
+      "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope\n",
+      "memory_max": 68719476736,
+      "swap_max": 0,
+      "all_test_outputs_in_tmpfs": true,
+      "original_exclusive_disk_floor_qualified": false,
+      "owned_rss_budget": 8589934592,
+      "rss_peak": 40828928,
+      "elapsed": 13.420804255001713,
+      "memory_events_before": {
+        "low": 0,
+        "high": 0,
+        "max": 447541,
+        "oom": 60,
+        "oom_kill": 12,
+        "oom_group_kill": 0
+      },
+      "memory_events_after": {
+        "low": 0,
+        "high": 0,
+        "max": 447541,
+        "oom": 60,
+        "oom_kill": 12,
+        "oom_group_kill": 0
+      },
+      "returncode": 0,
+      "error": null,
+      "passed": true,
+      "owned_tasks_retired": 51,
+      "all_owned_pidfds_retired": true
+    },
+    "full_runtime_execution_replay": {
+      "tag": "asm-linux-runtime-replay-1791146431959",
+      "receipt_sha256": "fef71b2adcf9ce55d2ed4a94f43d2605ede1ee1562736e6b8cbe70a5170e448b",
+      "schema": "uwvm-shared-original-cgroup-owned-pidfd-v1",
+      "source_manifest_sha256": "7d658d042d282611042b9ac63be7b5527a74035aa76a4061134d41eeed3f7e61",
+      "supervisor_sha256": "2be6abc3e63d9e6d7f0e0f87aa290eb0611e5c0211dc11b9b64431c6155b1dee",
+      "commands_sha256": "7b8eec757928a22b4ae774d66fc25b8006572375831ae6246ddff8463527a2bb",
+      "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope\n",
+      "memory_max": 68719476736,
+      "swap_max": 0,
+      "all_test_outputs_in_tmpfs": true,
+      "original_exclusive_disk_floor_qualified": false,
+      "owned_rss_budget": 8589934592,
+      "rss_peak": 251109376,
+      "elapsed": 440.82579950500804,
+      "memory_events_before": {
+        "low": 0,
+        "high": 0,
+        "max": 448415,
+        "oom": 60,
+        "oom_kill": 12,
+        "oom_group_kill": 0
+      },
+      "memory_events_after": {
+        "low": 0,
+        "high": 0,
+        "max": 448415,
+        "oom": 60,
+        "oom_kill": 12,
+        "oom_group_kill": 0
+      },
+      "returncode": 0,
+      "error": null,
+      "passed": true,
+      "owned_tasks_retired": 133,
+      "all_owned_pidfds_retired": true
+    },
+    "current_frontend": {
+      "tag": "asm-linux-native-1791144594529",
+      "receipt_sha256": "4e503b36b080e500694f493f1f5b9ce18e49c599e7edac9652ff83dc0d9aeea2",
+      "schema": "uwvm-shared-original-cgroup-owned-pidfd-v1",
+      "source_manifest_sha256": "f4f04adc93ff10ff262d6eed8e76b784c99c95db681487366e812444aa606a49",
+      "supervisor_sha256": "cd2b0bedb0bc2e9888bc519c23c2b2b477bd2109e010e3f1207d30e434b7eb62",
+      "commands_sha256": "814f648501bac0dc09f3844915903184a63aeb26054ab0b2d51c40697872a505",
+      "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope\n",
+      "memory_max": 68719476736,
+      "swap_max": 0,
+      "all_test_outputs_in_tmpfs": true,
+      "original_exclusive_disk_floor_qualified": false,
+      "owned_rss_budget": 8589934592,
+      "rss_peak": 4736811008,
+      "elapsed": 299.23994762200164,
+      "memory_events_before": {
+        "low": 0,
+        "high": 0,
+        "max": 445428,
+        "oom": 60,
+        "oom_kill": 12,
+        "oom_group_kill": 0
+      },
+      "memory_events_after": {
+        "low": 0,
+        "high": 0,
+        "max": 447541,
+        "oom": 60,
+        "oom_kill": 12,
+        "oom_group_kill": 0
+      },
+      "returncode": 0,
+      "error": null,
+      "passed": false,
+      "owned_tasks_retired": 13,
+      "all_owned_pidfds_retired": true
+    },
+    "DAP_protocol": {
+      "tag": "asm-linux-dap-native-1791145897534",
+      "receipt_sha256": "8ca3a7acdadeacfb240ba46f065c3bb7aac500c0cd23d9cce8477ca262cb0f83",
+      "schema": "uwvm-shared-original-cgroup-owned-pidfd-v1",
+      "source_manifest_sha256": "d41102b24f76c5a9faafd9c72e974d2d1c221a2b9e6a0547a80125077b50cd7c",
+      "supervisor_sha256": "21abc2dd7447728fe46c90d39285cb02aae75c15396321028000b940904c31b7",
+      "commands_sha256": "764c638e88d0deaa452d42ad7903fae932a3edd2c23f3fa8839c5210edd1332c",
+      "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope\n",
+      "memory_max": 68719476736,
+      "swap_max": 0,
+      "all_test_outputs_in_tmpfs": true,
+      "original_exclusive_disk_floor_qualified": false,
+      "owned_rss_budget": 8589934592,
+      "rss_peak": 47599616,
+      "elapsed": 2.824899102008203,
+      "memory_events_before": {
+        "low": 0,
+        "high": 0,
+        "max": 447541,
+        "oom": 60,
+        "oom_kill": 12,
+        "oom_group_kill": 0
+      },
+      "memory_events_after": {
+        "low": 0,
+        "high": 0,
+        "max": 447541,
+        "oom": 60,
+        "oom_kill": 12,
+        "oom_group_kill": 0
+      },
+      "returncode": 0,
+      "error": null,
+      "passed": true,
+      "owned_tasks_retired": 11,
+      "all_owned_pidfds_retired": true
+    }
+  },
+  "replay_evidence": {
+    "backend": {
+      "scope": "Pinned-binary native backend execution replay only; original build receipt retained separately",
+      "original_build": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-backend-1791144422744",
+      "original_receipt_sha256": "9a440c56f51f4f9fd5e2e210502149100e5141bf3f4825ac934cbeecb5495ab7",
+      "original_input_hashes_sha256": "66fa98f694fc4ce746d49e3b1bd0632ec108afd2e2189b6097ff4fc6424b9972",
+      "original_source_manifest_sha256": "13e4a211e01171ad8269b3935c84726d51664700fa254d7765cfb04e28755ecf",
+      "checked_input_files": 5553,
+      "binary_cells": 48,
+      "all_cells_passed": true
+    },
+    "full_runtime": {
+      "scope": "Pinned-binary full native runtime/component execution replay; original fresh compile receipt retained separately",
+      "original_build": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-final-1791143662606",
+      "original_receipt_sha256": "2d15f0833abd664ff0c9b85d218f45775fece92d628f603e5c58b89ca2f16281",
+      "source_manifest_sha256": "7d658d042d282611042b9ac63be7b5527a74035aa76a4061134d41eeed3f7e61",
+      "checked_input_files": 6961,
+      "command_count": 130,
+      "all_commands_passed": true,
+      "input_capture": "after original frozen-source build; original SDK-library qualification rechecked; all pins verified before and after replay"
+    }
+  },
+  "environment_interpretation": "Fresh compiler/test commands exited zero and ran inside the original cgroup. Their original strict receipts are retained, including shared memory.events changes; they are not relabelled PASS. Separate pinned-binary execution replays passed with unchanged memory.events. Replay does not retroactively qualify the original build environment.",
+  "qualification_limits": [
+    "PPC32 and SPARC64 complete Wasm MCJIT products remain gated by existing incomplete ELF loaders; signal/backend fixtures do not authorize relaxing these gates.",
+    "PPC64/PPC64LE/MIPS64/MIPS64EL/LoongArch64/SystemZ/ARM-state have real backend fixture evidence, but no complete target Wasm runtime product qualification in this run.",
+    "ARM-state is tested; Thumb generated code is refused before patching.",
+    "RV64GC has no native v128 register class in this matrix; i686 i64 split/bit-piece locations remain unavailable. Missing hardware or unproved locations are not synthesized.",
+    "This run does not qualify standalone interactive CLI main, C++ modules, Xmake project loading, all Wasm 3.0 opcodes, all native instruction forms, performance parity or all language/WASIp1 levels.",
+    "RV64 runtime logs contain ignored negative -zicfiss feature warnings from the pinned SDK; this run does not qualify clean interactive console output.",
+    "Current-source frontend checks cover their own later immutable snapshot. Full execution checks cover the exact final snapshot and the matching implementation files recorded above."
+  ],
+  "evidence_directory": "/private/var/folders/_5/nzqqvqhx0t9_t1m7jzr7dnt40000gn/T/codex-security-artifacts-6313e26318ef8d4e7446f874d960a07e908496deff33e699b36cf738c1d902f4/linux-native-qualification-20261005",
+  "remote_build_root": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds",
+  "raw_evidence": "Per-command argv, exit code, elapsed time, log hashes, source manifests, actual emitted object hashes and PIDFD retirement receipts are retained under each named cut."
+}

@@ -21,6 +21,7 @@
  ****************************************/
 
 #pragma once
+#include <uwvm2/runtime/lib/uwvm_runtime_posix_abi.h>
 
 #ifndef UWVM_MODULE
 // std
@@ -50,6 +51,7 @@
 # include <fast_io_device.h>
 # include <fast_io_crypto.h>
 # include <uwvm2/utils/container/impl.h>
+# include <uwvm2/utils/thread/native_thread_join.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
 # include "format.h"
@@ -156,26 +158,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             auto const message{ed25519_signature_message(header, isa_metadata, context_metadata, payload)};
             // The deterministic seed gives a lightweight local identity; it is for cache integrity, not third-party trust.
             auto const seed{reinterpret_cast<unsigned char const*>(ctx.signature_seed.data())};
-            auto private_key{::EVP_PKEY_new_raw_private_key(EVP_PKEY_ED25519, nullptr, seed, cache_ed25519_seed_size)};
+            auto private_key{::fast_io::noexcept_call(::EVP_PKEY_new_raw_private_key, EVP_PKEY_ED25519, nullptr, seed, cache_ed25519_seed_size)};
             if(private_key == nullptr) { return false; }
 
-            auto md_ctx{::EVP_MD_CTX_new()};
+            auto md_ctx{::fast_io::noexcept_call(::EVP_MD_CTX_new)};
             if(md_ctx == nullptr)
             {
-                ::EVP_PKEY_free(private_key);
+                ::fast_io::noexcept_call(::EVP_PKEY_free, private_key);
                 return false;
             }
 
             ::std::size_t signature_size{cache_ed25519_signature_size};
             signature.resize(signature_size);
-            auto const ok{::EVP_DigestSignInit(md_ctx, nullptr, nullptr, nullptr, private_key) == 1 &&
-                          ::EVP_DigestSign(md_ctx,
+            auto const ok{::fast_io::noexcept_call(::EVP_DigestSignInit, md_ctx, nullptr, nullptr, nullptr, private_key) == 1 &&
+                          ::fast_io::noexcept_call(::EVP_DigestSign, md_ctx,
                                            reinterpret_cast<unsigned char*>(signature.data()),
                                            ::std::addressof(signature_size),
                                            reinterpret_cast<unsigned char const*>(message.data()),
                                            message.size()) == 1};
-            ::EVP_MD_CTX_free(md_ctx);
-            ::EVP_PKEY_free(private_key);
+            ::fast_io::noexcept_call(::EVP_MD_CTX_free, md_ctx);
+            ::fast_io::noexcept_call(::EVP_PKEY_free, private_key);
             if(!ok) { return false; }
             signature.resize(signature_size);
             return signature_size == cache_ed25519_signature_size;
@@ -200,36 +202,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 ed25519_signature_message_parts(header, isa_metadata, isa_metadata_size, context_metadata, context_metadata_size, payload, payload_size)};
             // Verification reconstructs the public key from the same local identity so no external key store is required.
             auto const seed{reinterpret_cast<unsigned char const*>(ctx.signature_seed.data())};
-            auto private_key{::EVP_PKEY_new_raw_private_key(EVP_PKEY_ED25519, nullptr, seed, cache_ed25519_seed_size)};
+            auto private_key{::fast_io::noexcept_call(::EVP_PKEY_new_raw_private_key, EVP_PKEY_ED25519, nullptr, seed, cache_ed25519_seed_size)};
             if(private_key == nullptr) { return false; }
 
             ::uwvm2::utils::container::array<::std::byte, 32uz> public_key{};
             ::std::size_t public_key_size{public_key.size()};
             auto const public_key_ok{
-                ::EVP_PKEY_get_raw_public_key(private_key, reinterpret_cast<unsigned char*>(public_key.data()), ::std::addressof(public_key_size)) == 1 &&
+                ::fast_io::noexcept_call(::EVP_PKEY_get_raw_public_key, private_key, reinterpret_cast<unsigned char*>(public_key.data()), ::std::addressof(public_key_size)) == 1 &&
                 public_key_size == public_key.size()};
-            ::EVP_PKEY_free(private_key);
+            ::fast_io::noexcept_call(::EVP_PKEY_free, private_key);
             if(!public_key_ok) { return false; }
 
             auto verify_key{
-                ::EVP_PKEY_new_raw_public_key(EVP_PKEY_ED25519, nullptr, reinterpret_cast<unsigned char const*>(public_key.data()), public_key.size())};
+                ::fast_io::noexcept_call(::EVP_PKEY_new_raw_public_key, EVP_PKEY_ED25519, nullptr, reinterpret_cast<unsigned char const*>(public_key.data()), public_key.size())};
             if(verify_key == nullptr) { return false; }
 
-            auto md_ctx{::EVP_MD_CTX_new()};
+            auto md_ctx{::fast_io::noexcept_call(::EVP_MD_CTX_new)};
             if(md_ctx == nullptr)
             {
-                ::EVP_PKEY_free(verify_key);
+                ::fast_io::noexcept_call(::EVP_PKEY_free, verify_key);
                 return false;
             }
 
-            auto const ok{::EVP_DigestVerifyInit(md_ctx, nullptr, nullptr, nullptr, verify_key) == 1 &&
-                          ::EVP_DigestVerify(md_ctx,
+            auto const ok{::fast_io::noexcept_call(::EVP_DigestVerifyInit, md_ctx, nullptr, nullptr, nullptr, verify_key) == 1 &&
+                          ::fast_io::noexcept_call(::EVP_DigestVerify, md_ctx,
                                              reinterpret_cast<unsigned char const*>(signature),
                                              cache_ed25519_signature_size,
                                              reinterpret_cast<unsigned char const*>(message.data()),
                                              message.size()) == 1};
-            ::EVP_MD_CTX_free(md_ctx);
-            ::EVP_PKEY_free(verify_key);
+            ::fast_io::noexcept_call(::EVP_MD_CTX_free, md_ctx);
+            ::fast_io::noexcept_call(::EVP_PKEY_free, verify_key);
             return ok;
 #else
 # error "LLVM JIT cache Ed25519 signatures require OpenSSL."
@@ -639,7 +641,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #if defined(_WIN32) && !defined(__CYGWIN__)
             return static_cast<::std::uint_least64_t>(::fast_io::win32::GetCurrentProcessId());
 #elif defined(__unix__) || defined(__APPLE__) || defined(__linux__) || defined(__linux)
-            return static_cast<::std::uint_least64_t>(::getpid());
+            return static_cast<::std::uint_least64_t>(::uwvm2::runtime::lib::posix_abi::getpid_noexcept());
 #else
             return 0u;
 #endif
@@ -892,8 +894,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         struct async_cache_store_worker
         {
             ::std::mutex mutex{};
+            ::std::mutex lifecycle{}; // cold real native-owner join serialization
             ::std::condition_variable condition{};
-            ::std::thread worker{};
+#if defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+            using native_worker = ::fast_io::native_thread;
+#else
+            using native_worker = ::std::thread;
+#endif
+            native_worker worker{};
             ::std::deque<cache_store_request> requests{};
             ::std::size_t active_requests{};
             bool stop_requested{};
@@ -948,7 +956,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #endif
                 {
                     // The worker is lazy so programs that never store an object do not pay for a thread.
-                    this->worker = ::std::thread{[this]() noexcept { this->run(); }};
+                    this->worker = native_worker{[this]() noexcept { this->run(); }};
                     this->worker_started = true;
                     return true;
                 }
@@ -997,6 +1005,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 return cache_status::io_error;
             }
 
+            // Cold bounded DATA/work quiescence. The process-owned idle worker
+            // remains retained; this is NOT OS-thread termination or finalizers.
+            [[nodiscard]] inline bool flush_until(::std::chrono::steady_clock::time_point deadline) noexcept
+            {
+                ::std::unique_lock lock{this->mutex};
+                return this->condition.wait_until(lock, deadline, [this]() noexcept
+                    { return this->requests.empty() && this->active_requests == 0uz; });
+            }
             inline constexpr void flush() noexcept
             {
                 ::std::unique_lock lock{this->mutex};
@@ -1004,8 +1020,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 this->condition.wait(lock, [this]() noexcept { return this->requests.empty() && this->active_requests == 0uz; });
             }
 
+            // Terminal cold owner phase AFTER real runtime execution/producer
+            // admission drained. Stop acceptance and wake this ACTUAL store
+            // worker, but keep its complete native owner/queue alive on timeout.
+            // A WORK0 condition or early loop/TLS flag is never physical ACK.
+            [[nodiscard]] inline bool stop_and_join_until(::std::chrono::steady_clock::time_point deadline) noexcept
+            {
+                ::std::unique_lock owned{this->lifecycle, ::std::try_to_lock};
+                if(!owned.owns_lock()) { return false; } // pending, not a second OS join
+                {
+                    ::std::lock_guard lock{this->mutex};
+                    this->stop_requested = true;
+                    if(!this->worker_started) { return true; } // actually never started/already joined
+                }
+                this->condition.notify_all();
+#if defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+                auto const joined{::uwvm2::utils::thread::join_native_thread_until(this->worker, deadline)};
+                if(joined.actual.status != ::fast_io::thread_join_status::joined) { return false; }
+                {
+                    // Only successful ACTUAL provider join cleared native owner
+                    // fields. The queue is no longer observed by any worker;
+                    // destructor/normal exit will not invoke an unbounded join.
+                    ::std::lock_guard lock{this->mutex};
+                    this->worker_started = false;
+                    return this->requests.empty() && this->active_requests == 0uz;
+                }
+#else
+                static_cast<void>(deadline); return false; // retain unqualified real std owner
+#endif
+            }
             inline constexpr void stop_and_join() noexcept
             {
+                ::std::unique_lock owned{this->lifecycle};
                 {
                     ::std::lock_guard lock{this->mutex};
                     this->stop_requested = true;
@@ -1013,6 +1059,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                 this->condition.notify_all();
 
                 if(this->worker.joinable()) { this->worker.join(); }
+                // Real synchronous join succeeded (or owner never started).
+                // Preserve that fact for a later qualified terminal query.
+                ::std::lock_guard lock{this->mutex}; this->worker_started = false;
             }
         };
 
@@ -1053,7 +1102,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         return details::async_cache_store_worker_instance().enqueue(::std::move(request));
     }
 
+    [[nodiscard]] inline bool flush_async_store_objects_until(::std::chrono::steady_clock::time_point deadline) noexcept
+    { return details::async_cache_store_worker_instance().flush_until(deadline); }
     inline constexpr void flush_async_store_objects() noexcept { details::async_cache_store_worker_instance().flush(); }
+
+    // Terminal managed CLI shutdown only. Once called, accepted writes drain
+    // and future external stores use the existing synchronous fallback. The
+    // caller serializes all runtime/external store producers; ordinary reusable
+    // reset/flush retains its prior behavior and does not call this method.
+    [[nodiscard]] inline bool shutdown_async_store_objects_until(::std::chrono::steady_clock::time_point deadline) noexcept
+    { return details::async_cache_store_worker_instance().stop_and_join_until(deadline); }
 
     inline constexpr void shutdown_async_store_objects() noexcept
     {

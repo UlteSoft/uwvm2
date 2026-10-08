@@ -1,0 +1,228 @@
+{
+  "commands": [
+    [
+      "actual-wasm-tools-version",
+      [
+        "/usr/bin/env",
+        "-u",
+        "LD_PRELOAD",
+        "-u",
+        "LD_AUDIT",
+        "-u",
+        "LD_LIBRARY_PATH",
+        "-u",
+        "PYTHONOPTIMIZE",
+        "RAYON_NUM_THREADS=1",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasm-tools-1.259.0-x86_64-linux/wasm-tools",
+        "--version"
+      ]
+    ],
+    [
+      "normal-Core3-output-parse",
+      [
+        "/usr/bin/env",
+        "-u",
+        "LD_PRELOAD",
+        "-u",
+        "LD_AUDIT",
+        "-u",
+        "LD_LIBRARY_PATH",
+        "-u",
+        "PYTHONOPTIMIZE",
+        "RAYON_NUM_THREADS=1",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasm-tools-1.259.0-x86_64-linux/wasm-tools",
+        "parse",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/core3-normal-features-stdout-oracle-source-20261003-r1/fixtures/core3_normal_features_stdout.wat",
+        "-o",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/core3-normal-features-stdout-oracle-actual-20261003-r1/core3_normal_features_stdout.wasm"
+      ]
+    ],
+    [
+      "normal-Core3-output-validate",
+      [
+        "/usr/bin/env",
+        "-u",
+        "LD_PRELOAD",
+        "-u",
+        "LD_AUDIT",
+        "-u",
+        "LD_LIBRARY_PATH",
+        "-u",
+        "PYTHONOPTIMIZE",
+        "RAYON_NUM_THREADS=1",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasm-tools-1.259.0-x86_64-linux/wasm-tools",
+        "validate",
+        "--features",
+        "all",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/core3-normal-features-stdout-oracle-actual-20261003-r1/core3_normal_features_stdout.wasm"
+      ]
+    ],
+    [
+      "normal-Core3-output-dump",
+      [
+        "/usr/bin/env",
+        "-u",
+        "LD_PRELOAD",
+        "-u",
+        "LD_AUDIT",
+        "-u",
+        "LD_LIBRARY_PATH",
+        "-u",
+        "PYTHONOPTIMIZE",
+        "RAYON_NUM_THREADS=1",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasm-tools-1.259.0-x86_64-linux/wasm-tools",
+        "dump",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/core3-normal-features-stdout-oracle-actual-20261003-r1/core3_normal_features_stdout.wasm"
+      ]
+    ]
+  ],
+  "compiler_executed": false,
+  "derivation": {
+    "parent_source_plan_bytes": 15840,
+    "parent_source_plan_path": "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0022.qemu_platforms/core3_high32_boundary_oracle_literal_source_plan_20261003_r1.json",
+    "parent_source_plan_sha256": "cdda060000ef34b5f5a9a3b3e697e0a6f289937fa12699fac33bc443271fc438",
+    "scope": "Reuse only exact official tool prefix and source-time candidate provider contract; stage/output/input source pins are distinct and no old oracle result is borrowed."
+  },
+  "execution_ready": false,
+  "fixture": {
+    "bytes": 3022,
+    "path": "test/0022.qemu_platforms/fixtures/core3_normal_features_stdout.wat",
+    "remote_staged_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/core3-normal-features-stdout-oracle-source-20261003-r1/fixtures/core3_normal_features_stdout.wat",
+    "repo": "uwvm2",
+    "sha256": "6f56cb7c8da94e0173576fa16fe9942cbc595c7ed4dc2144189ea8dac85e4b42"
+  },
+  "literal_count": 4,
+  "native_executed": false,
+  "official_oracle_passed": false,
+  "output_directory": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/core3-normal-features-stdout-oracle-actual-20261003-r1",
+  "product_qualified": false,
+  "required_binding": [
+    "Root source review and keeper original UID/birth/PIDFD/subreaper/64GiB swap0 resource guardian and sole current lane ticket. No Mac or unreviewed native tool execution.",
+    "Exact WAT3022-byte current source pin, paired source/expectations immutable tar, actual newly staged regular input before/after. No source tree overlay or modification to current full product cut.",
+    "Official executable alias/resolved/size/SHA and compiler-independent ELF loader/providers current identity inside the cgroup before/after. Historical candidate metadata does not qualify loaded maps or version.",
+    "All four commands raw return0; bind fresh Wasm SHA and actual dump showing memory0 memory32/memory1 memory64, new instructions/types/import signature. A source review or generic version directory label is not oracle qualification.",
+    "Any unavailable parser/feature,77,or arbitrary nonzero fails the appropriate stage. This oracle does not execute Wasm, qualify output bytes, LLVM, GC/EH performance, debugger or any target product.",
+    "Original root/known PIDFD readiness, actual wait/reap, current init-only cgroup and original ticket retirement before returning the lane."
+  ],
+  "resources": {
+    "aggregate_owned_RSS_soft_bytes": 8589934592,
+    "disk_reserve_bytes": 8589934592,
+    "execute_cpu_set": "16-31",
+    "file_max_bytes": 536870912,
+    "kernel_memory_max_bytes": 68719476736,
+    "log_max_bytes": 33554432,
+    "mac_native": false,
+    "max_new_output_bytes": 1048576,
+    "original_cpu_set": "0,2,4,6,16-31",
+    "swap_max_bytes": 0
+  },
+  "schema": "uwvm.qemu.normal-Core3-output-official-literal4-source-plan.v1",
+  "scope": "Only official parse/validate/byte-dump of a normal successful modern Core3 Wasm output fixture. No user-product execution or new WASI implementation. Original keeper finite guardian/ticket required.",
+  "source_directory": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/core3-normal-features-stdout-oracle-source-20261003-r1",
+  "source_manifest": {
+    "bytes": 1113,
+    "path": "/tmp/uwvm-core3-normal-features-stdout-source-frozen-20261003-r1/manifest.json",
+    "sha256": "3130a30536a61870d6162ff01d67c59973c210b6277571ff5f17fb7f7010a871",
+    "source_tar": {
+      "bytes": 2978,
+      "path": "/tmp/uwvm-core3-normal-features-stdout-source-frozen-20261003-r1/source.tar.gz",
+      "sha256": "8b05ea107a65e0803243d30a80b7d53daf067d03edebe9d302c8a7ce163a1a7b"
+    }
+  },
+  "source_only": true,
+  "tool_and_candidate_providers": {
+    "ELF_interpreter": "/lib64/ld-linux-x86-64.so.2",
+    "ELF_machine": 62,
+    "actual_wrapper_tokens": [
+      {
+        "bytes": 10832184,
+        "path": "/usr/bin/env",
+        "real_path": "/usr/lib/cargo/bin/coreutils/env",
+        "sha256": "2a9b9ccf4e9724a6d6d8c97c835c9932223fbdefc9706fef9d0dfef7a9076739"
+      },
+      {
+        "bytes": 31256,
+        "path": "/usr/bin/taskset",
+        "real_path": "/usr/bin/taskset",
+        "sha256": "77f0448b62a216931c44f76492bde77fc26c9c32738470b2c4acca9b083922d2"
+      }
+    ],
+    "candidate_dependencies": {
+      "ld-linux-x86-64.so.2": [
+        {
+          "bytes": 254864,
+          "path": "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+          "real_path": "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+          "sha256": "223b94a42758f2434da331cc0aa62db1af5b456481762c5caceefa1a2d1eb8fb"
+        }
+      ],
+      "libc.so.6": [
+        {
+          "bytes": 2186512,
+          "path": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "real_path": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "sha256": "d763925433ff9b757390549e1b20c085f5e6de27ae700fe89194178d96a8a2b0"
+        }
+      ],
+      "libdl.so.2": [
+        {
+          "bytes": 14408,
+          "path": "/usr/lib/x86_64-linux-gnu/libdl.so.2",
+          "real_path": "/usr/lib/x86_64-linux-gnu/libdl.so.2",
+          "sha256": "d822d2db61dfc44ba839ebd6d3552dcd2030e1b762f13f35b25702017e5fe707"
+        }
+      ],
+      "libgcc_s.so.1": [
+        {
+          "bytes": 187120,
+          "path": "/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+          "real_path": "/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+          "sha256": "9d339ecb409578d6a5d587e6c537a8f9589b8a13fefba30d167433a4b5758bee"
+        }
+      ],
+      "libm.so.6": [
+        {
+          "bytes": 1198376,
+          "path": "/usr/lib/x86_64-linux-gnu/libm.so.6",
+          "real_path": "/usr/lib/x86_64-linux-gnu/libm.so.6",
+          "sha256": "670fb59bd462ee2f833e2ed7c0a1814e0dcdbec0b8bfa048bec46e2e6fd66334"
+        }
+      ],
+      "libpthread.so.0": [
+        {
+          "bytes": 14408,
+          "path": "/usr/lib/x86_64-linux-gnu/libpthread.so.0",
+          "real_path": "/usr/lib/x86_64-linux-gnu/libpthread.so.0",
+          "sha256": "c57a9c92bbd4dc724654c5e4cea774a28f772ba83b7c1804ccc8d9d364c1576b"
+        }
+      ]
+    },
+    "interpreter_pin": {
+      "bytes": 254864,
+      "path": "/lib64/ld-linux-x86-64.so.2",
+      "real_path": "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+      "sha256": "223b94a42758f2434da331cc0aa62db1af5b456481762c5caceefa1a2d1eb8fb"
+    },
+    "needed": [
+      "libgcc_s.so.1",
+      "libpthread.so.0",
+      "libm.so.6",
+      "libdl.so.2",
+      "libc.so.6",
+      "ld-linux-x86-64.so.2"
+    ],
+    "scope": "host-file metadata only; no tool version/help/test executed or loaded maps qualified",
+    "wasm_tools": {
+      "bytes": 20155568,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasm-tools-1.259.0-x86_64-linux/wasm-tools",
+      "real_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasm-tools-1.259.0-x86_64-linux/wasm-tools",
+      "sha256": "115d5986a8a1aeb112a5f2d98209c144f70c26188a5d41e266698a1e20de4ed1"
+    }
+  },
+  "tool_metadata": {
+    "bytes": 3089,
+    "path": "/tmp/uwvm-wasm-tools-1259-current-readonly-file-metadata-20261003-r1.json",
+    "scope": "historical readonly ELF candidate metadata only; actual version and loaded maps false",
+    "sha256": "0b3c7cbd61fcc0ac52a67d8e2238b9c97f7fd9443a65147b50bde475debb7309"
+  }
+}

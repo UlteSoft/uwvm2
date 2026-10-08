@@ -1,0 +1,188 @@
+--- a/llvm/lib/CodeGen/AsmPrinter/AsmPrinter.cpp
++++ b/llvm/lib/CodeGen/AsmPrinter/AsmPrinter.cpp
+@@ -34,10 +34,11 @@
+ #include "llvm/Analysis/MemoryLocation.h"
+ #include "llvm/Analysis/OptimizationRemarkEmitter.h"
+ #include "llvm/BinaryFormat/COFF.h"
+ #include "llvm/BinaryFormat/Dwarf.h"
+ #include "llvm/BinaryFormat/ELF.h"
++#include "llvm/BinaryFormat/MachO.h"
+ #include "llvm/CodeGen/AsmPrinterAnalysis.h"
+ #include "llvm/CodeGen/BasicBlockSectionsProfileReader.h"
+ #include "llvm/CodeGen/GCMetadata.h"
+ #include "llvm/CodeGen/GCMetadataPrinter.h"
+ #include "llvm/CodeGen/InsertCodePrefetch.h"
+@@ -986,10 +987,136 @@
+ /// \p Size - The size of the integer (in bytes) to emit.
+ void AsmPrinter::emitDebugValue(const MCExpr *Value, unsigned Size) const {
+   OutStreamer->emitValue(Value, Size);
+ }
+ 
++// UWVM downstream object metadata, not runtime/native-address authority.
++// Disabled modules retain their original instruction/section emission. A marked
++// module records ALL emitted MachineFunction definitions, including raw/unknown
++// bodies. Actual object symbols/aliases/inline-asm claims must INDEPENDENTLY
++// remain in the complete cold ownership conflict ledger (not this role table).
++static bool hasUWVMNativeOwnerTable(const Module &M, const TargetMachine &TM) {
++  Metadata *Flag = M.getModuleFlag("uwvm.native.code-owner.table.version");
++  if (!Flag)
++    return false;
++  auto *Version = mdconst::dyn_extract<ConstantInt>(Flag);
++  if (!Version || Version->getBitWidth() != 32 || Version->getValue() != 2)
++    return false;
++  const Triple &TT = TM.getTargetTriple();
++  const unsigned PointerBytes = TM.getMCAsmInfo().getCodePointerSize();
++  return (PointerBytes == 4 || PointerBytes == 8) &&
++         PointerBytes == TM.getProgramPointerSize() &&
++         (TT.isOSBinFormatELF() || TT.isOSBinFormatCOFF() ||
++          TT.isOSBinFormatMachO());
++}
++
++static void emitUWVMNativeOwnerRecord(MCContext &Context, MCStreamer &Out,
++                                      const MachineFunction &MF,
++                                      const TargetMachine &TM,
++                                      MCSymbol *TextBegin,
++                                      MCSymbol *CodeEnd,
++                                      MCSymbol *ObjectEntry,
++                                      MCSymbol *LocalObjectEntry) {
++  const Function &F = MF.getFunction();
++  // Actual emitting Function/MCContext own all bounded names. emitBytes copies
++  // them synchronously; MC symbol expressions remain owned by this live context
++  // until genuine object fixups finish. No runtime pointer escapes from here.
++  StringRef Name = F.getName();
++  StringRef EntryName = ObjectEntry ? ObjectEntry->getName() : StringRef();
++  StringRef LocalName = LocalObjectEntry ? LocalObjectEntry->getName() : StringRef();
++  const auto BoundedName = [](StringRef Value, bool Optional) {
++    return (Optional || !Value.empty()) && Value.size() <= 65535 &&
++           !Value.contains('\0');
++  };
++  const bool CompleteName = BoundedName(Name, false) &&
++                            BoundedName(EntryName, false) &&
++                            BoundedName(LocalName, LocalObjectEntry == nullptr) &&
++                            (LocalName.empty() || LocalName != EntryName);
++  if (!CompleteName) {
++    Name = StringRef();
++    EntryName = StringRef();
++    LocalName = StringRef(); // preserve the complete bounded unknown body claim.
++  }
++  const unsigned PointerBytes = TM.getMCAsmInfo().getCodePointerSize();
++  if ((PointerBytes != 4 && PointerBytes != 8) ||
++      PointerBytes != TM.getProgramPointerSize())
++    return; // hasUWVMNativeOwnerTable rejects this complete module shape.
++  const Triple &TT = TM.getTargetTriple();
++  MCSection *Records = nullptr;
++  if (TT.isOSBinFormatELF())
++    Records = Context.getELFSection(".uwvm.native.owners", ELF::SHT_PROGBITS,
++                                    ELF::SHF_ALLOC);
++  else if (TT.isOSBinFormatCOFF())
++    Records = Context.getCOFFSection(".uwvm$NO",
++        COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ);
++  else if (TT.isOSBinFormatMachO())
++    Records = Context.getMachOSection("__DATA", "__uwvm_nowners",
++        MachO::S_REGULAR, SectionKind::getReadOnlyWithRel());
++  if (!Records)
++    return;
++
++  // Role is descriptive DATA. Neither this attribute, an IR name nor the wire
++  // record grants Wasm identity, an execution lease or a native code capability.
++  unsigned Role = 0;
++  auto RoleAttr = F.getFnAttribute("uwvm.native.code-owner.role");
++  if (RoleAttr.isStringAttribute()) {
++    StringRef Value = RoleAttr.getValueAsString();
++    if (Value == "1") Role = 1;
++    else if (Value == "2") Role = 2;
++    else if (Value == "3") Role = 3;
++  }
++  // The first contract admits ONE continuous text body only. Split sections,
++  // prefix/prologue DATA or an unproved section shape are unknown claims. They
++  // remain records but must not acquire typed code/read/step authorization.
++  const bool Continuous = CompleteName && TextBegin && CodeEnd &&
++                          !MF.hasBBSections() && !F.hasPrefixData() &&
++                          !F.hasPrologueData() && MF.getSection() &&
++                          MF.getSection()->isText();
++  if (!CompleteName)
++    Role = 0;
++  const uint32_t RawBytes = 32 + 2 * PointerBytes + Name.size() +
++                            EntryName.size() + LocalName.size();
++  const uint32_t RecordBytes = alignTo(RawBytes, PointerBytes);
++  Out.pushSection();
++  Out.switchSection(Records);
++  Out.emitValueToAlignment(Align(PointerBytes));
++  Out.emitBytes(StringRef("UWVMNE2\0", 8));
++  Out.emitIntValue(2, 1); // exact record revision
++  Out.emitIntValue(PointerBytes, 1);
++  Out.emitIntValue(TM.getMCAsmInfo().isLittleEndian() ? 1 : 2, 1);
++  Out.emitIntValue(Continuous ? 1 : 0, 1);
++  Out.emitIntValue(Role, 1);
++  Out.emitZeros(3);
++  Out.emitIntValue(Name.size(), 4);
++  Out.emitIntValue(EntryName.size(), 4);
++  Out.emitIntValue(LocalName.size(), 4);
++  Out.emitIntValue(RecordBytes, 4);
++  // These are genuine same-object text-label relocations. In PPC ELFv1,
++  // CurrentFnBegin names TEXT while CurrentFnSym names an .opd descriptor.
++  // Never normalize a loaded text pointer through descriptor word0.
++  if (TextBegin)
++    Out.emitValue(MCSymbolRefExpr::create(TextBegin, Context), PointerBytes);
++  else
++    Out.emitZeros(PointerBytes); // unknown endpoint, cannot authorize code.
++  if (CodeEnd)
++    Out.emitValue(MCSymbolRefExpr::create(CodeEnd, Context), PointerBytes);
++  else
++    Out.emitZeros(PointerBytes); // unknown endpoint claim remains in the table.
++  Out.emitBytes(Name);
++  // These exact object names were already generated by the actual emitting
++  // TargetMachine/GlobalValue. No guessed prefix/fastcall/private-label rule.
++  // PPC ObjectEntry may name .opd DATA; only the two TEXT label relocations
++  // describe body offsets. Entry/local names never grant native permission.
++  Out.emitBytes(EntryName);
++  Out.emitBytes(LocalName);
++  Out.emitZeros(RecordBytes - RawBytes);
++  // Restore the exact previous section/subsection; the side table emits no
++  // instructions, code alignment, target trailer or executable allocation.
++  if (!Out.popSection())
++    Context.reportError(SMLoc(), "UWVM native owner record section restore failed");
++}
++
+ void AsmPrinter::emitFunctionHeaderComment() {}
+ 
+ void AsmPrinter::emitFunctionPrefix(ArrayRef<const Constant *> Prefix) {
+   const Function &F = MF->getFunction();
+   if (!MAI.hasSubsectionsViaSymbols()) {
+@@ -2441,10 +2568,22 @@
+       continue;
+     OutStreamer->AddComment("Address of block that was removed by CodeGen");
+     OutStreamer->emitLabel(Sym);
+   }
+ 
++  // Before target-specific DATA/trailers (e.g. PPC traceback), emit the real
++  // code-end label for an explicitly selected UWVM metadata module. Labels do
++  // not add instructions. The independent MC policy still excludes literal
++  // islands/padding and proves all successors before any real trap gate opens.
++  if (hasUWVMNativeOwnerTable(*F.getParent(), TM)) {
++    MCSymbol *CodeEnd = createTempSymbol("uwvm_code_end");
++    OutStreamer->emitLabel(CodeEnd);
++    emitUWVMNativeOwnerRecord(OutContext, *OutStreamer, *MF, TM,
++                              CurrentFnBegin, CodeEnd,
++                              CurrentFnSym, CurrentFnBeginLocal);
++  }
++
+   // Emit target-specific gunk after the function body.
+   emitFunctionBodyEnd();
+ 
+   // Even though wasm supports .type and .size in general, function symbols
+   // are automatically sized.
+@@ -3221,11 +3360,12 @@
+       F.hasFnAttribute("function-instrument") ||
+       F.hasFnAttribute("xray-instruction-threshold") ||
+       needFuncLabels(MF, *this) || NeedsLocalForSize ||
+       MF.getTarget().Options.EmitStackSizeSection ||
+       MF.getTarget().Options.EmitCallGraphSection ||
+-      MF.getTarget().Options.BBAddrMap) {
++      MF.getTarget().Options.BBAddrMap ||
++      hasUWVMNativeOwnerTable(*F.getParent(), TM)) {
+     CurrentFnBegin = createTempSymbol("func_begin");
+     if (NeedsLocalForSize)
+       CurrentFnSymForSize = CurrentFnBegin;
+   }
+ 

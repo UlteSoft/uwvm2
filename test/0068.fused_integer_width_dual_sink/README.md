@@ -1,0 +1,13 @@
+# Integer-width same-walk compiler slice
+
+SOURCE-only. Mandatory predecessor is preload12 AFTER (which requires heavy16R2 AFTER). ROOT is the only LIVE publisher; no compiler, LLVM verifier, WAT tool, BMI, native runner, ASM or performance qualification has run for this source.
+
+The immediate-free `i32.wrap_i64`, `i64.extend_i32_s`, `i64.extend_i32_u` now share the one first-arity/Bot transition in pure wasm3, INT full/lazy and LLVM full/lazy. The physical LLVM helper consumes the same owned event, preserving the original `Trunc/SExt/ZExt` expression. The old LLVM path already emitted these inline; this is semantic consolidation and dual output expansion, not a claim that the three always had raw replay. No pure-validator changes under wasm1p1/wasm2.
+
+Optional dual output remains a partial compiler experiment. Its original INT bounded walker directly supplies the true ring artifact and synchronous SSA; it has no full-tiered READY consumer. Unlisted legal instructions preserve ring typing and explicitly lose only native availability. `emit_integer_width=false` retains the prior slice. No per-access memory guard, runtime opcode body, musttail implementation or ordinary register-ring emission is changed.
+
+The positive fixture executes9 numeric definitions, including signed/unsigned edge bits, mixed6 typed arguments, cached spills and default locals; its genuine called start also executes GC i31, memory64, tail call and dead lexical children bypassed by an outer branch. Five unused modern negative definitions cover wrong width, known wrong concrete type in a dead block, reference-only bottom, missing arity and noexn. The DATA component uses the actual shared kernel but cannot certify C++/native/runtime authority.
+
+Use fresh keeper-owned matched source/provider builds for every18 configuration in `finite_build_variants.json`, then `finite_tests.py` for official WAT and real physical dual component, and `run_actual_cli.py` for each product four native modes plus pure validation. These runners do not themselves build the configs or certify cached ring/musttail; actual ELF/MD/target/ASM and source pins must be recorded under the original64GiB Linux cgroup. Failed optional IR work quota is not an RSS/OOM bound. No Mac execution.
+
+Core3 authoritative rules: https://webassembly.github.io/spec/core/valid/instructions.html#numeric-instructions and https://webassembly.github.io/spec/core/exec/numerics.html#integer-operations. Wrap is modulo2^32; unsigned extension preserves the32-bit unsigned value; signed extension sign-interprets32 bits then converts to64-bit two's complement. The same arity kernel protects the current frame prefix and accepts only unconstrained value Bot, never reference-only bottom as numeric.

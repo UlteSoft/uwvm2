@@ -6,7 +6,7 @@ case wasm1_code::i32_clz:
 {
     // Unary integer ops preserve stack depth. Local-get fusion avoids pushing a temporary value only
     // to consume it in the next dispatch.
-    validate_numeric_unary(u8"i32.clz", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x67u>(u8"i32.clz");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
@@ -26,7 +26,7 @@ case wasm1_code::i32_clz:
 }
 case wasm1_code::i32_ctz:
 {
-    validate_numeric_unary(u8"i32.ctz", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x68u>(u8"i32.ctz");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
@@ -46,7 +46,7 @@ case wasm1_code::i32_ctz:
 }
 case wasm1_code::i32_popcnt:
 {
-    validate_numeric_unary(u8"i32.popcnt", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x69u>(u8"i32.popcnt");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
@@ -69,7 +69,7 @@ case wasm1_code::i32_add:
 {
     // Addition is a high-frequency fusion hub: it can fold constants, combine with local updates,
     // feed branch patterns, and form reduction/MAC chains while preserving Wasm wraparound semantics.
-    validate_numeric_binary(u8"i32.add", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x6au>(u8"i32.add");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -113,10 +113,17 @@ case wasm1_code::i32_add:
                 {
                     wasm_u32 tmp_local_index{};
                     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                    // local.tee <localidx> [possibly br_if] ...
+                    // [opcode][bounded LEB bytes ............] unsafe (could be code_end)
+                    //  ^^ code_curr; code_curr + 1 is in [code_curr, code_end] because code_curr != code_end.
+                    // parse_by_scan consumes only [code_curr + 1, code_end) and may return code_end.
                     auto const [next_code, parse_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr + 1),
                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                                ::fast_io::mnp::leb128_get(tmp_local_index))};
                     if(parse_err != ::fast_io::parse_code::ok) { return false; }
+                    // local.tee <localidx> [br_if or other opcode] ...
+                    // [bounded opcode/LEB prefix][safe if below code_end] unsafe (could be code_end)
+                    //                             ^^ next_code_bytes: dereference only after equality check.
                     auto const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
                     if(next_code_bytes == code_end) { return false; }
                     wasm1_code after_tee{};  // init
@@ -477,7 +484,7 @@ case wasm1_code::i32_add:
 }
 case wasm1_code::i32_sub:
 {
-    validate_numeric_binary(u8"i32.sub", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x6bu>(u8"i32.sub");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -563,7 +570,7 @@ case wasm1_code::i32_sub:
 }
 case wasm1_code::i32_mul:
 {
-    validate_numeric_binary(u8"i32.mul", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x6cu>(u8"i32.mul");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -661,7 +668,7 @@ case wasm1_code::i32_div_s:
 {
     // Signed division must stay in a dedicated runtime helper because Wasm traps on divide-by-zero
     // and on INT_MIN / -1, unlike ordinary C++ signed division behavior.
-    validate_numeric_binary(u8"i32.div_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x6du>(u8"i32.div_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY
@@ -688,7 +695,7 @@ case wasm1_code::i32_div_s:
 }
 case wasm1_code::i32_div_u:
 {
-    validate_numeric_binary(u8"i32.div_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x6eu>(u8"i32.div_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY
@@ -713,7 +720,7 @@ case wasm1_code::i32_div_u:
 }
 case wasm1_code::i32_rem_s:
 {
-    validate_numeric_binary(u8"i32.rem_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x6fu>(u8"i32.rem_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -752,7 +759,7 @@ case wasm1_code::i32_rem_s:
 }
 case wasm1_code::i32_rem_u:
 {
-    validate_numeric_binary(u8"i32.rem_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x70u>(u8"i32.rem_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -811,7 +818,7 @@ case wasm1_code::i32_and:
 {
     // Bitwise operators are common in hash/crypto kernels, so the combine path keeps local and
     // immediate operands visible long enough to build single-dispatch update helpers.
-    validate_numeric_binary(u8"i32.and", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x71u>(u8"i32.and");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -923,7 +930,7 @@ case wasm1_code::i32_and:
 }
 case wasm1_code::i32_or:
 {
-    validate_numeric_binary(u8"i32.or", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x72u>(u8"i32.or");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -1009,7 +1016,7 @@ case wasm1_code::i32_or:
 }
 case wasm1_code::i32_xor:
 {
-    validate_numeric_binary(u8"i32.xor", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x73u>(u8"i32.xor");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -1165,7 +1172,7 @@ case wasm1_code::i32_xor:
 }
 case wasm1_code::i32_shl:
 {
-    validate_numeric_binary(u8"i32.shl", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x74u>(u8"i32.shl");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -1265,7 +1272,7 @@ case wasm1_code::i32_shl:
 }
 case wasm1_code::i32_shr_s:
 {
-    validate_numeric_binary(u8"i32.shr_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x75u>(u8"i32.shr_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -1338,7 +1345,7 @@ case wasm1_code::i32_shr_s:
 }
 case wasm1_code::i32_shr_u:
 {
-    validate_numeric_binary(u8"i32.shr_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x76u>(u8"i32.shr_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -1418,7 +1425,7 @@ case wasm1_code::i32_shr_u:
 }
 case wasm1_code::i32_rotl:
 {
-    validate_numeric_binary(u8"i32.rotl", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x77u>(u8"i32.rotl");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -1429,13 +1436,37 @@ case wasm1_code::i32_rotl:
         if(!is_polymorphic && code_curr != code_end) { ::std::memcpy(::std::addressof(next_op), code_curr, sizeof(next_op)); }
         if(!is_polymorphic && next_op == wasm1_code::local_tee)
         {
-            emit_opfunc_to(bytecode,
-                           translate::get_uwvmint_i32_binop_imm_stack_local_tee_fptr_from_tuple<
-                               CompileOption,
-                               ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::rotl>(curr_stacktop, interpreter_tuple));
-            emit_imm_to(bytecode, conbine_pending.imm_i32);
-            conbine_pending.kind = conbine_pending_kind::none;
-            break;
+            // br_if may replace the local.tee opfunc slot in place. This mega-op skips that slot,
+            // then would interpret the branch-target immediate as its next opfunc pointer.
+            bool const local_tee_followed_by_br_if{
+                [&]() constexpr UWVM_THROWS
+                {
+                    wasm_u32 tmp_local_index{};
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                    // local.tee <localidx> [possibly br_if] ... | code_end
+                    // [opcode][bounded LEB bytes ............] | one-past is not dereferenced
+                    // ^^ code_curr; next_op == local_tee proves code_curr < code_end, so +1 <= code_end.
+                    // parse_by_scan consumes only [code_curr + 1, code_end).
+                    auto const [next_code, parse_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr + 1),
+                                                                               reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                               ::fast_io::mnp::leb128_get(tmp_local_index))};
+                    if(parse_err != ::fast_io::parse_code::ok) { return false; }
+                    auto const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
+                    if(next_code_bytes == code_end) { return false; }
+                    wasm1_code after_tee{};
+                    ::std::memcpy(::std::addressof(after_tee), next_code_bytes, sizeof(after_tee));
+                    return after_tee == wasm1_code::br_if;
+                }()};
+            if(!local_tee_followed_by_br_if)
+            {
+                emit_opfunc_to(bytecode,
+                               translate::get_uwvmint_i32_binop_imm_stack_local_tee_fptr_from_tuple<
+                                   CompileOption,
+                                   ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::rotl>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(bytecode, conbine_pending.imm_i32);
+                conbine_pending.kind = conbine_pending_kind::none;
+                break;
+            }
         }
 # endif
         emit_opfunc_to(
@@ -1526,7 +1557,7 @@ case wasm1_code::i32_rotl:
 }
 case wasm1_code::i32_rotr:
 {
-    validate_numeric_binary(u8"i32.rotr", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_i32_numeric.template operator()<0x78u>(u8"i32.rotr");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -1602,7 +1633,7 @@ case wasm1_code::i32_rotr:
 }
 case wasm1_code::i64_clz:
 {
-    validate_numeric_unary(u8"i64.clz", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x79u>(u8"i64.clz");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
@@ -1622,7 +1653,7 @@ case wasm1_code::i64_clz:
 }
 case wasm1_code::i64_ctz:
 {
-    validate_numeric_unary(u8"i64.ctz", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x7au>(u8"i64.ctz");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
@@ -1642,7 +1673,7 @@ case wasm1_code::i64_ctz:
 }
 case wasm1_code::i64_popcnt:
 {
-    validate_numeric_unary(u8"i64.popcnt", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x7bu>(u8"i64.popcnt");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
@@ -1664,7 +1695,7 @@ case wasm1_code::i64_add:
 {
     // The i64 family mirrors the i32 fusion strategy, but immediates and shift counts have wider
     // storage requirements and must not reuse i32-only helpers.
-    validate_numeric_binary(u8"i64.add", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x7cu>(u8"i64.add");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -1975,7 +2006,7 @@ case wasm1_code::i64_add:
 }
 case wasm1_code::i64_sub:
 {
-    validate_numeric_binary(u8"i64.sub", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x7du>(u8"i64.sub");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -2069,7 +2100,7 @@ case wasm1_code::i64_sub:
 }
 case wasm1_code::i64_mul:
 {
-    validate_numeric_binary(u8"i64.mul", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x7eu>(u8"i64.mul");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -2213,7 +2244,7 @@ case wasm1_code::i64_mul:
 }
 case wasm1_code::i64_div_s:
 {
-    validate_numeric_binary(u8"i64.div_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x7fu>(u8"i64.div_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY
@@ -2238,7 +2269,7 @@ case wasm1_code::i64_div_s:
 }
 case wasm1_code::i64_div_u:
 {
-    validate_numeric_binary(u8"i64.div_u", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x80u>(u8"i64.div_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY
@@ -2263,7 +2294,7 @@ case wasm1_code::i64_div_u:
 }
 case wasm1_code::i64_rem_s:
 {
-    validate_numeric_binary(u8"i64.rem_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x81u>(u8"i64.rem_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY
@@ -2288,7 +2319,7 @@ case wasm1_code::i64_rem_s:
 }
 case wasm1_code::i64_rem_u:
 {
-    validate_numeric_binary(u8"i64.rem_u", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x82u>(u8"i64.rem_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY
@@ -2313,7 +2344,7 @@ case wasm1_code::i64_rem_u:
 }
 case wasm1_code::i64_and:
 {
-    validate_numeric_binary(u8"i64.and", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x83u>(u8"i64.and");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -2404,7 +2435,7 @@ case wasm1_code::i64_and:
 }
 case wasm1_code::i64_or:
 {
-    validate_numeric_binary(u8"i64.or", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x84u>(u8"i64.or");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -2498,7 +2529,7 @@ case wasm1_code::i64_or:
 }
 case wasm1_code::i64_xor:
 {
-    validate_numeric_binary(u8"i64.xor", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x85u>(u8"i64.xor");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -2645,7 +2676,7 @@ case wasm1_code::i64_xor:
 }
 case wasm1_code::i64_shl:
 {
-    validate_numeric_binary(u8"i64.shl", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x86u>(u8"i64.shl");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -2739,7 +2770,7 @@ case wasm1_code::i64_shl:
 }
 case wasm1_code::i64_shr_s:
 {
-    validate_numeric_binary(u8"i64.shr_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x87u>(u8"i64.shr_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -2833,7 +2864,7 @@ case wasm1_code::i64_shr_s:
 }
 case wasm1_code::i64_shr_u:
 {
-    validate_numeric_binary(u8"i64.shr_u", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x88u>(u8"i64.shr_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -2927,7 +2958,7 @@ case wasm1_code::i64_shr_u:
 }
 case wasm1_code::i64_rotl:
 {
-    validate_numeric_binary(u8"i64.rotl", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x89u>(u8"i64.rotl");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -3051,7 +3082,7 @@ case wasm1_code::i64_rotl:
 }
 case wasm1_code::i64_rotr:
 {
-    validate_numeric_binary(u8"i64.rotr", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
+    (void)validate_i64_numeric.template operator()<0x8au>(u8"i64.rotr");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS

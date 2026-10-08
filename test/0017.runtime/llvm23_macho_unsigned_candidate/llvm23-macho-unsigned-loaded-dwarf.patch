@@ -1,0 +1,137 @@
+--- a/llvm/lib/Object/RelocationResolver.cpp
++++ b/llvm/lib/Object/RelocationResolver.cpp
+@@ -17,6 +17,7 @@
+ #include "llvm/BinaryFormat/MachO.h"
+ #include "llvm/BinaryFormat/Wasm.h"
+ #include "llvm/Object/ELFObjectFile.h"
++#include "llvm/Object/MachO.h"
+ #include "llvm/Object/ObjectFile.h"
+ #include "llvm/Object/SymbolicFile.h"
+ #include "llvm/Support/Casting.h"
+@@ -712,8 +713,26 @@
+ 
+ static uint64_t resolveMachOX86_64(uint64_t Type, uint64_t Offset, uint64_t S,
+                                    uint64_t LocData, int64_t /*Addend*/) {
++  // External relocations receive the loaded symbol address in S. Local
++  // section relocations receive a load delta: DWARF's in-place value already
++  // includes the original section address. Do not add that base twice.
+   if (Type == MachO::X86_64_RELOC_UNSIGNED)
+-    return S;
++    return S + LocData;
++  llvm_unreachable("Invalid relocation type");
++}
++
++static bool supportsMachOAArch64(uint64_t Type) {
++  return Type == MachO::ARM64_RELOC_UNSIGNED;
++}
++
++static uint64_t resolveMachOAArch64(uint64_t Type, uint64_t /*Offset*/,
++                                   uint64_t S, uint64_t LocData,
++                                   int64_t /*Addend*/) {
++  // ARM64_RELOC_UNSIGNED also stores its addend in the relocation field.
++  // Paired SUBTRACTOR/ADDEND and instruction/authenticated fixups are not
++  // admitted by this resolver.
++  if (Type == MachO::ARM64_RELOC_UNSIGNED)
++    return S + LocData;
+   llvm_unreachable("Invalid relocation type");
+ }
+ 
+@@ -891,6 +910,8 @@
+   } else if (Obj.isMachO()) {
+     if (Obj.getArch() == Triple::x86_64)
+       return {supportsMachOX86_64, resolveMachOX86_64};
++    if (Obj.getArch() == Triple::aarch64)
++      return {supportsMachOAArch64, resolveMachOAArch64};
+     return {nullptr, nullptr};
+   } else if (Obj.isWasm()) {
+     if (Obj.getArch() == Triple::wasm32)
+@@ -933,7 +954,20 @@
+       }
+     }
+ 
+-    return Resolver(R.getType(), R.getOffset(), S, LocData, Addend);
++    uint64_t Result = Resolver(R.getType(), R.getOffset(), S, LocData, Addend);
++    if (auto *MObj = dyn_cast<MachOObjectFile>(Obj)) {
++      // The stateless resolver receives no field width. A 32-bit in-place
++      // negative addend is zero-extended by DWARFDataExtractor, so truncate
++      // the complete result to its real field width after unsigned arithmetic.
++      // The DWARF caller admits only non-PC-relative 4/8-byte unsigned fixups.
++      if (((MObj->getArch() == Triple::x86_64 &&
++            R.getType() == MachO::X86_64_RELOC_UNSIGNED) ||
++           (MObj->getArch() == Triple::aarch64 &&
++            R.getType() == MachO::ARM64_RELOC_UNSIGNED)) &&
++          MObj->getRelocationLength(R.getRawDataRefImpl()) == 2)
++        return static_cast<uint32_t>(Result);
++    }
++    return Result;
+   }
+ 
+   // Sometimes the caller might want to use its own specific implementation of
+--- a/llvm/lib/DebugInfo/DWARF/DWARFContext.cpp
++++ b/llvm/lib/DebugInfo/DWARF/DWARFContext.cpp
+@@ -1925,6 +1925,26 @@
+                                        std::map<SymbolRef, SymInfo> &Cache) {
+   SymInfo Ret = {0, (uint64_t)-1LL};
+   object::section_iterator RSec = Obj.section_end();
++  // Validate Mach-O's raw relocation identity before getSymbol() can form an
++  // unchecked symbol-table cursor. SupportsRelocation sees only r_type; it
++  // cannot validate r_extern, r_pcrel, r_length or a symbol/section ordinal.
++  if (auto *MObj = dyn_cast<MachOObjectFile>(&Obj)) {
++    auto Info = MObj->getRelocation(Reloc.getRawDataRefImpl());
++    if (MObj->isRelocationScattered(Info))
++      return createError("scattered Mach-O DWARF relocation is unsupported");
++    if (MObj->getPlainRelocationExternal(Info) &&
++        MObj->getPlainRelocationSymbolNum(Info) >=
++            MObj->getSymtabLoadCommand().nsyms)
++      return createError("invalid Mach-O DWARF relocation symbol index");
++    bool Unsigned =
++        (MObj->getArch() == Triple::x86_64 &&
++         Reloc.getType() == MachO::X86_64_RELOC_UNSIGNED) ||
++        (MObj->getArch() == Triple::aarch64 &&
++         Reloc.getType() == MachO::ARM64_RELOC_UNSIGNED);
++    if (Unsigned && (MObj->getAnyRelocationPCRel(Info) ||
++                     MObj->getAnyRelocationLength(Info) < 2))
++      return createError("unsupported Mach-O DWARF unsigned relocation flags");
++  }
+   object::symbol_iterator Sym = Reloc.getSymbol();
+ 
+   std::map<SymbolRef, SymInfo>::iterator CacheIt = Cache.end();
+@@ -1950,8 +1970,19 @@
+     RSec = *SectOrErr;
+     Ret.Address = *SymAddrOrErr;
+   } else if (auto *MObj = dyn_cast<MachOObjectFile>(&Obj)) {
++    auto Info = MObj->getRelocation(Reloc.getRawDataRefImpl());
+     RSec = MObj->getRelocationSection(Reloc.getRawDataRefImpl());
+-    Ret.Address = RSec->getAddress();
++    // R_ABS denotes a valid absolute in-place value and has no target section.
++    // An invalid nonzero ordinal also produces section_end(); distinguish it
++    // before dereferencing a section or silently treating it as absolute.
++    if (RSec == Obj.section_end() &&
++        MObj->getPlainRelocationSymbolNum(Info) != MachO::R_ABS)
++      return createError("invalid Mach-O DWARF relocation section ordinal");
++    // A local Mach-O in-place value already contains the original section
++    // address plus label offset/addend. Starting at zero makes the existing
++    // loaded-section adjustment below produce only LoadedBase - OriginalBase.
++    // External symbols retain their complete loaded symbol address above.
++    Ret.Address = 0;
+   }
+ 
+   if (RSec != Obj.section_end())
+@@ -2280,10 +2311,14 @@
+       RelocationResolver Resolver;
+       std::tie(Supports, Resolver) = getRelocationResolver(Obj);
+       for (const RelocationRef &Reloc : Section.relocations()) {
+-        // FIXME: it's not clear how to correctly handle scattered
+-        // relocations.
+-        if (isRelocScattered(Obj, Reloc))
++        // Scattered relocations have no supported DWARF load-delta contract.
++        // Report the failure so a loaded-object client can revoke the complete
++        // address map rather than silently retaining unrelocated coordinates.
++        if (isRelocScattered(Obj, Reloc)) {
++          HandleError(createError(
++              "scattered Mach-O DWARF relocation is unsupported"));
+           continue;
++        }
+ 
+         Expected<SymInfo> SymInfoOrErr =
+             getSymbolInfo(Obj, Reloc, L, AddrCache);

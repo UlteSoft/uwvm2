@@ -1,0 +1,1 @@
+(module (table i64 2 4 i31ref) (func (export "_start") i64.const 0 i32.const 31 ref.i31 table.set 0 i64.const 0 table.get 0 i31.get_s i32.const 31 i32.ne if unreachable end ref.null i31 i64.const 1 table.grow 0 i64.const 2 i64.ne if unreachable end table.size 0 i64.const 3 i64.ne if unreachable end))

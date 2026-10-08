@@ -20,23 +20,34 @@
             auto& state{*static_cast<runtime_llvm_jit_posix_unwind_probe_state*>(opaque)};
             // GetRegionStart names the registered FDE's function, unlike a guessed address+4096 interval which can
             // accidentally match an unrelated generated function. Repeated regions are distinct recursive activations.
-            auto const start{static_cast<::std::uintptr_t>(_Unwind_GetRegionStart(context))};
+            auto const start{static_cast<::std::uintptr_t>(::uwvm2::runtime::compiler::llvm_jit::native_unwind_abi::get_region_start_noexcept(context))};
             if(start == state.recursive_address)
             {
-                if(state.root_frames != 0u) { state.bad_order = true; }
+                // Broken epilogue CFI can leave the unwinder on the same
+                // recursive activation forever. This probe contains exactly
+                // three activations; reject a fourth instead of waiting for
+                // the counter to wrap. Ordinary Wasm walks have no such limit.
+                if(state.root_frames != 0u || state.recursive_frames == 3u)
+                {
+                    state.bad_order = true;
+                    return _URC_END_OF_STACK;
+                }
                 ++state.recursive_frames;
             }
             else if(start == state.root_address)
             {
                 if(state.recursive_frames != 3u) { state.bad_order = true; }
                 ++state.root_frames;
+                // The four generated frames are the complete witness. Host
+                // callers beyond its root are irrelevant to this capability.
+                return _URC_END_OF_STACK;
             }
             return _URC_NO_REASON;
         }
 
         UWVM_NOINLINE inline constexpr void runtime_llvm_jit_posix_unwind_probe_capture(void* opaque) noexcept
         {
-            static_cast<void>(_Unwind_Backtrace(runtime_llvm_jit_posix_unwind_probe_frame, opaque));
+            static_cast<void>(::uwvm2::runtime::compiler::llvm_jit::native_unwind_abi::backtrace_noexcept(runtime_llvm_jit_posix_unwind_probe_frame, opaque));
             ::std::atomic_signal_fence(::std::memory_order_seq_cst);
         }
 
@@ -106,12 +117,17 @@
             engine->finalizeObject();
             if(memory_manager_observer->has_finalization_failure()) [[unlikely]] { return false; }
             runtime_llvm_jit_posix_unwind_probe_state state{};
-            state.recursive_address = reinterpret_cast<::std::uintptr_t>(engine->getPointerToFunction(recursive));
-            state.root_address = reinterpret_cast<::std::uintptr_t>(engine->getPointerToFunction(root));
+            auto const recursive_callable{reinterpret_cast<::std::uintptr_t>(engine->getPointerToFunction(recursive))};
+            auto const root_callable{reinterpret_cast<::std::uintptr_t>(engine->getPointerToFunction(root))};
+            // The loader owns these live callable pointers. On descriptor ABIs,
+            // compare the unwinder's region with the descriptor's instruction entry,
+            // while preserving the descriptor (including TOC) for the actual call.
+            state.recursive_address = ::uwvm2::runtime::lib::details::native_function_code_address(recursive_callable);
+            state.root_address = ::uwvm2::runtime::lib::details::native_function_code_address(root_callable);
             if(state.recursive_address == 0u || state.root_address == 0u) [[unlikely]] { return false; }
             using capture_func_t = void (*)(void*) noexcept;
             using root_func_t = void (*)(void*, capture_func_t) noexcept;
-            reinterpret_cast<root_func_t>(state.root_address)(::std::addressof(state), &runtime_llvm_jit_posix_unwind_probe_capture);
+            reinterpret_cast<root_func_t>(root_callable)(::std::addressof(state), &runtime_llvm_jit_posix_unwind_probe_capture);
             return !state.bad_order && state.recursive_frames == 3u && state.root_frames == 1u;
         }
 #endif

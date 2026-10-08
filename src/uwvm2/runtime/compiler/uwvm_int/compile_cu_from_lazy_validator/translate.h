@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -33,11 +33,18 @@
 # include <memory>
 # include <type_traits>
 # include <utility>
+# include <vector>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+# include <uwvm2/validation/standard/wasm3/relaxed_simd.h>
+# include <uwvm2/validation/standard/wasm3/threads.h>
+# include <uwvm2/validation/standard/wasm3/tail_call.h>
 // import
 # include <fast_io.h>
+# include <uwvm2/uwvm/io/impl.h>
+# include <uwvm2/uwvm/utils/ansies/impl.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/utils/thread/impl.h>
@@ -48,12 +55,14 @@
 # include <uwvm2/validation/error/impl.h>
 # include <uwvm2/validation/standard/wasm1/impl.h>
 # include <uwvm2/validation/standard/wasm1p1/impl.h>
-# include <uwvm2/validation/standard/wasm2/impl.h>
+# include <uwvm2/validation/standard/wasm3/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/utils/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/optable/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/impl.h>
+# include <uwvm2/runtime/lib/uwvm_runtime.h>
+# include "checked_plan_lowering.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -245,8 +254,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         ::std::size_t primary_cu_index{SIZE_MAX};
     };
 
+    namespace details { class checked_register_ring_admission; }
+
     struct lazy_module_storage_t
     {
+        // Only initialize_checked_lazy_module_storage installs this immutable
+        // actual-source plan. Declared first, it pins parsed/type closure until
+        // all compiled symbols and delayed work have drained and are destroyed.
+        checked_integer_module_plan::owner checked_plan{};
+        // Default standard admission owns the original checked ring artifact.
+        ::std::unique_ptr<details::checked_register_ring_admission> ring_admission{};
         // The compiled symbol table has the same shape as eager compilation so interpreter dispatch does not need a lazy-only ABI.
         full_function_symbol_t compiled{};
         // Metadata is stored in module-wide arrays, allowing requests to pass around small indices instead of owning subobjects.
@@ -259,7 +276,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
     {
         // The lazy path forwards normal interpreter compile options to the eager function compiler to keep emitted code identical.
         ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option compile_options{};
-        // Validation needs parser-level module metadata. It is optional only when the caller explicitly promises prior validation.
+        // Optional parser provenance retained for callers; the fused compiler reads runtime declarations.
         parser_module_storage_t const* validator_module_storage{};
         // Validation also needs the exact feature switches used to parse that module.
         parser_feature_parameter_t const* validator_feature_parameter{};
@@ -302,6 +319,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                               ::uwvm2::validation::error::code_validation_error_impl& err,
                                               ::fast_io::parse_code pc = ::fast_io::parse_code::invalid) UWVM_THROWS
         {
+            // [caller-saved opcode/prefix] immediate bytes ... | code_end
+            // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+            // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
             err.err_curr = op_begin;
             err.err_code = ec;
             // Throw through the parser path so callers observe the same failure mechanism used by normal wasm validation.
@@ -315,6 +335,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             ::uwvm2::parser::wasm::base::wasm1p1_feature_kind feature,
             ::uwvm2::parser::wasm::base::wasm1p1_error_subject subject) UWVM_THROWS
         {
+            // [caller-saved opcode/prefix] immediate bytes ... | code_end
+            // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+            // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
             err.err_curr = op_begin;
             err.err_selectable.wasm1p1_feature_required.value = value;
             err.err_selectable.wasm1p1_feature_required.feature = feature;
@@ -330,6 +353,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             ::uwvm2::parser::wasm::base::wasm2_feature_kind feature,
             ::uwvm2::parser::wasm::base::wasm2_error_subject subject) UWVM_THROWS
         {
+            // [caller-saved opcode/prefix] immediate bytes ... | code_end
+            // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+            // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
             err.err_curr = op_begin;
             err.err_selectable.wasm2_feature_required.value = value;
             err.err_selectable.wasm2_feature_required.feature = feature;
@@ -356,7 +382,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             // Reuse the caller-provided error code so each opcode reports the immediate field that failed, not a generic scan error.
             if(parse_err != ::fast_io::parse_code::ok) [[unlikely]] { fail_lazy_split(op_begin, ec, err, parse_err); }
 
+            // LEB immediate ... code_end
+            // [safe parsed bytes] unsafe (could be code_end)
+            //                   ^^ next: successful scanner returned within the same input slice.
+            // [bounded decoded/immediate cursor] next bytes ... | end
+            // [safe consumed bytes]       | one-past is never dereferenced here
+            // ^^ code_curr: the successful scanner or checked lookahead supplies a position within the current code slice.
             code_curr = reinterpret_cast<::std::byte const*>(next);
+            // LEB immediate ... code_end
+            // [safe consumed bytes] unsafe (could be code_end)
+            //                       ^^ code_curr may be one-past; this assignment does not read it.
             return value;
         }
 
@@ -373,7 +408,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             {
                 fail_lazy_split(op_begin, code_validation_error_code::invalid_const_immediate, err, ::fast_io::parse_code::end_of_file);
             }
+            // fixed immediate[bytes] ... code_end
+            // [safe bytes            ] unsafe (could be code_end)
+            // ^^ code_curr: bytes <= remaining was checked before advancing.
             code_curr += bytes;
+            // fixed immediate[bytes] ... code_end
+            // [safe bytes            ] unsafe (could be code_end)
+            //                         ^^ code_curr may be one-past.
         }
 
         [[nodiscard]] inline constexpr wasm_byte read_u8_immediate(::std::byte const*& code_curr,
@@ -402,6 +443,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             auto const vt{static_cast<::uwvm2::parser::wasm::standard::wasm1p1::type::value_type>(type_byte)};
             if(!::uwvm2::parser::wasm::standard::wasm1p1::type::is_valid_value_type(vt)) [[unlikely]]
             {
+                // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                 err.err_curr = op_begin;
                 err.err_selectable.wasm1p1_invalid_reference_type.value = type_byte;
                 err.err_code = code_validation_error_code::wasm1p1_invalid_reference_type;
@@ -426,7 +470,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             {
                 fail_lazy_split(op_begin, code_validation_error_code::invalid_memory_index, err, ::fast_io::parse_code::end_of_file);
             }
+            // reserved memory-index byte ... code_end
+            // [safe byte                 ] unsafe (could be code_end)
+            // ^^ code_curr: equality check proved the byte exists.
             ++code_curr;
+            // [safe byte                 ] unsafe (could be code_end)
+            //                             ^^ code_curr may be one-past.
         }
 
         inline constexpr void skip_wasm1p1_block_type(::std::byte const*& code_curr,
@@ -444,6 +493,37 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             // control_op blocktype ...
             // [  safe  ] unsafe (could be the section_end)
             //            ^^ code_curr
+
+            // [control opcode][valtype or s33 index ... code_end)
+            // [safe          ] nonempty check above proves the prefix readable.
+            if(::uwvm2::validation::standard::wasm3::is_core3_extended_block_reference_prefix(
+                ::std::to_integer<unsigned>(*code_curr)))
+            {
+                auto const& policy{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(wasm_feature_parameter)};
+                auto const types_begin{curr_module.type_section_storage.type_section_begin};
+                auto const types_end{curr_module.type_section_storage.type_section_end};
+                // Both type-table endpoints are from the initializer's retained allocation or both null.
+                // [types_begin, types_end) is subtracted only when both endpoints are present.
+                // [safe                  ] no pointer moves; the count bounds concrete heap indices.
+                auto const type_count{types_begin == nullptr || types_end == nullptr ? 0uz :
+                    static_cast<::std::size_t>(types_end - types_begin)};
+                ::uwvm2::validation::standard::wasm3::recursive_type_context const empty_context{};
+                // The initializer borrows a validated, immutable Core 3 context for this module.
+                // A legacy module has no context; the decoder then classifies its bounded type table as functions.
+                auto const* const retained_context{curr_module.type_section_storage.core3_context_ptr};
+                auto const& context{retained_context == nullptr ? empty_context : *retained_context};
+                auto const carrier{::uwvm2::validation::standard::wasm3::read_core3_value_carrier(
+                    code_curr, code_end, !policy.disable_function_references, op_begin, err,
+                    type_count, nullptr, context, !policy.disable_gc, !policy.disable_exceptions)};
+                // [opcode][checked valtype] next ... code_end
+                // [safe                  ] unsafe (could be code_end)
+                //                          ^^ code_curr: bounded decoder skips the entire immediate.
+                // The Core 3 decoder has checked GC, exception and function
+                // reference gates against the exact heap. A legacy check on
+                // the projected 0x70 carrier would reject GC-only blocktypes.
+                static_cast<void>(carrier);
+                return;
+            }
 
             auto const blocktype_begin{code_curr};
             auto const blocktype{
@@ -464,6 +544,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                    first_blocktype_byte =
                                                        static_cast<wasm_byte>(static_cast<::std::uint_least8_t>(first_blocktype_byte) & 0xFFu);
 #endif
+                                                   // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                                                   // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                                                   // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                                                    err.err_curr = op_begin;
                                                    err.err_selectable.u8 = first_blocktype_byte;
                                                    err.err_code = code_validation_error_code::illegal_block_type;
@@ -541,12 +624,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 if(static_cast<::std::uint_least64_t>(blocktype) > ::std::numeric_limits<wasm_u32>::max() ||
                    static_cast<::std::size_t>(blocktype) >= all_type_count_uz) [[unlikely]]
                 {
+                    // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                    // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                    // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                     err.err_curr = op_begin;
                     err.err_selectable.illegal_type_index.type_index = blocktype > 0 ? static_cast<wasm_u32>(blocktype) : 0u;
                     err.err_selectable.illegal_type_index.all_type_count = static_cast<wasm_u32>(all_type_count_uz);
                     err.err_code = code_validation_error_code::illegal_type_index;
                     ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                 }
+                // The caller proved op_begin is the structural opcode; this borrow never advances it.
+                using opcode_name_t = ::uwvm2::utils::container::u8string_view;
+                auto const op_name{*op_begin == ::std::byte{0x02u} ? opcode_name_t{u8"block"} :
+                    *op_begin == ::std::byte{0x03u} ? opcode_name_t{u8"loop"} :
+                    *op_begin == ::std::byte{0x04u} ? opcode_name_t{u8"if"} : opcode_name_t{u8"try_table"}};
+                ::uwvm2::validation::standard::wasm3::require_core3_function_type_index_policy(
+                    curr_module.type_section_storage.core3_context_ptr, static_cast<::std::size_t>(blocktype), op_begin, op_name, err);
                 return;
             }
 
@@ -603,6 +696,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             for(::std::size_t i{begin_eu_index + 1uz}; i != end_eu_index; ++i)
             {
                 auto const curr_end{storage.execution_units.index_unchecked(i).code_end};
+                // [closed same-function execution units] | function end
+                // [bounded function-owned bytes         ] | end is exclusive
+                // ^^ code_end: the compile-unit range is function-owned; select the furthest end without dereferencing.
                 code_end = curr_end > code_end ? curr_end : code_end;
             }
             storage.compile_units.push_back({.function_index = fn.function_index,
@@ -765,6 +861,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             };
             switch(curr_opbase)
             {
+#if defined(__clang__)
+# pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wswitch" // Core 3 exception opcode extends the shared wasm1 enum.
+#endif
+                case static_cast<wasm1_code>(0x0au):
+#if defined(__clang__)
+# pragma clang diagnostic pop
+#endif
+                {
+                    ::uwvm2::validation::standard::wasm3::require_exceptions_enabled(!wasm1p1_para.disable_exceptions, 0x0au, op_begin, err);
+                    // [throw_ref] next ... code_end; outer scanner consumed the checked opcode.
+                    // [safe     ] unsafe (could be code_end)
+                    //             ^^ code_curr: no immediate, no read or movement here.
+                    // Whole-function compilation checks the operand and rejects reachable throw_ref.
+                    return;
+                }
+#if defined(__clang__)
+# pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wswitch" // Core 3 exception opcode extends the shared wasm1 enum.
+#endif
+                case static_cast<wasm1_code>(0x08u):
+#if defined(__clang__)
+# pragma clang diagnostic pop
+#endif
+                {
+                    ::uwvm2::validation::standard::wasm3::require_exceptions_enabled(!wasm1p1_para.disable_exceptions, 0x08u, op_begin, err);
+                    // [throw] tagidx ... code_end; bounded reader commits only the complete u32.
+                    // [safe ] unsafe (could be code_end)
+                    //         ^^ code_curr before decode
+                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_label_index, err);
+                    // [throw checked tagidx] next ... code_end
+                    // [safe               ] unsafe (could be code_end)
+                    //                       ^^ code_curr; whole-function compilation checks tag/payload/handler semantics.
+                    return;
+                }
                 case wasm1_code::br:
                 case wasm1_code::br_if:
                 {
@@ -785,6 +916,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                     if(target_count_exceeds_size_t || target_count_plus_default_overflows || target_count_uz + 1uz > remaining_bytes) [[unlikely]]
                     {
                         // Populate the richer selectable payload used by the standard validator for the same malformed table case.
+                        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                         err.err_curr = op_begin;
                         err.err_selectable.br_table_target_count_exceeds_remaining_bytes.target_count = target_count;
                         err.err_selectable.br_table_target_count_exceeds_remaining_bytes.remaining_bytes = remaining_bytes;
@@ -800,11 +934,83 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                     }
                     return;
                 }
+#if defined(__clang__)
+# pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wswitch" // Tail-call opcode extends the shared wasm1 enum.
+#endif
+                case static_cast<wasm1_code>(0x12u):
+#if defined(__clang__)
+# pragma clang diagnostic pop
+#endif
+                {
+                    ::uwvm2::validation::standard::wasm3::require_tail_call_enabled(!wasm1p1_para.disable_tail_call, 0x12u, op_begin, err);
+                    // [return_call] funcidx ... end
+                    // [safe       ] unsafe; bounded scanner commits after the complete u32.
+                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_function_index_encoding, err);
+                    // [return_call funcidx] ... end
+                    // [safe              ] unsafe (could be end)
+                    //                      ^^ code_curr
+                    return;
+                }
                 case wasm1_code::call:
                 {
                     (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_function_index_encoding, err);
                     return;
                 }
+#if defined(__clang__)
+# pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wswitch" // Typed-reference opcodes extend the shared wasm1 enum.
+#endif
+                case static_cast<wasm1_code>(0x14u):
+                case static_cast<wasm1_code>(0x15u):
+#if defined(__clang__)
+# pragma clang diagnostic pop
+#endif
+                {
+                    auto const tail{curr_opbase == static_cast<wasm1_code>(0x15u)};
+                    ::uwvm2::validation::standard::wasm3::require_function_references_enabled(
+                        !wasm1p1_para.disable_function_references, tail ? 0x15u : 0x14u, op_begin, err);
+                    if(tail)
+                    { ::uwvm2::validation::standard::wasm3::require_tail_call_enabled(!wasm1p1_para.disable_tail_call, 0x15u, op_begin, err); }
+                    // [call_ref/return_call_ref] typeidx ... code_end
+                    // [safe                    ] unsafe (could be code_end)
+                    //                            ^^ code_curr: bounded scanner owns the u32 advance.
+                    auto const type_index{read_leb128_immediate<wasm_u32>(
+                        code_curr, code_end, op_begin, code_validation_error_code::invalid_type_index, err)};
+                    // [opcode][complete typeidx] next ... code_end
+                    // [safe                    ] unsafe (could be code_end)
+                    //                            ^^ code_curr; the complete immediate is now validated.
+                    auto const types_begin{curr_module.type_section_storage.type_section_begin};
+                    auto const types_end{curr_module.type_section_storage.type_section_end};
+                    auto const type_count{types_begin == nullptr || types_end == nullptr ? 0uz :
+                        static_cast<::std::size_t>(types_end - types_begin)};
+                    if(static_cast<::std::size_t>(type_index) >= type_count) [[unlikely]]
+                    {
+                        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_type_index.type_index = type_index;
+                        err.err_selectable.illegal_type_index.all_type_count = static_cast<wasm_u32>(type_count);
+                        err.err_code = code_validation_error_code::illegal_type_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+                    ::uwvm2::validation::standard::wasm3::require_core3_function_type_index_policy(
+                        curr_module.type_section_storage.core3_context_ptr, static_cast<::std::size_t>(type_index),
+                        op_begin, tail ? ::uwvm2::utils::container::u8string_view{u8"return_call_ref"} :
+                                         ::uwvm2::utils::container::u8string_view{u8"call_ref"}, err);
+                    return;
+                }
+#if defined(__clang__)
+# pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wswitch" // Tail-call opcode extends the shared wasm1 enum.
+#endif
+                case static_cast<wasm1_code>(0x13u):
+#if defined(__clang__)
+# pragma clang diagnostic pop
+#endif
+                    ::uwvm2::validation::standard::wasm3::require_tail_call_enabled(!wasm1p1_para.disable_tail_call, 0x13u, op_begin, err);
+                    [[fallthrough]];
                 case wasm1_code::call_indirect:
                 {
                     // call_indirect type_index table_index ...
@@ -819,6 +1025,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                     //                          ^^ code_curr
 
                     auto const mvp_reserved_zero_byte{
+                        curr_opbase != static_cast<wasm1_code>(0x13u) &&
                         ::uwvm2::parser::wasm::standard::wasm1p1::features::uses_mvp_call_indirect_reserved_byte(wasm1p1_para)};
                     wasm_u32 table_index{};
                     if(!::uwvm2::parser::wasm::standard::wasm1p1::features::parse_call_indirect_trailing_immediate(
@@ -842,12 +1049,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         (types_begin == nullptr || types_end == nullptr) ? 0uz : static_cast<::std::size_t>(types_end - types_begin)};
                     if(static_cast<::std::size_t>(type_index) >= all_type_count_uz) [[unlikely]]
                     {
+                        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                         err.err_curr = op_begin;
                         err.err_selectable.illegal_type_index.type_index = type_index;
                         err.err_selectable.illegal_type_index.all_type_count = static_cast<wasm_u32>(all_type_count_uz);
                         err.err_code = code_validation_error_code::illegal_type_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
+
+                    ::uwvm2::validation::standard::wasm3::require_core3_function_type_index_policy(
+                        curr_module.type_section_storage.core3_context_ptr, static_cast<::std::size_t>(type_index),
+                        op_begin, curr_opbase == static_cast<wasm1_code>(0x13u) ?
+                            ::uwvm2::utils::container::u8string_view{u8"return_call_indirect"} :
+                            ::uwvm2::utils::container::u8string_view{u8"call_indirect"}, err);
 
                     // Reference Types/Core 2.0 keep the u32 grammar even when policy restricts the decoded value to zero.
                     if(!mvp_reserved_zero_byte && !wasm2_feature_enabled(wasm2_feature_kind::multiple_tables) && table_index != 0u)
@@ -900,14 +1116,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 case wasm1_code::i64_store16:
                 case wasm1_code::i64_store32:
                 {
-                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_memarg_align, err);
-                    (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_memarg_offset, err);
+                    // [opcode] memarg ... (code_end); bounded structural scan, typed validation follows materialization.
+                    ::uwvm2::validation::standard::wasm3::require_memory_immediate(
+                        ::uwvm2::validation::standard::wasm3::scan_memory_argument64(code_curr, code_end, !wasm1p1_para.disable_multi_memory, ::uwvm2::validation::standard::wasm3::uses_core3_validation_policy(wasm1p1_para)).error, op_begin, err);
+                    // [opcode memarg] ... unsafe (could be code_end); code_curr follows the complete memarg.
                     return;
                 }
                 case wasm1_code::memory_size:
                 case wasm1_code::memory_grow:
                 {
-                    skip_reserved_memory_index_byte(code_curr, code_end, op_begin, err);
+                    (void)::uwvm2::validation::standard::wasm3::read_memory_index(code_curr, code_end, op_begin, !wasm1p1_para.disable_multi_memory, err);
                     return;
                 }
                 case wasm1_code::i32_const:
@@ -956,7 +1174,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                             {
                                 fail_lazy_split(op_begin, code_validation_error_code::invalid_const_immediate, err);
                             }
-                            auto const result_type_byte{read_u8_immediate(code_curr, code_end, op_begin, err)};
+                            auto const type_begin{curr_module.type_section_storage.type_section_begin};
+                            auto const type_end{curr_module.type_section_storage.type_section_end};
+                            // [type_begin, type_end) is one retained module allocation, or an empty pair.
+                            // [safe                ] avoid subtracting two null endpoints.
+                            auto const type_count{type_begin == type_end ? 0uz : static_cast<::std::size_t>(type_end - type_begin)};
+                            ::uwvm2::validation::standard::wasm3::recursive_type_context const empty_context{};
+                            // The runtime borrows this validated context for the module lifetime; no
+                            // type-section or code cursor moves while selecting the fallback.
+                            auto const* const retained_context{curr_module.type_section_storage.core3_context_ptr};
+                            auto const& context{retained_context == nullptr ? empty_context : *retained_context};
+                            auto const result_type_byte{static_cast<wasm_byte>(::uwvm2::validation::standard::wasm3::read_core3_value_carrier(
+                                code_curr, code_end, !wasm1p1_para.disable_function_references, op_begin, err,
+                                type_count, nullptr, context, !wasm1p1_para.disable_gc,
+                                !wasm1p1_para.disable_exceptions))};
 
                             // select_t result_type_count result_type ...
                             // [                 safe               ] unsafe (could be the section_end)
@@ -964,12 +1195,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
                             // Field commits are transactional: a count-LEB decode failure leaves the cursor after the opcode;
                             // a decoded-count arity rejection or type decode failure leaves it after the count, and a
-                            // type-policy rejection follows the type byte.
-                            ensure_lazy_wasm1p1_value_type_enabled(op_begin,
-                                                                    result_type_byte,
-                                                                    wasm_feature_parameter,
-                                                                    ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction,
-                                                                    err);
+                            // type-policy rejection follows the complete value encoding.
+                            // The complete Core 3 decoder checked exn/noexn and exceptions;
+                            // select_t checked reference-types above. The legacy enum has no 0x69.
+                            if(result_type_byte != 0x69u)
+                            {
+                                ensure_lazy_wasm1p1_value_type_enabled(op_begin,
+                                                                        result_type_byte,
+                                                                        wasm_feature_parameter,
+                                                                        ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction,
+                                                                        err);
+                            }
                             return;
                         }
                         case static_cast<wasm_byte>(wasm1p1_code::table_get):
@@ -1012,11 +1248,64 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                            ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
                                                            ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_null);
                             }
-                            auto const rt_byte{read_u8_immediate(code_curr, code_end, op_begin, err)};
+                            // Both endpoints borrow the same initializer-owned type array; equal/null endpoints mean no types.
+                            auto const type_begin{curr_module.type_section_storage.type_section_begin};
+                            auto const type_end{curr_module.type_section_storage.type_section_end};
+                            auto const type_count{type_begin == type_end ? 0uz : static_cast<::std::size_t>(type_end - type_begin)};
+                            auto const* retained_context{curr_module.type_section_storage.core3_context_ptr};
+                            if(retained_context != nullptr || !wasm1p1_para.disable_gc)
+                            {
+                                ::uwvm2::validation::standard::wasm3::recursive_type_context const empty_context{};
+                                auto const& context{retained_context == nullptr ? empty_context : *retained_context};
+                                auto const decoded{::uwvm2::validation::standard::wasm3::scan_core3_ref_null_heap(
+                                    code_curr, code_end, context, !wasm1p1_para.disable_gc,
+                                    !wasm1p1_para.disable_function_references, !wasm1p1_para.disable_exceptions)};
+                                // [ref.null][checked signed-33 heap] next ... code_end
+                                // [safe                            ] unsafe (could be code_end)
+                                //                                  ^^ code_curr: scanner commits only a complete enabled heap.
+                                using error = ::uwvm2::validation::standard::wasm3::core3_ref_null_error;
+                                if(decoded.error == error::gc_disabled) [[unlikely]]
+                                { fail_lazy_feature_required(op_begin, err, opcode_u32(wasm1p1_code::ref_null),
+                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc,
+                                    ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction); }
+                                if(decoded.error == error::function_references_disabled) [[unlikely]]
+                                { ::uwvm2::validation::standard::wasm3::require_function_references_enabled(
+                                    false, 0xd0u, op_begin, err); }
+                                if(decoded.error == error::exceptions_disabled) [[unlikely]]
+                                { ::uwvm2::validation::standard::wasm3::require_exceptions_enabled(
+                                    false, 0xd0u, op_begin, err); }
+                                if(decoded.error != error::ok) [[unlikely]]
+                                {
+                                    // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                                    // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                                    // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
+                                    err.err_curr = op_begin; // Borrowed checked opcode; no pointer movement.
+                                    err.err_selectable.wasm1p1_invalid_reference_type.value =
+                                        code_curr == code_end ? 0u : ::std::to_integer<unsigned>(*code_curr);
+                                    err.err_code = code_validation_error_code::wasm1p1_invalid_reference_type;
+                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                }
+                                return;
+                            }
+                            auto const rt_byte{::uwvm2::validation::standard::wasm3::read_function_ref_null_carrier(
+                                code_curr, code_end, !wasm1p1_para.disable_function_references, type_count, op_begin, err, true, !wasm1p1_para.disable_gc)};
+                            if(rt_byte == 0x69u)
+                            {
+                                ::uwvm2::validation::standard::wasm3::require_exceptions_enabled(
+                                    !wasm1p1_para.disable_exceptions, 0xd0u, op_begin, err);
+                                // [ref.null][checked exn/noexn heap] next ... code_end
+                                // [safe                             ] unsafe (could be code_end)
+                                //                                     ^^ code_curr: whole-function compiler validates
+                                // the required adjacent throw_ref and emits the null trap.
+                                return;
+                            }
                             auto const rt{static_cast<::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type>(rt_byte)};
                             using reference_type = ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type;
                             if(rt != reference_type::funcref && rt != reference_type::externref) [[unlikely]]
                             {
+                                // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                                // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                                // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                                 err.err_curr = op_begin;
                                 err.err_selectable.wasm1p1_invalid_reference_type.value = rt_byte;
                                 err.err_code = code_validation_error_code::wasm1p1_invalid_reference_type;
@@ -1030,6 +1319,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 err);
                             return;
                         }
+                        case static_cast<wasm_byte>(0xd3u): // Core 3 ref.eq has no immediate.
+                        {
+                            if(wasm1p1_para.disable_gc) [[unlikely]]
+                            { fail_lazy_feature_required(op_begin, err, 0xd3u,
+                                ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc,
+                                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction); }
+                            // [ref.eq] next ... code_end; outer splitter already consumed the checked byte.
+                            // [safe  ] unsafe (could be code_end)
+                            //          ^^ code_curr: no immediate, no pointer movement here.
+                            return;
+                        }
+                        case static_cast<wasm_byte>(0xd5u):
+                        case static_cast<wasm_byte>(0xd6u):
+                        {
+                            // [branch opcode] labelidx ... code_end
+                            // [safe         ] unsafe (could be code_end)
+                            //                 ^^ code_curr: checked by bounded decoder before any advance.
+                            ::uwvm2::validation::standard::wasm3::require_function_references_enabled(
+                                !wasm1p1_para.disable_function_references, static_cast<unsigned>(op_byte), op_begin, err);
+                            (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::invalid_label_index, err);
+                            // [branch opcode][labelidx] next ... code_end
+                            // [safe                  ] unsafe (could be code_end)
+                            //                          ^^ code_curr: decoder owns/annotates the bounded advance.
+                            return;
+                        }
+                        case static_cast<wasm_byte>(0xd4u):
+                        {
+                            // [ref.as_non_null] next opcode ... end
+                            // [safe           ] unsafe (could be end)
+                            //                   ^^ code_curr: outer scanner consumed the checked opcode; no immediate.
+                            ::uwvm2::validation::standard::wasm3::require_function_references_enabled(
+                                !wasm1p1_para.disable_function_references, 0xd4u, op_begin, err);
+                            return;
+                        }
+
                         case static_cast<wasm_byte>(wasm1p1_code::ref_is_null):
                         {
                             if(!wasm2_feature_enabled(wasm2_feature_kind::reference_types)) [[unlikely]]
@@ -1057,6 +1381,48 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                    op_begin,
                                                                    code_validation_error_code::invalid_function_index_encoding,
                                                                    err);
+                            return;
+                        }
+                        case static_cast<wasm_byte>(wasm1p1_code::atomic_prefix):
+                        {
+                            // [FE] subopcode reserved ... (code_end)
+                            // [safe] unsafe (could be code_end)
+                            //        ^^ code_curr: the outer scanner already consumed the checked prefix.
+                            auto const memory_count{curr_module.imported_memory_vec_storage.size() + curr_module.local_defined_memory_vec_storage.size()};
+                            auto const address_type_at{[&](::std::uint_least32_t index) constexpr noexcept
+                            {
+                                // The decoder bounds-checks the combined index before
+                                // this resolver borrows imported/local declaration metadata.
+                                return ::uwvm2::uwvm::runtime::storage::runtime_memory_is_address64(curr_module, index) ?
+                                    ::uwvm2::validation::standard::wasm3::storage_address_type::i64 :
+                                    ::uwvm2::validation::standard::wasm3::storage_address_type::i32;
+                            }};
+                            (void)::uwvm2::validation::standard::wasm3::read_atomic_instruction64(
+                                code_curr, code_end, op_begin, !wasm1p1_para.disable_threads,
+                                !wasm1p1_para.disable_multi_memory, ::uwvm2::validation::standard::wasm3::uses_core3_validation_policy(wasm1p1_para),
+                                memory_count, address_type_at, err);
+                            // [FE subopcode validated immediates] ... (code_end)
+                            // [safe                            ] unsafe (could be code_end)
+                            //                                    ^^ code_curr; bounded atomic immediates add no structural nesting.
+                            return;
+                        }
+                        case static_cast<wasm_byte>(0xfbu):
+                        {
+                            // [FB] subopcode/immediate ... code_end
+                            // [safe] unsafe (could be code_end)
+                            //        ^^ code_curr: outer scanner already consumed the checked prefix.
+                            if(wasm1p1_para.disable_gc) [[unlikely]]
+                            {
+                                fail_lazy_feature_required(op_begin, err, 0xfbu,
+                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc,
+                                    ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                            }
+                            auto const decoded{::uwvm2::validation::standard::wasm3::scan_gc_instruction(code_curr, code_end)};
+                            if(decoded.error != ::uwvm2::validation::standard::wasm3::gc_immediate_error::ok) [[unlikely]]
+                            { fail_lazy_split(op_begin, code_validation_error_code::invalid_const_immediate, err); }
+                            // [FB][checked complete immediate] next ... code_end
+                            // [safe                          ] unsafe (could be code_end)
+                            //                                 ^^ code_curr: bounded scanner committed the advance.
                             return;
                         }
                         case static_cast<wasm_byte>(wasm1p1_code::numeric_prefix):
@@ -1096,7 +1462,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                    ::uwvm2::parser::wasm::base::wasm1p1_error_subject::data_segment);
                                     }
                                     (void)read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::illegal_data_index, err);
-                                    (void)read_u8_immediate(code_curr, code_end, op_begin, err);
+                                    // [opcode] memidx ... (code_end): scanner commits only within the checked byte range.
+                                    (void)::uwvm2::validation::standard::wasm3::read_memory_index(code_curr, code_end, op_begin, !wasm1p1_para.disable_multi_memory, err);
+                                    // [opcode memidx] ... unsafe (could be code_end); code_curr follows the complete index.
                                     return;
                                 }
                                 case wasm1p1_numeric_code::data_drop:
@@ -1122,8 +1490,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
                                                                    ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                                     }
-                                    (void)read_u8_immediate(code_curr, code_end, op_begin, err);
-                                    (void)read_u8_immediate(code_curr, code_end, op_begin, err);
+                                    // [opcode] memidx ... (code_end): scanner commits only within the checked byte range.
+                                    (void)::uwvm2::validation::standard::wasm3::read_memory_index(code_curr, code_end, op_begin, !wasm1p1_para.disable_multi_memory, err);
+                                    // [opcode memidx] ... unsafe (could be code_end); code_curr follows the complete index.
+                                    // [opcode] memidx ... (code_end): scanner commits only within the checked byte range.
+                                    (void)::uwvm2::validation::standard::wasm3::read_memory_index(code_curr, code_end, op_begin, !wasm1p1_para.disable_multi_memory, err);
+                                    // [opcode memidx] ... unsafe (could be code_end); code_curr follows the complete index.
                                     return;
                                 }
                                 case wasm1p1_numeric_code::memory_fill:
@@ -1136,7 +1508,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                    ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::bulk_memory,
                                                                    ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
                                     }
-                                    (void)read_u8_immediate(code_curr, code_end, op_begin, err);
+                                    // [opcode] memidx ... (code_end): scanner commits only within the checked byte range.
+                                    (void)::uwvm2::validation::standard::wasm3::read_memory_index(code_curr, code_end, op_begin, !wasm1p1_para.disable_multi_memory, err);
+                                    // [opcode memidx] ... unsafe (could be code_end); code_curr follows the complete index.
                                     return;
                                 }
                                 case wasm1p1_numeric_code::table_init:
@@ -1217,6 +1591,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 [[unlikely]] default:
                                 {
+                                    // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                                    // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                                    // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                                     err.err_curr = op_begin;
                                     err.err_selectable.u8 = static_cast<::std::uint_least8_t>(subopcode);
                                     err.err_code = code_validation_error_code::illegal_opbase;
@@ -1237,20 +1614,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
                             auto const simd_subopcode{
                                 read_leb128_immediate<wasm_u32>(code_curr, code_end, op_begin, code_validation_error_code::illegal_opbase, err)};
+                            // 0xfd subopcode ...
+                            // [safe         ] unsafe (could be code_end)
+                            //                 ^^ code_curr: bounded read_leb128_immediate consumed u32.
+                            if(::uwvm2::validation::standard::wasm3::relaxed_simd_operand_count(simd_subopcode) != 0u)
+                            {
+                                if(wasm1p1_para.disable_relaxed_simd)
+                                {
+                                    fail_lazy_feature_required(op_begin, err, simd_subopcode,
+                                        ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::relaxed_simd,
+                                        ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction);
+                                }
+                                // All 20 relaxed instructions have no trailing immediates. Stack validation
+                                // belongs to materialization or the explicit lazy+verification pass.
+                                return;
+                            }
                             auto const simd_code{static_cast<wasm1p1_simd_code>(simd_subopcode)};
                             auto const skip_simd_memarg{
                                 [&]() constexpr UWVM_THROWS
                                 {
-                                    (void)read_leb128_immediate<wasm_u32>(code_curr,
-                                                                          code_end,
-                                                                          op_begin,
-                                                                          code_validation_error_code::invalid_memarg_align,
-                                                                          err);
-                                    (void)read_leb128_immediate<wasm_u32>(code_curr,
-                                                                          code_end,
-                                                                          op_begin,
-                                                                          code_validation_error_code::invalid_memarg_offset,
-                                                                          err);
+                                    // [opcode] memarg ... (code_end); bounded structural scan, typed validation follows materialization.
+                    ::uwvm2::validation::standard::wasm3::require_memory_immediate(
+                        ::uwvm2::validation::standard::wasm3::scan_memory_argument64(code_curr, code_end, !wasm1p1_para.disable_multi_memory, ::uwvm2::validation::standard::wasm3::uses_core3_validation_policy(wasm1p1_para)).error, op_begin, err);
+                    // [opcode memarg] ... unsafe (could be code_end); code_curr follows the complete memarg.
                                 }};
 
                             switch(simd_code)
@@ -1517,6 +1903,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                 }
                                 [[unlikely]] default:
                                 {
+                                    // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                                    // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                                    // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                                     err.err_curr = op_begin;
                                     err.err_selectable.u8 = static_cast<::std::uint_least8_t>(simd_subopcode);
                                     err.err_code = code_validation_error_code::illegal_opbase;
@@ -1535,6 +1924,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                     }
 
                     // Unknown opcodes are rejected early because a wrong skip length would corrupt every later structural boundary.
+                    // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                    // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                    // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                     err.err_curr = op_begin;
                     err.err_selectable.u8 = static_cast<::std::uint_least8_t>(op_byte);
                     err.err_code = code_validation_error_code::illegal_opbase;
@@ -1557,6 +1949,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             auto const& curr_code{*curr_local_func.wasm_code_ptr};
             auto const code_begin{reinterpret_cast<::std::byte const*>(curr_code.body.expr_begin)};
             auto const code_end{reinterpret_cast<::std::byte const*>(curr_code.body.code_end)};
+            auto const& policy{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(wasm_feature_parameter)};
+            auto const* declaration_context{policy.disable_gc ?
+                ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::runtime_declaration_type_context(curr_module) : nullptr};
+            ::uwvm2::validation::standard::wasm3::require_function_declaration_policy(*curr_local_func.function_type_ptr, curr_code.locals,
+                curr_module.type_section_storage.requires_function_references, policy, code_begin, err,
+        curr_module.table_declarations_require_function_references, curr_module.global_declarations_require_function_references,
+        curr_module.element_declarations_require_function_references, curr_module.tag_section_present || !curr_module.imported_tag_vec_storage.empty(),
+                declaration_context, curr_module.type_section_storage.type_section_count,
+                curr_module.table_declarations_require_gc, curr_module.global_declarations_require_gc, curr_module.element_declarations_require_gc,
+                ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::runtime_exception_declaration_requirements(curr_module),
+                {.simd = curr_module.type_section_storage.requires_simd,
+                 .reference_types = curr_module.type_section_storage.requires_reference_types,
+                 .multi_value = curr_module.type_section_storage.requires_multi_value},
+                ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::runtime_storage_declaration_requirements(curr_module),
+                ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::runtime_address_declaration_requirements(curr_module),
+                ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::runtime_constant_declaration_requirements(curr_module));
 
             auto& fn{storage.functions.index_unchecked(local_function_index)};
             fn.function_index = function_index;
@@ -1610,11 +2018,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 // Read the opcode byte with memcpy to avoid aliasing and alignment assumptions on the wasm byte stream.
                 wasm1_code curr_opbase;  // No initialization necessary
                 ::std::memcpy(::std::addressof(curr_opbase), code_curr, sizeof(wasm1_code));
+                // opcode ... section_end
+                // [safe] unsafe (could be section_end)
+                // ^^ code_curr: loop entry proved a complete opcode byte.
                 ++code_curr;
+                // opcode ... section_end
+                // [safe] unsafe (could be section_end)
+                //        ^^ code_curr may be one-past.
 
                 /// @warning Extension point: structural opcode additions must update this lazy execution-unit scanner.
                 switch(curr_opbase)
                 {
+#if defined(__clang__)
+# pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wswitch" // Core 3 try_table extends the shared wasm1 enum.
+#endif
+                    case static_cast<wasm1_code>(0x1f): // Core 3 try_table
+#if defined(__clang__)
+# pragma clang diagnostic pop
+#endif
                     case wasm1_code::block:
                     case wasm1_code::loop:
                     case wasm1_code::if_:
@@ -1623,7 +2045,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         // [safe] unsafe (could be the section_end)
                         // ^^ op_begin
 
+                        if(curr_opbase == static_cast<wasm1_code>(0x1f))
+                        { ::uwvm2::validation::standard::wasm3::require_exceptions_enabled(
+                            !::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(wasm_feature_parameter).disable_exceptions,
+                            0x1fu, op_begin, err); }
                         skip_wasm1p1_block_type(code_curr, code_end, op_begin, curr_module, wasm_feature_parameter, err);
+                        if(curr_opbase == static_cast<wasm1_code>(0x1f))
+                        {
+                            auto const catches{::uwvm2::validation::standard::wasm3::scan_exception_catches(code_curr, code_end)};
+                            // [try_table blocktype checked vector] next ... code_end
+                            // [safe                             ] unsafe (could be code_end)
+                            //                                     ^^ code_curr: complete bounded scan, unchanged on failure.
+                            if(catches.error != ::uwvm2::validation::standard::wasm3::exception_immediate_error::ok)
+                            { fail_lazy_split(op_begin, code_validation_error_code::illegal_opbase, err); }
+                            // [try_table blocktype checked catches] next ... code_end
+                            // [safe                              ] unsafe (could be code_end)
+                            //                                      ^^ code_curr: checked before any execution-unit publication.
+                        }
+
 
                         // block blocktype ...
                         // [     safe    ] unsafe (could be the section_end)
@@ -1633,7 +2072,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         // directly readable in diagnostics and can be re-parsed independently later.
                         auto const parent_eu_index{active_parent_eu_index(control_stack.back_unchecked())};
                         auto const depth{control_stack.size()};
-                        auto const kind{curr_opbase == wasm1_code::block  ? lazy_execution_unit_kind::block
+                        auto const kind{(curr_opbase == wasm1_code::block || curr_opbase == static_cast<wasm1_code>(0x1f)) ? lazy_execution_unit_kind::block
                                         : curr_opbase == wasm1_code::loop ? lazy_execution_unit_kind::loop
                                                                           : lazy_execution_unit_kind::if_};
                         auto const eu_index{
@@ -1662,6 +2101,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
                         if(control_stack.empty()) [[unlikely]]
                         {
+                            // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                            // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                            // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                             err.err_curr = op_begin;
                             err.err_selectable.u8 = static_cast<::std::uint_least8_t>(curr_opbase);
                             err.err_code = code_validation_error_code::illegal_opbase;
@@ -1750,6 +2192,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             }
         }
 
+        #include "checked_register_ring_admission.h"
+
         struct lazy_compile_state_notifier
         {
             inline constexpr void operator()(::uwvm2::utils::thread::lazy_compile_unit_state& unit) const noexcept
@@ -1776,33 +2220,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             notify(fn.materialization_state);
         }
 
-        inline constexpr void validate_function_if_needed(runtime_module_storage_t const& curr_module,
-                                                          lazy_compile_options const& options,
-                                                          ::std::size_t local_function_index,
-                                                          ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+        [[noreturn]] inline void fail_checked_lazy_lowering(checked_integer_lowering_status result,
+                                                            ::std::size_t local_function_index) noexcept
         {
-            // Validation is intentionally delayed to materialization when requested, allowing module setup to build only lightweight
-            // structural metadata while preserving a strict validation barrier before code becomes executable.
-            if(options.validation_mode == lazy_validation_mode::validate_on_lazy_compile)
-            {
-                // Lazy validation uses the parser-composed code-version strategy immediately before materialization.
-                if(options.validator_module_storage == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-                if(options.validator_feature_parameter == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-
-                auto const import_func_count{curr_module.imported_function_vec_storage.size()};
-                auto const function_index{import_func_count + local_function_index};
-                auto const& curr_local_func{curr_module.local_defined_function_vec_storage.index_unchecked(local_function_index)};
-                auto const& curr_code{*curr_local_func.wasm_code_ptr};
-                auto const code_begin{reinterpret_cast<::std::byte const*>(curr_code.body.expr_begin)};
-                auto const code_end{reinterpret_cast<::std::byte const*>(curr_code.body.code_end)};
-
-                ::uwvm2::validation::standard::wasm2::validate_code_with_runtime_policy(*options.validator_module_storage,
-                                                                      function_index,
-                                                                      code_begin,
-                                                                      code_end,
-                                                                      err,
-                                                                      *options.validator_feature_parameter);
-            }
+            // Refuse unsupported or retired representations explicitly. A
+            // checked-mode request never falls back to raw Wasm decoding.
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                u8"uwvm: ", ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                u8"[fatal] ", ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                u8"Checked lazy integer lowering is unavailable for function ", ::fast_io::mnp::dec(local_function_index),
+                u8" (reason=", checked_integer_lowering_status_name(result), u8"). (runtime)\n\n",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            ::fast_io::fast_terminate();
+        }
+        inline void require_current_checked_function(runtime_module_storage_t const& curr_module,
+                                                     lazy_module_storage_t const& storage,
+                                                     ::std::size_t local_function_index) noexcept
+        {
+            // This cold request/cache gate runs under the existing worker-drain
+            // lifetime contract. Even a compiled cache hit must not report new
+            // materialization success for a plan from a retired real generation.
+            if(storage.checked_plan && !storage.checked_plan->matches_function_source(curr_module, local_function_index))
+            { fail_checked_lazy_lowering(checked_integer_lowering_status::missing_or_retired_source, local_function_index); }
         }
 
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
@@ -1812,17 +2252,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                           ::std::size_t local_function_index,
                                                           ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
-            // Validate immediately before compilation so a function cannot be installed into the interpreter if validation fails.
-            validate_function_if_needed(curr_module, options, local_function_index, err);
+            if(storage.checked_plan)
+            {
+                if(local_function_index >= storage.compiled.local_funcs.size()) { ::fast_io::fast_terminate(); }
+                auto const result{lower_checked_integer_function<CompileOption>(storage.checked_plan, curr_module,
+                    local_function_index, storage.compiled.local_funcs.index_unchecked(local_function_index))};
+                if(result != checked_integer_lowering_status::ok) { fail_checked_lazy_lowering(result, local_function_index); }
+                return;
+            }
+            // The factory already emitted this exact register-ring/fixup/ABI
+            // artifact during authoritative admission. First use only publishes
+            // readiness; it never decodes or matches the original body again.
+            if(storage.ring_admission == nullptr || !storage.ring_admission->matches_function<CompileOption>(
+                curr_module, options.compile_options.curr_wasm_id, local_function_index))
+            { fail_checked_lazy_lowering(checked_integer_lowering_status::missing_or_retired_source, local_function_index); }
 
-            // Materialize with the eager single-function compiler. This deliberately trades partial compilation for identical emitted
-            // opfunc streams, stack metadata, and call handling across lazy and non-lazy modes.
-            ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::compile_all_from_uwvm_local_func<CompileOption>(curr_module,
-                                                                                                                                  options.compile_options,
-                                                                                                                                  storage.compiled,
-                                                                                                                                  local_function_index,
-                                                                                                                                  options.validator_feature_parameter,
-                                                                                                                                  err);
         }
 
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
@@ -1838,6 +2282,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             auto& cu{storage.compile_units.index_unchecked(ctx->compile_unit_index)};
             if(cu.local_function_index >= storage.functions.size()) [[unlikely]] { return; }
             auto& fn{storage.functions.index_unchecked(cu.local_function_index)};
+            require_current_checked_function(*ctx->curr_module, storage, cu.local_function_index);
+            if(storage.ring_admission != nullptr && !storage.ring_admission->matches_function<CompileOption>(
+                *ctx->curr_module, ctx->options.compile_options.curr_wasm_id, cu.local_function_index))
+            { fail_checked_lazy_lowering(checked_integer_lowering_status::missing_or_retired_source, cu.local_function_index); }
 
             ::uwvm2::validation::error::code_validation_error_impl local_err{};
             auto& err{ctx->err == nullptr ? local_err : *ctx->err};
@@ -1957,6 +2405,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         }
     }  // namespace details
 
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption = {}>
     inline constexpr lazy_module_storage_t initialize_lazy_module_storage(runtime_module_storage_t const& curr_module,
                                                                           ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option const& options,
                                                                           ::uwvm2::validation::error::code_validation_error_impl& err,
@@ -1964,6 +2413,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                           parser_feature_parameter_t const* wasm_feature_parameter = nullptr) UWVM_THROWS
     {
         if(wasm_feature_parameter == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+        // Validate runtime pointers/counts once without decoding any function body.
+        ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::validate_runtime_module_storage(curr_module);
+        ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::require_runtime_module_declaration_policy(
+            curr_module, *wasm_feature_parameter, err);
 
         lazy_module_storage_t storage{};
 
@@ -1978,10 +2431,76 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         storage.execution_units.reserve(local_func_count);
         storage.compile_units.reserve(local_func_count);
 
-        // Build only indexing metadata during initialization. Real validation and bytecode emission can be deferred to the first use.
+        // This backend materializes whole functions. Build truthful whole-body
+        // units directly, avoiding a second structural scanner over Wasm bytes.
+        // Finer EU/CU scheduling flags no longer split this checked artifact.
+        split_config.eu_policy = lazy_execution_unit_split_policy_t::function_only;
+        split_config.cu_policy = lazy_compile_unit_split_policy_t::function;
+        // Authoritative body validation is fused with original ring emission.
         for(::std::size_t local_function_index{}; local_function_index != local_func_count; ++local_function_index)
         {
             details::build_lazy_function_execution_units(curr_module, storage, local_function_index, split_config, *wasm_feature_parameter, err);
+        }
+        storage.ring_admission = details::checked_register_ring_admission::admit<CompileOption>(
+            curr_module, storage, options, wasm_feature_parameter, err);
+        return storage;
+    }
+
+    // Experimental actual record-consumer slice. This initializer emits zero
+    // opfuncs and creates one whole-function unit from retained extents. Neither
+    // a raw structural scanner nor the raw trivial-inline matcher is invoked.
+    [[nodiscard]] inline lazy_module_storage_t initialize_checked_lazy_module_storage(
+        runtime_module_storage_t const& curr_module,
+        ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option const& options,
+        checked_integer_module_plan::owner plan)
+    {
+        if(!plan || !plan->matches_current_source(curr_module) ||
+           plan->function_count() != curr_module.local_defined_function_vec_storage.size()) { ::fast_io::fast_terminate(); }
+        lazy_module_storage_t storage{};
+        storage.checked_plan = ::std::move(plan);
+        auto const count{storage.checked_plan->function_count()};
+        storage.compiled.local_funcs.resize(count);
+        storage.compiled.local_defined_call_info.resize(count);
+        storage.functions.resize(count);
+        storage.execution_units.reserve(count); storage.compile_units.reserve(count);
+        auto const imported{curr_module.imported_function_vec_storage.size()};
+        for(::std::size_t index{}; index != count; ++index)
+        {
+            auto const* function{storage.checked_plan->function(index)};
+            if(function == nullptr || !storage.checked_plan->matches_function_source(curr_module, index))
+            { ::fast_io::fast_terminate(); }
+            auto& information{storage.compiled.local_defined_call_info.index_unchecked(index)};
+            information.module_id = options.curr_wasm_id; information.function_index = imported + index;
+            information.runtime_func = ::std::addressof(curr_module.local_defined_function_vec_storage.index_unchecked(index));
+            information.compiled_func = ::std::addressof(storage.compiled.local_funcs.index_unchecked(index));
+            for(auto const parameter: function->parameters())
+            {
+                auto const width{checked_plan_details::local_width(parameter)};
+                if(width == 0uz || width > (::std::numeric_limits<::std::size_t>::max)() - information.param_bytes) { ::fast_io::fast_terminate(); }
+                information.param_bytes += width;
+            }
+            for(auto const result: function->results())
+            {
+                auto const width{checked_plan_details::local_width(result)};
+                if(width == 0uz || width > (::std::numeric_limits<::std::size_t>::max)() - information.result_bytes) { ::fast_io::fast_terminate(); }
+                information.result_bytes += width;
+            }
+            auto& state{storage.functions.index_unchecked(index)};
+            state.function_index = imported + index; state.local_function_index = index;
+            state.first_eu_index = index; state.eu_count = 1uz;
+            state.first_cu_index = index; state.cu_count = 1uz; state.primary_cu_index = index;
+            auto const& code{*curr_module.local_defined_function_vec_storage.index_unchecked(index).wasm_code_ptr};
+            // The private plan was minted from this actual pinned descriptor.
+            // [owned expression bytes ... expr_end] | one-past
+            // [safe: source/type lifetime pinned  ] | borrow only, no byte reads
+            // ^^ descriptor begin/end -> immutable scheduling metadata copies.
+            auto const begin{reinterpret_cast<::std::byte const*>(code.body.expr_begin)};
+            auto const end{reinterpret_cast<::std::byte const*>(code.body.code_end)};
+            storage.execution_units.push_back({.function_index = imported + index, .local_function_index = index,
+                .code_begin = begin, .code_end = end, .code_size = function->expression_bytes()});
+            storage.compile_units.push_back({.function_index = imported + index, .local_function_index = index,
+                .begin_eu_index = index, .end_eu_index = index + 1uz,
+                .code_begin = begin, .code_end = end, .code_size = function->expression_bytes()});
         }
         return storage;
     }
@@ -1995,6 +2514,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
     {
         // Public synchronous entry point: invalid indices are internal runtime bugs, so terminate rather than fabricating a wasm error.
         if(compile_unit_index >= storage.compile_units.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+        auto& cu{storage.compile_units.index_unchecked(compile_unit_index)};
+        if(cu.local_function_index >= storage.functions.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+        auto& fn{storage.functions.index_unchecked(cu.local_function_index)};
+        details::require_current_checked_function(curr_module, storage, cu.local_function_index);
+        if(storage.ring_admission != nullptr && !storage.ring_admission->matches_function<CompileOption>(
+            curr_module, options.compile_options.curr_wasm_id, cu.local_function_index))
+        { details::fail_checked_lazy_lowering(checked_integer_lowering_status::missing_or_retired_source, cu.local_function_index); }
+
         ::fast_io::unix_timestamp compile_start_time{};
         if(::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::enabled()) [[unlikely]]
         {
@@ -2012,10 +2539,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             }
 # endif
         }
-
-        auto& cu{storage.compile_units.index_unchecked(compile_unit_index)};
-        if(cu.local_function_index >= storage.functions.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
-        auto& fn{storage.functions.index_unchecked(cu.local_function_index)};
 
         ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-cu-start module_id=",
                                                                      options.compile_options.curr_wasm_id,
@@ -2156,6 +2679,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

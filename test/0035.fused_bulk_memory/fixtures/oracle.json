@@ -1,0 +1,68 @@
+{
+  "source_only": true,
+  "native_executed": false,
+  "return_assertions": 20,
+  "trap_assertions": 14,
+  "invalid_WAST": 10,
+  "mixed_copy_oracle": [
+    {
+      "destination_address": "i32",
+      "source_address": "i32",
+      "length_type": "i32",
+      "expected_first4bits": 67305985
+    },
+    {
+      "destination_address": "i32",
+      "source_address": "i64",
+      "length_type": "i32",
+      "expected_first4bits": 67305985
+    },
+    {
+      "destination_address": "i64",
+      "source_address": "i32",
+      "length_type": "i32",
+      "expected_first4bits": 67305985
+    },
+    {
+      "destination_address": "i64",
+      "source_address": "i64",
+      "length_type": "i64",
+      "expected_first4bits": 67305985
+    }
+  ],
+  "malformed_binary": [
+    {
+      "path": "bulk_fill_missing_memidx.wasm",
+      "size": 33,
+      "sha256": "831e1935048b41442ae6f97e49b6068d21b24be331236225aef457017914260b",
+      "reason": "missing explicit memidx makes the end marker an illegal index"
+    },
+    {
+      "path": "bulk_fill_u32_overflow.wasm",
+      "size": 38,
+      "sha256": "ed59b67445fabc5dfde812dd3702aef18cc994c4394c13536a1c536d30da46bc",
+      "reason": "memidx exceeds u32"
+    },
+    {
+      "path": "bulk_copy_missing_source.wasm",
+      "size": 34,
+      "sha256": "04f2f01f1cb3150769c38d378bb47a610cb5286dc3a42af73ee33431db488438",
+      "reason": "missing source index consumes end marker as an illegal index"
+    },
+    {
+      "path": "bulk_copy_bad_destination.wasm",
+      "size": 35,
+      "sha256": "6735fd66dce9085bbd06b678df6e87cbd36b4438901e9b2186d48b0fa2304142",
+      "reason": "destination memory1 absent"
+    },
+    {
+      "path": "bulk_copy_bad_source.wasm",
+      "size": 35,
+      "sha256": "567d54dc98229c7c97d607c0e578794e4dc79ef5604ac9d6b649d482389818e9",
+      "reason": "source memory1 absent"
+    }
+  ],
+  "memory_pages_each": 1,
+  "actual_product_oracle_and_assembly_pending": true,
+  "after_trap_no_write_witness_pending": true
+}

@@ -552,8 +552,12 @@ namespace
         auto prep{prepare_runtime_from_wasm(wasm, module_name, {}, features)};
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
 
+        backend_compile_option_t options{};
+        options.validator_feature_parameter = ::std::addressof(features);
+        ::uwvm2::validation::error::code_validation_error_impl error{};
+        auto storage{lazy::initialize_lazy_module_storage(*prep.mod, options, error)};
         ::uwvm2::utils::container::vector<::std::size_t> callees{};
-        UWVM2TEST_REQUIRE(lazy::collect_direct_defined_callees(*prep.mod, 0uz, callees, ::std::addressof(features)));
+        UWVM2TEST_REQUIRE(lazy::collect_direct_defined_callees(*prep.mod, storage, 0uz, callees, ::std::addressof(features)));
         UWVM2TEST_REQUIRE(callees.size() == 1uz);
         UWVM2TEST_REQUIRE(callees.index_unchecked(0uz) == 1uz);
         return 0;

@@ -32,17 +32,26 @@ module;
 #include <memory>
 #include <type_traits>
 #include <utility>
+#include <vector>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/runtime/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 
 export module uwvm2.runtime.compiler.uwvm_int.compile_cu_from_lazy_validator:translate;
 
+import uwvm2.validation.standard.wasm3.relaxed_simd;
+import uwvm2.validation.standard.wasm3.threads;
+import uwvm2.validation.standard.wasm3.tail_call;
 import fast_io;
+import uwvm2.uwvm.io;
+import uwvm2.uwvm.utils.ansies;
+import :checked_plan_lowering;
 import uwvm2.object.global;
 import uwvm2.utils.container;
 import uwvm2.utils.debug;
 import uwvm2.utils.thread;
+import uwvm2.runtime;
 import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.parser.wasm.standard.wasm1p1.type;
@@ -53,7 +62,7 @@ import uwvm2.validation.error;
 import uwvm2.validation.concepts;
 import uwvm2.validation.standard.wasm1;
 import uwvm2.validation.standard.wasm1p1;
-import uwvm2.validation.standard.wasm2;
+import uwvm2.validation.standard.wasm3;
 import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.runtime.storage;
 import uwvm2.runtime.compiler.uwvm_int.optable;

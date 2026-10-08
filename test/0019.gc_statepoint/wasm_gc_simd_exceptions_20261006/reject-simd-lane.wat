@@ -1,0 +1,1 @@
+(module (tag (param v128)) (func (export "_start") v128.const i32x4 0 0 0 0 i8x16.extract_lane_u 16 drop))

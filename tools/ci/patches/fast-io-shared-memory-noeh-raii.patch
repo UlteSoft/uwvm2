@@ -1,0 +1,138 @@
+--- a/third-parties/fast_io/include/fast_io_hosted/process/shared_memory/win32.h
++++ b/third-parties/fast_io/include/fast_io_hosted/process/shared_memory/win32.h
+@@ -125,15 +125,12 @@
+ 		throw_win32_error();
+ 	}
+ 
+-	try
+-	{
+-		return win32_map_shared_memory_impl(handle, bytes, mode);
+-	}
+-	catch (...)
+-	{
+-		::fast_io::win32::CloseHandle(handle);
+-		throw;
+-	}
++	// Adopt exactly once before mapping. An EH mapping failure closes through
++	// the existing no-throw file destructor; noEH retains throw_error fail-stop.
++	::fast_io::basic_win32_family_file<family, char> owner{handle};
++	auto const state{win32_map_shared_memory_impl(owner.native_handle(), bytes, mode)};
++	(void)owner.release(); // Success transfers this handle to the returned state.
++	return state;
+ }
+ 
+ template <win32_family family>
+@@ -196,15 +193,12 @@
+ 	void *handle, ::std::size_t bytes, ipc_mode mode)
+ {
+ 	auto const duplicated_handle{::fast_io::win32::details::win32_dup_impl(handle)};
+-	try
+-	{
+-		return win32_map_shared_memory_impl(duplicated_handle, bytes, mode);
+-	}
+-	catch (...)
+-	{
+-		::fast_io::win32::CloseHandle(duplicated_handle);
+-		throw;
+-	}
++	// Adopt exactly once before mapping. An EH mapping failure closes through
++	// the existing no-throw file destructor; noEH retains throw_error fail-stop.
++	::fast_io::basic_win32_family_file<win32_family::native, char> owner{duplicated_handle};
++	auto const state{win32_map_shared_memory_impl(owner.native_handle(), bytes, mode)};
++	(void)owner.release(); // Success transfers this handle to the returned state.
++	return state;
+ }
+ 
+ } // namespace win32::details
+@@ -242,18 +236,10 @@
+ 		native_handle_type section_handle, size_type size, ipc_mode mode = ipc_mode::in | ipc_mode::out)
+ 	{
+ 		::fast_io::win32::details::win32_shared_memory_validate_mode(mode);
+-		try
+-		{
+-			assign(::fast_io::win32::details::win32_map_shared_memory_impl(section_handle, size, mode), mode);
+-		}
+-		catch (...)
+-		{
+-			if (section_handle != nullptr) [[likely]]
+-			{
+-				::fast_io::win32::CloseHandle(section_handle);
+-			}
+-			throw;
+-		}
++		// Mode validation above preserves the original pre-adoption behavior.
++		::fast_io::basic_win32_family_file<family, char> owner{section_handle};
++		assign(::fast_io::win32::details::win32_map_shared_memory_impl(owner.native_handle(), size, mode), mode);
++		(void)owner.release(); // assign is noexcept; this object now owns the handle.
+ 	}
+ 
+ 	inline basic_win32_family_shared_memory(basic_win32_family_shared_memory const &other)
+--- a/third-parties/fast_io/include/fast_io_hosted/process/shared_memory/nt.h
++++ b/third-parties/fast_io/include/fast_io_hosted/process/shared_memory/nt.h
+@@ -103,15 +103,12 @@
+ 		throw_nt_error(status);
+ 	}
+ 
+-	try
+-	{
+-		return nt_map_shared_memory_impl<family>(handle, mode);
+-	}
+-	catch (...)
+-	{
+-		::fast_io::win32::nt::nt_close<family == nt_family::zw>(handle);
+-		throw;
+-	}
++	// Retain the original Nt/Zw close family and adopt exactly once before
++	// mapping. The existing no-throw file destructor preserves EH cleanup.
++	::fast_io::basic_nt_family_file<family, char> owner{handle};
++	auto const state{nt_map_shared_memory_impl<family>(owner.native_handle(), mode)};
++	(void)owner.release(); // Success transfers this handle to the returned state.
++	return state;
+ }
+ 
+ inline nt_shared_memory_internal_tlc_str nt_shared_memory_path(
+@@ -181,15 +178,12 @@
+ inline nt_shared_memory_state nt_duplicate_shared_memory_impl(void *handle, ipc_mode mode)
+ {
+ 	auto const duplicated_handle{::fast_io::win32::nt::details::nt_dup_impl<family == nt_family::zw>(handle)};
+-	try
+-	{
+-		return nt_map_shared_memory_impl<family>(duplicated_handle, mode);
+-	}
+-	catch (...)
+-	{
+-		::fast_io::win32::nt::nt_close<family == nt_family::zw>(duplicated_handle);
+-		throw;
+-	}
++	// Retain the original Nt/Zw close family and adopt exactly once before
++	// mapping. The existing no-throw file destructor preserves EH cleanup.
++	::fast_io::basic_nt_family_file<family, char> owner{duplicated_handle};
++	auto const state{nt_map_shared_memory_impl<family>(owner.native_handle(), mode)};
++	(void)owner.release(); // Success transfers this handle to the returned state.
++	return state;
+ }
+ 
+ } // namespace win32::nt::details
+@@ -239,18 +233,10 @@
+ 		native_handle_type section_handle, ipc_mode mode = ipc_mode::in | ipc_mode::out)
+ 	{
+ 		::fast_io::win32::nt::details::nt_shared_memory_validate_mode(mode);
+-		try
+-		{
+-			assign(::fast_io::win32::nt::details::nt_map_shared_memory_impl<family>(section_handle, mode), mode);
+-		}
+-		catch (...)
+-		{
+-			if (section_handle != nullptr) [[likely]]
+-			{
+-				::fast_io::win32::nt::nt_close<family == nt_family::zw>(section_handle);
+-			}
+-			throw;
+-		}
++		// Mode validation above preserves the original pre-adoption behavior.
++		::fast_io::basic_nt_family_file<family, char> owner{section_handle};
++		assign(::fast_io::win32::nt::details::nt_map_shared_memory_impl<family>(owner.native_handle(), mode), mode);
++		(void)owner.release(); // assign is noexcept; this object now owns the handle.
+ 	}
+ 
+ 	inline basic_nt_family_shared_memory(basic_nt_family_shared_memory const &other)

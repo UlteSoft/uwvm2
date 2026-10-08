@@ -30,6 +30,9 @@ case wasm1_code::local_get:
                                                                             ::fast_io::mnp::leb128_get(local_index))};
     if(local_index_err != ::fast_io::parse_code::ok) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_code = code_validation_error_code::invalid_local_index;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(local_index_err);
@@ -47,6 +50,9 @@ case wasm1_code::local_get:
 
     if(local_index >= all_local_count) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.illegal_local_index.local_index = local_index;
         err.err_selectable.illegal_local_index.all_local_count = all_local_count;
@@ -55,6 +61,19 @@ case wasm1_code::local_get:
     }
 
     auto const curr_local_type{local_type_from_index(local_index)};
+    if(!initialized_locals.is_initialized(local_index, local_initially_initialized(local_index))) [[unlikely]]
+    {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
+        err.err_curr = op_begin; // Borrow the dispatch-checked opcode; no input read.
+        err.err_selectable.br_value_type_mismatch = {
+            .op_code_name = u8"local.get (unset non-null local)",
+            .expected_type = to_wasm1_value_type(curr_local_type),
+            .actual_type = to_wasm1_value_type(curr_local_type)};
+        err.err_code = code_validation_error_code::br_value_type_mismatch;
+        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+    }
     // Runtime local helpers address locals by byte offset inside the compiled frame, not by Wasm
     // index. Resolve the offset once so every fusion emits the same frame address.
     auto const local_off{local_offset_from_index(local_index)};
@@ -75,7 +94,26 @@ case wasm1_code::local_get:
             {
                 ::uwvm2::utils::container::array<local_offset_t, 12uz> offs{};  // max (f64)
                 offs[0] = local_offset_from_index(local_index);
+                ::uwvm2::validation::standard::wasm3::committed_integer_add_batch<
+                    FusedI32Sink::receives_fused_i32_operations> accepted_batch{};
+                if constexpr(FusedI32Sink::receives_fused_i32_operations)
+                {
+                    if(want == 8uz && (curr_local_type == curr_operand_stack_value_type::i32 ||
+                        curr_local_type == curr_operand_stack_value_type::i64))
+                    {
+                        // [same checked expression: head opcode + decoded local index] next | code_end
+                        // [safe original allocation                                  ]      | one-past
+                        // Successful head decode proved these offsets BEFORE subtraction;
+                        // owned DATA retains no cursor or pointer to the Wasm body.
+                        accepted_batch.begin(curr_local_type == curr_operand_stack_value_type::i64, local_index,
+                            static_cast<::std::size_t>(op_begin - code_begin),
+                            static_cast<::std::size_t>(code_curr - op_begin), control_flow_stack.size());
+                    }
+                }
 
+                // [head get + complete checked immediate] next ... | code_end
+                // [safe original code slice             ]          | one-past
+                // Copy the successful bounded head decode endpoint; no read here.
                 ::std::byte const* scan{code_curr};
                 bool ok{true};
 
@@ -98,6 +136,9 @@ case wasm1_code::local_get:
 
                     wasm_u32 next_local_index{};
                     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                    // [checked remaining local.get byte] immediate ... | code_end
+                    // [safe] scan != code_end proves +1 may be one-past BEFORE
+                    // forming parse_by_scan's immediate begin; it never reads end.
                     auto const [next_local_index_next, next_local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
                                                                                                       reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                                                       ::fast_io::mnp::leb128_get(next_local_index))};
@@ -109,7 +150,27 @@ case wasm1_code::local_get:
                     }
 
                     offs[i] = local_offset_from_index(next_local_index);
+                    if constexpr(FusedI32Sink::receives_fused_i32_operations)
+                    {
+                        if(want == 8uz && (curr_local_type == curr_operand_stack_value_type::i32 ||
+                            curr_local_type == curr_operand_stack_value_type::i64))
+                        {
+                            // [scan: checked local.get + complete successful LEB] next | code_end
+                            // [safe same expression allocation                 ]      | one-past
+                            // parse_by_scan's successful bounded end and scan's live
+                            // opcode prove BOTH differences BEFORE retaining owned DATA.
+                            accepted_batch.record_provider(next_local_index,
+                                static_cast<::std::size_t>(scan - code_begin),
+                                static_cast<::std::size_t>(reinterpret_cast<::std::byte const*>(next_local_index_next) - scan));
+                        }
+                    }
+                    // [bounded decoded immediate] next bytes ... | end
+                    // [safe consumed bytes]       | one-past is never dereferenced here
+                    // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                     scan = reinterpret_cast<::std::byte const*>(next_local_index_next);
+                    // [complete checked lookahead prefix] next ... function end
+                    // [safe                             ] unsafe (possibly one-past)
+                    //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                 }
 
                 // Parse the trailing adds.
@@ -127,6 +188,21 @@ case wasm1_code::local_get:
                         ok = false;
                         break;
                     }
+                    if constexpr(FusedI32Sink::receives_fused_i32_operations)
+                    {
+                        if(want == 8uz && (curr_local_type == curr_operand_stack_value_type::i32 ||
+                            curr_local_type == curr_operand_stack_value_type::i64))
+                        {
+                            // [same checked add opcode] next ... | code_end
+                            // [safe                   ]          | one-past
+                            // scan != code_end and the exact add comparison precede
+                            // this FIRST shared numeric transition; no source replay.
+                            accepted_batch.record_add(static_cast<::std::size_t>(scan - code_begin));
+                        }
+                    }
+                    // [checked lookahead opcode] next bytes ... | end
+                    // [safe consumed bytes]       | one-past is never dereferenced here
+                    // ^^ scan: the bounded scanner and current opcode guard establish a live byte; +1 may equal code_end.
                     ++scan;
                 }
 
@@ -172,8 +248,28 @@ case wasm1_code::local_get:
 
                 for(::std::size_t i{}; i < want; ++i) { emit_imm_to(bytecode, offs[i]); }
                 stacktop_commit_push1_typed_if_reachable(curr_local_type);
+                if constexpr(FusedI32Sink::receives_fused_i32_operations)
+                {
+                    if(want == 8uz && (curr_local_type == curr_operand_stack_value_type::i32 ||
+                        curr_local_type == curr_operand_stack_value_type::i64))
+                    {
+                        // The ENTIRE original scanner window and physical ring
+                        // commit succeeded. Failed speculative windows published
+                        // nothing. Consume only already owned first-pass DATA now.
+                        accepted_batch.publish_after_ring_commit(fused_i32_transaction);
+                    }
+                }
 
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ scan: preceding bounded scan/lookahead proved a position in this code slice.
+                // lookahead variable operation ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                 code_curr = scan;
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                //                       ^^ code_curr may be one-past; no read occurs here.
                 return true;
             }};
 
@@ -366,7 +462,13 @@ case wasm1_code::local_get:
                     }
 
                     offs[local_count] = local_offset_from_index(next_local_index);
+                    // [checked lookahead opcode] next bytes ... | end
+                    // [safe consumed bytes]       | one-past is never dereferenced here
+                    // ^^ scan: after_local_get != code_end was checked before its byte was read; +1 may equal end.
                     scan = after_local_get + 1u;
+                    // [complete checked lookahead prefix] next ... function end
+                    // [safe                             ] unsafe (possibly one-past)
+                    //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                     ++local_count;
                 }
 
@@ -375,6 +477,9 @@ case wasm1_code::local_get:
                 wasm1_code update_op{};  // init
                 ::std::memcpy(::std::addressof(update_op), scan, sizeof(update_op));
                 if(update_op != wasm1_code::local_set && update_op != wasm1_code::local_tee) { return false; }
+                // [checked lookahead opcode] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the bounded scanner and current opcode guard establish a live byte; +1 may equal code_end.
                 ++scan;
 
                 wasm_u32 dst_local_index{};
@@ -388,7 +493,13 @@ case wasm1_code::local_get:
                     return false;
                 }
 
+                // [bounded decoded immediate] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                 scan = reinterpret_cast<::std::byte const*>(dst_local_index_next);
+                // [complete checked lookahead prefix] next ... function end
+                // [safe                             ] unsafe (possibly one-past)
+                //                                     ^^ scan: preceding proof bounded this move; no dereference here.
 
                 if(update_op == wasm1_code::local_tee && scan != code_end)
                 {
@@ -533,7 +644,16 @@ case wasm1_code::local_get:
                 for(::std::size_t i{}; i != local_count; ++i) { emit_imm_to(bytecode, offs[i]); }
 
                 if(update_op == wasm1_code::local_tee) { stacktop_commit_push1_typed_if_reachable(curr_local_type); }
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ scan: preceding bounded scan/lookahead proved a position in this code slice.
+                // lookahead variable operation ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                 code_curr = scan;
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                //                       ^^ code_curr may be one-past; no read occurs here.
                 return true;
             }};
 
@@ -568,7 +688,13 @@ case wasm1_code::local_get:
                                                                             ::fast_io::mnp::leb128_get(imm_i32))};
                     if(imm_err != ::fast_io::parse_code::ok) { return false; }
                     imm = static_cast<wasm_i64>(imm_i32);
+                    // [bounded decoded immediate] next bytes ... | end
+                    // [safe consumed bytes]       | one-past is never dereferenced here
+                    // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                     scan = reinterpret_cast<::std::byte const*>(imm_next);
+                    // [complete checked lookahead prefix] next ... function end
+                    // [safe                             ] unsafe (possibly one-past)
+                    //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                 }
                 else
                 {
@@ -577,7 +703,13 @@ case wasm1_code::local_get:
                                                                             reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                             ::fast_io::mnp::leb128_get(imm))};
                     if(imm_err != ::fast_io::parse_code::ok) { return false; }
+                    // [bounded decoded immediate] next bytes ... | end
+                    // [safe consumed bytes]       | one-past is never dereferenced here
+                    // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                     scan = reinterpret_cast<::std::byte const*>(imm_next);
+                    // [complete checked lookahead prefix] next ... function end
+                    // [safe                             ] unsafe (possibly one-past)
+                    //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                 }
 
                 if(scan == code_end) { return false; }
@@ -587,6 +719,9 @@ case wasm1_code::local_get:
 
                 reorder_expr_binop expr_op{};  // init
                 if(!decode_reorder_expr_op(curr_local_type, binop, expr_op)) { return false; }
+                // [checked lookahead opcode] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the bounded scanner and current opcode guard establish a live byte; +1 may equal code_end.
                 ++scan;
 
                 if(scan == code_end) { return false; }
@@ -594,6 +729,9 @@ case wasm1_code::local_get:
                 wasm1_code update_op{};  // init
                 ::std::memcpy(::std::addressof(update_op), scan, sizeof(update_op));
                 if(update_op != wasm1_code::local_set && update_op != wasm1_code::local_tee) { return false; }
+                // [checked lookahead opcode] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the bounded scanner and current opcode guard establish a live byte; +1 may equal code_end.
                 ++scan;
 
                 wasm_u32 dst_local_index{};
@@ -614,7 +752,13 @@ case wasm1_code::local_get:
                     return false;
                 }
 
+                // [bounded decoded immediate] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                 scan = reinterpret_cast<::std::byte const*>(dst_local_index_next);
+                // [complete checked lookahead prefix] next ... function end
+                // [safe                             ] unsafe (possibly one-past)
+                //                                     ^^ scan: preceding proof bounded this move; no dereference here.
 
                 if(update_op == wasm1_code::local_tee && scan != code_end)
                 {
@@ -717,7 +861,16 @@ case wasm1_code::local_get:
                 emit_imm_to(bytecode, dst_off);
 
                 if(update_op == wasm1_code::local_tee) { stacktop_commit_push1_typed_if_reachable(curr_local_type); }
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ scan: preceding bounded scan/lookahead proved a position in this code slice.
+                // lookahead variable operation ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                 code_curr = scan;
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                //                       ^^ code_curr may be one-past; no read occurs here.
                 return true;
             }};
 
@@ -766,7 +919,13 @@ case wasm1_code::local_get:
 
                         operand_kind = reorder_expr_operand_kind::local;
                         operand_off = local_offset_from_index(next_local_index);
+                        // [bounded decoded immediate] next bytes ... | end
+                        // [safe consumed bytes]       | one-past is never dereferenced here
+                        // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                         scan = reinterpret_cast<::std::byte const*>(next_local_index_next);
+                        // [complete checked lookahead prefix] next ... function end
+                        // [safe                             ] unsafe (possibly one-past)
+                        //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                         ++local_read_count;
                     }
                     else if(curr_local_type == curr_operand_stack_value_type::i32 && operand_op == wasm1_code::i32_const)
@@ -779,7 +938,13 @@ case wasm1_code::local_get:
                         if(imm_err != ::fast_io::parse_code::ok) { break; }
                         operand_kind = reorder_expr_operand_kind::imm;
                         operand_imm = static_cast<wasm_i64>(imm);
+                        // [bounded decoded immediate] next bytes ... | end
+                        // [safe consumed bytes]       | one-past is never dereferenced here
+                        // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                         scan = reinterpret_cast<::std::byte const*>(imm_next);
+                        // [complete checked lookahead prefix] next ... function end
+                        // [safe                             ] unsafe (possibly one-past)
+                        //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                     }
                     else if(curr_local_type == curr_operand_stack_value_type::i64 && operand_op == wasm1_code::i64_const)
                     {
@@ -791,7 +956,13 @@ case wasm1_code::local_get:
                         if(imm_err != ::fast_io::parse_code::ok) { break; }
                         operand_kind = reorder_expr_operand_kind::imm;
                         operand_imm = imm;
+                        // [bounded decoded immediate] next bytes ... | end
+                        // [safe consumed bytes]       | one-past is never dereferenced here
+                        // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                         scan = reinterpret_cast<::std::byte const*>(imm_next);
+                        // [complete checked lookahead prefix] next ... function end
+                        // [safe                             ] unsafe (possibly one-past)
+                        //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                     }
                     else
                     {
@@ -800,7 +971,13 @@ case wasm1_code::local_get:
 
                     if(scan == code_end)
                     {
+                        // [saved lookahead position] next bytes ... | end
+                        // [safe consumed bytes]       | one-past is never dereferenced here
+                        // ^^ scan: step_begin was borrowed from the same bounded scan; this restores it without reading.
                         scan = step_begin;
+                        // [complete checked lookahead prefix] next ... function end
+                        // [safe                             ] unsafe (possibly one-past)
+                        //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                         break;
                     }
 
@@ -810,7 +987,13 @@ case wasm1_code::local_get:
                     reorder_expr_binop expr_op{};  // init
                     if(!decode_reorder_expr_op(curr_local_type, binop, expr_op))
                     {
+                        // [saved lookahead position] next bytes ... | end
+                        // [safe consumed bytes]       | one-past is never dereferenced here
+                        // ^^ scan: step_begin was borrowed from the same bounded scan; this restores it without reading.
                         scan = step_begin;
+                        // [complete checked lookahead prefix] next ... function end
+                        // [safe                             ] unsafe (possibly one-past)
+                        //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                         break;
                     }
 
@@ -818,6 +1001,9 @@ case wasm1_code::local_get:
                     kinds[step_count] = operand_kind;
                     offs[step_count] = operand_off;
                     imms[step_count] = operand_imm;
+                    // [checked lookahead opcode] next bytes ... | end
+                    // [safe consumed bytes]       | one-past is never dereferenced here
+                    // ^^ scan: the bounded scanner and current opcode guard establish a live byte; +1 may equal code_end.
                     ++scan;
                     ++step_count;
                 }
@@ -827,6 +1013,9 @@ case wasm1_code::local_get:
                 wasm1_code update_op{};  // init
                 ::std::memcpy(::std::addressof(update_op), scan, sizeof(update_op));
                 if(update_op != wasm1_code::local_set && update_op != wasm1_code::local_tee) { return false; }
+                // [checked lookahead opcode] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the bounded scanner and current opcode guard establish a live byte; +1 may equal code_end.
                 ++scan;
 
                 wasm_u32 dst_local_index{};
@@ -840,7 +1029,13 @@ case wasm1_code::local_get:
                     return false;
                 }
 
+                // [bounded decoded immediate] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                 scan = reinterpret_cast<::std::byte const*>(dst_local_index_next);
+                // [complete checked lookahead prefix] next ... function end
+                // [safe                             ] unsafe (possibly one-past)
+                //                                     ^^ scan: preceding proof bounded this move; no dereference here.
 
                 if(update_op == wasm1_code::local_tee && scan != code_end)
                 {
@@ -969,7 +1164,16 @@ case wasm1_code::local_get:
                 }
 
                 if(update_op == wasm1_code::local_tee) { stacktop_commit_push1_typed_if_reachable(curr_local_type); }
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ scan: preceding bounded scan/lookahead proved a position in this code slice.
+                // lookahead variable operation ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                 code_curr = scan;
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                //                       ^^ code_curr may be one-past; no read occurs here.
                 return true;
             }};
 
@@ -1027,7 +1231,13 @@ case wasm1_code::local_get:
                     }
 
                     offs[local_count] = local_offset_from_index(next_local_index);
+                    // [checked lookahead opcode] next bytes ... | end
+                    // [safe consumed bytes]       | one-past is never dereferenced here
+                    // ^^ scan: after_local_get != code_end was checked before its byte was read; +1 may equal end.
                     scan = after_local_get + 1u;
+                    // [complete checked lookahead prefix] next ... function end
+                    // [safe                             ] unsafe (possibly one-past)
+                    //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                     ++local_count;
                 }
 
@@ -1119,7 +1329,16 @@ case wasm1_code::local_get:
                 for(::std::size_t i{}; i != local_count; ++i) { emit_imm_to(bytecode, offs[i]); }
                 stacktop_commit_push1_typed_if_reachable(curr_local_type);
 
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ scan: preceding bounded scan/lookahead proved a position in this code slice.
+                // lookahead variable operation ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                 code_curr = scan;
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                //                       ^^ code_curr may be one-past; no read occurs here.
                 return true;
             }};
 
@@ -1168,7 +1387,13 @@ case wasm1_code::local_get:
 
                         operand_kind = reorder_expr_operand_kind::local;
                         operand_off = local_offset_from_index(next_local_index);
+                        // [bounded decoded immediate] next bytes ... | end
+                        // [safe consumed bytes]       | one-past is never dereferenced here
+                        // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                         scan = reinterpret_cast<::std::byte const*>(next_local_index_next);
+                        // [complete checked lookahead prefix] next ... function end
+                        // [safe                             ] unsafe (possibly one-past)
+                        //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                         ++local_read_count;
                     }
                     else if(curr_local_type == curr_operand_stack_value_type::i32 && operand_op == wasm1_code::i32_const)
@@ -1181,7 +1406,13 @@ case wasm1_code::local_get:
                         if(imm_err != ::fast_io::parse_code::ok) { break; }
                         operand_kind = reorder_expr_operand_kind::imm;
                         operand_imm = static_cast<wasm_i64>(imm);
+                        // [bounded decoded immediate] next bytes ... | end
+                        // [safe consumed bytes]       | one-past is never dereferenced here
+                        // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                         scan = reinterpret_cast<::std::byte const*>(imm_next);
+                        // [complete checked lookahead prefix] next ... function end
+                        // [safe                             ] unsafe (possibly one-past)
+                        //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                     }
                     else if(curr_local_type == curr_operand_stack_value_type::i64 && operand_op == wasm1_code::i64_const)
                     {
@@ -1193,7 +1424,13 @@ case wasm1_code::local_get:
                         if(imm_err != ::fast_io::parse_code::ok) { break; }
                         operand_kind = reorder_expr_operand_kind::imm;
                         operand_imm = imm;
+                        // [bounded decoded immediate] next bytes ... | end
+                        // [safe consumed bytes]       | one-past is never dereferenced here
+                        // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                         scan = reinterpret_cast<::std::byte const*>(imm_next);
+                        // [complete checked lookahead prefix] next ... function end
+                        // [safe                             ] unsafe (possibly one-past)
+                        //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                     }
                     else
                     {
@@ -1202,7 +1439,13 @@ case wasm1_code::local_get:
 
                     if(scan == code_end)
                     {
+                        // [saved lookahead position] next bytes ... | end
+                        // [safe consumed bytes]       | one-past is never dereferenced here
+                        // ^^ scan: step_begin was borrowed from the same bounded scan; this restores it without reading.
                         scan = step_begin;
+                        // [complete checked lookahead prefix] next ... function end
+                        // [safe                             ] unsafe (possibly one-past)
+                        //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                         break;
                     }
 
@@ -1212,7 +1455,13 @@ case wasm1_code::local_get:
                     reorder_expr_binop expr_op{};  // init
                     if(!decode_reorder_expr_op(curr_local_type, binop, expr_op))
                     {
+                        // [saved lookahead position] next bytes ... | end
+                        // [safe consumed bytes]       | one-past is never dereferenced here
+                        // ^^ scan: step_begin was borrowed from the same bounded scan; this restores it without reading.
                         scan = step_begin;
+                        // [complete checked lookahead prefix] next ... function end
+                        // [safe                             ] unsafe (possibly one-past)
+                        //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                         break;
                     }
 
@@ -1220,6 +1469,9 @@ case wasm1_code::local_get:
                     kinds[step_count] = operand_kind;
                     offs[step_count] = operand_off;
                     imms[step_count] = operand_imm;
+                    // [checked lookahead opcode] next bytes ... | end
+                    // [safe consumed bytes]       | one-past is never dereferenced here
+                    // ^^ scan: the bounded scanner and current opcode guard establish a live byte; +1 may equal code_end.
                     ++scan;
                     ++step_count;
                 }
@@ -1304,7 +1556,16 @@ case wasm1_code::local_get:
                 }
 
                 stacktop_commit_push1_typed_if_reachable(curr_local_type);
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ scan: preceding bounded scan/lookahead proved a position in this code slice.
+                // lookahead variable operation ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                 code_curr = scan;
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                //                       ^^ code_curr may be one-past; no read occurs here.
                 return true;
             }};
 
@@ -1353,6 +1614,24 @@ case wasm1_code::local_get:
                 }
                 if(local_limit < local_min) { return false; }
 
+                ::uwvm2::validation::standard::wasm3::committed_integer_add_batch<
+                    FusedI32Sink::receives_fused_i32_operations> accepted_preload{};
+                if constexpr(FusedI32Sink::receives_fused_i32_operations)
+                {
+                    if(curr_local_type == curr_operand_stack_value_type::i32 || curr_local_type == curr_operand_stack_value_type::i64)
+                    {
+                        // [same checked head get + complete index] next ... | code_end
+                        // [safe original expression allocation   ]          | one-past
+                        // Successful head parse proved both differences BEFORE
+                        // retaining DATA; no source pointer escapes this frame.
+                        accepted_preload.begin(curr_local_type == curr_operand_stack_value_type::i64, local_index,
+                            static_cast<::std::size_t>(op_begin - code_begin),
+                            static_cast<::std::size_t>(code_curr - op_begin), control_flow_stack.size());
+                    }
+                }
+                // [checked head get + bounded immediate] next ... | code_end
+                // [safe original slice                 ]          | one-past
+                // Copy the successful parse endpoint BEFORE any lookahead read.
                 ::std::byte const* scan{code_curr};
                 ::std::size_t local_count{1uz};
 
@@ -1366,6 +1645,9 @@ case wasm1_code::local_get:
 
                     wasm_u32 next_local_index{};
                     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                    // [checked local.get byte] immediate ... | code_end
+                    // [safe] scan != end proves +1 may reach one-past BEFORE
+                    // the LEB decoder's begin is formed; decoder never reads end.
                     auto const [next_local_index_next, next_local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan + 1u),
                                                                                                       reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                                                       ::fast_io::mnp::leb128_get(next_local_index))};
@@ -1376,7 +1658,26 @@ case wasm1_code::local_get:
                     }
 
                     offs[local_count] = local_offset_from_index(next_local_index);
+                    if constexpr(FusedI32Sink::receives_fused_i32_operations)
+                    {
+                        if(curr_local_type == curr_operand_stack_value_type::i32 || curr_local_type == curr_operand_stack_value_type::i64)
+                        {
+                            // [scan: checked get + successful bounded index] next | code_end
+                            // [safe same allocation                       ]      | one-past
+                            // Both endpoints are in this original slice BEFORE
+                            // subtraction. This is the scanner's FIRST decode DATA.
+                            accepted_preload.record_provider(next_local_index,
+                                static_cast<::std::size_t>(scan - code_begin),
+                                static_cast<::std::size_t>(reinterpret_cast<::std::byte const*>(next_local_index_next) - scan));
+                        }
+                    }
+                    // [bounded decoded immediate] next bytes ... | end
+                    // [safe consumed bytes]       | one-past is never dereferenced here
+                    // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                     scan = reinterpret_cast<::std::byte const*>(next_local_index_next);
+                    // [complete checked lookahead prefix] next ... function end
+                    // [safe                             ] unsafe (possibly one-past)
+                    //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                     ++local_count;
                 }
 
@@ -1475,8 +1776,27 @@ case wasm1_code::local_get:
                 emit_imm_to(bytecode, static_cast<::std::uint8_t>(local_count));
                 for(::std::size_t i{}; i != local_count; ++i) { emit_imm_to(bytecode, offs[i]); }
                 for(::std::size_t i{}; i != local_count; ++i) { stacktop_commit_push1_typed_if_reachable(curr_local_type); }
+                if constexpr(FusedI32Sink::receives_fused_i32_operations)
+                {
+                    if(curr_local_type == curr_operand_stack_value_type::i32 || curr_local_type == curr_operand_stack_value_type::i64)
+                    {
+                        // Actual N typed pushes and physical preload commit have
+                        // completed. Failed lookahead never published anything;
+                        // consume only the bounded accepted provider DATA here.
+                        accepted_preload.publish_providers_after_ring_commit(fused_i32_transaction, local_count);
+                    }
+                }
 
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ scan: preceding bounded scan/lookahead proved a position in this code slice.
+                // lookahead variable operation ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                 code_curr = scan;
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                //                       ^^ code_curr may be one-past; no read occurs here.
                 return true;
             }};
 
@@ -1509,6 +1829,9 @@ case wasm1_code::local_get:
                 wasm1_code op{};  // init
                 ::std::memcpy(::std::addressof(op), scan, sizeof(op));
                 if(op != const_op) { return false; }
+                // [fixed-sequence lookahead opcode] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the initial need_n >= min_n check covers every fixed byte in this sequence before the advance.
                 ++scan;
 
                 FpT const mul{[&](::std::byte const* p) constexpr noexcept
@@ -1516,14 +1839,23 @@ case wasm1_code::local_get:
                                   if constexpr(::std::same_as<FpT, wasm_f32>) { return read_wasm_f32_const(p); }
                                   else { return read_wasm_f64_const(p); }
                               }(scan)};
+                // [complete fixed-width immediate] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the enclosing fixed-size budget or endp - scan check covers this field.
                 scan += sizeof(mul);
 
                 ::std::memcpy(::std::addressof(op), scan, sizeof(op));
                 if(op != mul_op) { return false; }
+                // [fixed-sequence lookahead opcode] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the initial need_n >= min_n check covers every fixed byte in this sequence before the advance.
                 ++scan;
 
                 ::std::memcpy(::std::addressof(op), scan, sizeof(op));
                 if(op != const_op) { return false; }
+                // [fixed-sequence lookahead opcode] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the initial need_n >= min_n check covers every fixed byte in this sequence before the advance.
                 ++scan;
 
                 FpT const add{[&](::std::byte const* p) constexpr noexcept
@@ -1531,14 +1863,23 @@ case wasm1_code::local_get:
                                   if constexpr(::std::same_as<FpT, wasm_f32>) { return read_wasm_f32_const(p); }
                                   else { return read_wasm_f64_const(p); }
                               }(scan)};
+                // [complete fixed-width immediate] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the enclosing fixed-size budget or endp - scan check covers this field.
                 scan += sizeof(add);
 
                 ::std::memcpy(::std::addressof(op), scan, sizeof(op));
                 if(op != add_op) { return false; }
+                // [fixed-sequence lookahead opcode] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the initial need_n >= min_n check covers every fixed byte in this sequence before the advance.
                 ++scan;
 
                 ::std::memcpy(::std::addressof(op), scan, sizeof(op));
                 if(op != wasm1_code::local_set) { return false; }
+                // [fixed-sequence lookahead opcode] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the initial need_n >= min_n check covers every fixed byte in this sequence before the advance.
                 ++scan;
 
                 wasm_u32 dst_local_index{};
@@ -1547,7 +1888,13 @@ case wasm1_code::local_get:
                                                                         reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                         ::fast_io::mnp::leb128_get(dst_local_index))};
                 if(dst_err != ::fast_io::parse_code::ok || dst_local_index != local_index) { return false; }
+                // [bounded decoded immediate] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                 scan = reinterpret_cast<::std::byte const*>(dst_next);
+                // [complete checked lookahead prefix] next ... function end
+                // [safe                             ] unsafe (possibly one-past)
+                //                                     ^^ scan: preceding proof bounded this move; no dereference here.
 
                 // Ensure `src` local read is covered by the zero-init prefix.
                 auto const local_size{operand_stack_valtype_size(curr_local_type)};
@@ -1572,7 +1919,16 @@ case wasm1_code::local_get:
                 emit_imm_to(bytecode, mul);
                 emit_imm_to(bytecode, add);
 
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ scan: preceding bounded scan/lookahead proved a position in this code slice.
+                // lookahead variable operation ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                 code_curr = scan;
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                //                       ^^ code_curr may be one-past; no read occurs here.
                 return true;
             }};
 
@@ -1606,6 +1962,9 @@ case wasm1_code::local_get:
                                           wasm1_code op{};  // init
                                           ::std::memcpy(::std::addressof(op), scan, sizeof(op));
                                           if(op != expected) { return false; }
+                                          // [checked lookahead opcode] next bytes ... | end
+                                          // [safe consumed bytes]       | one-past is never dereferenced here
+                                          // ^^ scan: the bounded scanner and current opcode guard establish a live byte; +1 may equal code_end.
                                           ++scan;
                                           return true;
                                       }};
@@ -1617,7 +1976,13 @@ case wasm1_code::local_get:
                                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                ::fast_io::mnp::leb128_get(v))};
                                                if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                               // [bounded decoded immediate] next bytes ... | end
+                                               // [safe consumed bytes]       | one-past is never dereferenced here
+                                               // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                                                scan = reinterpret_cast<::std::byte const*>(next);
+                                               // [complete checked lookahead prefix] next ... function end
+                                               // [safe                             ] unsafe (possibly one-past)
+                                               //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                                                return true;
                                            }};
 
@@ -1626,7 +1991,13 @@ case wasm1_code::local_get:
                                                  if(!consume_op(wasm1_code::f64_const)) { return false; }
                                                  if(static_cast<::std::size_t>(endp - scan) < 8uz) [[unlikely]] { return false; }
                                                  out = read_wasm_f64_const(scan);
+                                                 // [complete fixed-width immediate] next bytes ... | end
+                                                 // [safe consumed bytes]       | one-past is never dereferenced here
+                                                 // ^^ scan: the enclosing fixed-size budget or endp - scan check covers this field.
                                                  scan += sizeof(out);
+                                                 // [complete checked lookahead prefix] next ... function end
+                                                 // [safe                             ] unsafe (possibly one-past)
+                                                 //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                                                  return true;
                                              }};
 
@@ -1696,7 +2067,16 @@ case wasm1_code::local_get:
                     emit_imm_to(bytecode, add);
                     stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f64);
 
+                    // lookahead variable op ... code_end
+                    // [safe consumed bytes] unsafe (could be code_end)
+                    // ^^ scan: preceding bounded scan/lookahead proved a position in this code slice.
+                    // lookahead variable operation ... code_end
+                    // [safe consumed bytes] unsafe (could be code_end)
+                    // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                     code_curr = scan;
+                    // lookahead variable op ... code_end
+                    // [safe consumed bytes] unsafe (could be code_end)
+                    //                       ^^ code_curr may be one-past; no read occurs here.
                     return true;
                 }
 
@@ -1723,7 +2103,16 @@ case wasm1_code::local_get:
                 emit_imm_to(bytecode, add);
                 stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f64);
 
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ scan: preceding bounded scan/lookahead proved a position in this code slice.
+                // lookahead variable operation ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                 code_curr = scan;
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                //                       ^^ code_curr may be one-past; no read occurs here.
                 return true;
             }};
 
@@ -1749,6 +2138,9 @@ case wasm1_code::local_get:
                                           wasm1_code op{};  // init
                                           ::std::memcpy(::std::addressof(op), scan, sizeof(op));
                                           if(op != expected) { return false; }
+                                          // [checked lookahead opcode] next bytes ... | end
+                                          // [safe consumed bytes]       | one-past is never dereferenced here
+                                          // ^^ scan: the bounded scanner and current opcode guard establish a live byte; +1 may equal code_end.
                                           ++scan;
                                           return true;
                                       }};
@@ -1767,7 +2159,13 @@ case wasm1_code::local_get:
                 {
                     return false;
                 }
+                // [bounded decoded immediate] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                 scan = reinterpret_cast<::std::byte const*>(dst_next);
+                // [complete checked lookahead prefix] next ... function end
+                // [safe                             ] unsafe (possibly one-past)
+                //                                     ^^ scan: preceding proof bounded this move; no dereference here.
 
                 if constexpr(Tee)
                 {
@@ -1833,7 +2231,16 @@ case wasm1_code::local_get:
 
                 conbine_pending.kind = conbine_pending_kind::none;
                 conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ scan: preceding bounded scan/lookahead proved a position in this code slice.
+                // lookahead variable operation ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                 code_curr = scan;
+                // lookahead variable op ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                //                       ^^ code_curr may be one-past; no read occurs here.
                 return true;
             }};
 
@@ -1846,9 +2253,30 @@ case wasm1_code::local_get:
 #endif
 
     operand_stack_push(curr_local_type);
+    operand_stack.back_unchecked().core_type = local_core_type_from_index(local_index);
+    operand_stack.back_unchecked().has_core_type = true;
+    if constexpr(FusedI32Sink::receives_fused_i32_operations)
+    {
+        // [checked local.get / bounded index / initialized owned local] next | code_end
+        // [safe same expression                                       ]     | one-past
+        // Original typed push has completed. Passing the checked index does
+        // not expose source bytes, local-frame pointers or execution authority.
+        if(curr_local_type == curr_operand_stack_value_type::i32)
+        { fused_i32_transaction.provider({.opcode = 0x20u, .value = local_index,
+            .source_offset = static_cast<::std::size_t>(op_begin - code_begin),
+            .source_bytes = static_cast<::std::size_t>(code_curr - op_begin),
+            .control_depth = control_flow_stack.size(), .stack_polymorphic = is_polymorphic}); }
+        else if(curr_local_type == curr_operand_stack_value_type::i64)
+        { fused_i32_transaction.provider64({.opcode = 0x20u, .value = local_index,
+            .source_offset = static_cast<::std::size_t>(op_begin - code_begin),
+            .source_bytes = static_cast<::std::size_t>(code_curr - op_begin),
+            .control_depth = control_flow_stack.size(), .stack_polymorphic = is_polymorphic}); }
+    }
     {
         auto const local_size{operand_stack_valtype_size(curr_local_type)};
-        if(local_size != 0uz)
+        // A non-defaultable local is proven set by validation before every get; its frame
+        // slot need not be zeroed on each function entry (important for deep tail calls).
+        if(local_size != 0uz && local_initially_initialized(local_index))
         {
             auto const end_off{static_cast<local_offset_t>(local_off + local_size)};
             if(end_off > local_bytes_zeroinit_end) { local_bytes_zeroinit_end = end_off; }
@@ -2416,6 +2844,9 @@ case wasm1_code::local_set:
                                                                             ::fast_io::mnp::leb128_get(local_index))};
     if(local_index_err != ::fast_io::parse_code::ok) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_code = code_validation_error_code::invalid_local_index;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(local_index_err);
@@ -2433,6 +2864,9 @@ case wasm1_code::local_set:
 
     if(local_index >= all_local_count) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.illegal_local_index.local_index = local_index;
         err.err_selectable.illegal_local_index.all_local_count = all_local_count;
@@ -2451,8 +2885,18 @@ case wasm1_code::local_set:
     {
         have_set_operand = true;
         set_operand_type = value.type;
-        if(!operand_type_matches(value, curr_local_type)) [[unlikely]]
+        auto const matches{rich_owned_available && !value.is_unknown ?
+            runtime_core3_value_type_matches(
+                ::uwvm2::validation::standard::wasm3::core3_operand_effective_type(value),
+                local_core_type_from_index(local_index),
+                ::uwvm2::validation::standard::wasm3::core3_signature_view<
+                    ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_owned_signature_t>{rich_owned_begin, runtime_type_count}) :
+            operand_type_matches(value, curr_local_type)};
+        if(!matches) [[unlikely]]
         {
+            // [caller-saved opcode/prefix] immediate bytes ... | code_end
+            // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+            // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
             err.err_curr = op_begin;
             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
             err.err_selectable.local_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_local_type);
@@ -2461,6 +2905,8 @@ case wasm1_code::local_set:
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
     }
+
+    initialized_locals.initialize(local_index, local_initially_initialized(local_index));
 
     // `local.tee` emits both a store and a logical push of the same value, so all fused helpers need
     // the destination offset while preserving the operand-stack value model.
@@ -3141,6 +3587,9 @@ case wasm1_code::local_tee:
                                                                             ::fast_io::mnp::leb128_get(local_index))};
     if(local_index_err != ::fast_io::parse_code::ok) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_code = code_validation_error_code::invalid_local_index;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(local_index_err);
@@ -3158,6 +3607,9 @@ case wasm1_code::local_tee:
 
     if(local_index >= all_local_count) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.illegal_local_index.local_index = local_index;
         err.err_selectable.illegal_local_index.all_local_count = all_local_count;
@@ -3177,8 +3629,18 @@ case wasm1_code::local_tee:
     }
     else if(auto const value{try_peek_concrete_operand()}; value.from_stack)
     {
-        if(!operand_type_matches(value, curr_local_type)) [[unlikely]]
+        auto const matches{rich_owned_available && !value.is_unknown ?
+            runtime_core3_value_type_matches(
+                ::uwvm2::validation::standard::wasm3::core3_operand_effective_type(value),
+                local_core_type_from_index(local_index),
+                ::uwvm2::validation::standard::wasm3::core3_signature_view<
+                    ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_owned_signature_t>{rich_owned_begin, runtime_type_count}) :
+            operand_type_matches(value, curr_local_type)};
+        if(!matches) [[unlikely]]
         {
+            // [caller-saved opcode/prefix] immediate bytes ... | code_end
+            // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+            // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
             err.err_curr = op_begin;
             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
             err.err_selectable.local_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_local_type);
@@ -3188,14 +3650,17 @@ case wasm1_code::local_tee:
         }
     }
 
+    initialized_locals.initialize(local_index, local_initially_initialized(local_index));
     // local.tee has result type t, even when its input was Unknown. Pop/push
     // through the helpers so changing the placeholder i32 to i64/v128 also
     // updates operand_stack_bytes; mutating only the tag corrupts accounting.
-    if(operand_stack.back_unchecked().is_unknown)
+    if(operand_stack.back_unchecked().is_unknown || operand_stack.back_unchecked().is_reference_bottom)
     {
         operand_stack_pop_unchecked();
         operand_stack_push(curr_local_type);
     }
+    operand_stack.back_unchecked().core_type = local_core_type_from_index(local_index);
+    operand_stack.back_unchecked().has_core_type = true;
 
     auto const local_off{local_offset_from_index(local_index)};
 
@@ -3859,6 +4324,9 @@ case wasm1_code::global_get:
                                                                               ::fast_io::mnp::leb128_get(global_index))};
     if(global_index_err != ::fast_io::parse_code::ok) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_code = code_validation_error_code::invalid_global_index;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(global_index_err);
@@ -3876,6 +4344,9 @@ case wasm1_code::global_get:
 
     if(global_index >= all_global_count) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.illegal_global_index.global_index = global_index;
         err.err_selectable.illegal_global_index.all_global_count = all_global_count;
@@ -3958,7 +4429,16 @@ case wasm1_code::global_get:
                                     emit_imm_to(bytecode, imm);
 
                                     // Skip `i32.const imm; i32.add; global.set <same>`: net stack effect is 0.
+                                    // fused local.set index ... code_end
+                                    // [safe consumed bytes] unsafe (could be code_end)
+                                    // ^^ set_index_next: successful bounded lookahead produced a position in the current code slice.
+                                    // [bounded decoded/immediate cursor] next bytes ... | end
+                                    // [safe consumed bytes]       | one-past is never dereferenced here
+                                    // ^^ code_curr: the successful scanner or checked lookahead supplies a position within the current code slice.
                                     code_curr = reinterpret_cast<::std::byte const*>(set_index_next);
+                                    // fused local.set index ... code_end
+                                    // [safe consumed bytes] unsafe (could be code_end)
+                                    //                       ^^ code_curr may be one-past; no read occurs here.
                                     break;
                                 }
                             }
@@ -3971,6 +4451,8 @@ case wasm1_code::global_get:
 #endif
 
     operand_stack_push(curr_global_type);
+    operand_stack.back_unchecked().core_type = get_global_core_type(global_index);
+    operand_stack.back_unchecked().has_core_type = true;
     {
         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
@@ -4001,7 +4483,7 @@ case wasm1_code::global_get:
                                        }
                                    }};
 
-        switch(curr_global_type)
+        switch(static_cast<unsigned>(curr_global_type) == 0x69u ? curr_operand_stack_value_type::externref : curr_global_type)
         {
             case curr_operand_stack_value_type::i32:
             {
@@ -4083,6 +4565,9 @@ case wasm1_code::global_set:
                                                                               ::fast_io::mnp::leb128_get(global_index))};
     if(global_index_err != ::fast_io::parse_code::ok) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_code = code_validation_error_code::invalid_global_index;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(global_index_err);
@@ -4100,6 +4585,9 @@ case wasm1_code::global_set:
 
     if(global_index >= all_global_count) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.illegal_global_index.global_index = global_index;
         err.err_selectable.illegal_global_index.all_global_count = all_global_count;
@@ -4134,6 +4622,9 @@ case wasm1_code::global_set:
 
     if(!curr_global_mutable) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.immutable_global_set.global_index = global_index;
         err.err_code = code_validation_error_code::immutable_global_set;
@@ -4143,8 +4634,18 @@ case wasm1_code::global_set:
     if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"global.set", 1uz); }
     else if(auto const value{try_pop_concrete_operand()}; value.from_stack)
     {
-        if(!operand_type_matches(value, curr_global_type)) [[unlikely]]
+        auto const matches{rich_owned_available && !value.is_unknown ?
+            runtime_core3_value_type_matches(
+                ::uwvm2::validation::standard::wasm3::core3_operand_effective_type(value),
+                get_global_core_type(global_index),
+                ::uwvm2::validation::standard::wasm3::core3_signature_view<
+                    ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_owned_signature_t>{rich_owned_begin, runtime_type_count}) :
+            operand_type_matches(value, curr_global_type)};
+        if(!matches) [[unlikely]]
         {
+            // [caller-saved opcode/prefix] immediate bytes ... | code_end
+            // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+            // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
             err.err_curr = op_begin;
             err.err_selectable.global_variable_type_mismatch.global_index = global_index;
             err.err_selectable.global_variable_type_mismatch.expected_type = to_wasm1_value_type(curr_global_type);
@@ -4178,7 +4679,7 @@ case wasm1_code::global_set:
                                            emit_imm_to(bytecode, global_access.local_imported_global_index);
                                        }
                                    }};
-        switch(curr_global_type)
+        switch(static_cast<unsigned>(curr_global_type) == 0x69u ? curr_operand_stack_value_type::externref : curr_global_type)
         {
             case curr_operand_stack_value_type::i32:
             {

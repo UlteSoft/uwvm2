@@ -1,0 +1,22 @@
+--- a/third-parties/fast_io/share/fast_io/fast_io_inc/core.inc
++++ b/third-parties/fast_io/share/fast_io/fast_io_inc/core.inc
+@@ -253,7 +253,19 @@
+ 
+ namespace char_category
+ {
++    // Match the hosted/core header's public C character-category family.
++    using ::fast_io::char_category::is_c_alnum;
++    using ::fast_io::char_category::is_c_alpha;
++    using ::fast_io::char_category::is_c_blank;
++    using ::fast_io::char_category::is_c_cntrl;
+     using ::fast_io::char_category::is_c_digit;
++    using ::fast_io::char_category::is_c_graph;
++    using ::fast_io::char_category::is_c_lower;
++    using ::fast_io::char_category::is_c_print;
++    using ::fast_io::char_category::is_c_punct;
++    using ::fast_io::char_category::is_c_space;
++    using ::fast_io::char_category::is_c_upper;
++    using ::fast_io::char_category::is_c_xdigit;
+     using ::fast_io::char_category::is_dos_file_invalid_character;
+ }
+ 

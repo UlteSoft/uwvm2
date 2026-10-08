@@ -75,6 +75,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         inline static constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte section_id{
             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(::uwvm2::parser::wasm::standard::wasm1::section::section_id::global_sec)};
 
+        // Aggregate over definitions and imports; preserve binary feature requirements without changing value storage.
+        bool requires_function_references{};
+        bool requires_gc{};
+        bool requires_exceptions{};
+        bool requires_reference_types{}, requires_simd{};
+        // Module-wide aggregate from successful constexpr decoding, including
+        // table/element/data expressions even when no Global section is encoded.
+        bool constant_expressions_require_extended_const{};
+        unsigned extended_const_diagnostic_value{};
+        ::uwvm2::parser::wasm::base::wasm1p1_error_subject extended_const_diagnostic_subject{};
+        ::uwvm2::parser::wasm::base::constant_expression_opcode_requirements constant_expression_opcode_requirements{};
+        // First successful required encoding, retained solely for cold policy diagnostics.
+        unsigned reference_types_diagnostic_value{};
         ::uwvm2::parser::wasm::standard::wasm1::section::section_span_view sec_span{};
 
         ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::features::final_local_global_type<Fs...>> local_globals{};

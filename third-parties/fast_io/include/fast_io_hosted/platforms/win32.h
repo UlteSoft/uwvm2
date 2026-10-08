@@ -280,7 +280,8 @@ inline constexpr win32_open_mode calculate_win32_open_mode(open_mode_perms ompm)
 	{
 		mode.dwDesiredAccess |= 0x40000000; // GENERIC_WRITE
 	}
-	if (((value & open_mode::in) != open_mode::none) || ((value & open_mode::app) != open_mode::none))
+	if (((value & open_mode::in) != open_mode::none) ||
+		((value & open_mode::app) != open_mode::none && (value & open_mode::explicit_disposition) == open_mode::none))
 	{
 		mode.dwDesiredAccess |= 0x80000000; // GENERIC_READ
 		if ((value & open_mode::out) != open_mode::none &&
@@ -398,6 +399,13 @@ inline constexpr win32_open_mode calculate_win32_open_mode(open_mode_perms ompm)
 		{
 			mode.dwCreationDisposition = 4; // OPEN_ALWAYS
 		}
+	}
+	if ((value & open_mode::explicit_disposition) != open_mode::none)
+	{
+		bool const create{(value & open_mode::creat) != open_mode::none};
+		bool const truncate{(value & open_mode::trunc) != open_mode::none};
+		bool const exclusive{(value & open_mode::excl) != open_mode::none};
+		mode.dwCreationDisposition = create ? (exclusive ? 1u : (truncate ? 2u : 4u)) : (truncate ? 5u : 3u);
 	}
 	if ((value & open_mode::direct) != open_mode::none)
 	{

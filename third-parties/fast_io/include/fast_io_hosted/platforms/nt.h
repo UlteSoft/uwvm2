@@ -88,7 +88,11 @@ inline constexpr nt_open_mode calculate_nt_open_mode(open_mode_perms ompm) noexc
 	constexpr auto default_write_attribute{0x00020000L /*READ_CONTROL*/ | 0x0002 /*FILE_WRITE_DATA*/ | 0x0004 /*FILE_APPEND_DATA*/};
 	constexpr auto default_read_attribute{0x00020000L /*READ_CONTROL*/ | 0x0001 /*FILE_READ_DATA*/};
 
-	mode.DesiredAccess |= 0x00100000L /*SYNCHRONIZE*/ | 0x0080 /*FILE_READ_ATTRIBUTES*/ | 0x0100 /*FILE_WRITE_ATTRIBUTES*/;
+	mode.DesiredAccess |= 0x00100000L /*SYNCHRONIZE*/ | 0x0080 /*FILE_READ_ATTRIBUTES*/;
+	if ((value & open_mode::no_write_attributes) == open_mode::none)
+	{
+		mode.DesiredAccess |= 0x0100 /*FILE_WRITE_ATTRIBUTES*/;
+	}
 
 	if ((value & open_mode::no_shared_read) == open_mode::none)
 	{
@@ -112,7 +116,8 @@ inline constexpr nt_open_mode calculate_nt_open_mode(open_mode_perms ompm) noexc
 		mode.DesiredAccess |= default_write_attribute;
 		generic_write = true;
 	}
-	if (((value & open_mode::in) != open_mode::none) || ((value & open_mode::app) != open_mode::none))
+	if (((value & open_mode::in) != open_mode::none) ||
+		((value & open_mode::app) != open_mode::none && (value & open_mode::explicit_disposition) == open_mode::none))
 	{
 		mode.DesiredAccess |= default_read_attribute;
 		if ((value & open_mode::out) != open_mode::none &&
@@ -211,6 +216,13 @@ inline constexpr nt_open_mode calculate_nt_open_mode(open_mode_perms ompm) noexc
 		{
 			mode.CreateDisposition = 0x00000003; // OPEN_ALWAYS	=>	FILE_OPEN_IF		(0x00000003)
 		}
+	}
+	if ((value & open_mode::explicit_disposition) != open_mode::none)
+	{
+		bool const create{(value & open_mode::creat) != open_mode::none};
+		bool const truncate{(value & open_mode::trunc) != open_mode::none};
+		bool const exclusive{(value & open_mode::excl) != open_mode::none};
+		mode.CreateDisposition = create ? (exclusive ? 2u : (truncate ? 5u : 3u)) : (truncate ? 4u : 1u);
 	}
 	if ((value & open_mode::direct) != open_mode::none)
 	{
@@ -338,13 +350,13 @@ inline constexpr nt_open_mode calculate_nt_open_mode(open_mode_perms ompm) noexc
 template <bool zw>
 inline void *nt_create_file_common(void *directory, ::fast_io::win32::nt::unicode_string *relative_path, nt_open_mode const &mode)
 {
-	::fast_io::win32::security_attributes sec_attr{sizeof(::fast_io::win32::security_attributes), nullptr, true};
+	// NT expects a SECURITY_DESCRIPTOR, not the Win32 SECURITY_ATTRIBUTES wrapper.
+	// Null uses the token default security; OBJ_INHERIT above controls inheritance.
 	::fast_io::win32::nt::object_attributes obj{.Length = sizeof(::fast_io::win32::nt::object_attributes),
 												.RootDirectory = directory,
 												.ObjectName = relative_path,
 												.Attributes = mode.ObjAttributes,
-												.SecurityDescriptor =
-													mode.ObjAttributes & 0x00000002 ? __builtin_addressof(sec_attr) : nullptr,
+												.SecurityDescriptor = nullptr,
 												.SecurityQualityOfService = nullptr};
 	void *handle;
 	::fast_io::win32::nt::io_status_block block;

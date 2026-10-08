@@ -306,9 +306,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
         unsigned custom_page_size_log2{};
 
+#if SIZE_MAX > UINT32_MAX
+        // Use pointer-alignment padding on 64-bit hosts, preserving hot offsets.
+        bool sequentially_consistent_size{};
+#endif
+
         // Querying lock status itself can cause race conditions, so a double-atom model is used here.
         ::std::atomic_flag* growing_flag_p{};
         ::std::atomic_size_t* active_ops_p{};
+        // Owner identity is read only after a bounds check fails. Keep the
+        // existing base/length/page/lock member offsets unchanged.
+        ::std::size_t diagnostic_owner_memory_index{};
+#if SIZE_MAX <= UINT32_MAX
+        // 32-bit hosts have no padding after custom_page_size_log2. Append the
+        // immutable size/grow policy instead of shifting the existing lock fields.
+        bool sequentially_consistent_size{};
+#endif
+        // Dedicated publication avoids mixing atomic and non-atomic accesses to
+        // memory_length. Shared size queries need no relocation pin; every grow
+        // publishes only after allocation, copy and zero initialization finish.
+        ::std::atomic_size_t ordered_memory_length{};
+
+
         // constexpr data
 
         /// @brief If mmap is not possible, it indicates that realloc is required. This means the content may grow, potentially changing the base address,
@@ -362,12 +381,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         /// @note       This function is designed to be lock-free and cannot be executed during WASM execution (multi-threaded). It can only be done before the
         ///             WASM execution.
         /// @note       You can use it after clear().
-        inline constexpr void init_by_page_count(::std::size_t init_page_count) noexcept
+        inline constexpr void init_by_page_count(::std::size_t init_page_count, ::std::size_t memory_index = 0uz) noexcept
         {
             if(init_page_count > ::std::numeric_limits<::std::size_t>::max() >> this->custom_page_size_log2) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             if(this->memory_begin == nullptr) [[likely]]
             {
+                this->diagnostic_owner_memory_index = memory_index;
                 // UB will never appear; it has been preemptively checked.
                 this->memory_length = init_page_count << this->custom_page_size_log2;
 
@@ -376,6 +396,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                 auto const temp_memory_begin{allocator_t::allocate_aligned_zero(alignment, this->memory_length)};
 
                 this->memory_begin = ::std::assume_aligned<alignment>(reinterpret_cast<::std::byte*>(temp_memory_begin));
+                if(this->sequentially_consistent_size) { this->ordered_memory_length.store(this->memory_length, ::std::memory_order_seq_cst); }
             }
         }
 
@@ -435,7 +456,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             }
 
             auto const memory_grow_size{page_grow_size << this_custom_page_size_log2};
-            auto const curr_memory_length{this->memory_length};
+            auto const curr_memory_length{this->sequentially_consistent_size ? this->ordered_memory_length.load(::std::memory_order_seq_cst) : this->memory_length};
             if(old_page_size_out != nullptr) [[likely]] { *old_page_size_out = curr_memory_length >> this_custom_page_size_log2; }
 
             if(max_limit_memory_length < curr_memory_length) [[unlikely]]
@@ -498,6 +519,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
             this->memory_begin = ::std::assume_aligned<alignment>(temp_memory_begin);
             this->memory_length = new_memory_length;
+            if(this->sequentially_consistent_size) { this->ordered_memory_length.store(new_memory_length, ::std::memory_order_seq_cst); }
 
             // growing_flag_guard destruct here
             return true;
@@ -573,7 +595,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             }
 
             auto const memory_grow_size{page_grow_size << this_custom_page_size_log2};
-            auto const curr_memory_length{this->memory_length};
+            auto const curr_memory_length{this->sequentially_consistent_size ? this->ordered_memory_length.load(::std::memory_order_seq_cst) : this->memory_length};
             if(old_page_size_out != nullptr) [[likely]] { *old_page_size_out = curr_memory_length >> this_custom_page_size_log2; }
 
             if(max_limit_memory_length < curr_memory_length) [[unlikely]]
@@ -637,6 +659,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
             this->memory_begin = ::std::assume_aligned<alignment>(temp_memory_begin);
             this->memory_length = new_memory_length;
+            if(this->sequentially_consistent_size) { this->ordered_memory_length.store(new_memory_length, ::std::memory_order_seq_cst); }
 
             // growing_flag_guard destruct here
             return true;
@@ -644,6 +667,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
         inline constexpr ::std::size_t get_page_size() const noexcept
         {
+            if(this->sequentially_consistent_size)
+            { return this->ordered_memory_length.load(::std::memory_order_seq_cst) >> this->custom_page_size_log2; }
             memory_operation_guard_t memory_op_guard{this->growing_flag_p, this->active_ops_p};
             // UB will never appear; it has been preemptively checked.
 
@@ -662,6 +687,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             this->memory_begin = other.memory_begin;
             this->memory_length = other.memory_length;
             this->custom_page_size_log2 = other.custom_page_size_log2;
+            this->diagnostic_owner_memory_index = other.diagnostic_owner_memory_index;
+            this->sequentially_consistent_size = other.sequentially_consistent_size;
+            this->ordered_memory_length.store(other.ordered_memory_length.load(::std::memory_order_relaxed), ::std::memory_order_relaxed);
             this->growing_flag_p = other.growing_flag_p;
             this->active_ops_p = other.active_ops_p;
 
@@ -669,6 +697,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             other.memory_begin = nullptr;
             other.memory_length = 0uz;
             other.custom_page_size_log2 = 0u;
+            other.diagnostic_owner_memory_index = 0uz;
+            other.sequentially_consistent_size = false;
+            other.ordered_memory_length.store(0uz, ::std::memory_order_relaxed);
             other.growing_flag_p = nullptr;
             other.active_ops_p = nullptr;
         }
@@ -684,6 +715,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             this->memory_begin = other.memory_begin;
             this->memory_length = other.memory_length;
             this->custom_page_size_log2 = other.custom_page_size_log2;
+            this->diagnostic_owner_memory_index = other.diagnostic_owner_memory_index;
+            this->sequentially_consistent_size = other.sequentially_consistent_size;
+            this->ordered_memory_length.store(other.ordered_memory_length.load(::std::memory_order_relaxed), ::std::memory_order_relaxed);
             this->growing_flag_p = other.growing_flag_p;
             this->active_ops_p = other.active_ops_p;
 
@@ -691,6 +725,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             other.memory_begin = nullptr;
             other.memory_length = 0uz;
             other.custom_page_size_log2 = 0u;
+            other.diagnostic_owner_memory_index = 0uz;
+            other.sequentially_consistent_size = false;
+            other.ordered_memory_length.store(0uz, ::std::memory_order_relaxed);
             other.growing_flag_p = nullptr;
             other.active_ops_p = nullptr;
 
@@ -703,9 +740,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         ///             WASM execution.
         inline constexpr void clear() noexcept
         {
+            this->diagnostic_owner_memory_index = 0uz;
             Alloc::deallocate_aligned_n(this->memory_begin, alignment, this->memory_length);  // dealloc includes built-in nullptr checking
 
             this->memory_length = 0uz;
+            this->ordered_memory_length.store(0uz, ::std::memory_order_relaxed);
             this->memory_begin = nullptr;
         }
 
@@ -715,6 +754,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         ///             WASM execution.
         inline constexpr void clear_destroy() noexcept
         {
+            this->diagnostic_owner_memory_index = 0uz;
             Alloc::deallocate_aligned_n(this->memory_begin, alignment, this->memory_length);  // dealloc includes built-in nullptr checking
 
             if(this->growing_flag_p != nullptr) [[likely]] { ::std::destroy_at(this->growing_flag_p); }
@@ -724,6 +764,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             atomic_size_allcator_t::deallocate_n(this->active_ops_p, 1uz);  // dealloc includes built-in nullptr checking
 
             this->memory_length = 0uz;
+            this->ordered_memory_length.store(0uz, ::std::memory_order_relaxed);
             this->memory_begin = nullptr;
             this->custom_page_size_log2 = 0u;
             this->growing_flag_p = nullptr;

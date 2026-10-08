@@ -99,14 +99,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t path_len,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t buf_ptrsz) noexcept
     {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-        if(env.wasip1_memory == nullptr) [[unlikely]]
-        {
-            // Security issues inherent to virtual machines
-            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-        }
-# endif
-        auto& memory{*env.wasip1_memory};
+        auto const memory_pointer{env.get_memory()};
+        if(memory_pointer == nullptr) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault; }
+        auto& memory{*memory_pointer};
 
         // path_ptrsz is ConstPointer<u8> (alignment 1).
         check_wasip1_guest_pointer_alignment<8uz>(buf_ptrsz, u8"path_filestat_get.buf (filestat)");

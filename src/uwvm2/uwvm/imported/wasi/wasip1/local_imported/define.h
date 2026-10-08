@@ -44,6 +44,7 @@
 # include <uwvm2/imported/wasi/wasip1/impl.h>
 # include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
+# include <uwvm2/uwvm/debugger/wasip1_calls.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -219,6 +220,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
                       ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t::may_modify>
         struct wasip1_local_imported_function final : wasip1_local_imported_function_base<Fn>
         {
+            using base = wasip1_local_imported_function_base<Fn>;
+            using local_imported_function_type = typename base::local_imported_function_type;
+            inline static constexpr void call(local_imported_function_type& function) noexcept
+            {
+                namespace calls = ::uwvm2::uwvm::debugger::wasip1_calls;
+                if(::std::is_constant_evaluated() || !calls::enabled.load(::std::memory_order_relaxed)) { base::call(function); return; }
+                calls::record row{};
+                constexpr auto count{::fast_io::tuple_size<decltype(function.params)>::value};
+                static_assert(count <= 16u); row.count = count;
+                [&]<::std::size_t... I>(::std::index_sequence<I...>)
+                {
+                    ((row.arguments[I] = static_cast<::std::uint64_t>(static_cast<::std::make_unsigned_t<::std::remove_cvref_t<decltype(::uwvm2::utils::container::get<I>(function.params))>>>(::uwvm2::utils::container::get<I>(function.params))),
+                      row.widths[I] = sizeof(::uwvm2::utils::container::get<I>(function.params)) * 8u), ...);
+                }(::std::make_index_sequence<count>{});
+                auto const observed{calls::enter(function_name, row)};
+                base::call(function); // only the genuine builtin wrapper emits return
+                if constexpr(::fast_io::tuple_size<decltype(function.res)>::value == 0u) { calls::leave(observed, false, 0u); }
+                else { calls::leave(observed, true, static_cast<::std::uint64_t>(::uwvm2::utils::container::get<0>(function.res))); }
+            }
             inline static constexpr ::uwvm2::utils::container::u8string_view function_name{Name};
             inline static constexpr ::uwvm2::uwvm::wasm::type::local_imported_wasm_fp_control_policy_t wasm_fp_control_policy{
                 WasmFpControlPolicy};

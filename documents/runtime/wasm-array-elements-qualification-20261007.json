@@ -1,0 +1,119 @@
+{
+  "schema": "uwvm-gc-array-element-debug-qualification-v1",
+  "passed": true,
+  "date": "2026-10-07",
+  "repositories": [
+    "uwvm2",
+    "uwvm2-ros"
+  ],
+  "backend": "full LLVM JIT",
+  "architectures": [
+    "x86_64 Linux",
+    "riscv64 QEMU Linux",
+    "aarch64 QEMU Linux"
+  ],
+  "source_cut": "source212",
+  "source_identities": {
+    "uwvm2": "sha256:c9052516f4bead683100a034f39d8c4b843ffda562c530e2702f366080bf6fa6",
+    "uwvm2-ros": "sha256:6a98e1dd7c2b4031cdd94f3c7a6b62146b83d70767794073e6dc2016442c2c58"
+  },
+  "latest_tree_qualified": false,
+  "production_cpp_changed": false,
+  "fix": "Shared CLI member-page harness no longer forms a negative last index for a zero-member GC array",
+  "source_hashes": {
+    "run_wasm_live_containers_cli.py": "56bb21cf24eb0cb6061110efd457d96f38f0e281c44e62ef6cb610221f1288f9",
+    "wasm_array_elem_cases.py": "842d255d2ec29ad2467f79f6f1013b2077be1b1162cb932236e7302bbe539071",
+    "run_wasm_array_elem_cli.py": "9b1bd169011f74a71d3b6c1d100dd80e736279296cb955ede6886767431093e8"
+  },
+  "positive_VM_sessions": 50,
+  "matrix_VM_sessions": 48,
+  "smoke_VM_sessions": 2,
+  "additional_old_harness_expected_failure_VM_sessions": 1,
+  "total_actual_VM_sessions": 51,
+  "positive_exact_value_pauses": 750,
+  "positive_exact_GC_member_pages": 8350,
+  "exact_empty_array_member_pages": 700,
+  "independently_validated_paired_modules": 4,
+  "negative_control": {
+    "passed": true,
+    "actual_VM": true,
+    "expected_old_runner_exit": 1,
+    "actual_old_runner_exit": 1,
+    "old_member_harness_sha256": "fcf30d4db029f49f08bbd3a3d82f6d875caa73ef3976bf7437ecdcfdad485a24",
+    "corrected_member_harness_sha256": "56bb21cf24eb0cb6061110efd457d96f38f0e281c44e62ef6cb610221f1288f9",
+    "fully_checked_pauses_before_expected_failure": 11,
+    "managed_console_exit_required_by_harness": 0,
+    "failed_command": "members operands 1 0 0 0 2 -1 1",
+    "new_positive_runner_smoke": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/smoke363-results/results.json",
+    "child_output_sha256": "510d7e7eaf5de8857c62f2836249e3dcc31382795a3f17deeaaea6b11fc54587",
+    "cgroup": "0::/system.slice/docker-d3b12e6d323a0f28c2408989fff41a1ca1a991e19945919bc870337dd0afae03.scope\n"
+  },
+  "preexecution_input_hash_count": 30311,
+  "scope": {
+    "array_new_elem": true,
+    "array_init_elem": true,
+    "generic_and_typed_nullable_funcref": true,
+    "exact_function_module_and_index": true,
+    "operand_local_typed_table_roots": true,
+    "successful_call_ref_dispatch": true,
+    "unchanged_source_array": true,
+    "dropped_segment_zero_length_init": true,
+    "dropped_segment_nonnull_zero_length_new_array": true,
+    "empty_array_pages_without_negative_index": true,
+    "unchanged_genuine_stop_ids": true,
+    "full_Core3_state_coverage": false,
+    "invalid_or_stale_path_coverage": false,
+    "nonzero_access_after_elem_drop_traps": false,
+    "whole_instance_restore": false,
+    "performance_qualification": false
+  },
+  "resource": {
+    "owned_RSS_peak_bytes": 309760000,
+    "folder_high_water_bytes": 14465564672,
+    "minimum_global_free_bytes": 65919770624,
+    "all_max_OOM_events_zero": true
+  },
+  "final_resource": {
+    "passed": true,
+    "qualification_sha256": "e638beb30fa9fc325a81fff0e4896cbad45b2819f9a64937e3c262fd0e03804d",
+    "manifest_sha256": "7357826aa7fdb047390f81e8acd7243fffb6a3d8e7ce674dbde014ed50d47a5b",
+    "archive_sha256": "77173f00ea1f9aa25669dababf7c01ba1b939db0cfe978999010eefb099df444",
+    "archive_bytes": 9033271,
+    "member_count": 283,
+    "package_receipt_sha256": "a763f477b91dc430fc5425f84ac904d95134fd0fcf5fc27b1961751b55c1a344",
+    "actual_package_root_pid": 184853,
+    "actual_root_reaped_exit": 0,
+    "all_owned_processes_retired": true,
+    "foreign_processes_signalled": [],
+    "foreign_processes_adopted": [],
+    "final_owned_folder_high_water_bytes": 14662692864,
+    "final_linux_free_bytes": 64389926912,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  "evidence": {
+    "directory": "/Users/liyinan/Documents/MacroModel/wasm-core3-debug-audit-20261007-r1",
+    "qualification": "QUALIFIED365.json",
+    "qualification_sha256": "e638beb30fa9fc325a81fff0e4896cbad45b2819f9a64937e3c262fd0e03804d",
+    "archive": "delivery366.tar.gz",
+    "archive_sha256": "77173f00ea1f9aa25669dababf7c01ba1b939db0cfe978999010eefb099df444",
+    "archive_bytes": 9033271,
+    "member_count": 283,
+    "transport_verification": "DELIVERY370-local-verification.json"
+  },
+  "remaining": [
+    "nonzero element-segment access traps after elem.drop",
+    "other GC element reference kinds/subtyping/cycles",
+    "invalid-path/stale-handle combinations",
+    "empty table query harness and huge table indices above 2^32",
+    "full VM qualification on remaining Linux architectures",
+    "whole-instance checkpoint restoration",
+    "debug-off performance qualification"
+  ]
+}

@@ -107,15 +107,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
         ) noexcept
     {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-        if(env.wasip1_memory == nullptr) [[unlikely]]
-        {
-            // Security issues inherent to virtual machines
-            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-        }
-# endif
 
-        auto& memory{*env.wasip1_memory};
+        auto const memory_pointer{env.get_memory()};
+        if(memory_pointer == nullptr) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault; }
+        auto& memory{*memory_pointer};
 
         // fd remains a 32-bit handle in the mirrored wasm64 ABI.
         check_wasip1_guest_pointer_alignment<4uz>(ro_fd_ptrsz, u8"sock_accept_wasm64.ro_fd (fd)");

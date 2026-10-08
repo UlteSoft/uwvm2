@@ -170,6 +170,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         exceed_the_max_parser_limit,
         wasm1p1_feature_required,
         wasm2_feature_required,
+        wasm3_extended_const_disabled,
+        wasm3_table_initializer_disabled,
         wasm1p1_invalid_data_count_section_count,
         wasm1p1_data_count_section_resolved_not_match_the_actual_number,
         wasm1p1_invalid_element_segment_flag,
@@ -179,7 +181,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         wasm1p1_invalid_elem_expr_count,
         wasm1p1_element_table_type_mismatch,
         wasm1p1_reference_type_mismatch,
-        wasm1p1_init_ref_func_index_exceeds_maxvul
+        wasm1p1_init_ref_func_index_exceeds_maxvul,
+        wasm3_limit_type_max_lt_min,
+        wasm3_memory_limit_out_of_range,
+        wasm3_table_limit_out_of_range,
+        wasm3_rich_signature_not_integrated,
+        wasm3_rich_value_not_integrated,
+        wasm3_invalid_tag_type,
+        wasm3_invalid_tag_count
     };
 
     /// @brief used for duplicate_imports_of_the_same_import_type
@@ -266,7 +275,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         reference_types,
         sign_extension,
         nontrapping_float_to_int,
-        simd
+        simd,
+        relaxed_simd,
+        multi_memory,
+        threads,
+        tail_call,
+        memory64,
+        table64,
+        function_references,
+        gc,
+        exceptions,
+        extended_const,
+        table_initializer
     };
 
     /// @brief WebAssembly 1.1 syntax/semantic site used by wasm1p1-specific diagnostics.
@@ -281,8 +301,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         instruction,
         init_ref_null,
         init_ref_func,
-        init_v128_const
+        init_v128_const,
+        memory_type,
+        function_type,
+        local_type,
+        global_type,
+        tag_type
     };
+
+    // Constant-expression instruction requirements retain their actual source
+    // site independently of the expression's result type. A GC-to-externref
+    // conversion must not erase the requirement of its preceding GC opcodes.
+    // Every scalar defaults to zero, preserving zero-default storage contracts.
+    struct constant_expression_opcode_requirement
+    {
+        bool required{};
+        unsigned value{};
+        wasm1p1_error_subject subject{};
+    };
+    struct constant_expression_opcode_requirements
+    {
+        constant_expression_opcode_requirement gc{}, exceptions{}, function_references{}, reference_types{}, simd{};
+    };
+    static_assert(::std::is_trivially_copyable_v<constant_expression_opcode_requirements> &&
+                  ::std::is_trivially_destructible_v<constant_expression_opcode_requirements>);
+    inline constexpr void record_constant_expression_opcode_requirement(
+        constant_expression_opcode_requirement& target, unsigned value, wasm1p1_error_subject subject) noexcept
+    {
+        if(!target.required) { target = {.required = true, .value = value, .subject = subject}; }
+    }
+    inline constexpr void merge_constant_expression_opcode_requirements(
+        constant_expression_opcode_requirements& target, constant_expression_opcode_requirements const& source) noexcept
+    {
+        // Fixed five scalar records, not a declaration, expression or byte walk.
+        if(!target.gc.required && source.gc.required) { target.gc = source.gc; }
+        if(!target.exceptions.required && source.exceptions.required) { target.exceptions = source.exceptions; }
+        if(!target.function_references.required && source.function_references.required) { target.function_references = source.function_references; }
+        if(!target.reference_types.required && source.reference_types.required) { target.reference_types = source.reference_types; }
+        if(!target.simd.required && source.simd.required) { target.simd = source.simd; }
+    }
 
     /// @brief Used to set the output of wasm1p1_feature_required errors.
     struct wasm1p1_feature_required_t
@@ -343,6 +400,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         ::std::uint_least32_t table_idx;
         ::std::uint_least8_t segment_type;
         ::std::uint_least8_t table_type;
+        // Core 3 reference metadata accompanies the legacy one-byte carrier so
+        // two distinct typed function heaps never print as funcref vs funcref.
+        ::std::int_least64_t segment_heap;
+        ::std::int_least64_t table_heap;
+        bool segment_nullable;
+        bool table_nullable;
     };
 
     /// @brief Used to set the output of wasm1p1 init ref.func index errors.
@@ -415,7 +478,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         error_f32 f32;
         bool boolean;
 
-        ::std::uint_least64_t u64arr[1];
+        ::std::uint_least64_t u64arr[2];
         ::std::int_least64_t i64arr[1];
         ::std::uint_least32_t u32arr[2];
         ::std::int_least32_t i32arr[2];

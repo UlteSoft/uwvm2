@@ -1,0 +1,77 @@
+--- a/third-parties/fast_io/include/fast_io_hosted/filesystem/posix_nothrow.h
++++ b/third-parties/fast_io/include/fast_io_hosted/filesystem/posix_nothrow.h
+@@ -122,6 +122,33 @@
+ // payload or symbol redirection. Only use this noexcept libc alias when the
+ // target headers do not supply the real raw syscall number.
+ extern int fd_data_sync(int) noexcept __asm__("fdatasync");
++#endif
++#if defined(__linux__)
++// posix_fadvise returns zero or the POSIX error value itself; it is NOT a
++// -1/errno API. Use the actual SDK large-file libc ABI, which owns target
++// register-pair ordering/alignment and s390 packed syscall arguments.
++# if defined(__GLIBC__) || defined(__BIONIC__)
++extern int fd_advise(int, seek_offset_type, seek_offset_type, int) noexcept __asm__("posix_fadvise64");
++# else
++extern int fd_advise(int, seek_offset_type, seek_offset_type, int) noexcept __asm__("posix_fadvise");
++# endif
++// Only source-confirmed SDK symbol contracts are selected here. __GLIBC__
++// also appears in uClibc; its optional large-file symbols need their own SDK
++// binding and must not inherit GNU glibc qualification. Other Linux libcs,
++// including musl, need actual SDK/target binding before enabling this API.
++// glibc 2.3.x macros cannot prove the 2.3.3 wide-length default ABI; automatic
++// selection conservatively starts at 2.4. Older SDKs retain their provider.
++// Android introduced the wide public entry in API 21. Keep the template
++// name present everywhere for dependent public requires-expressions, but
++// do not instantiate an unqualified or unavailable runtime symbol.
++# if defined(__GLIBC__) && !defined(__UCLIBC__) && !defined(__BIONIC__) && \
++	(__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 4))
++inline constexpr bool fd_advise_sdk_available = true;
++# elif defined(__BIONIC__) && defined(__ANDROID_API__) && __ANDROID_API__ >= 21
++inline constexpr bool fd_advise_sdk_available = true;
++# else
++inline constexpr bool fd_advise_sdk_available = false;
++# endif
+ #endif
+ // The readonly getter below accepts F_GETFL only. No arbitrary fcntl
+ // command, locking-structure ABI or pointer payload is accepted.
+@@ -407,6 +434,30 @@
+ 	return {};
+ }
+ #endif
++#if defined(__linux__)
++template <::fast_io::posix_family family, ::std::integral char_type>
++requires (details::posix_nothrow_abi::fd_advise_sdk_available &&
++	::std::numeric_limits<details::posix_nothrow_abi::seek_offset_type>::is_signed &&
++	::std::numeric_limits<details::posix_nothrow_abi::seek_offset_type>::digits >=
++		::std::numeric_limits<::fast_io::intfpos_t>::digits)
++inline posix_operation_result posix_fadvise_nothrow(basic_posix_family_io_observer<family, char_type> file,
++	::fast_io::intfpos_t offset, ::fast_io::intfpos_t length, int native_advice) noexcept
++{
++	// Borrow only the caller-pinned descriptor number through ONE real SDK
++	// posix_fadvise call. No pointer, ownership transfer, allocation, retry,
++	// errno access or software emulation is introduced. The SDK large-file
++	// ABI carries both signed offsets without narrowing, including on i386.
++	// Negative values and invalid advice are forwarded unchanged: only the
++	// actual native implementation determines its descriptor/error precedence.
++	// No hint is silently clamped, validated, ignored or upgraded here. In a
++	// unqualified/narrow/older SDK this overload is not callable; dependent
++	// consumers retain their previous provider instead of receiving a guessed
++	// EOVERFLOW or referencing an unavailable large-file symbol.
++	using native_offset_type = details::posix_nothrow_abi::seek_offset_type;
++	return {details::posix_nothrow_abi::fd_advise(file.native_handle(),
++		static_cast<native_offset_type>(offset), static_cast<native_offset_type>(length), native_advice)};
++}
++#endif
+ template <::fast_io::posix_family family, ::std::integral char_type>
+ inline posix_operation_result posix_close_nothrow(basic_posix_family_file<family, char_type>& file) noexcept
+ {
+--- a/third-parties/fast_io/share/fast_io/fast_io_inc/host/posix.inc
++++ b/third-parties/fast_io/share/fast_io/fast_io_inc/host/posix.inc
+@@ -30,6 +30,7 @@
+ #endif
+ #if defined(__linux__)
+     using ::fast_io::posix_fdatasync_nothrow;
++    using ::fast_io::posix_fadvise_nothrow;
+ #endif
+ 
+ #if ((!defined(_WIN32) || defined(__WINE__)) || defined(__CYGWIN__))

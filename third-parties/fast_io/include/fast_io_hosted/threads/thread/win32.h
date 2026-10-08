@@ -169,6 +169,21 @@ public:
 		return this->id_ != 0;
 	}
 
+	// Exclusive HOST owner: a thread handle becomes signaled only at actual
+	// termination. Never infer completion from an application-provided flag.
+	[[nodiscard]] inline ::fast_io::thread_join_result try_join() noexcept
+	{
+		if (!this->joinable()) { return {::fast_io::thread_join_status::not_joinable, 0u}; }
+		auto const waited{::fast_io::win32::WaitForSingleObject(this->handle_, 0u)};
+		if (waited == 0x00000102u) { return {::fast_io::thread_join_status::pending, waited}; } // WAIT_TIMEOUT
+		if (waited != 0u)
+		{ return {::fast_io::thread_join_status::failed, waited == 0xFFFFFFFFu ? ::fast_io::win32::GetLastError() : waited}; }
+		if (!::fast_io::win32::CloseHandle(this->handle_))
+		{ return {::fast_io::thread_join_status::failed, ::fast_io::win32::GetLastError()}; }
+		this->handle_ = nullptr; this->id_ = 0u;
+		return {::fast_io::thread_join_status::joined, 0u};
+	}
+
 	inline
 #if __cpp_constexpr >= 202207L
 		// https://en.cppreference.com/w/cpp/compiler_support/23.html#cpp_constexpr_202207L

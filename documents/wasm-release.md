@@ -1,4 +1,4 @@
-# WebAssembly Specifaction Release
+# WebAssembly Specification Releases
 
 ## Changes by Release
 
@@ -81,7 +81,9 @@
 - 2.0 + tail_calls + function_references + gc (Draft 2024-12-09) (Phase 5 - The Feature is Standardized, merged into wasm3.0)
   - Integration with managed reference types and subtyping introduced by GC
 
-### WebAssembly 3.0 (Draft 2024-09-21) — Changes
+### WebAssembly 3.0 (Release 2026-09-21) — Changes
+
+This list follows the [official Core 3.0 change history](https://webassembly.github.io/spec/core/appendix/changes.html#release-3-0) and its [constant-expression validation rules](https://webassembly.github.io/spec/core/valid/instructions.html#constant-expressions).
 
 - Extended constant expressions
   - Allow basic numeric computations in const expr: `iN.add`, `iN.sub`, `iN.mul`, and `global.get` of prior immutable globals
@@ -93,6 +95,8 @@
 - Multiple memories
   - Multiple memories per module; memory index immediates for memory ops (incl. loads/stores and SIMD loads/stores)
   - Data segments take a memory index
+- 64-bit address space
+  - Memories and tables may declare an `i64` address type; their instruction operands, limits, and active-segment offsets use that address type
 - Typeful references (function references)
   - Generalized reference types: `(ref null? heaptype)`; heap types: `func`, `extern`, `typeidx`
   - New/refined instructions: `ref.as_non_null`, `br_on_null`, `br_on_non_null`, `call_ref`; refined `ref.func`
@@ -106,7 +110,17 @@
   - Struct ops: `struct.new`, `struct.new_default`, `struct.get_s`, `struct.get_u`, `struct.set`
   - Array ops: `array.new`, `array.new_default`, `array.new_fixed`, `array.new_data`, `array.new_elem`, `array.get_s`, `array.get_u`, `array.set`, `array.len`, `array.fill`, `array.copy`, `array.init_data`, `array.init_elem`
   - External conversion: `any.convert_extern`, `extern.convert_any`
-  - Extended const instr: `ref.i31`, `struct.new*`, `array.new*`, `any.convert_extern`, `extern.convert_any`
+  - GC constant instructions: `ref.i31`, `struct.new`, `struct.new_default`, `array.new`, `array.new_default`, `array.new_fixed`, `any.convert_extern`, `extern.convert_any`; these do not require the separate numeric extended-const feature
+- Relaxed SIMD
+  - New relaxed min/max, multiply-add, truncation, swizzle, lane selection, q15 multiply and dot-product instructions; the standard permits implementation-dependent results
+- Profiles
+  - The specification introduces a deterministic execution profile
 - Custom annotations (text format)
   - Generic annotations `(@id ...)`; escaped identifiers `@"..."`
   - Built-in name annotations: `(@name "...")` for module/type/func/local/field; `(@custom "...")` for arbitrary custom sections
+
+### Implementation release gate
+
+Core 3.0 instruction and validation support does not establish that the managed-object runtime is ready for long-lived programs. The current GC object store retains every allocated struct and array until module teardown. The [GC release blocker and executable memory-growth gate](../benchmark/0004.wasm3-core/RELEASE_BLOCKER_GC.md) record the source-bound Linux measurements, the missing reachability collection, and the root, thread, cross-module, and reclamation requirements that must pass before a production release. Performance comparisons for the other Core 3.0 features are tracked separately in the [Core 3 benchmark](../benchmark/0004.wasm3-core/README.md).
+
+For an Xmake release build, refresh `--build-source-id` with the current source fingerprint during `xmake f` while preserving the other build options. `xmake -r` recompiles but does not refresh Xmake's cached configuration. Check that the finished executable embeds the expected fingerprint before treating runtime results as source-bound evidence; the earlier macOS v3 evidence is explicitly invalidated in `build/wasm3-evidence/final-20260925/macos-v3-provenance-invalidated.json` for this reason.

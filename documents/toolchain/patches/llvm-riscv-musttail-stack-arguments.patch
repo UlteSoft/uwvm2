@@ -1,0 +1,93 @@
+--- a/llvm/lib/Target/RISCV/RISCVISelLowering.cpp
++++ b/llvm/lib/Target/RISCV/RISCVISelLowering.cpp
+@@ -25757,11 +25757,37 @@
+ 
+   if (!IsTailCall)
+     Chain = DAG.getCALLSEQ_START(Chain, NumBytes, 0, CLI.DL);
++  else
++    // A tail call writes into the incoming argument area. Finish reading all
++    // incoming stack arguments before any potentially overlapping outgoing
++    // store; independent data dependencies alone do not protect permutations.
++    Chain = DAG.getStackArgumentTokenFactor(Chain);
+ 
+   // Copy argument values to their designated locations.
+   SmallVector<std::pair<Register, SDValue>, 8> RegsToPass;
+   SmallVector<SDValue, 8> MemOpChains;
+   SDValue StackPtr;
++  auto StoreStackArgument = [&](SDValue Value, int64_t Offset) {
++    if (IsTailCall) {
++      // Tail-call arguments must be relative to the incoming SP. The current
++      // SP still includes this function's frame: storing there can overwrite
++      // callee-saved spills and leaves the actual incoming argument unchanged
++      // after the epilogue restores SP. Fixed objects retain the incoming-SP
++      // coordinate system through frame-index elimination.
++      int FI = MF.getFrameInfo().CreateFixedObject(
++          Value.getValueType().getStoreSize().getFixedValue(), Offset,
++          /*IsImmutable=*/false);
++      SDValue Address = DAG.getFrameIndex(FI, PtrVT);
++      return DAG.getStore(Chain, DL, Value, Address,
++                          MachinePointerInfo::getFixedStack(MF, FI));
++    }
++    if (!StackPtr.getNode())
++      StackPtr = DAG.getCopyFromReg(Chain, DL, RISCV::X2, PtrVT);
++    SDValue Address = DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
++                                  DAG.getIntPtrConstant(Offset, DL));
++    return DAG.getStore(Chain, DL, Value, Address,
++                        MachinePointerInfo::getStack(MF, Offset));
++  };
+   for (unsigned i = 0, j = 0, e = ArgLocs.size(), OutIdx = 0; i != e;
+        ++i, ++OutIdx) {
+     CCValAssign &VA = ArgLocs[i];
+@@ -25789,15 +25815,7 @@
+ 
+       if (HiVA.isMemLoc()) {
+         // Second half of f64 is passed on the stack.
+-        if (!StackPtr.getNode())
+-          StackPtr = DAG.getCopyFromReg(Chain, DL, RISCV::X2, PtrVT);
+-        SDValue Address =
+-            DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
+-                        DAG.getIntPtrConstant(HiVA.getLocMemOffset(), DL));
+-        // Emit the store.
+-        MemOpChains.push_back(DAG.getStore(
+-            Chain, DL, Hi, Address,
+-            MachinePointerInfo::getStack(MF, HiVA.getLocMemOffset())));
++        MemOpChains.push_back(StoreStackArgument(Hi, HiVA.getLocMemOffset()));
+       } else {
+         // Second half of f64 is passed in another GPR.
+         Register RegHigh = HiVA.getLocReg();
+@@ -25826,15 +25844,7 @@
+ 
+       if (HiVA.isMemLoc()) {
+         // Second half of vector is passed on the stack.
+-        if (!StackPtr.getNode())
+-          StackPtr = DAG.getCopyFromReg(Chain, DL, RISCV::X2, PtrVT);
+-        SDValue Address =
+-            DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
+-                        DAG.getIntPtrConstant(HiVA.getLocMemOffset(), DL));
+-        // Emit the store.
+-        MemOpChains.push_back(DAG.getStore(
+-            Chain, DL, Hi, Address,
+-            MachinePointerInfo::getStack(MF, HiVA.getLocMemOffset())));
++        MemOpChains.push_back(StoreStackArgument(Hi, HiVA.getLocMemOffset()));
+       } else {
+         // Second half of vector is passed in another GPR.
+         Register RegHigh = HiVA.getLocReg();
+@@ -26018,17 +26028,8 @@
+       assert((!IsTailCall || (CLI.CB && CLI.CB->isMustTailCall())) &&
+              "Tail call not allowed if stack is used for passing parameters");
+ 
+-      // Work out the address of the stack slot.
+-      if (!StackPtr.getNode())
+-        StackPtr = DAG.getCopyFromReg(Chain, DL, RISCV::X2, PtrVT);
+-      SDValue Address =
+-          DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
+-                      DAG.getIntPtrConstant(VA.getLocMemOffset(), DL));
+-
+-      // Emit the store.
+       MemOpChains.push_back(
+-          DAG.getStore(Chain, DL, ArgValue, Address,
+-                       MachinePointerInfo::getStack(MF, VA.getLocMemOffset())));
++          StoreStackArgument(ArgValue, VA.getLocMemOffset()));
+     }
+   }
+ 

@@ -1,4 +1,109 @@
 ﻿/// @warning Extension point: branch stack repair must be audited when adding new value categories or block result forms.
+#if defined(__clang__)
+# pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wswitch" // Core 3 opcode is intentionally outside the shared wasm1 enum.
+#endif
+case static_cast<wasm1_code>(0x0au): // Core 3 throw_ref in a validated unreachable region
+#if defined(__clang__)
+# pragma clang diagnostic pop
+#endif
+{
+    // [throw_ref] next ... code_end
+    // [safe     ] unsafe (could be code_end)
+    // ^^ op_begin borrows the dispatch-checked opcode; throw_ref has no immediate.
+    auto const op_begin{code_curr};
+    ::uwvm2::validation::standard::wasm3::require_exceptions_enabled(!wasm1p1_para.disable_exceptions, 0x0au, op_begin, err);
+    ++code_curr;
+    // [throw_ref] next ... code_end
+    // [safe     ] unsafe (could be code_end)
+    //             ^^ code_curr: exactly one checked byte consumed, possibly one-past.
+    auto const source_stack_bytes{operand_stack_bytes};
+    namespace v3 = ::uwvm2::validation::standard::wasm3;
+    decltype(try_pop_concrete_operand()) operand{};
+    auto const consume{[&]() constexpr noexcept
+    {
+        // Shared count > 0 proves one live current-frame top; preserve the owned rich type.
+        operand = try_pop_concrete_operand();
+        return v3::core3_operand{v3::core3_operand_effective_type(operand), !operand.from_stack || operand.is_unknown};
+    }};
+    auto const matches{[&](auto actual, auto expected) constexpr noexcept
+    { return runtime_core3_value_type_matches(actual, expected,
+        v3::core3_signature_view<::uwvm2::uwvm::runtime::storage::wasm_binfmt1_owned_signature_t>{
+            rich_owned_begin, rich_owned_available ? runtime_type_count : 0uz}); }};
+    auto const failure{v3::pop_core3_expected_operand(is_polymorphic, concrete_operand_count, consume,
+        v3::exception_validation_details::exception_reference(true), matches)};
+    if(failure == v3::typed_stack_error::stack_underflow) [[unlikely]]
+    { report_operand_stack_underflow(op_begin, u8"throw_ref", 1uz); }
+    // The shared expected-pop already checked the full Core 3 exception reference.
+    if(failure != v3::typed_stack_error::ok) [[unlikely]]
+    {
+        // [throw_ref] ... code_end; reporting borrows op_begin without advancing or reading it.
+        // [safe     ]
+        // ^^ err_curr
+        err.err_curr = op_begin;
+        err.err_code = code_validation_error_code::br_value_type_mismatch;
+        err.err_selectable.br_value_type_mismatch = {.op_code_name = u8"throw_ref",
+            .expected_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(0x69u),
+            .actual_type = to_wasm1_value_type(operand.type)};
+        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+    }
+    if(static_null_exception_pending)
+    {
+        // The immediately preceding ref.null exn/noexn emitted no runtime carrier. The
+        // checked adjacent throw_ref therefore traps directly, including inside try_table.
+        // A trap must never be dispatched as a catchable guest_exception.
+        if(!operand.from_stack || static_cast<unsigned>(operand.type) != 0x69u) [[unlikely]]
+        { ::fast_io::fast_terminate(); }
+        static_null_exception_pending = false;
+        if(codegen_reachable)
+        {
+            emit_opfunc_to(bytecode,
+                ::uwvm2::runtime::compiler::uwvm_int::optable::translate::
+                    get_uwvmint_throw_ref_null_fptr_from_tuple<CompileOption>(interpreter_tuple));
+        }
+        v3::make_core3_frame_unreachable(is_polymorphic, [&]() constexpr noexcept
+        {
+            // The actual static-null transfer retires the same current-frame suffix.
+            operand_stack_truncate_to(control_flow_stack.back_unchecked().operand_stack_base);
+        });
+        codegen_reachable = false;
+        break;
+    }
+    // Reachability is an independent execution fact, not inferred from polymorphic operand types.
+    if(codegen_reachable)
+    {
+#if defined(UWVM_CPP_EXCEPTIONS)
+# ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+        flush_conbine_pending();
+# endif
+        stacktop_flush_all_to_operand_stack(bytecode);
+        auto const protected_throw{exception_has_active_handlers()};
+        namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+        emit_opfunc_to(bytecode, protected_throw ?
+            translate::get_uwvmint_throw_ref_catching_fptr_from_tuple<CompileOption>(interpreter_tuple) :
+            translate::get_uwvmint_throw_ref_fptr_from_tuple<CompileOption>(interpreter_tuple));
+        if(protected_throw) { emit_exception_call_site(op_begin, source_stack_bytes); }
+#else
+        ::uwvm2::runtime::compiler::shared::wasm_exception_control::unsupported(op_begin, 0x0au, err);
+#endif
+    }
+    v3::make_core3_frame_unreachable(is_polymorphic, [&]() constexpr noexcept
+    {
+        // The actual function/control frame owns this proven stack base; truncate its suffix only.
+        operand_stack_truncate_to(control_flow_stack.back_unchecked().operand_stack_base);
+    });
+    codegen_reachable = false;
+    // No opfunc, branch, trace operation, ring spill or combine flush is emitted for this dead instruction.
+    break;
+}
+#if defined(__clang__)
+# pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wswitch" // Core 3 opcode is intentionally outside the shared wasm1 enum.
+#endif
+case static_cast<wasm1_code>(0x08u): // Core 3 throw
+#if defined(__clang__)
+# pragma clang diagnostic pop
+#endif
 case wasm1_code::br:
 {
     // Branch translation is where Wasm's structured label stack becomes concrete interpreter jumps.
@@ -14,6 +119,10 @@ case wasm1_code::br:
     // [safe] unsafe (could be the section_end)
     // ^^ op_begin
 
+    if(curr_opbase == static_cast<wasm1_code>(0x08u))
+    { ::uwvm2::validation::standard::wasm3::require_exceptions_enabled(!wasm1p1_para.disable_exceptions, 0x08u, op_begin, err); }
+    // [br/throw] u32 index ... code_end
+    // [safe    ] unsafe (could be code_end); dispatch proved the opcode byte before this increment.
     ++code_curr;
 
     // br     label_index ...
@@ -27,6 +136,9 @@ case wasm1_code::br:
                                                                 ::fast_io::mnp::leb128_get(label_index))};
     if(label_err != ::fast_io::parse_code::ok) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_code = code_validation_error_code::invalid_label_index;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(label_err);
@@ -42,10 +154,70 @@ case wasm1_code::br:
     // [     safe       ] unsafe (could be the section_end)
     //                    ^^ code_curr
 
+    if(curr_opbase == static_cast<wasm1_code>(0x08u))
+    {
+        namespace eh = ::uwvm2::runtime::compiler::shared::wasm_exception_control;
+        auto const tag{eh::resolve_tag(curr_module, label_index, op_begin, 0x08u, err)};
+        auto const payload_count{tag.parameters.size()};
+        if(!is_polymorphic && concrete_operand_count() < payload_count) [[unlikely]]
+        { report_operand_stack_underflow(op_begin, u8"throw", payload_count); }
+        auto const available{concrete_operand_count()};
+        auto const concrete{available < payload_count ? available : payload_count};
+        auto const* rich_tag{rich_owned_available && tag.type_index < runtime_type_count ?
+            ::std::addressof(rich_owned_begin[tag.type_index]) : nullptr};
+        if(rich_tag != nullptr && rich_tag->parameters.size() != payload_count) [[unlikely]]
+        { ::fast_io::fast_terminate(); }
+        for(::std::size_t i{}; i != concrete; ++i)
+        {
+            auto const& operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
+            // [validated tag payload] end; i < concrete <= payload_count proves
+            // [safe               ] unsafe (one-past)
+            //              ^^ reversed parameter index and retained signature entry are live.
+            auto const index{payload_count - 1uz - i};
+            auto const matches{rich_tag != nullptr && !operand.is_unknown ?
+                runtime_core3_value_type_matches(
+                    ::uwvm2::validation::standard::wasm3::core3_operand_effective_type(operand),
+                    rich_tag->parameters.index_unchecked(index),
+                    ::uwvm2::validation::standard::wasm3::core3_signature_view<
+                        ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_owned_signature_t>{rich_owned_begin, runtime_type_count}) :
+                ::uwvm2::validation::standard::wasm3::reference_carrier_matches(operand, tag.parameters.begin[index])};
+            if(!matches) [[unlikely]]
+            { eh::unsupported(op_begin, 0x08u, err); }
+        }
+        auto const target{eh::find_handler(control_flow_stack, tag.identity)};
+        if(target == SIZE_MAX)
+        {
+            // Even unreachable throws validate their payload. A live escaping throw creates an owning
+            // exception and unwinds the actual call chain; it must never be lowered to a trap.
+            if(codegen_reachable)
+            {
+#if defined(UWVM_CPP_EXCEPTIONS)
+# ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                flush_conbine_pending();
+# endif
+                emit_exception_throw(tag, op_begin);
+#else
+                eh::unsupported(op_begin, 0x08u, err);
+#endif
+            }
+            operand_stack_truncate_to(control_flow_stack.back_unchecked().operand_stack_base);
+            is_polymorphic = true;
+            codegen_reachable = false;
+            break;
+        }
+        // The selected handler belongs to a live lexical ancestor; its outer target cannot have
+        // expired. Runtime tuple repair below discards the payload for catch_all and preserves it
+        // for catch. No exception object escapes, so allocation/unwind can be eliminated entirely.
+        label_index = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(control_flow_stack.size() - 1uz - target);
+    }
+
     auto const all_label_count_uz{control_flow_stack.size()};
     auto const label_index_uz{static_cast<::std::size_t>(label_index)};
     if(label_index_uz >= all_label_count_uz) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.illegal_label_index.label_index = label_index;
         err.err_selectable.illegal_label_index.all_label_count = static_cast<wasm_u32>(all_label_count_uz);
@@ -58,7 +230,7 @@ case wasm1_code::br:
     auto const target_frame_index{all_label_count_uz - 1uz - label_index_uz};
     auto& target_frame{control_flow_stack.index_unchecked(target_frame_index)};
     auto const target_label_types{target_frame.label};
-    auto const target_arity{static_cast<::std::size_t>(target_label_types.end - target_label_types.begin)};
+    auto const target_arity{target_label_types.begin == target_label_types.end ? 0uz : static_cast<::std::size_t>(target_label_types.end - target_label_types.begin)};
 
     if(!is_polymorphic && concrete_operand_count() < target_arity) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"br", target_arity); }
 
@@ -70,8 +242,13 @@ case wasm1_code::br:
         {
             auto const expected_type{target_label_types.begin[target_arity - 1uz - i]};
             auto const actual_operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
-            if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
+            if(!block_value_matches(actual_operand, target_label_types, target_frame.signature_type_index,
+                target_frame.type != block_type::loop, target_frame.has_singleton_result_core_type,
+                target_frame.singleton_result_core_type, target_arity - 1uz - i)) [[unlikely]]
             {
+                // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br";
                 err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
@@ -113,6 +290,9 @@ case wasm1_code::br:
                                               wasm1_code op;  // no init
                                               ::std::memcpy(::std::addressof(op), p, sizeof(op));
                                               if(op != expected) { return false; }
+                                              // [checked lookahead opcode] next bytes ... | end
+                                              // [safe consumed bytes]       | one-past is never dereferenced here
+                                              // ^^ p: the preceding p < endp guard and opcode read prove one byte; p may now equal endp.
                                               ++p;
                                               return true;
                                           }};
@@ -124,6 +304,9 @@ case wasm1_code::br:
                                                                                                    reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                    ::fast_io::mnp::leb128_get(v))};
                                                    if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                   // [bounded LEB immediate] next bytes ... | end
+                                                   // [safe consumed bytes]       | one-past is never dereferenced here
+                                                   // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                    p = reinterpret_cast<::std::byte const*>(next);
                                                    return true;
                                                }};
@@ -135,6 +318,9 @@ case wasm1_code::br:
                                                                                                    reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                    ::fast_io::mnp::leb128_get(v))};
                                                    if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                   // [bounded LEB immediate] next bytes ... | end
+                                                   // [safe consumed bytes]       | one-past is never dereferenced here
+                                                   // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                    p = reinterpret_cast<::std::byte const*>(next);
                                                    return true;
                                                }};
@@ -190,7 +376,7 @@ case wasm1_code::br:
 
                     if(match_ok)
                     {
-                        ensure_memory0_resolved();
+                        ensure_memory_resolved();
 
                         auto const& loop_lbl{labels.index_unchecked(target_label_id)};
                         if(!loop_lbl.in_thunk && loop_lbl.offset != SIZE_MAX)
@@ -208,7 +394,7 @@ case wasm1_code::br:
                             namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                             emit_opfunc_to(bytecode, translate::get_uwvmint_i32_sum_loop_run_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                             emit_imm_to(bytecode, local_offset_from_index(sp_local_idx));
-                            emit_imm_to(bytecode, resolved_memory0.memory_p);
+                            emit_imm_to(bytecode, resolved_memory.memory_p);
                             emit_imm_to(bytecode, off_i);
                             emit_imm_to(bytecode, off_sum);
                             emit_imm_to(bytecode, end_i);
@@ -240,6 +426,9 @@ case wasm1_code::br:
                                               wasm1_code op;  // no init
                                               ::std::memcpy(::std::addressof(op), p, sizeof(op));
                                               if(op != expected) { return false; }
+                                              // [checked lookahead opcode] next bytes ... | end
+                                              // [safe consumed bytes]       | one-past is never dereferenced here
+                                              // ^^ p: the preceding p < endp guard and opcode read prove one byte; p may now equal endp.
                                               ++p;
                                               return true;
                                           }};
@@ -251,6 +440,9 @@ case wasm1_code::br:
                                                                                                    reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                    ::fast_io::mnp::leb128_get(v))};
                                                    if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                   // [bounded LEB immediate] next bytes ... | end
+                                                   // [safe consumed bytes]       | one-past is never dereferenced here
+                                                   // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                    p = reinterpret_cast<::std::byte const*>(next);
                                                    return true;
                                                }};
@@ -262,6 +454,9 @@ case wasm1_code::br:
                                                                                                    reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                    ::fast_io::mnp::leb128_get(v))};
                                                    if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                   // [bounded LEB immediate] next bytes ... | end
+                                                   // [safe consumed bytes]       | one-past is never dereferenced here
+                                                   // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                    p = reinterpret_cast<::std::byte const*>(next);
                                                    return true;
                                                }};
@@ -273,6 +468,9 @@ case wasm1_code::br:
                                                                                                    reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                    ::fast_io::mnp::leb128_get(v))};
                                                    if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                   // [bounded LEB immediate] next bytes ... | end
+                                                   // [safe consumed bytes]       | one-past is never dereferenced here
+                                                   // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                    p = reinterpret_cast<::std::byte const*>(next);
                                                    return true;
                                                }};
@@ -386,6 +584,9 @@ case wasm1_code::br:
                                                   wasm1_code op;  // no init
                                                   ::std::memcpy(::std::addressof(op), p, sizeof(op));
                                                   if(op != expected) { return false; }
+                                                  // [checked lookahead opcode] next bytes ... | end
+                                                  // [safe consumed bytes]       | one-past is never dereferenced here
+                                                  // ^^ p: the preceding p < endp guard and opcode read prove one byte; p may now equal endp.
                                                   ++p;
                                                   return true;
                                               }};
@@ -397,6 +598,9 @@ case wasm1_code::br:
                                                                                                        reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                        ::fast_io::mnp::leb128_get(v))};
                                                        if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                       // [bounded LEB immediate] next bytes ... | end
+                                                       // [safe consumed bytes]       | one-past is never dereferenced here
+                                                       // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                        p = reinterpret_cast<::std::byte const*>(next);
                                                        return true;
                                                    }};
@@ -408,6 +612,9 @@ case wasm1_code::br:
                                                                                                        reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                        ::fast_io::mnp::leb128_get(v))};
                                                        if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                       // [bounded LEB immediate] next bytes ... | end
+                                                       // [safe consumed bytes]       | one-past is never dereferenced here
+                                                       // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                        p = reinterpret_cast<::std::byte const*>(next);
                                                        return true;
                                                    }};
@@ -417,6 +624,9 @@ case wasm1_code::br:
                                                               if(!consume_op(wasm1_code::f64_const)) { return false; }
                                                               if(static_cast<::std::size_t>(endp - p) < sizeof(wasm_f64)) [[unlikely]] { return false; }
                                                               auto const bits{read_wasm_le_u64(p)};
+                                                              // [checked fixed-width constant] next bytes ... | end
+                                                              // [safe consumed bytes]       | one-past is never dereferenced here
+                                                              // ^^ p: the preceding endp - p >= sizeof(field) check proves this entire advance.
                                                               p += sizeof(::std::uint64_t);
                                                               return bits == expected_bits;
                                                           }};
@@ -548,6 +758,9 @@ case wasm1_code::br:
                                                   wasm1_code op;  // no init
                                                   ::std::memcpy(::std::addressof(op), p, sizeof(op));
                                                   if(op != expected) { return false; }
+                                                  // [checked lookahead opcode] next bytes ... | end
+                                                  // [safe consumed bytes]       | one-past is never dereferenced here
+                                                  // ^^ p: the preceding p < endp guard and opcode read prove one byte; p may now equal endp.
                                                   ++p;
                                                   return true;
                                               }};
@@ -559,6 +772,9 @@ case wasm1_code::br:
                                                                                                        reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                        ::fast_io::mnp::leb128_get(v))};
                                                        if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                       // [bounded LEB immediate] next bytes ... | end
+                                                       // [safe consumed bytes]       | one-past is never dereferenced here
+                                                       // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                        p = reinterpret_cast<::std::byte const*>(next);
                                                        return true;
                                                    }};
@@ -570,6 +786,9 @@ case wasm1_code::br:
                                                                                                        reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                        ::fast_io::mnp::leb128_get(v))};
                                                        if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                       // [bounded LEB immediate] next bytes ... | end
+                                                       // [safe consumed bytes]       | one-past is never dereferenced here
+                                                       // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                        p = reinterpret_cast<::std::byte const*>(next);
                                                        return true;
                                                    }};
@@ -579,6 +798,9 @@ case wasm1_code::br:
                                                               if(!consume_op(wasm1_code::f64_const)) { return false; }
                                                               if(static_cast<::std::size_t>(endp - p) < sizeof(wasm_f64)) [[unlikely]] { return false; }
                                                               auto const bits{read_wasm_le_u64(p)};
+                                                              // [checked fixed-width constant] next bytes ... | end
+                                                              // [safe consumed bytes]       | one-past is never dereferenced here
+                                                              // ^^ p: the preceding endp - p >= sizeof(field) check proves this entire advance.
                                                               p += sizeof(::std::uint64_t);
                                                               return bits == expected_bits;
                                                           }};
@@ -680,6 +902,9 @@ case wasm1_code::br:
                                                   wasm1_code op;  // no init
                                                   ::std::memcpy(::std::addressof(op), p, sizeof(op));
                                                   if(op != expected) { return false; }
+                                                  // [checked lookahead opcode] next bytes ... | end
+                                                  // [safe consumed bytes]       | one-past is never dereferenced here
+                                                  // ^^ p: the preceding p < endp guard and opcode read prove one byte; p may now equal endp.
                                                   ++p;
                                                   return true;
                                               }};
@@ -691,6 +916,9 @@ case wasm1_code::br:
                                                                                                        reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                        ::fast_io::mnp::leb128_get(v))};
                                                        if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                       // [bounded LEB immediate] next bytes ... | end
+                                                       // [safe consumed bytes]       | one-past is never dereferenced here
+                                                       // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                        p = reinterpret_cast<::std::byte const*>(next);
                                                        return true;
                                                    }};
@@ -702,6 +930,9 @@ case wasm1_code::br:
                                                                                                        reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                        ::fast_io::mnp::leb128_get(v))};
                                                        if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                       // [bounded LEB immediate] next bytes ... | end
+                                                       // [safe consumed bytes]       | one-past is never dereferenced here
+                                                       // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                        p = reinterpret_cast<::std::byte const*>(next);
                                                        return true;
                                                    }};
@@ -711,6 +942,9 @@ case wasm1_code::br:
                                                               if(!consume_op(wasm1_code::f32_const)) { return false; }
                                                               if(static_cast<::std::size_t>(endp - p) < 4uz) [[unlikely]] { return false; }
                                                               auto const bits{read_wasm_le_u32(p)};
+                                                              // [checked fixed-width constant] next bytes ... | end
+                                                              // [safe consumed bytes]       | one-past is never dereferenced here
+                                                              // ^^ p: the preceding endp - p >= sizeof(field) check proves this entire advance.
                                                               p += sizeof(::std::uint32_t);
                                                               return bits == expected_bits;
                                                           }};
@@ -1082,6 +1316,9 @@ case wasm1_code::br_if:
                                                                 ::fast_io::mnp::leb128_get(label_index))};
     if(label_err != ::fast_io::parse_code::ok) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_code = code_validation_error_code::invalid_label_index;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(label_err);
@@ -1101,6 +1338,9 @@ case wasm1_code::br_if:
     auto const label_index_uz{static_cast<::std::size_t>(label_index)};
     if(label_index_uz >= all_label_count_uz) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.illegal_label_index.label_index = label_index;
         err.err_selectable.illegal_label_index.all_label_count = static_cast<wasm_u32>(all_label_count_uz);
@@ -1131,6 +1371,9 @@ case wasm1_code::br_if:
     {
         if(!operand_type_matches(cond, curr_operand_stack_value_type::i32)) [[unlikely]]
         {
+            // [caller-saved opcode/prefix] immediate bytes ... | code_end
+            // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+            // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_if";
             err.err_selectable.br_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
@@ -1147,8 +1390,13 @@ case wasm1_code::br_if:
         {
             auto const expected_type{target_label_types.begin[target_arity - 1uz - i]};
             auto const actual_operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
-            if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
+            if(!block_value_matches(actual_operand, target_label_types, target_frame.signature_type_index,
+                target_frame.type != block_type::loop, target_frame.has_singleton_result_core_type,
+                target_frame.singleton_result_core_type, target_arity - 1uz - i)) [[unlikely]]
             {
+                // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
                 err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(expected_type);
@@ -1158,12 +1406,13 @@ case wasm1_code::br_if:
             }
         }
 
-        // Core pop_vals/push_vals also refines present Unknowns, not only missing slots.
-        if(is_polymorphic)
-        {
-            pop_available_concrete_operands(concrete_to_check);
-            for(auto curr{target_label_types.begin}; curr != target_label_types.end; ++curr) { operand_stack_push(*curr); }
-        }
+        // Core 3 pop_vals/push_vals reifies the label tuple on both reachable and
+        // polymorphic fallthrough. A narrower reference argument must not survive
+        // as the type of the following instruction after br_if.
+        pop_available_concrete_operands(concrete_to_check);
+        block_push_types(target_label_types, target_frame.signature_type_index,
+            target_frame.type != block_type::loop, target_frame.has_singleton_result_core_type,
+            target_frame.singleton_result_core_type);
     }
 
     // Translate: `br_if` needs stack repair on the taken path only. If repair is necessary, emit a thunk target.
@@ -1370,8 +1619,8 @@ case wasm1_code::br_if:
 
                             // No memory in module => no memory load to mega-fuse.
                             if(all_memory_count == 0u) { return false; }
-                            ensure_memory0_resolved();
-                            native_memory_t* const memory0_p{resolved_memory0.memory_p};
+                            ensure_memory_resolved();
+                            native_memory_t* const memory0_p{resolved_memory.memory_p};
                             if(memory0_p == nullptr) [[unlikely]] { return false; }
 
                             // Candidate 1: `f32_load_localget_off` immediately preceding the compare.
@@ -1612,7 +1861,11 @@ case wasm1_code::br_if:
                                 auto const end{CompileOption.i32_stack_top_end_pos};
                                 auto curr{pre_load_stacktop.i32_stack_top_curr_pos};
                                 // Undo two pushes: `i32.load` and `i32.const`.
+                                // [safe register ring begin, end): curr is a numeric slot index, not a pointer.
+                                // ^^ curr: each modulo step wraps at end and stays in the configured ring.
                                 curr = (curr + 1uz == end) ? begin : (curr + 1uz);
+                                // [safe register ring begin, end): curr is still a slot index.
+                                // ^^ curr: the second undo uses the first bounded result.
                                 curr = (curr + 1uz == end) ? begin : (curr + 1uz);
                                 pre_load_stacktop.i32_stack_top_curr_pos = curr;
                                 if constexpr(CompileOption.i32_stack_top_begin_pos == CompileOption.i64_stack_top_begin_pos &&
@@ -2047,6 +2300,9 @@ case wasm1_code::br_if:
                                                   wasm1_code op{};  // init
                                                   ::std::memcpy(::std::addressof(op), p, sizeof(op));
                                                   if(op != expected) { return false; }
+                                                  // [checked lookahead opcode] next bytes ... | end
+                                                  // [safe consumed bytes]       | one-past is never dereferenced here
+                                                  // ^^ p: p began within this loop slice; bounded decoders keep p <= endp and the equality guard proves one byte.
                                                   ++p;
                                                   return true;
                                               }};
@@ -2058,6 +2314,9 @@ case wasm1_code::br_if:
                                                                                                        reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                        ::fast_io::mnp::leb128_get(v))};
                                                        if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                       // [bounded LEB immediate] next bytes ... | end
+                                                       // [safe consumed bytes]       | one-past is never dereferenced here
+                                                       // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                        p = reinterpret_cast<::std::byte const*>(next);
                                                        return true;
                                                    }};
@@ -2069,6 +2328,9 @@ case wasm1_code::br_if:
                                                                                                        reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                        ::fast_io::mnp::leb128_get(v))};
                                                        if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                       // [bounded LEB immediate] next bytes ... | end
+                                                       // [safe consumed bytes]       | one-past is never dereferenced here
+                                                       // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                        p = reinterpret_cast<::std::byte const*>(next);
                                                        return true;
                                                    }};
@@ -2520,6 +2782,9 @@ case wasm1_code::br_if:
                                               wasm1_code op;  // no init
                                               ::std::memcpy(::std::addressof(op), p, sizeof(op));
                                               if(op != expected) { return false; }
+                                              // [checked lookahead opcode] next bytes ... | end
+                                              // [safe consumed bytes]       | one-past is never dereferenced here
+                                              // ^^ p: the preceding p < endp guard and opcode read prove one byte; p may now equal endp.
                                               ++p;
                                               return true;
                                           }};
@@ -2531,6 +2796,9 @@ case wasm1_code::br_if:
                                                                                                    reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                    ::fast_io::mnp::leb128_get(v))};
                                                    if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                   // [bounded LEB immediate] next bytes ... | end
+                                                   // [safe consumed bytes]       | one-past is never dereferenced here
+                                                   // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                    p = reinterpret_cast<::std::byte const*>(next);
                                                    return true;
                                                }};
@@ -2542,6 +2810,9 @@ case wasm1_code::br_if:
                                                                                                    reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
                                                                                                    ::fast_io::mnp::leb128_get(v))};
                                                    if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                   // [bounded LEB immediate] next bytes ... | end
+                                                   // [safe consumed bytes]       | one-past is never dereferenced here
+                                                   // ^^ p: parse_by_scan succeeded, so next is within the same [old p, endp] slice.
                                                    p = reinterpret_cast<::std::byte const*>(next);
                                                    return true;
                                                }};
@@ -2551,6 +2822,9 @@ case wasm1_code::br_if:
                                                           if(!consume_op(wasm1_code::f32_const, p)) { return false; }
                                                           if(static_cast<::std::size_t>(endp - p) < 4uz) [[unlikely]] { return false; }
                                                           auto const bits{read_wasm_le_u32(p)};
+                                                          // [checked fixed-width constant] next bytes ... | end
+                                                          // [safe consumed bytes]       | one-past is never dereferenced here
+                                                          // ^^ p: the preceding endp - p >= sizeof(field) check proves this entire advance.
                                                           p += sizeof(::std::uint32_t);
                                                           return bits == expected_bits;
                                                       }};
@@ -3178,6 +3452,9 @@ case wasm1_code::br_table:
                                                             ::fast_io::mnp::leb128_get(target_count))};
     if(cnt_err != ::fast_io::parse_code::ok) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_code = code_validation_error_code::invalid_label_index;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(cnt_err);
@@ -3218,6 +3495,9 @@ case wasm1_code::br_table:
     auto const target_count_plus_default_overflows{!target_count_exceeds_size_t && target_count_uz == max_br_table_label_count};
     if(target_count_exceeds_size_t || target_count_plus_default_overflows || remaining_bytes == 0uz || target_count_uz >= remaining_bytes) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.br_table_target_count_exceeds_remaining_bytes.target_count = target_count;
         err.err_selectable.br_table_target_count_exceeds_remaining_bytes.remaining_bytes = remaining_bytes;
@@ -3231,6 +3511,9 @@ case wasm1_code::br_table:
                               {
                                   if(static_cast<::std::size_t>(li) >= all_label_count_uz) [[unlikely]]
                                   {
+                                      // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                                      // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                                      // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                                       err.err_curr = op_begin;
                                       err.err_selectable.illegal_label_index.label_index = li;
                                       err.err_selectable.illegal_label_index.all_label_count = static_cast<wasm_u32>(all_label_count_uz);
@@ -3259,8 +3542,11 @@ case wasm1_code::br_table:
                                           return;
                                       }
 
-                                      auto const expected_arity{static_cast<::std::size_t>(expected_label_types.end - expected_label_types.begin)};
-                                      auto const actual_arity{static_cast<::std::size_t>(actual_types.end - actual_types.begin)};
+                                      // Empty signatures may be a null/null borrowed range.
+                                      auto const expected_arity{expected_label_types.begin == expected_label_types.end ? 0uz :
+                                          static_cast<::std::size_t>(expected_label_types.end - expected_label_types.begin)};
+                                      auto const actual_arity{actual_types.begin == actual_types.end ? 0uz :
+                                          static_cast<::std::size_t>(actual_types.end - actual_types.begin)};
                                       bool mismatch{expected_arity != actual_arity};
                                       curr_operand_stack_value_type expected_type{};
                                       curr_operand_stack_value_type actual_type{};
@@ -3268,14 +3554,61 @@ case wasm1_code::br_table:
                                       auto const comparable_count{expected_arity < actual_arity ? expected_arity : actual_arity};
                                       for(::std::size_t i{}; i != comparable_count; ++i)
                                       {
-                                          // Core 1 requires identical label types; Core 2 also allows a common bottom
-                                          // argument. An explicit MVP policy must retain the Core 1 rule in every backend.
-                                          // The selector is still on top; only missing/unknown arguments may meet.
-                                          auto const depth_from_top{expected_arity - i};
-                                          auto const argument_is_bottom{!::uwvm2::parser::wasm::standard::wasm1p1::features::uses_mvp_validation_rules(wasm1p1_para) && is_polymorphic &&
-                                              (concrete_operand_count() <= depth_from_top ||
-                                               operand_stack.index_unchecked(operand_stack.size() - 1uz - depth_from_top).is_unknown)};
-                                          if(expected_label_types.begin[i] != actual_types.begin[i] && !argument_is_bottom)
+                                          auto const& expected_frame{control_flow_stack.index_unchecked(
+                                              all_label_count_uz - 1uz - static_cast<::std::size_t>(expected_label))};
+                                          auto const& actual_frame{control_flow_stack.index_unchecked(
+                                              all_label_count_uz - 1uz - static_cast<::std::size_t>(li))};
+                                          bool matches{};
+                                          if(::uwvm2::parser::wasm::standard::wasm1p1::features::uses_mvp_validation_rules(wasm1p1_para))
+                                          {
+                                              auto const expected_rich{block_core_type_at(expected_label_types,
+                                                  expected_frame.signature_type_index, expected_frame.type != block_type::loop,
+                                                  expected_frame.has_singleton_result_core_type,
+                                                  expected_frame.singleton_result_core_type, i)};
+                                              auto const actual_rich{block_core_type_at(actual_types,
+                                                  actual_frame.signature_type_index, actual_frame.type != block_type::loop,
+                                                  actual_frame.has_singleton_result_core_type,
+                                                  actual_frame.singleton_result_core_type, i)};
+                                              // Both labels were range-checked; the control stack is stable.
+                                              auto const expected_core{expected_rich.has_type ? expected_rich.type :
+                                                  ::uwvm2::validation::standard::wasm3::core3_legacy_carrier_type(expected_label_types.begin[i])};
+                                              auto const actual_core{actual_rich.has_type ? actual_rich.type :
+                                                  ::uwvm2::validation::standard::wasm3::core3_legacy_carrier_type(actual_types.begin[i])};
+                                              auto const signatures{::uwvm2::validation::standard::wasm3::core3_signature_view<
+                                                  ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_owned_signature_t>{rich_owned_begin,
+                                                      rich_owned_available ? runtime_type_count : 0uz}};
+                                              matches = expected_label_types.begin[i] == actual_types.begin[i] &&
+                                                  runtime_core3_value_type_matches(expected_core,
+                                                      actual_core, signatures) &&
+                                                  runtime_core3_value_type_matches(actual_core,
+                                                      expected_core, signatures);
+                                          }
+                                          else
+                                          {
+                                              // Core 3 permits different labels if the same stack argument is a
+                                              // subtype of every target. The selector is still at stack depth zero.
+                                              auto const depth_from_top{expected_arity - i};
+                                              if(concrete_operand_count() <= depth_from_top)
+                                              {
+                                                  // Polymorphic bottom matches; reachable underflow is reported
+                                                  // after decoding all targets, before code generation.
+                                                  matches = true;
+                                              }
+                                              else
+                                              {
+                                                  // [frame base ... argument ... selector] live operand storage
+                                                  // [safe       | safe     | safe    ] unsafe (vector end)
+                                                  //               ^^ index_unchecked(size - 1 - depth_from_top)
+                                                  // Neither code_curr nor the operand stack advances here.
+                                                  auto const& argument{operand_stack.index_unchecked(
+                                                      operand_stack.size() - 1uz - depth_from_top)};
+                                                  matches = block_value_matches(argument, actual_types,
+                                                      actual_frame.signature_type_index, actual_frame.type != block_type::loop,
+                                                      actual_frame.has_singleton_result_core_type,
+                                                      actual_frame.singleton_result_core_type, i);
+                                              }
+                                          }
+                                          if(!matches)
                                           {
                                               mismatch = true;
                                               expected_type = expected_label_types.begin[i];
@@ -3292,6 +3625,9 @@ case wasm1_code::br_table:
                                               if(actual_arity != 0uz) { actual_type = actual_types.begin[0]; }
                                           }
 
+                                          // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                                          // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                                          // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                                           err.err_curr = op_begin;
                                           err.err_selectable.br_table_target_type_mismatch.expected_label_index = expected_label;
                                           err.err_selectable.br_table_target_type_mismatch.mismatched_label_index = li;
@@ -3323,6 +3659,9 @@ case wasm1_code::br_table:
                                                               ::fast_io::mnp::leb128_get(li))};
         if(li_err != ::fast_io::parse_code::ok) [[unlikely]]
         {
+            // [caller-saved opcode/prefix] immediate bytes ... | code_end
+            // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+            // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
             err.err_curr = op_begin;
             err.err_code = code_validation_error_code::invalid_label_index;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(li_err);
@@ -3355,6 +3694,9 @@ case wasm1_code::br_table:
                                                             ::fast_io::mnp::leb128_get(default_label))};
     if(def_err != ::fast_io::parse_code::ok) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_code = code_validation_error_code::invalid_label_index;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(def_err);
@@ -3377,7 +3719,8 @@ case wasm1_code::br_table:
     check_br_table_sig(default_label, get_sig(default_label));
 
     constexpr auto max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
-    auto const expected_arity{static_cast<::std::size_t>(expected_label_types.end - expected_label_types.begin)};
+    auto const expected_arity{expected_label_types.begin == expected_label_types.end ? 0uz :
+        static_cast<::std::size_t>(expected_label_types.end - expected_label_types.begin)};
     auto const expected_arity_plus_index_overflows{expected_arity == max_operand_stack_requirement};
     auto const required_stack_size{expected_arity_plus_index_overflows ? max_operand_stack_requirement : (expected_arity + 1uz)};
 
@@ -3390,6 +3733,9 @@ case wasm1_code::br_table:
     {
         if(!operand_type_matches(idx, curr_operand_stack_value_type::i32)) [[unlikely]]
         {
+            // [caller-saved opcode/prefix] immediate bytes ... | code_end
+            // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+            // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_table";
             err.err_selectable.br_cond_type_not_i32.cond_type = to_wasm1_value_type(idx.type);
@@ -3420,14 +3766,21 @@ case wasm1_code::br_table:
 
     if(expected_arity != 0uz)
     {
+        auto const& expected_frame{control_flow_stack.index_unchecked(
+            all_label_count_uz - 1uz - static_cast<::std::size_t>(expected_label))};
         auto const available_arg_count{concrete_operand_count()};
         auto const concrete_to_check{available_arg_count < expected_arity ? available_arg_count : expected_arity};
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const actual_operand{operand_stack.index_unchecked(operand_stack.size() - 1uz - i)};
             auto const curr_expected_type{expected_label_types.begin[expected_arity - 1uz - i]};
-            if(!stack_entry_type_matches(actual_operand, curr_expected_type)) [[unlikely]]
+            if(!block_value_matches(actual_operand, expected_label_types, expected_frame.signature_type_index,
+                expected_frame.type != block_type::loop, expected_frame.has_singleton_result_core_type,
+                expected_frame.singleton_result_core_type, expected_arity - 1uz - i)) [[unlikely]]
             {
+                // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_table";
                 err.err_selectable.br_value_type_mismatch.expected_type = to_wasm1_value_type(curr_expected_type);

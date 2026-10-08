@@ -39,6 +39,9 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
+# include <uwvm2/validation/standard/wasm3/relaxed_simd.h>
+# include <uwvm2/validation/standard/wasm3/threads.h>
+# include <uwvm2/validation/standard/wasm3/tail_call.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/debug/impl.h>
@@ -52,14 +55,16 @@
 # include <uwvm2/parser/wasm/standard/wasm2/features/impl.h>
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/validation/error/impl.h>
-# include <uwvm2/validation/standard/wasm2/impl.h>
+# include <uwvm2/validation/standard/wasm3/impl.h>
 # include <uwvm2/object/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
+# include <uwvm2/runtime/compiler/shared/wasm_exception_control.h>
 # include <uwvm2/uwvm/runtime/runtime_mode/impl.h>
 # include <uwvm2/runtime/compiler/shared/wasm1p1_simd.h>
+# include <uwvm2/runtime/compiler/shared/wasm_threads.h>
 # include <uwvm2/runtime/compiler/uwvm_int/optable/impl.h>
 #endif
 

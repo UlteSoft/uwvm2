@@ -1,0 +1,13 @@
+Optional short ULEB128/SLEB128 decoder patch for a private LLVM23.1.1 source copy.
+Run: python3 apply-short-leb.py /path/to/llvm-source-root --check
+Then: python3 apply-short-leb.py /path/to/llvm-source-root
+The script authenticates exact upstream/header/patch hashes, rejects unknown inputs,
+and is idempotent. Do not apply it to an arbitrary installed SDK or newer LLVM tree.
+Rebuild the pinned paired libc++, libc++abi and libunwind SDK with matching ABI,
+namespace, assertions and static link configuration, then relink the runtime. The
+qualified products use static __1 libc++ and LLVM23.1.1. Do not mix C++ ABI versions.
+Long/truncated LEB fallback is unchanged. ASan/UBSan differential and actual JIT CFI
+registration/retirement tests passed; native exception speedup was about 6%, while
+indirect/throw_ref remained much slower than Wasmtime. No FDE row cache is shipped.
+This native SDK patch was performance-qualified on x86_64 Linux only. Other native
+architectures require their own paired SDK and validation. See gc-eh-perf-20261005.txt.

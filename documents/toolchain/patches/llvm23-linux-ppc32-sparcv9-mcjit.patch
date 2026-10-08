@@ -1,0 +1,468 @@
+--- a/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyld.cpp
++++ b/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyld.cpp
+@@ -970,6 +970,9 @@
+     Relocations[SymInfo.getSectionID()].push_back(RECopy);
+   }
+ }
++
++// The public downstream capability query is tied to this compiled library.
++unsigned RuntimeDyld::getUWVMELFLoaderCapabilities() noexcept { return 3u; }
+ 
+ uint8_t *RuntimeDyldImpl::createStubFunction(uint8_t *Addr,
+                                              unsigned AbiVariant) {
+@@ -1049,6 +1052,27 @@
+     writeBytesUnaligned(JrATInstr, Addr + 24, 4);
+     writeBytesUnaligned(NopInstr, Addr + 28, 4);
+     return Addr;
++  } else if (Arch == Triple::ppc || Arch == Triple::ppcle) {
++    // ELF32 uses direct code pointers. Tail jump preserves the original LR;
++    // r12 is ABI scratch and no native stack or VM context is exposed.
++    writeInt32BE(Addr,      0x3d800000); // lis r12,hi(addr)
++    writeInt32BE(Addr + 4,  0x618c0000); // ori r12,r12,lo(addr)
++    writeInt32BE(Addr + 8,  0x7d8903a6); // mtctr r12
++    writeInt32BE(Addr + 12, 0x4e800420); // bctr
++    return Addr;
++  } else if (Arch == Triple::sparcv9) {
++    // V9 ABI g1/g5 are volatile scratch. Build all 64 address bits without
++    // touching o7, sp, or rotating a register window; jmpl writes g0 so the
++    // original call's return address survives. The delay slot is a nop.
++    writeInt32BE(Addr,      0x03000000); // sethi %hh(addr),g1
++    writeInt32BE(Addr + 4,  0x82106000); // or g1,%hm(addr),g1
++    writeInt32BE(Addr + 8,  0x83287020); // sllx g1,32,g1
++    writeInt32BE(Addr + 12, 0x0b000000); // sethi %lm(addr),g5
++    writeInt32BE(Addr + 16, 0x8a116000); // or g5,%lo(addr),g5
++    writeInt32BE(Addr + 20, 0x82104005); // or g1,g5,g1
++    writeInt32BE(Addr + 24, 0x81c06000); // jmpl g1,g0
++    writeInt32BE(Addr + 28, 0x01000000); // nop
++    return Addr;
+   } else if (Arch == Triple::ppc64 || Arch == Triple::ppc64le) {
+     // Depending on which version of the ELF ABI is in use, we need to
+     // generate one of two variants of the stub.  They both start with
+--- a/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.cpp
++++ b/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.cpp
+@@ -1071,23 +1071,160 @@
+   return ((value + 0x8000) >> 48) & 0xffff;
+ }
+ 
++// Revision 11: ELF32 calls and EH frames need more than the address halves.
++// Keep overflow checks in Release builds; truncating a branch can jump into
++// unrelated VM code. Integer writes follow the object's byte order.
+ void RuntimeDyldELF::resolvePPC32Relocation(const SectionEntry &Section,
+-                                            uint64_t Offset, uint64_t Value,
+-                                            uint32_t Type, int64_t Addend) {
++                                         uint64_t Offset, uint64_t Value,
++                                         uint32_t Type, int64_t Addend) {
+   uint8_t *LocalAddress = Section.getAddressWithOffset(Offset);
++  uint64_t Result = Value + Addend;
++  uint64_t Place = Section.getLoadAddressWithOffset(Offset);
+   switch (Type) {
+   default:
+-    report_fatal_error("Relocation type not implemented yet!");
+-    break;
++    report_fatal_error("Unsupported PPC32 MCJIT relocation");
++  case ELF::R_PPC_NONE:
++    return;
++  case ELF::R_PPC_ADDR32:
++    if (!isUInt<32>(Result))
++      report_fatal_error("PPC32 address relocation overflow");
++    writeInt32BE(LocalAddress, Result);
++    return;
+   case ELF::R_PPC_ADDR16_LO:
+-    writeInt16BE(LocalAddress, applyPPClo(Value + Addend));
+-    break;
++    if (!isUInt<32>(Result))
++      report_fatal_error("PPC32 address-half relocation overflow");
++    writeInt16BE(LocalAddress, applyPPClo(Result));
++    return;
+   case ELF::R_PPC_ADDR16_HI:
+-    writeInt16BE(LocalAddress, applyPPChi(Value + Addend));
+-    break;
++    if (!isUInt<32>(Result))
++      report_fatal_error("PPC32 address-half relocation overflow");
++    writeInt16BE(LocalAddress, applyPPChi(Result));
++    return;
+   case ELF::R_PPC_ADDR16_HA:
+-    writeInt16BE(LocalAddress, applyPPCha(Value + Addend));
+-    break;
++    if (!isUInt<32>(Result))
++      report_fatal_error("PPC32 address-half relocation overflow");
++    writeInt16BE(LocalAddress, applyPPCha(Result));
++    return;
++  case ELF::R_PPC_REL16_LO:
++    writeInt16BE(LocalAddress, applyPPClo(Result - Place));
++    return;
++  case ELF::R_PPC_REL16_HI:
++    writeInt16BE(LocalAddress, applyPPChi(Result - Place));
++    return;
++  case ELF::R_PPC_REL16_HA:
++    writeInt16BE(LocalAddress, applyPPCha(Result - Place));
++    return;
++  case ELF::R_PPC_REL24: {
++    int64_t Delta = static_cast<int64_t>(Result - Place);
++    if (!isInt<26>(Delta) || (Delta & 3))
++      report_fatal_error("PPC32 branch relocation overflow or misalignment");
++    uint32_t Inst = readBytesUnaligned(LocalAddress, 4);
++    writeInt32BE(LocalAddress, (Inst & 0xfc000003) | (Delta & 0x03fffffc));
++    return;
++  }
++  case ELF::R_PPC_REL32: {
++    int64_t Delta = static_cast<int64_t>(Result - Place);
++    if (!isInt<32>(Delta))
++      report_fatal_error("PPC32 PC-relative relocation overflow");
++    writeInt32BE(LocalAddress, Delta);
++    return;
++  }
++  }
++}
++
++// SPARC V9 static abs64 MCJIT. These are relocations, not register or memory
++// capabilities: the debugger still authenticates the compiler's function body
++// and never admits loader stubs into its public native instruction range.
++void RuntimeDyldELF::resolveSparc64Relocation(const SectionEntry &Section,
++                                           uint64_t Offset, uint64_t Value,
++                                           uint32_t Type, int64_t Addend) {
++  uint8_t *Address = Section.getAddressWithOffset(Offset);
++  uint64_t Result = Value + Addend;
++  int64_t Delta = static_cast<int64_t>(Result -
++                                     Section.getLoadAddressWithOffset(Offset));
++  auto Field = [&](uint32_t Mask, uint32_t Bits) {
++    uint32_t Inst = readBytesUnaligned(Address, 4);
++    writeInt32BE(Address, (Inst & ~Mask) | (Bits & Mask));
++  };
++  // ELF64 SPARC encodes an additional signed 24-bit value in r_info's type
++  // data. Only OLO10 consumes it; retain it while dispatching on the low byte.
++  int64_t TypeData = SignExtend64<24>(Type >> 8);
++  switch (Type & 0xff) {
++  default:
++    report_fatal_error("Unsupported SPARC64 MCJIT relocation");
++  case ELF::R_SPARC_NONE:
++    return;
++  case ELF::R_SPARC_64:
++  case ELF::R_SPARC_UA64:
++    writeInt64BE(Address, Result);
++    return;
++  case ELF::R_SPARC_32:
++  case ELF::R_SPARC_UA32:
++    if (!isUInt<32>(Result))
++      report_fatal_error("SPARC64 32-bit address relocation overflow");
++    writeInt32BE(Address, Result);
++    return;
++  case ELF::R_SPARC_DISP64:
++    writeInt64BE(Address, Delta);
++    return;
++  case ELF::R_SPARC_DISP32:
++    if (!isInt<32>(Delta))
++      report_fatal_error("SPARC64 PC-relative relocation overflow");
++    writeInt32BE(Address, Delta);
++    return;
++  case ELF::R_SPARC_HI22:
++  case ELF::R_SPARC_LM22:
++    Field(0x3fffff, Result >> 10);
++    return;
++  case ELF::R_SPARC_LO10:
++    Field(0x3ff, Result);
++    return;
++  case ELF::R_SPARC_HH22:
++    Field(0x3fffff, Result >> 42);
++    return;
++  case ELF::R_SPARC_HM10:
++    Field(0x3ff, Result >> 32);
++    return;
++  case ELF::R_SPARC_H44:
++    if (!isUInt<44>(Result))
++      report_fatal_error("SPARC64 44-bit address relocation overflow");
++    Field(0x3fffff, Result >> 22);
++    return;
++  case ELF::R_SPARC_M44:
++    Field(0x3ff, Result >> 12);
++    return;
++  case ELF::R_SPARC_L44:
++    Field(0xfff, Result);
++    return;
++  case ELF::R_SPARC_HIX22:
++    Field(0x3fffff, ~Result >> 10);
++    return;
++  case ELF::R_SPARC_LOX10:
++    Field(0x1fff, (Result & 0x3ff) | 0x1c00);
++    return;
++  case ELF::R_SPARC_OLO10: {
++    int64_t Bits = static_cast<int64_t>(Result & 0x3ff) + TypeData;
++    if (!isInt<13>(Bits))
++      report_fatal_error("SPARC64 OLO10 relocation overflow");
++    Field(0x1fff, Bits);
++    return;
++  }
++  case ELF::R_SPARC_WDISP30:
++  case ELF::R_SPARC_WPLT30:
++    if (!isInt<32>(Delta) || (Delta & 3))
++      report_fatal_error("SPARC64 call relocation overflow or misalignment");
++    Field(0x3fffffff, static_cast<uint64_t>(Delta) >> 2);
++    return;
++  case ELF::R_SPARC_WDISP22:
++    if (!isInt<24>(Delta) || (Delta & 3))
++      report_fatal_error("SPARC64 branch relocation overflow or misalignment");
++    Field(0x3fffff, static_cast<uint64_t>(Delta) >> 2);
++    return;
++  case ELF::R_SPARC_WDISP19:
++    if (!isInt<21>(Delta) || (Delta & 3))
++      report_fatal_error("SPARC64 branch relocation overflow or misalignment");
++    Field(0x7ffff, static_cast<uint64_t>(Delta) >> 2);
++    return;
+   }
+ }
+ 
+@@ -1505,6 +1642,9 @@
+   case Triple::ppc64le:
+     resolvePPC64Relocation(Section, Offset, Value, Type, Addend);
+     break;
++  case Triple::sparcv9:
++    resolveSparc64Relocation(Section, Offset, Value, Type, Addend);
++    break;
+   case Triple::systemz:
+     resolveSystemZRelocation(Section, Offset, Value, Type, Addend);
+     break;
+@@ -2051,6 +2191,57 @@
+       processSimpleRelocation(SectionID, Offset, RelType, Value);
+     }
+ 
++  } else if (Arch == Triple::ppc || Arch == Triple::ppcle ||
++             Arch == Triple::sparcv9) {
++    bool IsPPC32 = Arch != Triple::sparcv9;
++    bool IsCall = IsPPC32 ? RelType == ELF::R_PPC_REL24
++                         : ((RelType & 0xff) == ELF::R_SPARC_WDISP30 ||
++                            (RelType & 0xff) == ELF::R_SPARC_WPLT30);
++    if (!IsCall) {
++      processSimpleRelocation(SectionID, Offset, RelType, Value);
++      return ++RelI;
++    }
++    SectionEntry &Section = Sections[SectionID];
++    // Only same-section destinations have a known displacement before remote
++    // section mapping. External and cross-section calls use a full-width tail
++    // stub, preserving the caller's LR/o7 and its stack/register window.
++    int64_t Delta = Value.Addend - static_cast<int64_t>(Offset);
++    bool Direct = !Value.SymbolName && Value.SectionID == SectionID &&
++                  !(Delta & 3) && (IsPPC32 ? isInt<26>(Delta) : isInt<32>(Delta));
++    if (Direct) {
++      processSimpleRelocation(SectionID, Offset, RelType, Value);
++      return ++RelI;
++    }
++    auto [It, Inserted] = Stubs.try_emplace(Value);
++    if (Inserted) {
++      It->second = Section.getStubOffset();
++      uint8_t *Stub = createStubFunction(Section.getAddressWithOffset(It->second));
++      auto Add = [&](unsigned StubOffset, unsigned Kind) {
++        RelocationEntry RE(SectionID, Stub - Section.getAddress() + StubOffset,
++                           Kind, Value.Addend);
++        if (Value.SymbolName)
++          addRelocationForSymbol(RE, Value.SymbolName);
++        else
++          addRelocationForSection(RE, Value.SectionID);
++      };
++      if (IsPPC32) {
++        unsigned LowHalf = IsTargetLittleEndian ? 0 : 2;
++        Add(LowHalf, ELF::R_PPC_ADDR16_HI);
++        Add(4 + LowHalf, ELF::R_PPC_ADDR16_LO);
++      } else {
++        Add(0, ELF::R_SPARC_HH22);
++        Add(4, ELF::R_SPARC_HM10);
++        Add(12, ELF::R_SPARC_LM22);
++        Add(16, ELF::R_SPARC_LO10);
++      }
++      Section.advanceStubOffset(getMaxStubSize());
++    }
++    // Leave this relocation deferred. The section's target load address can
++    // change after loadObject; resolving to its original host address here
++    // would bake in an invalid remote displacement.
++    RelocationEntry RE(SectionID, Offset, RelType, It->second);
++    addRelocationForSection(RE, SectionID);
++    return ++RelI;
+   } else if (Arch == Triple::ppc64 || Arch == Triple::ppc64le) {
+     if (RelType == ELF::R_PPC64_REL24) {
+       // Determine ABI variant in use for this object.
+@@ -2787,12 +2978,15 @@
+   case Triple::loongarch64:
+   case Triple::ppc64:
+   case Triple::ppc64le:
++  case Triple::sparcv9:
+   case Triple::systemz:
+     Result = sizeof(uint64_t);
+     break;
+   case Triple::x86:
+   case Triple::arm:
+   case Triple::thumb:
++  case Triple::ppc:
++  case Triple::ppcle:
+     Result = sizeof(uint32_t);
+     break;
+   case Triple::mips:
+--- a/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.h
++++ b/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.h
+@@ -63,6 +63,9 @@
+ 
+   void resolvePPC64Relocation(const SectionEntry &Section, uint64_t Offset,
+                               uint64_t Value, uint32_t Type, int64_t Addend);
++
++  void resolveSparc64Relocation(const SectionEntry &Section, uint64_t Offset,
++                                uint64_t Value, uint32_t Type, int64_t Addend);
+ 
+   void resolveSystemZRelocation(const SectionEntry &Section, uint64_t Offset,
+                                 uint64_t Value, uint32_t Type, int64_t Addend);
+@@ -85,6 +88,10 @@
+       return 32;
+     if (Arch == Triple::loongarch64)
+       return 20; // lu12i.w; ori; lu32i.d; lu52i.d; jr
++    else if (Arch == Triple::ppc || Arch == Triple::ppcle)
++      return 16; // lis; ori; mtctr; bctr
++    else if (Arch == Triple::sparcv9)
++      return 32; // abs64 in g1/g5; jmpl g1,g0; nop
+     else if (Arch == Triple::ppc64 || Arch == Triple::ppc64le)
+       return 44;
+     else if (Arch == Triple::x86_64)
+@@ -100,6 +107,9 @@
+   Align getStubAlignment() override {
+     if (Arch == Triple::systemz || Arch == Triple::riscv64)
+       return Align(8);
++    else if (Arch == Triple::ppc || Arch == Triple::ppcle ||
++             Arch == Triple::sparcv9)
++      return Align(4);
+     else
+       return Align(1);
+   }
+--- a/llvm/include/llvm/ExecutionEngine/RuntimeDyld.h
++++ b/llvm/include/llvm/ExecutionEngine/RuntimeDyld.h
+@@ -189,6 +189,12 @@
+     bool FinalizationLocked = false;
+   };
+ 
++  /// Downstream revision-11 ELF loader ABI. Bits 0/1 denote PPC32/SPARC V9.
++  /// Defined in the actual RuntimeDyld library, not an inline header claim.
++  /// Consumers with stale unpatched archives fail to link instead of enabling
++  /// a loader from generated-header/version metadata alone.
++  static LLVM_ABI unsigned getUWVMELFLoaderCapabilities() noexcept;
++
+   /// Construct a RuntimeDyld instance.
+   LLVM_ABI RuntimeDyld(MemoryManager &MemMgr, JITSymbolResolver &Resolver);
+   RuntimeDyld(const RuntimeDyld &) = delete;
+--- a/llvm/lib/Target/Sparc/TargetInfo/SparcTargetInfo.cpp
++++ b/llvm/lib/Target/Sparc/TargetInfo/SparcTargetInfo.cpp
+@@ -28,7 +28,7 @@
+ LLVMInitializeSparcTargetInfo() {
+   RegisterTarget<Triple::sparc, /*HasJIT=*/false> X(getTheSparcTarget(),
+                                                     "sparc", "Sparc", "Sparc");
+-  RegisterTarget<Triple::sparcv9, /*HasJIT=*/false> Y(
++  RegisterTarget<Triple::sparcv9, /*HasJIT=*/true> Y(
+       getTheSparcV9Target(), "sparcv9", "Sparc V9", "Sparc");
+   RegisterTarget<Triple::sparcel, /*HasJIT=*/false> Z(
+       getTheSparcelTarget(), "sparcel", "Sparc LE", "Sparc");
+--- a/llvm/include/llvm/Config/llvm-config.h.cmake
++++ b/llvm/include/llvm/Config/llvm-config.h.cmake
+@@ -74,6 +74,11 @@
+ 
+ /* Patch version of the LLVM API */
+ #define LLVM_VERSION_PATCH ${LLVM_VERSION_PATCH}
++
++/* Downstream RuntimeDyld loader capabilities, revision 11. Stock LLVM must
++ * not acquire these by version-number inference or consumer flags. */
++#define LLVM_UWVM_ROS_ELF_PPC32_MCJIT 1
++#define LLVM_UWVM_ROS_ELF_SPARCV9_MCJIT 1
+ 
+ /* LLVM version string */
+ #define LLVM_VERSION_STRING "${PACKAGE_VERSION}"
+--- a/llvm/lib/Target/PowerPC/PPCISelLowering.cpp
++++ b/llvm/lib/Target/PowerPC/PPCISelLowering.cpp
+@@ -5098,8 +5098,22 @@
+ /// optimization should implement this function.
+ bool PPCTargetLowering::IsEligibleForTailCallOptimization(
+     const GlobalValue *CalleeGV, CallingConv::ID CalleeCC,
+-    CallingConv::ID CallerCC, bool isVarArg,
++    CallingConv::ID CallerCC, const CallBase *CB, bool isVarArg,
+     const SmallVectorImpl<ISD::InputArg> &Ins) const {
++  // PPC32 ELF can reuse the incoming C argument area for an exact-prototype
++  // musttail. The IR verifier proves matching ABI types/attributes; byval and
++  // varargs remain excluded. This is sibling-call reuse, not callee-popping
++  // fastcc, and must not change C callers or invent support for tailcc.
++  if (Subtarget.is32BitELFABI() &&
++      getTargetMachine().getRelocationModel() == Reloc::Static &&
++      CalleeCC == CallingConv::C &&
++      CallerCC == CallingConv::C && CB && CB->isMustTailCall() && !isVarArg &&
++      CB->getCaller()->getFunctionType() == CB->getFunctionType()) {
++    for (unsigned I = 0, E = CB->arg_size(); I != E; ++I)
++      if (CB->paramHasAttr(I, Attribute::ByVal))
++        return false;
++    return true;
++  }
+   if (!getTargetMachine().Options.GuaranteedTailCallOpt)
+     return false;
+ 
+@@ -5885,7 +5899,7 @@
+         isCalleeExternalSymbol);
+   else
+     return IsEligibleForTailCallOptimization(CalleeGV, CalleeCC, CallerCC,
+-                                             isVarArg, Ins);
++                                             CB, isVarArg, Ins);
+ }
+ 
+ SDValue
+@@ -6057,7 +6071,9 @@
+ 
+   // Calculate by how many bytes the stack has to be adjusted in case of tail
+   // call optimization.
+-  int SPDiff = CalculateTailCallSPDiff(DAG, IsTailCall, NumBytes);
++  int SPDiff = (IsTailCall && CallConv == CallingConv::C)
++                   ? 0
++                   : CalculateTailCallSPDiff(DAG, IsTailCall, NumBytes);
+ 
+   // Adjust the stack pointer for the new arguments...
+   // These operations are automatically eliminated by the prolog/epilog pass
+--- a/llvm/lib/Target/PowerPC/PPCISelLowering.h
++++ b/llvm/lib/Target/PowerPC/PPCISelLowering.h
+@@ -668,7 +668,7 @@
+ 
+     bool IsEligibleForTailCallOptimization(
+         const GlobalValue *CalleeGV, CallingConv::ID CalleeCC,
+-        CallingConv::ID CallerCC, bool isVarArg,
++        CallingConv::ID CallerCC, const CallBase *CB, bool isVarArg,
+         const SmallVectorImpl<ISD::InputArg> &Ins) const;
+ 
+     bool IsEligibleForTailCallOptimization_64SVR4(
+--- a/llvm/lib/Target/Sparc/SparcISelLowering.cpp
++++ b/llvm/lib/Target/Sparc/SparcISelLowering.cpp
+@@ -809,8 +809,11 @@
+   auto &Outs = CLI.Outs;
+   auto &Caller = MF.getFunction();
+ 
+-  // Do not tail call opt functions with "disable-tail-calls" attribute.
+-  if (Caller.getFnAttribute("disable-tail-calls").getValueAsString() == "true")
++  // The attribute disables optional sibling-call optimization, not an IR
++  // musttail contract. UWVM requires physical retirement for return_call;
++  // all ordinary calls retain the attribute and the existing ABI checks below.
++  if (Caller.getFnAttribute("disable-tail-calls").getValueAsString() == "true" &&
++      !(CLI.CB && CLI.CB->isMustTailCall()))
+     return false;
+ 
+   // Do not tail call opt if the stack is used to pass parameters.
+--- a/llvm/lib/Object/RelocationResolver.cpp
++++ b/llvm/lib/Object/RelocationResolver.cpp
+@@ -233,6 +233,8 @@
+   case ELF::R_SPARC_64:
+   case ELF::R_SPARC_UA32:
+   case ELF::R_SPARC_UA64:
++  case ELF::R_SPARC_DISP32:
++  case ELF::R_SPARC_DISP64:
+     return true;
+   default:
+     return false;
+@@ -247,6 +249,13 @@
+   case ELF::R_SPARC_UA32:
+   case ELF::R_SPARC_UA64:
+     return S + Addend;
++  // JIT V9 EH frames use signed PC-relative relocations. The DWARF object
++  // reader must resolve these too, independently of RuntimeDyld loading;
++  // otherwise a valid EH section invalidates every provenance line/location.
++  case ELF::R_SPARC_DISP32:
++    return (S + Addend - Offset) & 0xFFFFFFFF;
++  case ELF::R_SPARC_DISP64:
++    return S + Addend - Offset;
+   default:
+     llvm_unreachable("Invalid relocation type");
+   }

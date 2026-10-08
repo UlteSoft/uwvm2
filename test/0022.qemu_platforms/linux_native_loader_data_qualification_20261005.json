@@ -1,0 +1,497 @@
+{
+  "schema": "uwvm-linux-native-loader-data-qualification-v1",
+  "date": "2026-10-05",
+  "scope": "Actual PPC32/SPARC64 ELF loading/remapping DATA component in both repositories; not target native execution, full Wasm debugging or full CLI qualification",
+  "all_architecture_product_complete": false,
+  "loader_revision": "23.1.1-uwvm-ros.11",
+  "host_component_sdk": "Actual ros.10 host headers/foundation libraries plus freshly compiled revision-11 RuntimeDyld and RuntimeDyldELF objects; no revision-11 full SDK claim",
+  "source_manifest_sha256": "295aa816304e5a297462c6e22a6df5b6e9c012f9667a634d65d5754267b79b76",
+  "input_manifest_sha256": "fc114d61a6d91028a8cd6da35b0f03eae846f0488c61c098693d83e86b0c16bd",
+  "results_sha256": "5fe2333ccfe8634a5e1799bfffec339f820cd848589e0fbb90a9bcc2bd5da09c",
+  "receipt_sha256": "07631ea08ca4b0093d493d8a898d55577a95d76809749d9d21219a642606917c",
+  "raw_remote_evidence": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553",
+  "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope\n",
+  "memory_events_before": {
+    "low": 0,
+    "high": 0,
+    "max": 448415,
+    "oom": 60,
+    "oom_kill": 12,
+    "oom_group_kill": 0
+  },
+  "memory_events_after": {
+    "low": 0,
+    "high": 0,
+    "max": 448415,
+    "oom": 60,
+    "oom_kill": 12,
+    "oom_group_kill": 0
+  },
+  "strict_cgroup_passed": true,
+  "rss_peak": 457125888,
+  "seconds": 31.583493366008042,
+  "owned_tasks_retired": 31,
+  "commands": [
+    {
+      "label": "RuntimeDyld-compile",
+      "argv": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/bin/clang++",
+        "-std=c++26",
+        "-stdlib=libc++",
+        "-O1",
+        "-DNDEBUG",
+        "-g0",
+        "-fno-rtti",
+        "-fno-exceptions",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-native-fix-20261004-1791097440143/work/llvm10/include",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader11-1791148193281/uwvm2-ros/third-parties/llvm/llvm/include",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2-ros/third-parties/llvm/llvm/lib/ExecutionEngine/RuntimeDyld",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader11-1791148193281/uwvm2/third-parties/fast_io/include",
+        "-MD",
+        "-MF",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/RuntimeDyld.d",
+        "-c",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2-ros/third-parties/llvm/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyld.cpp",
+        "-o",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/RuntimeDyld.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 3.2724051249970216,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/RuntimeDyld-compile.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "RuntimeDyldELF-compile",
+      "argv": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/bin/clang++",
+        "-std=c++26",
+        "-stdlib=libc++",
+        "-O1",
+        "-DNDEBUG",
+        "-g0",
+        "-fno-rtti",
+        "-fno-exceptions",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-native-fix-20261004-1791097440143/work/llvm10/include",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader11-1791148193281/uwvm2-ros/third-parties/llvm/llvm/include",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2-ros/third-parties/llvm/llvm/lib/ExecutionEngine/RuntimeDyld",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader11-1791148193281/uwvm2/third-parties/fast_io/include",
+        "-MD",
+        "-MF",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/RuntimeDyldELF.d",
+        "-c",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2-ros/third-parties/llvm/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.cpp",
+        "-o",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/RuntimeDyldELF.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 4.675490490000811,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/RuntimeDyldELF-compile.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "uwvm2-cgroup",
+      "argv": [
+        "bash",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2/tools/ci/require_wasm3_test_cgroup.sh"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.21535672000027262,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-cgroup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "uwvm2-link",
+      "argv": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/bin/clang++",
+        "-std=c++26",
+        "-stdlib=libc++",
+        "-O1",
+        "-DNDEBUG",
+        "-g0",
+        "-fno-rtti",
+        "-fno-exceptions",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-native-fix-20261004-1791097440143/work/llvm10/include",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader11-1791148193281/uwvm2-ros/third-parties/llvm/llvm/include",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2-ros/third-parties/llvm/llvm/lib/ExecutionEngine/RuntimeDyld",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader11-1791148193281/uwvm2/third-parties/fast_io/include",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2/test/0017.runtime/native_elf_relocations.cc",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/RuntimeDyld.o",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/RuntimeDyldELF.o",
+        "@/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/link.rsp",
+        "-L/home/macromodel/Documents/uwvm3-implementation/deps/usr/lib/x86_64-linux-gnu",
+        "-l:libz.so.1",
+        "-l:libzstd.so.1",
+        "-pthread",
+        "-ldl",
+        "-o",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-native_elf_relocations"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 7.07948497000325,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-link.log",
+      "sha256": "e802dedeb666206be02d74728df9cb60f9d66d93764d85107ec2700104f61a76"
+    },
+    {
+      "label": "uwvm2-ppc32-assemble",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/clang23-host/usr/bin/clang++-23",
+        "--target=powerpc-linux-gnu",
+        "-c",
+        "-x",
+        "assembler",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2/test/0017.runtime/fixtures/native_elf_relocations_ppc32.s",
+        "-o",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ppc32.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.21545516200421844,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ppc32-assemble.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "uwvm2-ppc32-relocations",
+      "argv": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/bin/llvm-readobj",
+        "-r",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ppc32.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.2152864200033946,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ppc32-relocations.log",
+      "sha256": "a0101d856af0a0614266be4933a008efe184f4f439db7800743f456160753bb5"
+    },
+    {
+      "label": "uwvm2-ppc32-remapped",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-native_elf_relocations",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ppc32.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.16532670400920324,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ppc32-remapped.log",
+      "sha256": "8a4b60d40d3fdcebf08e4fa0009302b4f9be0a406edaf2110a71c88f75d7436d"
+    },
+    {
+      "label": "uwvm2-ppc32-reject",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-native_elf_relocations",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ppc32.o",
+        "overflow"
+      ],
+      "returncode": -6,
+      "expected": "overflow",
+      "seconds": 1.2671789820014965,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ppc32-reject.log",
+      "sha256": "c85325c99f20a3ff6831637ef0141d7281c5c0547b20bad22739a04778b4fe44"
+    },
+    {
+      "label": "uwvm2-sparc64-assemble",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/clang23-host/usr/bin/clang++-23",
+        "--target=sparc64-linux-gnu",
+        "-c",
+        "-x",
+        "assembler",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2/test/0017.runtime/fixtures/native_elf_relocations_sparc64.s",
+        "-o",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-sparc64.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.21536287799244747,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-sparc64-assemble.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "uwvm2-sparc64-relocations",
+      "argv": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/bin/llvm-readobj",
+        "-r",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-sparc64.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.2153728989942465,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-sparc64-relocations.log",
+      "sha256": "107598ecc38573807cdc086c6a03cb9192456018182a6e2da8f04edef923075b"
+    },
+    {
+      "label": "uwvm2-sparc64-remapped",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-native_elf_relocations",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-sparc64.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.16515431700099725,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-sparc64-remapped.log",
+      "sha256": "8a4b60d40d3fdcebf08e4fa0009302b4f9be0a406edaf2110a71c88f75d7436d"
+    },
+    {
+      "label": "uwvm2-sparc64_overflow-assemble",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/clang23-host/usr/bin/clang++-23",
+        "--target=sparc64-linux-gnu",
+        "-c",
+        "-x",
+        "assembler",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2/test/0017.runtime/fixtures/native_elf_relocations_sparc64_overflow.s",
+        "-o",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-sparc64_overflow.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.21535201999358833,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-sparc64_overflow-assemble.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "uwvm2-sparc64_overflow-relocations",
+      "argv": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/bin/llvm-readobj",
+        "-r",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-sparc64_overflow.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.21548156499920879,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-sparc64_overflow-relocations.log",
+      "sha256": "6afe1f34d2f4400b89fc923e5f8c6b942c68af9f42a2bb3fc2301a963aeb99ec"
+    },
+    {
+      "label": "uwvm2-sparc64_overflow-reject",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-native_elf_relocations",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-sparc64_overflow.o",
+        "overflow"
+      ],
+      "returncode": -6,
+      "expected": "overflow",
+      "seconds": 1.2674983729957603,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-sparc64_overflow-reject.log",
+      "sha256": "daf3be94edf0fdbc3b64c150f2a34965eb360559d0c624f3b5b029d0606b5d49"
+    },
+    {
+      "label": "uwvm2-ros-cgroup",
+      "argv": [
+        "bash",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2-ros/tools/ci/require_wasm3_test_cgroup.sh"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.21530764299677685,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-cgroup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "uwvm2-ros-link",
+      "argv": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/bin/clang++",
+        "-std=c++26",
+        "-stdlib=libc++",
+        "-O1",
+        "-DNDEBUG",
+        "-g0",
+        "-fno-rtti",
+        "-fno-exceptions",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-native-fix-20261004-1791097440143/work/llvm10/include",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader11-1791148193281/uwvm2-ros/third-parties/llvm/llvm/include",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2-ros/third-parties/llvm/llvm/lib/ExecutionEngine/RuntimeDyld",
+        "-I/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader11-1791148193281/uwvm2/third-parties/fast_io/include",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2-ros/test/0017.runtime/native_elf_relocations.cc",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/RuntimeDyld.o",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/RuntimeDyldELF.o",
+        "@/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/link.rsp",
+        "-L/home/macromodel/Documents/uwvm3-implementation/deps/usr/lib/x86_64-linux-gnu",
+        "-l:libz.so.1",
+        "-l:libzstd.so.1",
+        "-pthread",
+        "-ldl",
+        "-o",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-native_elf_relocations"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 7.079823795997072,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-link.log",
+      "sha256": "fcc0737a5d4cde082231ef5ea5907a55602dfe4c2c0b2704386103fe599fd2bd"
+    },
+    {
+      "label": "uwvm2-ros-ppc32-assemble",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/clang23-host/usr/bin/clang++-23",
+        "--target=powerpc-linux-gnu",
+        "-c",
+        "-x",
+        "assembler",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2-ros/test/0017.runtime/fixtures/native_elf_relocations_ppc32.s",
+        "-o",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-ppc32.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.21543484900030307,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-ppc32-assemble.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "uwvm2-ros-ppc32-relocations",
+      "argv": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/bin/llvm-readobj",
+        "-r",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-ppc32.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.21533419100160245,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-ppc32-relocations.log",
+      "sha256": "177c518a994b54f2bb7711c070ff95307e522c63cdfb09ce00b15b3a39815a7e"
+    },
+    {
+      "label": "uwvm2-ros-ppc32-remapped",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-native_elf_relocations",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-ppc32.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.16533744300249964,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-ppc32-remapped.log",
+      "sha256": "8a4b60d40d3fdcebf08e4fa0009302b4f9be0a406edaf2110a71c88f75d7436d"
+    },
+    {
+      "label": "uwvm2-ros-ppc32-reject",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-native_elf_relocations",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-ppc32.o",
+        "overflow"
+      ],
+      "returncode": -6,
+      "expected": "overflow",
+      "seconds": 1.2678474060085136,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-ppc32-reject.log",
+      "sha256": "c85325c99f20a3ff6831637ef0141d7281c5c0547b20bad22739a04778b4fe44"
+    },
+    {
+      "label": "uwvm2-ros-sparc64-assemble",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/clang23-host/usr/bin/clang++-23",
+        "--target=sparc64-linux-gnu",
+        "-c",
+        "-x",
+        "assembler",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2-ros/test/0017.runtime/fixtures/native_elf_relocations_sparc64.s",
+        "-o",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-sparc64.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.215342323994264,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-sparc64-assemble.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "uwvm2-ros-sparc64-relocations",
+      "argv": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/bin/llvm-readobj",
+        "-r",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-sparc64.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.21531591699749697,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-sparc64-relocations.log",
+      "sha256": "081aaeb7d14dcb2b03d335fd526f562b2f25d21d3660c5b2427c394781b08a92"
+    },
+    {
+      "label": "uwvm2-ros-sparc64-remapped",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-native_elf_relocations",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-sparc64.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.16531763799139298,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-sparc64-remapped.log",
+      "sha256": "8a4b60d40d3fdcebf08e4fa0009302b4f9be0a406edaf2110a71c88f75d7436d"
+    },
+    {
+      "label": "uwvm2-ros-sparc64_overflow-assemble",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/clang23-host/usr/bin/clang++-23",
+        "--target=sparc64-linux-gnu",
+        "-c",
+        "-x",
+        "assembler",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/candidates/asm-linux-loader-data-1791149720553/uwvm2-ros/test/0017.runtime/fixtures/native_elf_relocations_sparc64_overflow.s",
+        "-o",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-sparc64_overflow.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.21543076400121208,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-sparc64_overflow-assemble.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "uwvm2-ros-sparc64_overflow-relocations",
+      "argv": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/bin/llvm-readobj",
+        "-r",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-sparc64_overflow.o"
+      ],
+      "returncode": 0,
+      "expected": 0,
+      "seconds": 0.21549177999258973,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-sparc64_overflow-relocations.log",
+      "sha256": "071bd7f0f07e6ecd47b8021e56b1b21e9e1618bcd0c2d255eb704baec9b7d480"
+    },
+    {
+      "label": "uwvm2-ros-sparc64_overflow-reject",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-native_elf_relocations",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-sparc64_overflow.o",
+        "overflow"
+      ],
+      "returncode": -6,
+      "expected": "overflow",
+      "seconds": 1.26730310099083,
+      "log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-linux-loader-data-1791149720553/work/uwvm2-ros-sparc64_overflow-reject.log",
+      "sha256": "daf3be94edf0fdbc3b64c150f2a34965eb360559d0c624f3b5b029d0606b5d49"
+    }
+  ],
+  "executed_native_instructions": false,
+  "positive_checks": [
+    "Same-section direct call after section remapping",
+    "External and far cross-section tail stubs preserve instruction fields and full destination",
+    "Repeated external call shares its stub",
+    "Nonzero addend is applied exactly once",
+    "Absolute full-width numeric data",
+    "PC-relative data used by EH/debug metadata"
+  ],
+  "negative_checks": [
+    "PPC32 address-half overflow fails with retained LLVM fatal error under NDEBUG",
+    "SPARC64 absolute32 overflow fails with retained LLVM fatal error under NDEBUG"
+  ],
+  "protection_contract": "No new debugger capabilities; native stack/CFA/spills/VM code/VM registers/native memory remain unexposed. Loader tail stubs have no authenticated Wasm body ownership.",
+  "current_implementation_sha256": {
+    "uwvm2-ros/third-parties/llvm/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyld.cpp": "f55adafa9ce93639faa1258932386e78e5324bdf07eb7350769e361f723fd459",
+    "uwvm2-ros/third-parties/llvm/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.cpp": "66966a9ce1b3193c0f1656f892d79aeea1df5cee7c1bbf0d31fa1097737167d5",
+    "uwvm2-ros/third-parties/llvm/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.h": "f8af2a587e656648af9b320b3bbb072c618c12808249a0f4b5e47c3350be558f",
+    "uwvm2-ros/third-parties/llvm/llvm/lib/Target/Sparc/TargetInfo/SparcTargetInfo.cpp": "288c281598625656de05461a9f7fea9b175749537f019fdb8b9423e5a6eb486b",
+    "uwvm2-ros/third-parties/llvm/llvm/include/llvm/Config/llvm-config.h.cmake": "135b790cfa53126b74abfe1b6edfa924bec511c879cdceaa550f47a321e1fa3c",
+    "uwvm2/src/uwvm2/runtime/compiler/llvm_jit/mcjit_target_support.h": "4ab51674a3aea0ac7c420167e349388fb793f8b2540beaa9a643834972fdd851",
+    "uwvm2-ros/src/uwvm2/runtime/compiler/llvm_jit/mcjit_target_support.h": "0417f2376df4e3cd2252e0d559c250cb1c5bb7b5f4dcc78cc9f656ef0f2e5f20",
+    "uwvm2/test/0017.runtime/native_elf_relocations.cc": "2bf901c6b4bcbb6debb4f240a89de8dcfcbbacc07fa11656267e4308aad14d86",
+    "uwvm2-ros/test/0017.runtime/native_elf_relocations.cc": "2bf901c6b4bcbb6debb4f240a89de8dcfcbbacc07fa11656267e4308aad14d86",
+    "uwvm2/documents/toolchain/patches/llvm23-linux-ppc32-sparcv9-mcjit.patch": "64bad774a65536b55ae33851b077886fe153e429c7dd6b45a6ac58972614a897"
+  },
+  "pending": "Source-matched PPC32/SPARC64 full target LLVM and real Wasm native-debugger integration; remaining architecture full runtime qualifications."
+}

@@ -1,7 +1,7 @@
 
 if is_plat("linux") then
     set_allowedarchs("i386", "x86_64", "arm", "arm64", "riscv", "riscv64", "loong64", "s390x",
-        "mips", "mips64", "ppc", "ppc64", "sparc", "sparc64", "hppa", "hppa64", "alpha",
+        "mips", "mipsel", "mips64", "mips64el", "ppc", "ppc64", "sparc", "sparc64", "hppa", "hppa64", "alpha",
         "sh", "sh4", "m68k", "xtensa", "csky", "hexagon", "arc", "arceb", "or1k", "nios2",
         "microblaze")
 end
@@ -83,16 +83,57 @@ function linux_target()
         -- attribute. Internal opfunc visibility is handled in their macros.
         local mips_target = get_config("target") or ""
         local mips_llvm_target = get_config("llvm-target") or ""
-        if is_arch("mips") or is_arch("mips64") or mips_target:lower():find("^mips") or
+        if is_arch("mips", "mipsel", "mips64", "mips64el") or mips_target:lower():find("^mips") or
             mips_llvm_target:lower():find("^mips") then
             add_cxflags("-mllvm -mips-tail-calls", {force = true})
+            -- Full LLVM static consumers exceed the signed 16-bit GOT window.
+            add_cxflags("-mxgot", {force = true})
+            -- Keep the large runtime translation unit's unused local text and
+            -- data out of the final GOT when the linker collects sections.
+            add_cxflags("-ffunction-sections", "-fdata-sections", {force = true})
         end
 
         -- lld does not support the PPC64 ELFv1 ABI used by big-endian Linux, and
         -- 32-bit PowerPC glibc linker scripts use absolute paths that bfd resolves
         -- through sysroot correctly. SPARC64 also uses relocations in GCC startup
         -- objects that current lld rejects. Use the system linker for these families.
-        if not is_powerpc_family() and not is_sparc_family() then
+        local function mips64_linker_arch_from_triple(triple)
+            if triple == "" or triple == "detect" then
+                return nil
+            end
+            triple = triple:lower()
+            if triple:find("^mips64el%-") then
+                return "mips64el"
+            elseif triple:find("^mips64%-") then
+                return "mips64"
+            end
+            return false
+        end
+
+        -- The actual compiler target takes precedence over the LLVM target and
+        -- architecture aliases when choosing the N64 linker's byte order.
+        local mips64_linker_arch = mips64_linker_arch_from_triple(mips_target)
+        if mips64_linker_arch == nil then
+            mips64_linker_arch = mips64_linker_arch_from_triple(mips_llvm_target)
+        end
+        if mips64_linker_arch == nil then
+            if is_arch("mips64el") then
+                mips64_linker_arch = "mips64el"
+            elseif is_arch("mips64") then
+                mips64_linker_arch = "mips64"
+            end
+        end
+        local mips64_native_debug = (get_config("linux-native-debug") or get_config("linux-x64-native-debug")) and
+            mips64_linker_arch
+        if mips64_native_debug then
+            -- N64 static LLVM consumers still overflow BFD's local GOT_PAGE
+            -- range with -mxgot. Current glibc startup notes also conflict with
+            -- LLD's noexecstack policy. Use the qualified MIPS gold linker;
+            -- keep the final stack non-executable. This mixed linker profile
+            -- disables LTO in the release-family rules.
+            add_ldflags("-fuse-ld=gold", "--ld-path=" .. mips64_linker_arch .. "-linux-gnuabi64-ld.gold",
+                "-Wl,-z,noexecstack", "-Wl,--gc-sections", {force = true})
+        elseif not is_powerpc_family() and not is_sparc_family() then
             add_ldflags("-fuse-ld=lld", {force = true})
         end
     end

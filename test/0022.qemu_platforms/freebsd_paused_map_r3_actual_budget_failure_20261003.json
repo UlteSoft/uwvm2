@@ -1,0 +1,47 @@
+{
+  "ISO_max_bytes": 16777216,
+  "ROS_bundled_product_qualified": false,
+  "actual_completed_stages": 1,
+  "actual_error_log_sha256": "185fc83144bbcebf1ab4419055ec1c1e59822cd9836ea834853c0b5569000fc3",
+  "actual_roster_after": [
+    10154
+  ],
+  "failed_admission_exact_free_bytes_not_recorded": true,
+  "fixed_planned_stages": 5,
+  "guest_platform_qualified": false,
+  "later_readonly_statvfs_free_bytes": 8898293760,
+  "memory_events_after": {
+    "high": 0,
+    "low": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_group_kill": 0,
+    "oom_kill": 0
+  },
+  "original_known_retirement": [
+    {
+      "birth": 5507298,
+      "pid": 395426,
+      "pidfd_readable": true,
+      "reaped_returncode": 1
+    }
+  ],
+  "original_root_pidfd_retirement": {
+    "actual_reaped_returncode": 1,
+    "pid": 395426,
+    "pidfd_readable": true
+  },
+  "overlay_max_bytes": 536870912,
+  "raw_evidence_manifest_sha256": "6efb513d966a5ed32e3ccf471e069529b593a4627fc005fe9aae81397c430683",
+  "reserve_bytes": 8589934592,
+  "schema": "uwvm-freebsd151-paused-map-r3-original-budget-failure-v1",
+  "seed_ISO_overlay_QEMU_guest_created_or_executed": false,
+  "seed_and_log_max_bytes": 75497472,
+  "smallraw_local_path": "/tmp/uwvm-qemu-freebsd-paused-map-r3-attempt1-budget-failure-small-evidence",
+  "stage_returncode": 1,
+  "status": "FAIL_BEFORE_SEED_BUDGET",
+  "ticket_id": "1129e7461fbf43e1935f6de456d5d5a8",
+  "ticket_retired": true,
+  "unchanged_required_budget_bytes": 9219080192,
+  "whole_VM_restore_qualified": false
+}

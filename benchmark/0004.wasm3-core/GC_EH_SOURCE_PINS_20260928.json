@@ -1,0 +1,107 @@
+{
+  "wasmtime_commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b",
+  "wavm_commit": "4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09",
+  "sources": [
+    {
+      "name": "wasmtime-copying-codegen",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/func_environ/gc/copying.rs",
+      "bytes": 17475,
+      "sha256": "a6ac6f742b68c1390d78c973b6e31809e2ad1a84366684b09e9dfd84b231b733",
+      "file": "wasmtime-copying-codegen.txt"
+    },
+    {
+      "name": "wasmtime-drc-codegen",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/func_environ/gc/drc.rs",
+      "bytes": 36775,
+      "sha256": "abd732072ee524f004f4c0d61dd1379b1e09242ae4df27969d3874fce339c4a5",
+      "file": "wasmtime-drc-codegen.txt"
+    },
+    {
+      "name": "wasmtime-copying-heap",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/gc/copying.rs",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "name": "wasmtime-drc-heap",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/gc/drc.rs",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "name": "wavm-exception",
+      "url": "https://raw.githubusercontent.com/WAVM/WAVM/4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09/Lib/Runtime/Exception.cpp",
+      "bytes": 12125,
+      "sha256": "d109804683a9fa728e9950e3d4c5f19f903d840ac6a36b6d10c4b79ea06557bc",
+      "file": "wavm-exception.txt"
+    },
+    {
+      "name": "wavm-object-gc",
+      "url": "https://raw.githubusercontent.com/WAVM/WAVM/4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09/Lib/Runtime/ObjectGC.cpp",
+      "bytes": 7564,
+      "sha256": "dc0f9dc2127fcdb3269a389c0944446b6f0c2e255283ec4db5356d2cae7b5f19",
+      "file": "wavm-object-gc.txt"
+    },
+    {
+      "name": "jdk27-annotated",
+      "url": "https://api.github.com/repos/openjdk/jdk/git/tags/38e4a9cb5de2a9ab96c27e8655bc8c347b47ef9d",
+      "bytes": 690,
+      "sha256": "bbabc90135eab9ac05128de7e43664b06b68bc9f29a7bb5f87edc7ade2613ee0",
+      "file": "jdk27-annotated.txt",
+      "commit": "815ff4dc327fe17f2433c7d115a5a503af10f3c4"
+    },
+    {
+      "name": "jdk27-tlab",
+      "url": "https://raw.githubusercontent.com/openjdk/jdk/815ff4dc327fe17f2433c7d115a5a503af10f3c4/src/hotspot/share/gc/shared/threadLocalAllocBuffer.inline.hpp",
+      "bytes": 4158,
+      "sha256": "1e4bde4c9b67dae112bee82f619ce92b0ec98010826889e074b24f4c48635272",
+      "file": "jdk27-tlab.txt"
+    },
+    {
+      "name": "jdk27-g1-allocator",
+      "url": "https://raw.githubusercontent.com/openjdk/jdk/815ff4dc327fe17f2433c7d115a5a503af10f3c4/src/hotspot/share/gc/g1/g1Allocator.inline.hpp",
+      "bytes": 4745,
+      "sha256": "e135e36db91de90ef8a989eeea92b3b49ac3909418968d24a3103ee775d3d8c5",
+      "file": "jdk27-g1-allocator.txt"
+    },
+    {
+      "name": "jdk27-z-barrier",
+      "url": "https://raw.githubusercontent.com/openjdk/jdk/815ff4dc327fe17f2433c7d115a5a503af10f3c4/src/hotspot/share/gc/z/zBarrier.inline.hpp",
+      "bytes": 30436,
+      "sha256": "4eff4733b344e0f34b56c39f38dab2574a70017b4a750cbb52c57dcdca678483",
+      "file": "jdk27-z-barrier.txt"
+    },
+    {
+      "name": "jdk27-z-barrier-runtime",
+      "url": "https://raw.githubusercontent.com/openjdk/jdk/815ff4dc327fe17f2433c7d115a5a503af10f3c4/src/hotspot/share/gc/z/zBarrierSetRuntime.cpp",
+      "bytes": 6421,
+      "sha256": "810af581b276a04f53f8bfaaf539d0010d29165825471dc35332f00e446e6155",
+      "file": "jdk27-z-barrier-runtime.txt"
+    },
+    {
+      "name": "wasmtime-vm-gc-tree",
+      "url": "https://api.github.com/repos/bytecodealliance/wasmtime/contents/crates/wasmtime/src/runtime/vm/gc?ref=46c23a87dac1465986a8ad53ba6a7ae49372857b",
+      "error": "HTTP Error 403: rate limit exceeded"
+    },
+    {
+      "name": "wasmtime-config",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/config.rs",
+      "bytes": 225844,
+      "sha256": "2763a78934a53e38e586b5b8de281fab651c7400652c3b05588e1e9d2800d39a",
+      "file": "wasmtime-config.txt"
+    }
+  ],
+  "openjdk27_commit": "815ff4dc327fe17f2433c7d115a5a503af10f3c4",
+  "moving_online_api_docs_version": "50.0.0-dev on 2026-09-28; not pinned binary qualification",
+  "audited_product_sources": {
+    "uwvm2": {
+      "src/uwvm2/uwvm/runtime/storage/gc_object.h": "a24fa96e3e45eb1ec2e70936ce2da06d1439cf269a0d175bfa7ed38661017c49",
+      "src/uwvm2/runtime/lib/uwvm_runtime.default.cpp": "209e1f6c12991a6b35dbc1e0e1bb7711d87eed6d150aefa6393409d34d06c988",
+      "src/uwvm2/runtime/exception/value.h": "a14d0ccd788c183689d3d79cfce9d8f47751378afbb89260508f0a58db6e8350"
+    },
+    "uwvm2-ros": {
+      "src/uwvm2/uwvm/runtime/storage/gc_object.h": "a24fa96e3e45eb1ec2e70936ce2da06d1439cf269a0d175bfa7ed38661017c49",
+      "src/uwvm2/runtime/lib/uwvm_runtime.default.cpp": "077c93e1b8327205d04016f263d4d725b333c5c7808ab0139386d87a0a6c575c",
+      "src/uwvm2/runtime/exception/value.h": "a14d0ccd788c183689d3d79cfce9d8f47751378afbb89260508f0a58db6e8350"
+    }
+  },
+  "audit_scope": "Pinned source and historical assembly audit, no new formal timing or product modification"
+}

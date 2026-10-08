@@ -68,6 +68,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         inline static constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte section_id{
             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(::uwvm2::parser::wasm::standard::wasm1::section::section_id::element_sec)};
 
+        // Preserve explicit reference-type requirements even for empty/declarative segments.
+        bool requires_function_references{};
+        bool requires_gc{};
+        bool requires_exceptions{};
+        bool requires_reference_types{};
+        // First successful required encoding, retained solely for cold policy diagnostics.
+        unsigned reference_types_diagnostic_value{};
         ::uwvm2::parser::wasm::standard::wasm1::section::section_span_view sec_span{};
 
         ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::features::final_element_type_t<Fs...>> elems{};

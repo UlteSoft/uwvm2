@@ -40,25 +40,36 @@
  ****************************************/
 
 #pragma once
+#include <uwvm2/runtime/lib/uwvm_runtime_posix_abi.h>
 
 #ifndef UWVM_MODULE
 // std
 # include <bit>
+# include <array>
+# include <chrono>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
+# include <cstdlib>
+# include <cstdio>
 # include <limits>
 # include <memory>
+# include <span>
 # include <type_traits>
 # include <utility>
+# include <vector>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
+# if defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+#  include <thread>
+# endif
 // platform
 # include <uwvm2/runtime/lib/uwvm_runtime.h>
 // import
 # include <fast_io.h>
+# include <uwvm2/utils/control/impl.h>
 # include <uwvm2/utils/ansies/impl.h>
 # include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/utils/madvise/impl.h>
@@ -73,8 +84,17 @@
 # include <uwvm2/uwvm/cmdline/impl.h>
 # include <uwvm2/uwvm/wasm/impl.h>
 # include <uwvm2/uwvm/runtime/impl.h>
+# include <uwvm2/uwvm/debugger/impl.h>
+# if defined(__unix__) || defined(__APPLE__)
+#  include <unistd.h>
+# endif
+# if defined(__linux__)
+#  include <sys/socket.h>
+#  include <sys/syscall.h>
+# endif
 # include "retval.h"
 # include "loader.h"
+# include "owned_source.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -123,7 +143,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         auto const import_link_walk_bound{[]() constexpr noexcept -> ::std::size_t
                                           {
                                               ::std::size_t bound{};
-                                              for(auto const& module_entry: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
+                                              for(auto const& module_entry: ::uwvm2::uwvm::runtime::storage::active_runtime_registry())
                                               {
                                                   auto const imported_function_count{module_entry.second.imported_function_vec_storage.size()};
                                                   if(imported_function_count > ::std::numeric_limits<::std::size_t>::max() - bound)
@@ -151,8 +171,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // the resolved wasm-defined leaf because the import entry itself may only be a forwarding slot.
         auto const is_void_to_void_wasm_func_index{[&](::std::size_t func_index) constexpr noexcept -> bool
                                                    {
-                                                       auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
-                                                       if(rt_it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]]
+                                                       auto const rt_it{::uwvm2::uwvm::runtime::storage::active_runtime_registry().find(main_module_name)};
+                                                       if(rt_it == ::uwvm2::uwvm::runtime::storage::active_runtime_registry().end()) [[unlikely]]
                                                        {
                                                            return false;
                                                        }
@@ -203,8 +223,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     // subtraction would be UB. `sec_begin != nullptr` is the parser's "section present" flag.
                     if(startsec.sec_span.sec_begin != nullptr)
                     {
-                        if(auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
-                           rt_it != ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end())
+                        if(auto const rt_it{::uwvm2::uwvm::runtime::storage::active_runtime_registry().find(main_module_name)};
+                           rt_it != ::uwvm2::uwvm::runtime::storage::active_runtime_registry().end())
                         {
                             auto const import_n{rt_it->second.imported_function_vec_storage.size()};
                             auto const idx{static_cast<::std::size_t>(startsec.start_idx)};
@@ -238,8 +258,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                       if(exp == nullptr || exp->type != external_types::func) { return false; }
 
                                       auto const resolved{static_cast<::std::size_t>(exp->storage.func_idx)};
-                                      auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
-                                      if(rt_it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]] { return false; }
+                                      auto const rt_it{::uwvm2::uwvm::runtime::storage::active_runtime_registry().find(main_module_name)};
+                                      if(rt_it == ::uwvm2::uwvm::runtime::storage::active_runtime_registry().end()) [[unlikely]] { return false; }
                                       auto const import_n{rt_it->second.imported_function_vec_storage.size()};
                                       auto const total_n{import_n + rt_it->second.local_defined_function_vec_storage.size()};
                                       if(resolved >= total_n) { return false; }
@@ -301,17 +321,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
 
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                             u8"uwvm: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                             u8"[fatal] ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8"Cannot resolve entry function for module=\"",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                             main_module_name,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8"\": expected start section or exported function \"_start\"/\"main\" with signature () -> ().\n\n",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
         ::fast_io::fast_terminate();
     }
 
@@ -461,14 +481,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     [[noreturn]] inline constexpr void wasm_set_start_func_fatal(Args && ... args) noexcept
     {
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                             u8"uwvm: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                             u8"[fatal] ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             ::std::forward<Args>(args)...,
                             u8"\n\n",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
         ::fast_io::fast_terminate();
     }
 
@@ -555,9 +575,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             if(!first) { ::fast_io::io::perr(output, u8", "); }
             first = false;
             ::fast_io::io::perr(output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                 wasm_entry_type_name(wasm_entry_type_code(*curr)),
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE));
         }
         ::fast_io::io::perr(output, u8")");
     }
@@ -571,11 +591,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     inline constexpr void print_wasm_entry_info_prefix(Output & output) noexcept
     {
         ::fast_io::io::perr(output,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                             u8"uwvm: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_GREEN),
                             u8"[info]  ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE));
     }
 
     /**
@@ -599,23 +619,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         auto u8log_output_ul{::fast_io::operations::decay::output_stream_unlocked_ref_decay(u8log_output_osr)};
 
         ::fast_io::io::perr(u8log_output_ul,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                             u8"uwvm: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                             u8"[fatal] ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8"--wasm-set-start-func argument count mismatch for local function ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                             local_function_index,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8": expected ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                             param_count,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8" argument(s), got ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                             argument_token_count,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8".\n");
         print_wasm_entry_info_prefix(u8log_output_ul);
         ::fast_io::io::perr(u8log_output_ul, u8"function type: ");
@@ -631,17 +651,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             // The loop bound is exactly `argument_token_count`, so this unchecked lookup is range-proven here.
             auto const arg{argument_tokens.index_unchecked(i)};
             ::fast_io::io::perr(u8log_output_ul,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                 wasm_entry_input_literal_type(arg),
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8" ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_GREEN),
                                 u8"\"",
                                 arg,
                                 u8"\"",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE));
         }
-        ::fast_io::io::perr(u8log_output_ul, u8")\n\n", ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        ::fast_io::io::perr(u8log_output_ul, u8")\n\n", ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
         ::fast_io::fast_terminate();
     }
 
@@ -759,25 +779,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         auto const bits{::std::bit_cast<Unsigned>(value)};
         ::fast_io::io::perr(output,
                             u8"bin=",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                             ::fast_io::mnp::bin0b(bits),
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8", oct=",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                             ::fast_io::mnp::oct0o(bits),
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8", sdec=",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                             ::fast_io::mnp::dec(value),
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8", udec=",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                             ::fast_io::mnp::dec(bits),
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8", hex=",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                             ::fast_io::mnp::hex0x(bits),
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE));
     }
 
     /**
@@ -798,17 +818,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
         ::fast_io::io::perr(output,
                             u8"#",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                             arg_index,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8" ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                             wasm_entry_type_name(type_code),
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8" input=\"",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_GREEN),
                             arg,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8"\" => ");
 
         switch(static_cast<wasm_value_type>(type_code))
@@ -836,17 +856,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 ::std::memcpy(::std::addressof(bits), ::std::addressof(value), sizeof(bits));
                 ::fast_io::io::perr(output,
                                     u8"value=",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                     ::fast_io::mnp::general(value),
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8", hexfloat=",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                     ::fast_io::mnp::hexfloat0x(value),
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8", bitfloat(hex)=",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                     ::fast_io::mnp::hex0x</*full=*/true>(bits),
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE));
                 break;
             }
             case wasm_value_type::f64:
@@ -856,17 +876,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 ::std::memcpy(::std::addressof(bits), ::std::addressof(value), sizeof(bits));
                 ::fast_io::io::perr(output,
                                     u8"value=",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                     ::fast_io::mnp::general(value),
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8", hexfloat=",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                     ::fast_io::mnp::hexfloat0x(value),
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8", bitfloat(hex)=",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                     ::fast_io::mnp::hex0x</*full=*/true>(bits),
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE));
                 break;
             }
             [[unlikely]] default:
@@ -899,31 +919,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         auto u8log_output_ul{::fast_io::operations::decay::output_stream_unlocked_ref_decay(u8log_output_osr)};
 
         ::fast_io::io::perr(u8log_output_ul,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                             u8"uwvm: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_GREEN),
                             u8"[info]  ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8"--wasm-set-start-func resolved.\n"
                             // body_indent (begin)
                             u8"              "
                             // body_indent (end)
                             u8"local-defined func index: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                             local_function_index,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8"\n"
                             // body_indent (begin)
                             u8"              "
                             // body_indent (end)
                             u8"wasm func index:          ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                             function_index,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8" (import-inclusive, import-count=",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                             import_count,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8")\n"
                             // body_indent (begin)
                             u8"              "
@@ -974,13 +994,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             u8"              "
                             // body_indent (end)
                             ,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_GREEN),
                             u8"[",
                             ::uwvm2::uwvm::io::get_local_realtime(),
                             u8"] ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                             u8"(verbose)\n",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
     }
 
     /**
@@ -1055,8 +1075,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             return entry;
         }
 
-        auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
-        if(rt_it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]] { ::fast_io::fast_terminate(); }
+        auto const rt_it{::uwvm2::uwvm::runtime::storage::active_runtime_registry().find(main_module_name)};
+        if(rt_it == ::uwvm2::uwvm::runtime::storage::active_runtime_registry().end()) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         auto const& rt{rt_it->second};
         auto const local_index{static_cast<::std::size_t>(requested.local_function_index)};
@@ -1117,11 +1137,67 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     inline constexpr void run_initialized_module_graph(::uwvm2::utils::container::u8string_view main_module_name,
                                                        RunConfig cfg, RunEntry run_entry) noexcept
     {
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+        if constexpr(::std::is_same_v<RunConfig, ::uwvm2::runtime::lib::full_compile_run_config>)
+        {
+            if(::uwvm2::runtime::lib::runtime_llvm_jit_debug_registered_worker_stopping_host_api()) { return; }
+        }
+#endif
+        ::uwvm2::runtime::gc::scoped_cli_gc_execution gc_cli_execution{};
+        // Derived by runtime from the actual initializer-owned native map and
+        // mode. No external bool or raw module/handle can assert this closure.
+        if constexpr(::std::is_same_v<RunConfig, ::uwvm2::runtime::lib::full_compile_run_config>)
+        {
+            static_cast<void>(::uwvm2::runtime::lib::runtime_gc_prepare_cli_collection_host_api());
+            // Core 3 instantiation rejects every invalid body before any active
+            // segment can mutate an imported memory or table. Full compilation
+            // fuses that proof with its one translation of every body.
+            if(!::uwvm2::runtime::lib::full_compile_prepare_host_api()) [[unlikely]]
+            {
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+                if(::uwvm2::runtime::lib::runtime_llvm_jit_debug_registered_worker_stopping_host_api()) { return; }
+#endif
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                    u8"uwvm: ",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
+                    u8"[fatal] ",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
+                    u8"Cannot prepare the initialized module graph for the current full runtime mode.\n\n",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+        }
+        if constexpr(::std::is_same_v<RunConfig, ::uwvm2::runtime::lib::lazy_compile_run_config>)
+        {
+            // The deferred segment contract applies to lazy/tiered too. Every
+            // body is fused into its actual checked artifact BEFORE any preload
+            // segment/start can change an imported memory/table. The later run
+            // entry only consumes the already admitted publication.
+            if(!::uwvm2::runtime::lib::lazy_compile_prepare_host_api(main_module_name, cfg)) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                    u8"uwvm: ",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
+                    u8"[fatal] ",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
+                    u8"Cannot prepare the initialized module graph for the current lazy runtime mode.\n\n",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+        }
         using start_section_t = ::uwvm2::parser::wasm::standard::wasm1::features::start_section_storage_t;
         // Preloaded Wasm modules are instances too: run each actual start section once, in preload order.
         // Do not invoke library exports named _start/main, and do not apply the main-module CLI override to libraries.
-        for(auto const& module: ::uwvm2::uwvm::wasm::storage::preloaded_wasm)
+        for(auto const& module: ::uwvm2::uwvm::wasm::storage::active_preloaded_wasm())
         {
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+            if constexpr(::std::is_same_v<RunConfig, ::uwvm2::runtime::lib::full_compile_run_config>)
+            {
+                if(::uwvm2::runtime::lib::runtime_llvm_jit_debug_registered_worker_stopping_host_api()) { return; }
+            }
+#endif
             if(module.binfmt_ver != 1u) [[unlikely]] { ::fast_io::fast_terminate(); }
             ::uwvm2::uwvm::runtime::initializer::apply_runtime_active_segments(module.module_name);
             auto const& start{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<start_section_t>(
@@ -1134,7 +1210,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             start_cfg.module_start = true;
             run_entry(module.module_name, start_cfg);
         }
-        auto const& main_module{::uwvm2::uwvm::wasm::storage::execute_wasm};
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+        if constexpr(::std::is_same_v<RunConfig, ::uwvm2::runtime::lib::full_compile_run_config>)
+        {
+            if(::uwvm2::runtime::lib::runtime_llvm_jit_debug_registered_worker_stopping_host_api()) { return; }
+        }
+#endif
+        auto const& main_module{::uwvm2::uwvm::wasm::storage::active_execute_wasm()};
         ::uwvm2::uwvm::runtime::initializer::apply_runtime_active_segments(main_module_name);
         auto const& start{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<start_section_t>(
             main_module.wasm_module_storage.wasm_binfmt_ver1_storage.sections)};
@@ -1148,6 +1230,115 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     {
         run_initialized_module_graph(main_module_name, cfg, ::uwvm2::runtime::lib::full_compile_and_run_main_module);
     }
+
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+    [[nodiscard]] inline bool install_debug_source_maps(::uwvm2::uwvm::debugger::controller& control)
+    {
+        namespace parser = ::uwvm2::parser::wasm;
+        namespace wasm = ::uwvm2::uwvm::wasm;
+        auto const& runtime_modules{::uwvm2::uwvm::runtime::storage::active_runtime_registry()};
+        ::std::uint64_t module_id{};
+        // LLVM full assigns dense IDs by iterating this same, unchanged
+        // runtime_modules table in compile_all_modules_if_needed(). This runs
+        // after prepare_debug_host_api() has completed that assignment.
+        for(auto const& runtime_entry : runtime_modules)
+        {
+            if(module_id == ::std::numeric_limits<::std::uint64_t>::max()) { return false; }
+            auto const parsed{wasm::storage::all_module.find(runtime_entry.first)};
+            if(parsed == wasm::storage::all_module.end() ||
+               (parsed->second.type != wasm::type::module_type_t::exec_wasm &&
+                parsed->second.type != wasm::type::module_type_t::preloaded_wasm))
+            { ++module_id; continue; }
+            auto const* file{parsed->second.module_storage_ptr.wf};
+            if(file == nullptr || file->binfmt_ver != 1u) { return false; }
+            auto const& module{file->wasm_module_storage.wasm_binfmt_ver1_storage};
+            bool installed{false};
+            [&]<typename... Fs>(::uwvm2::utils::container::tuple<Fs...>)
+            {
+                using code_section_t = parser::standard::wasm1::features::code_section_storage_t<Fs...>;
+                using custom_section_t = parser::standard::wasm1::features::custom_section_storage_t;
+                auto const& code{parser::concepts::operation::get_first_type_in_tuple<code_section_t>(module.sections)};
+                auto const& custom{parser::concepts::operation::get_first_type_in_tuple<custom_section_t>(module.sections)};
+                ::uwvm2::uwvm::debugger::source_map_sections sections{};
+                bool invalid{};
+                ::std::array<bool, 4u> seen_custom{};
+                ::std::span<::std::byte const> source_url{};
+                ::fast_io::string source_json{}, source_directory{};
+                auto const file_begin{reinterpret_cast<::std::uintptr_t>(module.module_span.module_begin)};
+                auto const file_end{reinterpret_cast<::std::uintptr_t>(module.module_span.module_end)};
+                auto const code_begin{reinterpret_cast<::std::uintptr_t>(code.sec_span.sec_begin)};
+                auto const code_end{reinterpret_cast<::std::uintptr_t>(code.sec_span.sec_end)};
+                if(file_begin == 0u || file_end < file_begin || code_begin < file_begin ||
+                   code_end < code_begin || code_end > file_end) { invalid = true; }
+                else
+                { sections.code_section_content_size = code_end - code_begin;
+                  sections.code_section_file_offset = code_begin - file_begin;
+                  sections.module_file_size = file_end - file_begin; }
+                for(auto const& entry : custom.customs)
+                {
+                    ::std::span<::std::byte const>* destination{};
+                    bool* seen{};
+                    if(entry.custom_name == u8".debug_line") { destination = ::std::addressof(sections.debug_line); seen = ::std::addressof(seen_custom[0u]); }
+                    else if(entry.custom_name == u8".debug_line_str") { destination = ::std::addressof(sections.debug_line_str); seen = ::std::addressof(seen_custom[1u]); }
+                    else if(entry.custom_name == u8".debug_str") { destination = ::std::addressof(sections.debug_str); seen = ::std::addressof(seen_custom[2u]); }
+                    else if(entry.custom_name == u8"sourceMappingURL") { destination = ::std::addressof(source_url); seen = ::std::addressof(seen_custom[3u]); }
+                    if(destination == nullptr) { continue; }
+                    auto const begin{reinterpret_cast<::std::uintptr_t>(entry.custom_begin)};
+                    auto const end{reinterpret_cast<::std::uintptr_t>(entry.sec_span.sec_end)};
+                    if(*seen || begin < file_begin || end < begin || end > file_end)
+                    { invalid = true; continue; }
+                    *seen = true;
+                    // [validated mapped module; custom payload, section end]
+                    // [safe                                               ] end is one-past within the loader-owned bytes.
+                    //  ^^ no pointer advance; span length follows checked integer bounds.
+                    *destination = {reinterpret_cast<::std::byte const*>(begin), end - begin};
+                }
+                if(sections.debug_line.empty() && seen_custom[3u] && !invalid)
+                {
+                    sections.source_map_declared = true;
+                    auto const name{::std::string_view{reinterpret_cast<char const*>(file->file_name.data()),file->file_name.size()}};
+                    if(::uwvm2::uwvm::debugger::read_source_map_sidecar(source_url,name,source_json,source_directory))
+                    {
+                        sections.source_map_json = {source_json.data(),source_json.size()};
+                        sections.source_map_directory = {source_directory.data(),source_directory.size()};
+                    }
+                    else { invalid = true; }
+                }
+                auto const& runtime{runtime_entry.second};
+                ::std::vector<::uwvm2::uwvm::debugger::source_function_span> functions{};
+                auto const imported{runtime.imported_function_vec_storage.size()};
+                auto const count{runtime.local_defined_function_vec_storage.size()};
+                functions.reserve(count);
+                for(::std::size_t index{}; index != count; ++index)
+                {
+                    auto const* body{runtime.local_defined_function_vec_storage.index_unchecked(index).wasm_code_ptr};
+                    if(body == nullptr || index > ::std::numeric_limits<::std::uint64_t>::max() - imported)
+                    { invalid = true; break; }
+                    auto const expr{reinterpret_cast<::std::uintptr_t>(body->body.expr_begin)};
+                    auto const end{reinterpret_cast<::std::uintptr_t>(body->body.code_end)};
+                    if(expr < code_begin || end <= expr || end > code_end)
+                    { invalid = true; break; }
+                    // [Code content] [body locals] [expression ... code_end]
+                    // [safe        ] [safe       ] [safe                 ] one-past
+                    //                               ^^ expression offset is checked before any source lookup.
+                    functions.push_back({static_cast<::std::uint64_t>(imported + index),
+                                         static_cast<::std::uint64_t>(expr - code_begin),
+                                         static_cast<::std::uint64_t>(end - expr)});
+                }
+                installed = control.install_source_module(module_id, sections, ::std::move(functions), invalid);
+            }(wasm::feature::wasm_binfmt1_features);
+            if(!installed) { return false; }
+            // Only the runtime's actual canonical source/native publication can
+            // mint a binding. Preloaded/foreign modules remain metadata-unavailable.
+            auto binding{::uwvm2::runtime::lib::llvm_jit_debug_bind_source_host_api(static_cast<::std::size_t>(module_id))};
+            // Optional metadata failure leaves the existing Wasm/line/native
+            // controls usable; no partial index or binding is queried.
+            if(binding) { static_cast<void>(control.install_source_metadata(module_id, ::std::move(binding))); }
+            ++module_id;
+        }
+        return true;
+    }
+#endif
 
     // Default adaptive compilation limit: floor(log2(hardware concurrency)), at least one.
     inline constexpr ::std::size_t calculate_default_runtime_compile_threads(::std::size_t max_compile_threads) noexcept
@@ -1214,15 +1405,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             []<typename... Args>(Args&&... args) constexpr noexcept
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                     u8"[warn]  ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     ::std::forward<Args>(args)...,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                     u8" (runtime-compile-threads)\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
             }};
 
         // Warning-to-fatal escalation is split from the warning helper so diagnostics keep the original warning text
@@ -1231,15 +1422,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             []() constexpr noexcept
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                                     u8"[fatal] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"Convert warnings to fatal errors. ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                     u8"(runtime-compile-threads)\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                 ::fast_io::fast_terminate();
             }};
 
@@ -1248,14 +1439,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             []<typename... Args>(Args&&... args) constexpr noexcept
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                                     u8"[fatal] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     ::std::forward<Args>(args)...,
                                     u8"\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                 ::fast_io::fast_terminate();
             }};
 
@@ -1265,19 +1456,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             []<typename... Args>(Args&&... args) constexpr noexcept
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_GREEN),
                                     u8"[info]  ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     ::std::forward<Args>(args)...,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_GREEN),
                                     u8"[",
                                     ::uwvm2::uwvm::io::get_local_realtime(),
                                     u8"] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                     u8"(verbose)\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
             }};
 
 # ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
@@ -1324,9 +1515,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 if(::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
                 {
                     runtime_compile_threads_warn(u8"Requested runtime compile thread policy \"",
-                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                 ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                  u8"aggressive",
-                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                 ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                  u8"\", but this platform does not provide fast_io::native_thread. Falling back to 0 extra compile threads.");
 
                     if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
@@ -1345,13 +1536,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     if(resolved_compile_threads > max_compile_threads && ::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
                     {
                         runtime_compile_threads_warn(u8"Requested runtime compile thread count (requested=",
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                      resolved_compile_threads,
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                      u8", detected-max=",
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                      max_compile_threads,
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                      u8"). The requested value will still be used, but performance may be suboptimal.");
 
                         if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
@@ -1361,9 +1552,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     {
                         runtime_compile_threads_warn(
                             u8"Requested runtime compile thread count (requested=",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                             requested_compile_threads,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8"), but this platform does not provide fast_io::native_thread. Falling back to 0 extra compile threads.");
 
                         if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
@@ -1380,13 +1571,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     if(requested_compile_threads_abs > static_cast<runtime_compile_threads_unsigned_type>(max_compile_threads)) [[unlikely]]
                     {
                         runtime_compile_threads_fatal(u8"Invalid negative runtime compile thread count (requested=",
-                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                      ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                       requested_compile_threads,
-                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                      ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                       u8", detected-max=",
-                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                      ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                       max_compile_threads,
-                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                      ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                       u8"): the absolute value of a negative setting must not exceed the detected max thread count.");
                     }
 
@@ -1410,27 +1601,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 {
 # ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
                     runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                          resolved_compile_threads,
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                          u8" (requested=",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                          u8"default",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                          u8", detected-max=",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                          max_compile_threads,
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                          u8", per-module full-compile scheduling may adapt below this upper bound). ");
 # else
                     runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                          resolved_compile_threads,
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                          u8" (requested=",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                          u8"default",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                          u8", fast_io::native_thread unavailable on this platform). ");
 # endif
                 }
@@ -1439,44 +1630,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
                     runtime_compile_threads_verbose_info(
                         u8"Runtime compile thread upper bound resolved to ",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                         resolved_compile_threads,
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                         u8" (requested=",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                         u8"aggressive",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                         u8", detected-max=",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                         max_compile_threads,
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                         u8", aggressive-policy=floor(max*2/3), per-module full-compile scheduling may adapt below this upper bound). ");
 # else
                     runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                          resolved_compile_threads,
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                          u8" (requested=",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                          u8"aggressive",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                          u8", fast_io::native_thread unavailable on this platform). ");
 # endif
                 }
                 else
                 {
                     runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                          resolved_compile_threads,
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                          u8" (requested=",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                          ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads,
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                          u8", detected-max=",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                          max_compile_threads,
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                          u8"). ");
                 }
             }
@@ -1484,19 +1675,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             {
 # ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
                 runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                      resolved_compile_threads,
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                      u8" by the default policy (detected-max=",
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                      max_compile_threads,
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                      u8", per-module full-compile scheduling may adapt below this upper bound). ");
 # else
                 runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                                      resolved_compile_threads,
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                      u8" by the default policy (fast_io::native_thread unavailable on this platform). ");
 # endif
             }
@@ -1557,27 +1748,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         {
             ::fast_io::io::perr(
                 ::uwvm2::uwvm::io::u8log_output,
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                 u8"uwvm: ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                 u8"[fatal] ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                 u8"auto_compile runtime mode is only supported by the uwvm-int backend (-Rint, or -Rcc int without -Rcm). " u8"Use -Rcm lazy|full with -Rcc jit|tiered to select LLVM-JIT or tiered runtime modes explicitly. ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                 u8"(runtime)\n\n",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
             ::fast_io::fast_terminate();
         }
 
-        auto const main_wasm_bytes{loaded_wasm_file_byte_size(::uwvm2::uwvm::wasm::storage::execute_wasm)};
+        auto const main_wasm_bytes{loaded_wasm_file_byte_size(::uwvm2::uwvm::wasm::storage::active_execute_wasm())};
         ::std::size_t preload_wasm_bytes{};
-        for(auto const& preloaded_wasm: ::uwvm2::uwvm::wasm::storage::preloaded_wasm)
+        for(auto const& preloaded_wasm: ::uwvm2::uwvm::wasm::storage::active_preloaded_wasm())
         {
             preload_wasm_bytes = saturating_add_size(preload_wasm_bytes, loaded_wasm_file_byte_size(preloaded_wasm));
         }
 
         auto const total_wasm_bytes{saturating_add_size(main_wasm_bytes, preload_wasm_bytes)};
-        auto const has_preload_wasm{!::uwvm2::uwvm::wasm::storage::preloaded_wasm.empty()};
+        auto const has_preload_wasm{!::uwvm2::uwvm::wasm::storage::active_preloaded_wasm().empty()};
 
         // With preloads, total loaded Wasm size is the relevant full-compile cost because full mode translates all loaded
         // Wasm modules.  Without preloads, the executable module size is the useful hot-code proxy.
@@ -1592,40 +1783,40 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             // Keep the auto decision visible under verbose logging so benchmark runs can explain why the uwvm-int auto
             // policy behaved like `-Rcm full` or `-Rcm lazy` without adding noise to normal program output.
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_GREEN),
                                 u8"[info]  ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8"uwvm-int auto selected ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                 ::fast_io::mnp::cond(selected_full, u8"full", u8"lazy"),
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8" compile for uwvm-int (main-wasm-bytes=",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                 main_wasm_bytes,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8", preload-wasm-bytes=",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                 preload_wasm_bytes,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8", total-wasm-bytes=",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                 total_wasm_bytes,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8", threshold=",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                 threshold,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 ::fast_io::mnp::cond(has_preload_wasm, u8", policy=preload-total", u8", policy=main-only"),
                                 u8"). ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_GREEN),
                                 u8"[",
                                 ::uwvm2::uwvm::io::get_local_realtime(),
                                 u8"] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                 u8"(verbose)\n",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
         }
     }
 #endif
@@ -1649,11 +1840,269 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      * @return  Process-style integer return code from `uwvm2::uwvm::run::retval`.
      * @warning Fatal configuration/runtime invariants can terminate the process through `fast_io::fast_terminate`.
      */
+    // Explicit debugger mode supplies LLVM/full defaults only when the user did
+    // not choose a backend/mode. An explicit incompatible selection is fatal,
+    // before loading imports or executing any start section.
+    inline constexpr bool prepare_debug_jit_mode() noexcept
+    {
+        if(::uwvm2::uwvm::wasm::storage::execute_wasm_mode != ::uwvm2::uwvm::wasm::base::mode::debug_jit) { return true; }
+        namespace mode = ::uwvm2::uwvm::runtime::runtime_mode;
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+        bool preset{mode::is_runtime_mode_code_jit_existed || mode::is_runtime_mode_code_aot_existed};
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+        preset = preset || mode::is_runtime_mode_code_int_existed;
+# endif
+# if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+        preset = preset || mode::is_runtime_mode_code_debug_existed;
+# endif
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        preset = preset || mode::is_runtime_mode_code_tiered_existed;
+# endif
+        if(!preset && !mode::custom_runtime_mode_existed) { mode::global_runtime_mode = mode::runtime_mode_t::full_compile; }
+        if(!preset && !mode::custom_runtime_compiler_existed) { mode::global_runtime_compiler = mode::runtime_compiler_t::llvm_jit_only; }
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+        if(mode::global_runtime_mode == mode::runtime_mode_t::full_compile &&
+           mode::global_runtime_compiler == mode::runtime_compiler_t::llvm_jit_only) { return true; }
+#endif
+        auto const compiler{[]() constexpr noexcept -> ::uwvm2::utils::container::u8string_view
+        {
+            switch(mode::global_runtime_compiler)
+            {
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                case mode::runtime_compiler_t::uwvm_interpreter_only: return u8"uwvm-int";
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+                case mode::runtime_compiler_t::llvm_jit_only: return u8"llvm-jit";
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+                case mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered: return u8"tiered";
+#endif
+#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+                case mode::runtime_compiler_t::debug_interpreter: return u8"debug-interpreter";
+#endif
+                default: return u8"unavailable";
+            }
+        }()};
+        auto const compilation{[]() constexpr noexcept -> ::uwvm2::utils::container::u8string_view
+        {
+            switch(mode::global_runtime_mode)
+            {
+                case mode::runtime_mode_t::full_compile: return u8"full";
+                case mode::runtime_mode_t::auto_compile: return u8"auto";
+                case mode::runtime_mode_t::lazy_compile: return u8"lazy";
+                case mode::runtime_mode_t::lazy_compile_with_full_code_verification: return u8"lazy+verification";
+                default: return u8"unknown";
+            }
+        }()};
+        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE), u8"uwvm: ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED), u8"[fatal] ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
+            u8"debug-jit is unsupported in the current mode: ", compiler, u8"/", compilation,
+            u8". It requires LLVM JIT full compilation and native thread support. ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE), u8"(runtime)\n\n",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
+        return false;
+    }
+
+    inline bool prepare_debug_console_input() noexcept
+    {
+        if(::uwvm2::uwvm::wasm::storage::execute_wasm_mode != ::uwvm2::uwvm::wasm::base::mode::debug_jit) { return true; }
+        // External channel adoption authenticates and seals its actual endpoint
+        // before guest setup. Stdin is guest input in that launch, not a second
+        // command source competing for the one protected console-input owner.
+        if(::uwvm2::uwvm::cmdline::params::details::debug_jit_control_fd >= 0 ||
+           ::uwvm2::uwvm::cmdline::params::details::debug_jit_control_handle != 0u) { return true; }
+        namespace control = ::uwvm2::utils::control;
+#if defined(__linux__) || defined(__FreeBSD__) || (defined(__APPLE__) && defined(__MACH__)) || (defined(_WIN32) && !defined(__CYGWIN__))
+        // Host launch authority only, before constructing any guest file table.
+        // A retained native duplicate pins the input object; guest path_open
+        // checks the opened OS object, not a guest-provided path label.
+        auto const status{control::seal_console_input_host_api(0)};
+#else
+        auto const status{control::sealed_input_status::unsupported_platform};
+#endif
+        if(status == control::sealed_input_status::ok)
+        {
+            // Check the host console's own sinks before emitting any prompt.
+            // A regular-file/FIFO alias feeds output back into command input;
+            // same-slave-terminal output is allowed because its direction differs.
+            auto const stdout_status{control::inspect_guest_output_host_api(1)};
+            auto const stderr_status{control::inspect_guest_output_host_api(2)};
+            if(stdout_status == control::sealed_input_decision::allow && stderr_status == control::sealed_input_decision::allow) { return true; }
+            auto const report{[](auto output) noexcept
+            {
+                ::fast_io::io::perr(output,
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE), u8"uwvm: ",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED), u8"[fatal] ",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
+                    u8"Unable to isolate debug-jit command input: console output aliases protected input or its identity cannot be verified. ",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE), u8"(runtime)\n\n",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
+            }};
+            // Never send even the failure diagnostic to a rejected command-input
+            // alias. If neither sink is safe, fail with a nonzero exit silently.
+            if(stderr_status == control::sealed_input_decision::allow) { report(::fast_io::u8err()); }
+            else if(stdout_status == control::sealed_input_decision::allow) { report(::fast_io::u8out()); }
+            return false;
+        }
+        auto const reason{[&]() noexcept -> ::uwvm2::utils::container::u8string_view
+        {
+            switch(status)
+            {
+                case control::sealed_input_status::already_sealed: return u8"input already bound to another launch";
+                case control::sealed_input_status::invalid_descriptor: return u8"input descriptor is not readable";
+                case control::sealed_input_status::identity_unavailable: return u8"input identity cannot be protected";
+                case control::sealed_input_status::unsupported_platform: return u8"secure console input is unavailable on this platform";
+                default: return u8"unknown input isolation failure";
+            }
+        }()};
+        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE), u8"uwvm: ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED), u8"[fatal] ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
+            u8"Unable to isolate debug-jit command input: ", reason, u8". ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE), u8"(runtime)\n\n",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
+        return false;
+    }
+
+    inline bool prepare_debug_control_fd_mode() noexcept
+    {
+        if(::uwvm2::uwvm::cmdline::params::details::debug_jit_control_fd < 0) { return true; }
+#if ((defined(__linux__) && defined(SYS_pidfd_open) && defined(SCM_CREDENTIALS)) || \
+     (defined(__APPLE__) && defined(__MACH__))) && defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+        namespace mode = ::uwvm2::uwvm::runtime::runtime_mode;
+        if((::uwvm2::uwvm::wasm::storage::execute_wasm_mode == ::uwvm2::uwvm::wasm::base::mode::run ||
+            ::uwvm2::uwvm::wasm::storage::execute_wasm_mode == ::uwvm2::uwvm::wasm::base::mode::debug_jit) &&
+           mode::global_runtime_mode == mode::runtime_mode_t::full_compile &&
+           mode::global_runtime_compiler == mode::runtime_compiler_t::llvm_jit_only) { return true; }
+#endif
+        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE), u8"uwvm: ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED), u8"[fatal] ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
+            u8"debug-jit control FD is unsupported in the current mode. It requires supported Linux or macOS, native threads, and LLVM JIT full run mode. ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE), u8"(runtime)\n\n",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
+        return false;
+    }
+
+    inline bool prepare_debug_control_handle_mode() noexcept
+    {
+        if(::uwvm2::uwvm::cmdline::params::details::debug_jit_control_handle == 0u) { return true; }
+#if defined(_WIN32) && !defined(__CYGWIN__) && defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+        namespace mode = ::uwvm2::uwvm::runtime::runtime_mode;
+        if(::uwvm2::uwvm::cmdline::params::details::debug_jit_control_fd < 0 &&
+           (::uwvm2::uwvm::wasm::storage::execute_wasm_mode == ::uwvm2::uwvm::wasm::base::mode::run ||
+            ::uwvm2::uwvm::wasm::storage::execute_wasm_mode == ::uwvm2::uwvm::wasm::base::mode::debug_jit) &&
+           mode::global_runtime_mode == mode::runtime_mode_t::full_compile &&
+           mode::global_runtime_compiler == mode::runtime_compiler_t::llvm_jit_only) { return true; }
+#endif
+        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE), u8"uwvm: ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED), u8"[fatal] ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
+            u8"debug-jit control HANDLE is unsupported in the current mode. It requires Windows, native threads, and LLVM JIT full run mode. ",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE), u8"(runtime)\n\n",
+            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
+        return false;
+    }
+
     inline constexpr int run() noexcept
     {
+        if(!prepare_debug_jit_mode() || !prepare_debug_control_fd_mode() ||
+           !prepare_debug_control_handle_mode() || !prepare_debug_console_input())
+        { return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error); }
+#if ((defined(__linux__) && defined(SYS_pidfd_open) && defined(SCM_CREDENTIALS)) || \
+     (defined(__APPLE__) && defined(__MACH__)) || (defined(_WIN32) && !defined(__CYGWIN__))) && \
+    defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+# if defined(_WIN32) && !defined(__CYGWIN__)
+        using debug_control_channel = ::uwvm2::uwvm::debugger::windows_control_handle;
+# elif defined(__APPLE__) && defined(__MACH__)
+        using debug_control_channel = ::uwvm2::uwvm::debugger::macos_control_fd;
+# else
+        using debug_control_channel = ::uwvm2::uwvm::debugger::linux_control_fd;
+# endif
+        ::std::unique_ptr<debug_control_channel> debug_channel{};
+# if defined(_WIN32) && !defined(__CYGWIN__)
+        if(auto const value{::uwvm2::uwvm::cmdline::params::details::debug_jit_control_handle}; value != 0u)
+        {
+            // Host-only inherited client HANDLE is authenticated and sealed
+            // before any guest import, file table or JIT code can be admitted.
+            debug_channel = debug_control_channel::adopt(value);
+            if(!debug_channel)
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE), u8"uwvm: ",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED), u8"[fatal] ",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
+                    u8"Unable to authorize debug-jit control HANDLE: expected the direct launcher parent's inherited, single-instance local message pipe client. ",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE), u8"(runtime)\n\n",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
+                return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
+            }
+        }
+# else
+        if(auto const fd{::uwvm2::uwvm::cmdline::params::details::debug_jit_control_fd}; fd >= 0)
+        {
+            // Adopt and seal before loading guest imports, file tables or code.
+            debug_channel = debug_control_channel::adopt(fd);
+            if(!debug_channel)
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE), u8"uwvm: ",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED), u8"[fatal] ",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
+                    u8"Unable to authorize debug-jit control FD: expected a live external peer on an inherited private Unix socket. ",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE), u8"(runtime)\n\n",
+                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
+                return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
+            }
+        }
+# endif
+#endif
         // Preloaded wasm modules and dynamic-link bindings are prepared before this function is entered.  This driver
         // consumes the resulting global command-line/storage state and performs the final ordered load/execute sequence.
 
+        bool owned_full_prepared{};
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS)
+        namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
+        // Debug/reserved LLVM-full may own a pure-Wasm preload graph. Ordinary
+        // full with preload providers retains its previous mapped loader path.
+        // This supplies lifetime only: source values still need a completed
+        // validation epoch, stopped ticket and actual function/code generation.
+        bool own_single_source{(::uwvm2::uwvm::wasm::storage::execute_wasm_mode == ::uwvm2::uwvm::wasm::base::mode::run ||
+                                ::uwvm2::uwvm::wasm::storage::execute_wasm_mode == ::uwvm2::uwvm::wasm::base::mode::debug_jit) &&
+            runtime_mode::global_runtime_mode == runtime_mode::runtime_mode_t::full_compile &&
+            runtime_mode::global_runtime_compiler == runtime_mode::runtime_compiler_t::llvm_jit_only &&
+            (::uwvm2::uwvm::wasm::storage::preloaded_wasm.empty() ||
+             ::uwvm2::uwvm::wasm::storage::execute_wasm_mode == ::uwvm2::uwvm::wasm::base::mode::debug_jit ||
+             ::uwvm2::uwvm::cmdline::params::details::debug_jit_control_fd >= 0 ||
+             ::uwvm2::uwvm::cmdline::params::details::debug_jit_control_handle != 0u)};
+# if defined(UWVM_SUPPORT_PRELOAD_DL)
+        own_single_source = own_single_source && ::uwvm2::uwvm::wasm::storage::preloaded_dl.empty();
+# endif
+# if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+        own_single_source = own_single_source && ::uwvm2::uwvm::wasm::storage::weak_symbol.empty();
+# endif
+        if(own_single_source)
+        {
+            // Only debug/reserved modes select an immutable owned preparse
+            // image; ordinary full retains its existing mapped source behavior.
+            // The FD/HANDLE was authenticated above before any input effects.
+            bool const retain_debug_image{
+                ::uwvm2::uwvm::wasm::storage::execute_wasm_mode == ::uwvm2::uwvm::wasm::base::mode::debug_jit ||
+                ::uwvm2::uwvm::cmdline::params::details::debug_jit_control_fd >= 0 ||
+                ::uwvm2::uwvm::cmdline::params::details::debug_jit_control_handle != 0u};
+            auto const prepared{prepare_owned_full_cli_source(retain_debug_image)};
+            if(prepared != static_cast<int>(::uwvm2::uwvm::run::retval::ok)) { return prepared; }
+            owned_full_prepared = true;
+        }
+#endif
+        if(!owned_full_prepared)
+        {
         // Load the executable wasm module first.  Later local/weak modules may satisfy imports used by the executable.
         if(auto const ret{::uwvm2::uwvm::run::load_exec_wasm_module()}; ret != static_cast<int>(::uwvm2::uwvm::run::retval::ok)) [[unlikely]] { return ret; }
 
@@ -1672,6 +2121,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
         }
 
+        }
+
         // Inspection-only modes intentionally run before dependency checks.  A user may inspect sections or parser-level
         // validity even when imports are unresolved for execution.
         switch(::uwvm2::uwvm::wasm::storage::execute_wasm_mode)
@@ -1683,19 +2134,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                         u8"uwvm: ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_GREEN),
                                         u8"[info]  ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                         u8"Start printing section details. ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_GREEN),
                                         u8"[",
                                         ::uwvm2::uwvm::io::get_local_realtime(),
                                         u8"] ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                         u8"(verbose)\n",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                 }
 
                 ::uwvm2::uwvm::wasm::section_detail::print_section_details();
@@ -1726,17 +2177,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // A backendless build is still useful for parsing, section printing, and validation.  Executable mode is rejected
         // only after those non-executing modes have had a chance to return successfully.
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                             u8"uwvm: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                             u8"[fatal] ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8"This build was configured without executable runtime backends. Only validation and section details are available.\n\n",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
         return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
 #else
         // Executable mode begins here.  Import existence and import-cycle validation must precede runtime initialization
         // because runtime storage assumes all module links are resolvable and acyclic.
+        if(!owned_full_prepared)
         if(auto const ret{::uwvm2::uwvm::wasm::loader::check_import_exist_and_detect_cycles()};
            ret != ::uwvm2::uwvm::wasm::loader::load_and_check_modules_rtl::ok) [[unlikely]]
         {
@@ -1744,7 +2196,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
 
         // Initialize runtime storage, link metadata, and backend-visible module data after import resolution succeeds.
-        ::uwvm2::uwvm::runtime::initializer::initialize_runtime(true);
+        if(!owned_full_prepared) { ::uwvm2::uwvm::runtime::initializer::initialize_runtime(true); }
 
 # if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
         // The debug interpreter backend is modeled as a full-compile backend.  If the command line selected a lazy mode,
@@ -1755,28 +2207,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             if(::uwvm2::uwvm::io::show_runtime_warning)
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                     u8"[warn]  ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"Debug interpreter requires full compile; forcing full compile.",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                     u8" (runtime)\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
 
                 if(::uwvm2::uwvm::io::runtime_warning_fatal) [[unlikely]]
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                         u8"uwvm: ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                                         u8"[fatal] ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                         u8"Convert warnings to fatal errors. ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                         u8"(runtime)\n\n",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                     ::fast_io::fast_terminate();
                 }
             }
@@ -1794,7 +2246,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // Resolve global execution knobs after runtime storage exists.  Entry resolution needs runtime function type
         // storage, and compile-thread resolution publishes the value consumed by full-translation runtime code.
         resolve_runtime_compile_threads();
-        auto runtime_entry{resolve_runtime_entry_invocation(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name)};
+        auto runtime_entry{resolve_runtime_entry_invocation(::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name)};
 
         // Dispatch matrix:
         //
@@ -1815,8 +2267,200 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # endif
                 ::std::unreachable();
             }
+            case ::uwvm2::uwvm::wasm::base::mode::debug_jit:
+            {
+# if ((defined(__linux__) && defined(SYS_pidfd_open) && defined(SCM_CREDENTIALS)) || \
+      (defined(__APPLE__) && defined(__MACH__)) || (defined(_WIN32) && !defined(__CYGWIN__))) && \
+     defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+                // The authenticated channel is the sole command consumer in
+                // an external launch. Its execution branch below also honors
+                // debug mode's initial pause; stdin remains guest input.
+                if(!debug_channel)
+# endif
+                {
+# if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+                namespace debugger = ::uwvm2::uwvm::debugger;
+                namespace control = ::uwvm2::utils::control;
+                control::launch_config config{};
+                config.debug_enabled = true;
+                // Let the authenticated host controller validate replace requests; the runtime currently rejects
+                // publication until an independently validated single-function compiler and old-code owner exist.
+                config.replacement_enabled = true;
+                config.compiler = control::backend::llvm;
+                config.mode = control::compile_mode::full;
+                config.origin = control::launch_origin::console;
+                // A process-local routing label, never an authentication secret.
+                // The console authority is an owning host capability, not these bytes.
+                config.instance[0] = 1u;
+#  if defined(_WIN32) && !defined(__CYGWIN__)
+                config.vm_process = ::fast_io::win32::GetCurrentProcessId();
+#  elif defined(__unix__) || defined(__APPLE__)
+                config.vm_process = static_cast<::std::uint64_t>(::uwvm2::runtime::lib::posix_abi::getpid_noexcept());
+#  endif
+                // Actual initialized CLI owner requests precise roots BEFORE
+                // selected debug compilation. Empty/non-GC cohorts remain unchanged.
+                ::uwvm2::runtime::gc::scoped_cli_gc_execution debug_gc_compilation_owner{};
+                static_cast<void>(::uwvm2::runtime::lib::runtime_gc_prepare_cli_collection_host_api());
+                auto controller{debugger::controller::create(config, 256u,
+                    ::uwvm2::runtime::lib::llvm_jit_capture_debug_stack_host_api,
+                    ::uwvm2::runtime::lib::llvm_jit_debug_read_memory_host_api)};
+                if(!controller ||
+                   ::uwvm2::runtime::lib::llvm_jit_configure_debug_session_host_api(controller->domain(), controller->observer(),
+                       ::uwvm2::runtime::lib::llvm_jit_debug_safe_point_granularity::instruction) !=
+                       ::uwvm2::runtime::lib::llvm_jit_debug_configure_result::ok ||
+                       ::uwvm2::runtime::lib::llvm_jit_configure_debug_value_observation_host_api() !=
+                       ::uwvm2::runtime::lib::llvm_jit_debug_configure_result::ok ||
+                   !::uwvm2::runtime::lib::llvm_jit_prepare_debug_host_api() ||
+                   !install_debug_source_maps(*controller) || !controller->arm_initial_pause())
+                {
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE), u8"uwvm: ",
+                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED), u8"[fatal] ",
+                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
+                        u8"Unable to prepare the LLVM full debugger before guest execution.\n\n",
+                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
+                    return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
+                }
+                ::uwvm2::runtime::lib::full_compile_run_config run_config{};
+                configure_runtime_entry_buffers(run_config, runtime_entry);
+                // The actual launched FastIO owner remains exclusive until a
+                // real OS join. notify_guest_exit is a debugger event, never a
+                // physical thread-retirement receipt (TLS/launch RAII may follow).
+                struct actual_guest_launch_state final
+                {
+                    ::std::shared_ptr<debugger::controller> control;
+                    ::uwvm2::runtime::lib::full_compile_run_config config;
+                };
+                ::std::shared_ptr<actual_guest_launch_state> launch_state{};
+#ifdef UWVM_CPP_EXCEPTIONS
+                try
+#endif
+                { launch_state = ::std::make_shared<actual_guest_launch_state>(actual_guest_launch_state{controller, run_config}); }
+#ifdef UWVM_CPP_EXCEPTIONS
+                catch(...) { return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error); }
+#endif
+                auto launched{::uwvm2::runtime::lib::runtime_launch_llvm_jit_debug_guest_worker_host_api(
+                    controller->domain(), ::std::move(launch_state), +[](void* state) noexcept
+                    {
+                        // Runtime retains this real HOST recipe to actual OS/TLS
+                        // join. The guest receives no native/thread/controller address.
+                        auto& actual{*static_cast<actual_guest_launch_state*>(state)};
+                        run_full_module_graph(::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name, actual.config);
+                        actual.control->notify_guest_exit(
+                            ::uwvm2::runtime::lib::runtime_llvm_jit_debug_registered_worker_exit_code_host_api());
+                    })};
+                if(launched.status != ::uwvm2::runtime::lib::llvm_jit_debug_guest_worker_launch_status::started || !launched.worker)
+                { return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error); }
+                debugger::managed_cli_shutdown shutdown{controller, launched.worker};
+                // Debug-mode WASI initialization never grants the management
+                // input descriptor to guests (including through output handles).
+                // This standalone launcher explicitly selects process
+                // containment after actual physical EOF if finite managed
+                // cleanup is still pending. Terminal CtrlD has a distinct editor
+                // event and can retain the prompt for quit retry / quit force.
+                auto result{debugger::run_console(*controller, ::std::addressof(shutdown), true)};
+                if(result == debugger::console_exit::input_failure)
+                {
+                    // The native input adapter has restored its terminal/signal
+                    // state. Still try the real finite cleanup pipeline; failure
+                    // never destroys a joinable guest or native/code borrower.
+                    auto const actual{shutdown.attempt_until(::std::chrono::steady_clock::now() + ::std::chrono::seconds{2})};
+                    if(actual.phase == debugger::managed_cli_shutdown_phase::completed)
+                    {
+                        ::uwvm2::runtime::lib::reset_runtime_state_host_api();
+                        return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
+                    }
+                    debugger::write_console_shutdown_result({nullptr, nullptr,
+                        +[](void*, ::fast_io::string_view text) noexcept { ::fast_io::print(::fast_io::out(), text); }}, actual);
+                }
+                if(result == debugger::console_exit::managed_exit)
+                {
+                    // Native event/TLS borrower, runtime entry/cache workers and
+                    // the actual launched guest OS thread all gave real ACKs.
+                    // Only this path reaches the existing ordinary runtime reset.
+                    break;
+                }
+                // The console writes directly to fast_io::out(), a native
+                // observer. Diagnostic/runtime logs also use native files or
+                // observers, so none retains a C stdio or fast_io output buffer.
+                // Section-detail buffers finish in their separate mode; cache
+                // file buffers belong to workers, whose owners remain live.
+                // Only explicit quit force, the preselected physical-EOF policy
+                // or failed input reaches process containment. It is not a join
+                // or cleanup claim: pending request/controller/guest/code owners
+                // remain live until the operating system terminates this process.
+                #  if defined(_WIN32) && !defined(__CYGWIN__)
+                ::fast_io::win32::ExitProcess(result == debugger::console_exit::input_failure ? 1u : 0u);
+                ::std::unreachable(); // ExitProcess terminates this process; no owner may destruct early.
+#  elif defined(__linux__) || defined(__APPLE__)
+                ::uwvm2::runtime::lib::posix_abi::_exit_noexcept(result == debugger::console_exit::input_failure ? 1 : 0);
+#  else
+                ::std::_Exit(result == debugger::console_exit::input_failure ? 1 : 0);
+#  endif
+# else
+                return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
+# endif
+                }
+            }
+            [[fallthrough]];
             case ::uwvm2::uwvm::wasm::base::mode::run:
             {
+# if ((defined(__linux__) && defined(SYS_pidfd_open) && defined(SCM_CREDENTIALS)) || \
+      (defined(__APPLE__) && defined(__MACH__)) || (defined(_WIN32) && !defined(__CYGWIN__))) && \
+     defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+                if(debug_channel)
+                {
+                    namespace debugger = ::uwvm2::uwvm::debugger;
+                    namespace control = ::uwvm2::utils::control;
+                    control::launch_config config{};
+                    config.debug_enabled = true;
+                    // The externally authorized debug channel shares the console's fail-closed replacement protocol.
+                    config.replacement_enabled = true;
+                    config.compiler = control::backend::llvm;
+                    config.mode = control::compile_mode::full;
+                    config.origin = control::launch_origin::console;
+                    config.instance[0] = 1u; // Routing label, not an authentication secret.
+#  if defined(_WIN32) && !defined(__CYGWIN__)
+                    config.vm_process = ::fast_io::win32::GetCurrentProcessId();
+#  else
+                    config.vm_process = static_cast<::std::uint64_t>(::uwvm2::runtime::lib::posix_abi::getpid_noexcept());
+#  endif
+                    // Actual initialized CLI owner requests precise roots BEFORE
+                    // selected debug compilation. Empty/non-GC cohorts remain unchanged.
+                    ::uwvm2::runtime::gc::scoped_cli_gc_execution debug_gc_compilation_owner{};
+                    static_cast<void>(::uwvm2::runtime::lib::runtime_gc_prepare_cli_collection_host_api());
+                    auto controller{debugger::controller::create(config, 256u,
+                        ::uwvm2::runtime::lib::llvm_jit_capture_debug_stack_host_api,
+                        ::uwvm2::runtime::lib::llvm_jit_debug_read_memory_host_api)};
+                    if(!controller ||
+                       ::uwvm2::runtime::lib::llvm_jit_configure_debug_session_host_api(controller->domain(), controller->observer(),
+                           ::uwvm2::runtime::lib::llvm_jit_debug_safe_point_granularity::instruction) !=
+                           ::uwvm2::runtime::lib::llvm_jit_debug_configure_result::ok ||
+                           ::uwvm2::runtime::lib::llvm_jit_configure_debug_value_observation_host_api() !=
+                           ::uwvm2::runtime::lib::llvm_jit_debug_configure_result::ok ||
+                       !::uwvm2::runtime::lib::llvm_jit_prepare_debug_host_api() ||
+                       !install_debug_source_maps(*controller) ||
+                       (::uwvm2::uwvm::wasm::storage::execute_wasm_mode == ::uwvm2::uwvm::wasm::base::mode::debug_jit &&
+                        !controller->arm_initial_pause()))
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE), u8"uwvm: ",
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED), u8"[fatal] ",
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
+                            u8"Unable to prepare late LLVM full debugger before guest execution.\n\n",
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
+                        return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
+                    }
+                    ::std::thread management{[controller, channel = ::std::move(debug_channel)]() noexcept
+                    { channel->serve(*controller); }};
+                    ::uwvm2::runtime::lib::full_compile_run_config cfg{};
+                    configure_runtime_entry_buffers(cfg, runtime_entry);
+                    run_full_module_graph(::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name, cfg);
+                    controller->notify_guest_exit(0);
+                    management.join();
+                    break;
+                }
+# endif
                 // Only `run` reaches the runtime library.  `runtime_entry` has already been resolved so every branch below
                 // can forward the same packed entry ABI buffers to its selected runtime entry point.
                 // Runtime mode chooses the broad compilation strategy; runtime compiler chooses the backend that realizes
@@ -1829,17 +2473,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                         // introduced auto mode without going through `resolve_runtime_int_auto_mode()`, or tried to combine
                         // it with a non-int backend.  Fail loudly instead of silently treating it like lazy/full.
                         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                             u8"uwvm: ",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                                             u8"[fatal] ",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                             u8"auto_compile runtime mode was not resolved before runtime dispatch. auto_compile is only supported by the "
                                             u8"uwvm-int auto policy (-Rint, or -Rcc int without -Rcm), and LLVM-JIT/tiered backends require an explicit "
                                             u8"runtime mode (-Rcm lazy|full). ",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                             u8"(runtime)\n\n",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                         ::fast_io::fast_terminate();
 
                         break;
@@ -1875,36 +2519,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                         if(!lazy_backend_supported) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                                 u8"uwvm: ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                                                 u8"[fatal] ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                 u8"Lazy compilation currently supports the uwvm-int, llvm-jit, and tiered backends (-Rcc int|jit|tiered). ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                                 u8"(runtime)\n\n",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                             ::fast_io::fast_terminate();
                         }
 
-                        // `assume_full_code_verified=false` lets the lazy runtime validate as part of on-demand work.
+                        // Mandatory all-body fused admission occurs inside lazy initialization; native publication remains deferred.
                         ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
                         configure_runtime_entry_buffers(cfg, runtime_entry);
                         cfg.assume_full_code_verified = false;
-                        run_initialized_module_graph(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg,
+                        run_initialized_module_graph(::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name, cfg,
                                                      ::uwvm2::runtime::lib::lazy_compile_and_run_main_module);
 # else
                         ::fast_io::io::perr(
                             ::uwvm2::uwvm::io::u8log_output,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                             u8"uwvm: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                             u8"[fatal] ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8"Lazy compilation is not currently supported. The current VM only supports full compile with int or jit (-Rcm full -Rcc int|jit). ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                             u8"(runtime)\n\n",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                         ::fast_io::fast_terminate();
 # endif
 
@@ -1913,9 +2557,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile_with_full_code_verification:
                     {
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
-                        // This mode keeps lazy compilation/materialization, but performs a full validation pass before
-                        // execution.  Backends must still support lazy runtime entry; the only difference from plain lazy
-                        // mode is the `assume_full_code_verified=true` flag passed after validation succeeds.
+                        // Both lazy spellings require the same all-body fused
+                        // admission. This alias never pure-validates then walks
+                        // the same original body to translate it again.
                         bool lazy_backend_supported{};
 #  if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
@@ -1941,45 +2585,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                         if(!lazy_backend_supported) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                                 u8"uwvm: ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                                                 u8"[fatal] ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                 u8"Lazy compilation currently supports the uwvm-int, llvm-jit, and tiered backends (-Rcc int|jit|tiered). ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                                 u8"(runtime)\n\n",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                             ::fast_io::fast_terminate();
                         }
 
-                        // Validate before entering lazy execution, then tell the runtime it can skip duplicate whole-code
-                        // validation work.  Per-function compilation may still occur lazily.
-                        if(!::uwvm2::uwvm::runtime::validator::validate_all_wasm_code()) [[unlikely]]
-                        {
-                            // Runtime storage has already been initialized at this point. Release backend artifacts and invalidate
-                            // pointer caches before returning so an embedding host can load another module set safely.
-                            ::uwvm2::runtime::lib::reset_runtime_state_host_api();
-                            return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
-                        }
-
+                        // No speculative validity certificate is passed. The
+                        // artifact factory completes authoritative validation
+                        // and translation together before any guest publication.
                         ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
                         configure_runtime_entry_buffers(cfg, runtime_entry);
-                        cfg.assume_full_code_verified = true;
-                        run_initialized_module_graph(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg,
+                        cfg.assume_full_code_verified = false;
+                        run_initialized_module_graph(::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name, cfg,
                                                      ::uwvm2::runtime::lib::lazy_compile_and_run_main_module);
 # else
                         ::fast_io::io::perr(
                             ::uwvm2::uwvm::io::u8log_output,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                             u8"uwvm: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                             u8"[fatal] ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8"Lazy compilation with full code verification is not currently supported. The current VM only supports full compile with int or jit (-Rcm full -Rcc int|jit). ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                             u8"(runtime)\n\n",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                         ::fast_io::fast_terminate();
 # endif
 
@@ -1997,7 +2634,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                 // Full compile with the uwvm-int interpreter backend.
                                 ::uwvm2::runtime::lib::full_compile_run_config cfg{};
                                 configure_runtime_entry_buffers(cfg, runtime_entry);
-                                run_full_module_graph(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
+                                run_full_module_graph(::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name, cfg);
 
                                 break;
                             }
@@ -2009,15 +2646,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                 // implemented yet, so fail explicitly instead of falling into another backend.
                                 ::fast_io::io::perr(
                                     ::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                                     u8"[fatal] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"Debug Interpreter is not currently supported. The current VM only supports full compile with int or jit (-Rcm full -Rcc int|jit). ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                     u8"(runtime)\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                                 ::fast_io::fast_terminate();
 
                                 break;
@@ -2029,15 +2666,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                 // Tiered compilation is inherently a lazy/tiered strategy and conflicts with the full
                                 // compile runtime mode.  Report the conflict before runtime library entry.
                                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                                     u8"uwvm: ",
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                                                     u8"[fatal] ",
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                                     u8"Tiered compilation conflicts with full compilation. ",
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                                     u8"(runtime)\n\n",
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                                 ::fast_io::fast_terminate();
 
                                 break;
@@ -2050,7 +2687,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                 // runtime library from the globally configured runtime-mode storage.
                                 ::uwvm2::runtime::lib::full_compile_run_config cfg{};
                                 configure_runtime_entry_buffers(cfg, runtime_entry);
-                                run_full_module_graph(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
+                                run_full_module_graph(::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name, cfg);
 
                                 break;
                             }

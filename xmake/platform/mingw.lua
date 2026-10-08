@@ -10,6 +10,9 @@ function mingw_target()
     if use_llvm_compiler then	
         set_toolchains("clang")
         add_ldflags("-fuse-ld=lld", {force = true})
+        -- Keep the MinGW unwinder in the standalone PE. A dynamic libgcc_s_seh import can make an otherwise valid
+        -- LLVM-full debugger/JIT executable fail at process startup on a Windows host without that DLL.
+        add_ldflags("-static-libgcc", {force = true})
     end
 
     local sysroot_para = get_config("sysroot")

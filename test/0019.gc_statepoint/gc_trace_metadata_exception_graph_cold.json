@@ -1,0 +1,65 @@
+{
+  "schema": "uwvm-precise-trace-native-exception-graph-cold-v1",
+  "source_only": true,
+  "native_passed": false,
+  "product_collection_qualified": false,
+  "performance_measured": false,
+  "pins": {
+    "test/0019.gc_statepoint/gc_trace_metadata_exception_graph.cc": {
+      "bytes": 14387,
+      "sha256": "4ecabd224f7e2ec412e9aba07e7b02f6c8c4dd79b1fbfb919dca2e6512a3f23b"
+    },
+    "src/uwvm2/uwvm/runtime/storage/gc_trace_metadata.h": {
+      "bytes": 8782,
+      "sha256": "998b85e4e38568f4ff60e2e0438e092565c7bd17c7ddf7d540b6007a8a090ab9"
+    },
+    "src/uwvm2/uwvm/runtime/storage/gc_object.h": {
+      "bytes": 282971,
+      "sha256": "aeb9efb38c9d430856949196c3d5df1a8c7097ac6f9b7de15055d18cacb92f06"
+    },
+    "src/uwvm2/uwvm/runtime/storage/gc_exception_graph.inc": {
+      "bytes": 27978,
+      "sha256": "cbd3f8894b1261667f6aec8ba17ce57217a9deed7d2b00963e6acc7a996695a4"
+    },
+    "src/uwvm2/runtime/exception/native_roots.h": {
+      "bytes": 20962,
+      "sha256": "ac973417c0459c65570027a0fddeaa296fcd4fc57dd9198ab88fc651c31d3ac9"
+    }
+  },
+  "required_defines": [
+    "UWVM_EXPERIMENTAL_EXCEPTION_GC_GRAPH=1",
+    "UWVM_EXPERIMENTAL_NATIVE_EXCEPTION_ROOTS=1"
+  ],
+  "external_exception_handles": 0,
+  "metadata_variants": [
+    0,
+    1
+  ],
+  "six_switch_variants": [
+    0,
+    1
+  ],
+  "sanitizers_required": [
+    "address",
+    "undefined"
+  ],
+  "expected": {
+    "successful_collections": 5,
+    "aggregate_reclaimed": 8,
+    "exn_retired": 1,
+    "rejected_collections": 2,
+    "all_rejected_reclaimed": 0
+  },
+  "resource_contract": {
+    "memory_max": 68719476736,
+    "swap_max": 0,
+    "native_execution_owner": "linux_fused_resume",
+    "compile_cpu_role": "E-core",
+    "host_native_compilation": false
+  },
+  "limits": [
+    "Native primitive graph/domain API only; no product pause/root enumeration or external-handle integration qualification.",
+    "C/C++ throw/catch/rethrow/native exception activation integration requires separate real product tests.",
+    "No allocation performance or hardware-counter result exists for this source."
+  ]
+}

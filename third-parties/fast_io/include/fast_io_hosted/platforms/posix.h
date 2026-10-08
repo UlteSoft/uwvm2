@@ -309,6 +309,13 @@ inline constexpr int calculate_posix_open_mode(open_mode value) noexcept
 		return {};
 #endif
 
+	if ((value & open_mode::explicit_disposition) != open_mode::none)
+	{
+		bool const read{(value & open_mode::in) != open_mode::none};
+		bool const write{(value & (open_mode::out | open_mode::app)) != open_mode::none};
+		if ((value & open_mode::app) != open_mode::none) { mode |= O_APPEND; }
+		return mode | (write ? (read ? O_RDWR : O_WRONLY) : O_RDONLY);
+	}
 	using utype = typename ::std::underlying_type<open_mode>::type;
 	constexpr auto supported_values{static_cast<utype>(open_mode::out) | static_cast<utype>(open_mode::app) |
 									static_cast<utype>(open_mode::in)};

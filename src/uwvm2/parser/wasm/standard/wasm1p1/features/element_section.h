@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -39,6 +39,7 @@
 # include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
 # include "def.h"
 # include "feature_def.h"
+# include "types.h"
 # include "data_section.h"
 #endif
 
@@ -155,10 +156,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline constexpr ::std::byte const* parse_reftype(::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type& reftype,
+                                                          ::uwvm2::parser::wasm::standard::wasm3::type::core_value_type& core_type,
+                                                          bool& has_core_type,
+                                                          bool& requires_function_references,
+                                                          bool& requires_gc,
+                                                          bool& requires_exceptions,
                                                           ::std::byte const* section_curr,
                                                           ::std::byte const* const section_end,
                                                           ::uwvm2::parser::wasm::base::error_impl& err,
-                                                          ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) UWVM_THROWS
+                                                          ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
+                                                          ::std::size_t known_function_type_count,
+                                                          ::uwvm2::validation::standard::wasm3::recursive_type_context const& context) UWVM_THROWS
         {
             // [before_reftype ...] reftype ... tail ... (section_end)
             // [       safe      ] unsafe (could be the section_end)
@@ -170,20 +178,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
 
-            // [before_reftype ...] reftype ... tail ... (section_end)
-            // [       safe      ] [safe] unsafe
-            //                    ^^ section_curr
-            //
-            // section_curr != section_end proves that the one-byte reference type read is in bounds.
-            ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte raw_ref;
-            ::std::memcpy(::std::addressof(raw_ref), section_curr, sizeof(raw_ref));
-#if CHAR_BIT > 8
-            raw_ref = static_cast<decltype(raw_ref)>(static_cast<::std::uint_least8_t>(raw_ref) & 0xFFu);
-#endif
-
-            auto const parsed{static_cast<::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type>(raw_ref)};
-            auto const parsed_value{::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(parsed)};
-            if(!::uwvm2::parser::wasm::standard::wasm1p1::type::is_valid_reference_type(parsed_value) ||
+            ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type parsed_value{};
+            bool explicit_type{}, needs_function_references{};
+            // [reftype ...] section_end: equality was excluded above, so the prefix is readable.
+            // ^^ next borrows section_curr; the explicit decoder proves every heap byte against section_end.
+            auto next{section_curr};
+            if(!parse_explicit_declaration_value_type(next, section_end, parsed_value, explicit_type,
+                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::element_segment, err, fs_para,
+                ::std::addressof(core_type), known_function_type_count,
+                ::std::addressof(context), ::std::addressof(needs_function_references)))
+            {
+                parsed_value = static_cast<decltype(parsed_value)>(::std::to_integer<unsigned>(*next) & 0xffu);
+                // [legacy reftype] expression vector ... section_end
+                // [safe          ] ^^ next advances past the proven live byte, possibly becoming section_end.
+                ++next;
+            }
+            // [complete reftype] expression vector ... section_end
+            // [safe            ] ^^ next is bounded, possibly section_end; no expression has been read.
+            auto const raw_ref{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(parsed_value)};
+            auto const parsed{static_cast<::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type>(parsed_value)};
+            if((raw_ref != 0x69u &&
+                !::uwvm2::parser::wasm::standard::wasm1p1::type::is_valid_reference_type(parsed_value)) ||
                !::uwvm2::parser::wasm::standard::wasm1p1::features::reference_type_enabled(parsed, fs_para)) [[unlikely]]
             {
                 err.err_curr = section_curr;
@@ -194,14 +209,110 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             }
 
             reftype = parsed;
-            // section_curr points at the one-byte reference type already proven safe by the validation above.
-            // Pointer move: advance to the first byte after reftype.
-            ++section_curr;
+            has_core_type = explicit_type;
+            requires_function_references |= needs_function_references;
+            requires_gc |= explicit_type && ::uwvm2::validation::standard::wasm3::core3_value_requires_gc(
+                core_type, ::std::addressof(context), known_function_type_count);
+            requires_exceptions |= explicit_type &&
+                ::uwvm2::validation::standard::wasm3::core3_value_requires_exceptions(core_type);
+            // [complete checked reftype] expression vector ... section_end
+            // [safe                   ] unsafe (could be section_end)
+            //                           ^^ section_curr commits only the complete, bounded type endpoint.
+            section_curr = next;
 
             // [before_reftype ... reftype] tail ... (section_end)
             // [          safe           ] unsafe (could be the section_end)
             //                             ^^ section_curr
             return section_curr;
+        }
+
+        // Element parsing precedes the validator module; keep the reference subtype
+        // check at this parser boundary rather than importing validation code here.
+        template<typename ValueType>
+        [[nodiscard]] inline constexpr ::uwvm2::parser::wasm::standard::wasm3::type::core_value_type
+            element_legacy_carrier_type(ValueType carrier) noexcept
+        {
+            namespace t = ::uwvm2::parser::wasm::standard::wasm3::type;
+            using kind = t::value_kind;
+            using heap = t::abstract_heap_type;
+            switch(static_cast<unsigned>(carrier))
+            {
+                case 0x7fu: return {kind::i32};
+                case 0x7eu: return {kind::i64};
+                case 0x7du: return {kind::f32};
+                case 0x7cu: return {kind::f64};
+                case 0x7bu: return {kind::v128};
+                case 0x70u: return {kind::reference, {static_cast<::std::int_least64_t>(heap::func)}, true};
+                case 0x6fu: return {kind::reference, {static_cast<::std::int_least64_t>(heap::extern_)}, true};
+                case 0x69u: return {kind::reference, {static_cast<::std::int_least64_t>(heap::exn)}, true};
+                default: return {kind::i32};
+            }
+        }
+
+        template<typename Signatures>
+        [[nodiscard]] inline bool element_function_types_equivalent(
+            ::std::size_t first, ::std::size_t second, Signatures const& signatures) noexcept
+        {
+            using pair = ::std::pair<::std::size_t, ::std::size_t>;
+            using kind = ::uwvm2::parser::wasm::standard::wasm3::type::value_kind;
+            ::uwvm2::utils::container::vector<pair> pending{}, seen{};
+            pending.push_back({first, second});
+            while(!pending.empty())
+            {
+                auto const current{pending.back_unchecked()};
+                pending.pop_back_unchecked();
+                if(current.first >= signatures.size() || current.second >= signatures.size()) { return false; }
+                if(current.first == current.second) { continue; }
+                bool visited{};
+                for(auto const& pair_seen: seen) { if(pair_seen == current) { visited = true; break; } }
+                if(visited) { continue; }
+                seen.push_back(current);
+                // [signatures.begin, signatures.end) is parser-retained until module retirement.
+                // [safe                             ] both indices were checked above.
+                //                   ^^ these indexed borrows do not advance a parser cursor.
+                auto const& left{signatures.index_unchecked(current.first)};
+                auto const& right{signatures.index_unchecked(current.second)};
+                if(left.parameters.size() != right.parameters.size() || left.results.size() != right.results.size()) { return false; }
+                auto const compare_value{[&](auto a, auto b) noexcept
+                {
+                    if(a.kind != b.kind) { return false; }
+                    if(a.kind != kind::reference) { return true; }
+                    if(a.nullable != b.nullable) { return false; }
+                    if(a.heap == b.heap) { return true; }
+                    if(!a.heap.is_defined() || !b.heap.is_defined()) { return false; }
+                    pending.push_back({static_cast<::std::size_t>(a.heap.code), static_cast<::std::size_t>(b.heap.code)});
+                    return true;
+                }};
+                for(::std::size_t i{}; i != left.parameters.size(); ++i)
+                { if(!compare_value(left.parameters.index_unchecked(i), right.parameters.index_unchecked(i))) { return false; } }
+                for(::std::size_t i{}; i != left.results.size(); ++i)
+                { if(!compare_value(left.results.index_unchecked(i), right.results.index_unchecked(i))) { return false; } }
+            }
+            return true;
+        }
+
+        template<typename Signatures>
+        [[nodiscard]] inline bool element_value_type_matches(
+            ::uwvm2::parser::wasm::standard::wasm3::type::core_value_type actual,
+            ::uwvm2::parser::wasm::standard::wasm3::type::core_value_type expected,
+            Signatures const& signatures) noexcept
+        {
+            using kind = ::uwvm2::parser::wasm::standard::wasm3::type::value_kind;
+            using heap = ::uwvm2::parser::wasm::standard::wasm3::type::abstract_heap_type;
+            if(actual.kind != expected.kind) { return false; }
+            if(actual.kind != kind::reference) { return true; }
+            if(actual.nullable && !expected.nullable) { return false; }
+            if(actual.heap == expected.heap || actual.heap.code == ::uwvm2::parser::wasm::standard::wasm3::type::heap_type::bottom_code)
+            { return true; }
+            if(actual.heap.code == static_cast<::std::int_least64_t>(heap::noexn) &&
+               expected.heap.code == static_cast<::std::int_least64_t>(heap::exn)) { return true; }
+            if(actual.heap.code == static_cast<::std::int_least64_t>(heap::nofunc))
+            { return expected.heap.is_defined() || expected.heap.code == static_cast<::std::int_least64_t>(heap::func); }
+            if(actual.heap.is_defined() && expected.heap.code == static_cast<::std::int_least64_t>(heap::func)) { return true; }
+            if(actual.heap.is_defined() && expected.heap.is_defined())
+            { return element_function_types_equivalent(static_cast<::std::size_t>(actual.heap.code),
+                                                       static_cast<::std::size_t>(expected.heap.code), signatures); }
+            return false;
         }
 
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -220,9 +331,50 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
 
-            // element_storage.table_idx is now proven to be within the imported+defined table range used by get_table_reftype.
+            // element_storage.table_idx is now proven within imported+defined tables. Compare the declared
+            // Core 3 element type with the table type before any active segment is instantiated.
             auto const table_reftype{get_table_reftype(module_storage, element_storage.table_idx)};
-            if(table_reftype != element_storage.reftype) [[unlikely]]
+            auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                import_section_storage_t<Fs...>>(module_storage.sections)};
+            auto const& imported_tables{importsec.importdesc.index_unchecked(1uz)};
+            auto const& tablesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                table_section_storage_t<Fs...>>(module_storage.sections)};
+            auto const& typesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Fs...>>(module_storage.sections)};
+            auto const table_core_type{[&]() constexpr noexcept
+            {
+                if(element_storage.table_idx < imported_tables.size())
+                {
+                    auto const* imported{imported_tables.index_unchecked(element_storage.table_idx)};
+                    if(imported == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                    auto const& table{imported->imports.storage.table};
+                    return table.has_core_type ? table.core_type :
+                        wasm1p1_element_details::element_legacy_carrier_type(
+                            ::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(table.reftype));
+                }
+                auto const& table{tablesec.tables.index_unchecked(element_storage.table_idx - imported_tables.size())};
+                return table.has_core_type ? table.core_type :
+                    wasm1p1_element_details::element_legacy_carrier_type(
+                        ::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(table.reftype));
+            }()};
+            auto const element_core_type{element_storage.has_core_type ? element_storage.core_type :
+                wasm1p1_element_details::element_legacy_carrier_type(
+                    ::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(element_storage.reftype))};
+            // Core 3 active segments use reference subtyping, not equality: for example an
+            // i31ref segment may initialize an anyref table. The canonical context also handles
+            // struct/array and declared defined-type supertypes. Older function-only sections
+            // retain their structural function-signature fallback.
+            auto const element_assignable{[&]() noexcept
+            {
+                using kind = ::uwvm2::parser::wasm::standard::wasm3::type::value_kind;
+                if(!typesec.core3_context.records.empty() ||
+                   (element_core_type.kind == kind::reference && table_core_type.kind == kind::reference &&
+                    !element_core_type.heap.is_defined() && !table_core_type.heap.is_defined()))
+                { return typesec.core3_context.matches(element_core_type, table_core_type); }
+                return wasm1p1_element_details::element_value_type_matches(
+                    element_core_type, table_core_type, typesec.owned_signatures);
+            }()};
+            if(!element_assignable) [[unlikely]]
             {
                 err.err_curr = err_curr;
                 err.err_selectable.wasm1p1_element_table_type_mismatch.table_idx = element_storage.table_idx;
@@ -230,6 +382,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     ::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(element_storage.reftype));
                 err.err_selectable.wasm1p1_element_table_type_mismatch.table_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
                     ::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(table_reftype));
+                err.err_selectable.wasm1p1_element_table_type_mismatch.segment_heap = element_core_type.heap.code;
+                err.err_selectable.wasm1p1_element_table_type_mismatch.table_heap = table_core_type.heap.code;
+                err.err_selectable.wasm1p1_element_table_type_mismatch.segment_nullable = element_core_type.nullable;
+                err.err_selectable.wasm1p1_element_table_type_mismatch.table_nullable = table_core_type.nullable;
                 err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1p1_element_table_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -382,6 +538,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         inline constexpr ::std::byte const*
             parse_and_check_ref_const_expr_valid(::uwvm2::parser::wasm::standard::wasm1::features::final_wasm_const_expr<Fs...>& expr,
                                                  ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type expected_reftype,
+                                                 ::uwvm2::parser::wasm::standard::wasm3::type::core_value_type expected_core_type,
+                                                 bool has_expected_core_type,
                                                  ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...>& module_storage,
                                                  module_counts_t<Fs...> const counts,
                                                  ::std::byte const* section_curr,
@@ -389,287 +547,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                                  ::uwvm2::parser::wasm::base::error_impl& err,
                                                  ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) UWVM_THROWS
         {
-            auto const& importsec{
-                ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<import_section_storage_t<Fs...>>(module_storage.sections)};
-            // Bucket 3 stores imported globals; wasm1 importdesc layout provides it for the feature set used here.
-            auto const& imported_global{importsec.importdesc.index_unchecked(3uz)};
-            // Wasm 2.0 constant expressions can only read immutable imported globals.
-            // Local globals in segment offsets/initializers require a later proposal.
-            auto const imported_global_size{imported_global.size()};
-            auto const expected_value_type{::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(expected_reftype)};
-            auto const expected_value_type_byte{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(expected_value_type)};
-
-            expr.begin = section_curr;
-            bool has_data_on_type_stack{};
-            using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
-            using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-
-            for(;;)
-            {
-                // [before_expr ...] opcode ... expr_tail ... end ... (section_end)
-                // [      safe     ] unsafe (could be the section_end)
-                //                  ^^ section_curr
-                if(section_curr == section_end) [[unlikely]]
-                {
-                    err.err_curr = section_curr;
-                    err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_terminator_not_found;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                }
-
-                // [before_expr ...] opcode ... expr_tail ... end ... (section_end)
-                // [      safe     ] [safe] unsafe
-                //                  ^^ section_curr
-                //
-                // section_curr != section_end proves that reading the one-byte opcode is in bounds.
-                ::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type opcode;
-                ::std::memcpy(::std::addressof(opcode), section_curr, sizeof(opcode));
-#if CHAR_BIT > 8
-                opcode &= static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xFFu);
-#endif
-
-                if(opcode ==
-                   static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::end))
-                {
-                    // section_curr points at the one-byte end opcode already proven safe by the opcode read.
-                    // Pointer move: advance to the first byte after the checked terminator.
-                    ++section_curr;
-
-                    // [before_expr ... expr ... end] tail ... (section_end)
-                    // [            safe           ] unsafe (could be the section_end)
-                    //                              ^^ section_curr
-                    break;
-                }
-
-                if(has_data_on_type_stack) [[unlikely]]
-                {
-                    err.err_curr = section_curr;
-                    err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_stack_should_be_only_one_element;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                }
-
-                has_data_on_type_stack = true;
-
-                switch(opcode)
-                {
-                    case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xD0u):
-                    {
-                        // section_curr points at the one-byte ref.null opcode already proven safe by the opcode read.
-                        // Pointer move: advance to the reference-type immediate.
-                        ++section_curr;
-
-                        // [before_expr ... ref.null] reftype ... expr_tail ... end ... (section_end)
-                        // [          safe          ] unsafe (could be the section_end)
-                        //                           ^^ section_curr
-                        if(section_curr == section_end) [[unlikely]]
-                        {
-                            err.err_curr = section_curr;
-                            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_illegal_data;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                        }
-
-                        // [before_expr ... ref.null reftype] ... expr_tail ... end ... (section_end)
-                        // [          safe                  ] unsafe
-                        //                           ^^ section_curr
-                        // section_curr != section_end proves that the one-byte reference type read is in bounds.
-                        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte raw_ref;
-                        ::std::memcpy(::std::addressof(raw_ref), section_curr, sizeof(raw_ref));
-#if CHAR_BIT > 8
-                        raw_ref = static_cast<decltype(raw_ref)>(static_cast<::std::uint_least8_t>(raw_ref) & 0xFFu);
-#endif
-                        auto const ref_type{static_cast<::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type>(raw_ref)};
-                        auto const ref_value_type{::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(ref_type)};
-                        if(!::uwvm2::parser::wasm::standard::wasm1p1::type::is_valid_reference_type(ref_value_type) ||
-                           !::uwvm2::parser::wasm::standard::wasm1p1::features::reference_type_enabled(ref_type, fs_para)) [[unlikely]]
-                        {
-                            err.err_curr = section_curr;
-                            err.err_selectable.wasm1p1_reference_type.value = raw_ref;
-                            err.err_selectable.wasm1p1_reference_type.subject = ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_null;
-                            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1p1_invalid_reference_type;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                        }
-
-                        if(ref_type != expected_reftype) [[unlikely]]
-                        {
-                            err.err_curr = section_curr;
-                            err.err_selectable.wasm1p1_reference_type_mismatch.expected = expected_value_type_byte;
-                            err.err_selectable.wasm1p1_reference_type_mismatch.actual =
-                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(ref_value_type);
-                            err.err_selectable.wasm1p1_reference_type_mismatch.subject = ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_null;
-                            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1p1_reference_type_mismatch;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                        }
-
-                        // section_curr points at the one-byte reference type already proven safe by section_curr != section_end and validated above.
-                        // Pointer move: advance to the next expression byte.
-                        ++section_curr;
-
-                        // [before_expr ... ref.null reftype] expr_tail ... end ... (section_end)
-                        // [              safe              ] unsafe (could be the section_end)
-                        //                                    ^^ section_curr
-                        expr.opcodes.reserve(1uz);
-                        expr.opcodes.emplace_back_unchecked(
-                            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.ref_null_type = raw_ref},
-                            static_cast<::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic>(0xD0u));
-                        break;
-                    }
-                    case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(0xD2u):
-                    {
-                        if(expected_reftype != ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type::funcref) [[unlikely]]
-                        {
-                            err.err_curr = section_curr;
-                            err.err_selectable.wasm1p1_reference_type_mismatch.expected = expected_value_type_byte;
-                            err.err_selectable.wasm1p1_reference_type_mismatch.actual = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
-                                ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref);
-                            err.err_selectable.wasm1p1_reference_type_mismatch.subject = ::uwvm2::parser::wasm::base::wasm1p1_error_subject::init_ref_func;
-                            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1p1_reference_type_mismatch;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                        }
-
-                        // section_curr points at the one-byte ref.func opcode already proven safe by the opcode read.
-                        // Pointer move: advance to the funcidx LEB128 immediate.
-                        ++section_curr;
-
-                        // [before_expr ... ref.func] funcidx ... expr_tail ... end ... (section_end)
-                        // [         safe           ] unsafe (could be the section_end)
-                        //                            ^^ section_curr
-                        //
-                        // parse_by_scan bounds-checks the LEB128 funcidx before index validation.
-                        wasm_u32 func_idx;
-                        auto const [next, perr]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(section_curr),
-                                                                         reinterpret_cast<char8_t_const_may_alias_ptr>(section_end),
-                                                                         ::fast_io::mnp::leb128_get(func_idx))};
-                        if(perr != ::fast_io::parse_code::ok) [[unlikely]]
-                        {
-                            err.err_curr = section_curr;
-                            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_illegal_data;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(perr);
-                        }
-
-                        // [before_expr ... ref.func funcidx ...] expr_tail ... end ... (section_end)
-                        // [                safe                ] unsafe (could be the section_end)
-                        //                           ^^ section_curr
-
-                        if(func_idx >= counts.all_func_size) [[unlikely]]
-                        {
-                            err.err_curr = section_curr;
-                            err.err_selectable.elem_func_index_exceeds_maxvul.idx = func_idx;
-                            err.err_selectable.elem_func_index_exceeds_maxvul.maxval = counts.all_func_size;
-                            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::elem_func_index_exceeds_maxvul;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                        }
-
-                        // parse_by_scan succeeded, so [section_curr, next) is now proven safe and next is inside [section_curr, section_end].
-                        // Proof view before moving section_curr: section_curr still points at the funcidx LEB128, and next marks the next expression byte.
-                        // Pointer move: advance section_curr to the next expression byte after the checked funcidx.
-                        section_curr = reinterpret_cast<::std::byte const*>(next);
-
-                        // [before_expr ... ref.func funcidx ...] expr_tail ... end ... (section_end)
-                        // [                safe                ] unsafe (could be the section_end)
-                        //                                      ^^ section_curr
-                        expr.opcodes.reserve(1uz);
-                        expr.opcodes.emplace_back_unchecked(
-                            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.ref_func_idx = func_idx},
-                            static_cast<::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic>(0xD2u));
-                        break;
-                    }
-                    case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(
-                        ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get):
-                    {
-                        // section_curr points at the one-byte global.get opcode already proven safe by the opcode read.
-                        // Pointer move: advance to the globalidx LEB128 immediate.
-                        ++section_curr;
-
-                        // [before_expr ... global.get] globalidx ... expr_tail ... end ... (section_end)
-                        // [          safe            ] unsafe (could be the section_end)
-                        //                             ^^ section_curr
-
-                        // parse_by_scan bounds-checks the LEB128 global index before imported-global lookup.
-                        wasm_u32 global_idx;
-                        auto const [next, perr]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(section_curr),
-                                                                         reinterpret_cast<char8_t_const_may_alias_ptr>(section_end),
-                                                                         ::fast_io::mnp::leb128_get(global_idx))};
-                        if(perr != ::fast_io::parse_code::ok) [[unlikely]]
-                        {
-                            err.err_curr = section_curr;
-                            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_illegal_data;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(perr);
-                        }
-
-                        // [before_expr ... global.get globalidx ...] expr_tail ... end ... (section_end)
-                        // [                  safe                  ] unsafe (could be the section_end)
-                        //                             ^^ section_curr
-
-                        auto const global_idx_uz{static_cast<::std::size_t>(global_idx)};
-                        if(global_idx_uz >= imported_global_size) [[unlikely]]
-                        {
-                            err.err_curr = section_curr;
-                            err.err_selectable.u32arr[0] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(imported_global_size);
-                            err.err_selectable.u32arr[1] = global_idx;
-                            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_ref_illegal_imported_global;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                        }
-
-                        auto const curr_imported_global_ptr{imported_global.index_unchecked(global_idx_uz)};
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                        if(curr_imported_global_ptr == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#endif
-                        auto const& curr_imported_global{curr_imported_global_ptr->imports.storage.global};
-                        auto const global_type_byte{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(curr_imported_global.type)};
-                        auto const global_is_mutable{curr_imported_global.is_mutable};
-
-                        if(global_type_byte != expected_value_type_byte) [[unlikely]]
-                        {
-                            err.err_curr = section_curr;
-                            err.err_selectable.wasm1p1_reference_type_mismatch.expected = expected_value_type_byte;
-                            err.err_selectable.wasm1p1_reference_type_mismatch.actual = global_type_byte;
-                            err.err_selectable.wasm1p1_reference_type_mismatch.subject = ::uwvm2::parser::wasm::base::wasm1p1_error_subject::reference_type;
-                            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1p1_reference_type_mismatch;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                        }
-                        if(global_is_mutable) [[unlikely]]
-                        {
-                            err.err_curr = section_curr;
-                            err.err_selectable.u32 = global_idx;
-                            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_ref_mutable_imported_global;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                        }
-
-                        // parse_by_scan succeeded, so [section_curr, next) is now proven safe and next is inside [section_curr, section_end].
-                        // Proof view before moving section_curr: section_curr still points at the globalidx LEB128, and next marks the next expression byte.
-                        // Pointer move: advance section_curr to the next expression byte after the checked globalidx.
-                        section_curr = reinterpret_cast<::std::byte const*>(next);
-
-                        // [before_expr ... global.get globalidx ...] expr_tail ... end ... (section_end)
-                        // [                  safe                  ] unsafe (could be the section_end)
-                        //                                           ^^ section_curr
-                        expr.opcodes.reserve(1uz);
-                        expr.opcodes.emplace_back_unchecked(
-                            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.global_idx = global_idx},
-                            ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get);
-                        break;
-                    }
-                    [[unlikely]] default:
-                    {
-                        /// @warning Extension point: a new const-expression opcode for element offsets/expressions must be parsed before this fallback.
-                        err.err_curr = section_curr;
-                        err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_illegal_instruction;
-                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                    }
-                }
-            }
-
-            if(!has_data_on_type_stack) [[unlikely]]
-            {
-                err.err_curr = section_curr;
-                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::init_const_expr_stack_empty;
-                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-            }
-
-            // [before_expr ... expr ... end] tail ... (section_end)
-            // [            safe           ] unsafe (could be the section_end)
-            //                              ^^ section_curr
-            expr.end = section_curr;
-            return section_curr;
+            // Core 3 element expressions use the same typed constant stack and GC constructors
+            // as globals. The full module context also includes earlier defined immutable globals.
+            // [before_expr] opcode ... end ... section_end
+            // [safe      ] unsafe (could be section_end)
+            //              ^^ section_curr is passed unchanged to the bounded shared decoder.
+            (void)counts;
+            ::uwvm2::parser::wasm::standard::wasm1p1::features::global_type const expected{
+                ::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(expected_reftype),
+                false, expected_core_type, has_expected_core_type};
+            auto const next{::uwvm2::parser::wasm::standard::wasm1::features::parse_and_check_global_expr_valid(
+                ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<global_section_storage_t<Fs...>>{},
+                expected, expr, module_storage, section_curr, section_end, err, fs_para, true,
+                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::element_segment)};
+            // [before_expr ... checked expression end] next ... section_end
+            // [safe                                ] unsafe (could be section_end)
+            //                                       ^^ next is returned only after every immediate was bounded.
+            return next;
         }
 
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -722,7 +616,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 // parse_and_check_ref_const_expr_valid checks the whole reference constant expression against section_end and returns its end pointer.
                 // Pointer move: replace section_curr with the first byte after the checked constant expression.
                 section_curr =
-                    parse_and_check_ref_const_expr_valid(expr, element_storage.reftype, module_storage, counts, section_curr, section_end, err, fs_para);
+                    parse_and_check_ref_const_expr_valid(expr, element_storage.reftype, element_storage.core_type,
+                        element_storage.has_core_type, module_storage, counts, section_curr, section_end, err, fs_para);
 
                 // [before_expr_vec ... expr ...] next_expr_or_tail ... (section_end)
                 // [          safe              ] unsafe (could be the section_end)
@@ -754,8 +649,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
 
         auto& element_storage{fet_storage.segment};
+        // Binary elemkind 0x00 and the implicit funcidx form both decode to (ref func),
+        // without nullability. Preserve that exact Core 3 type for active segments and table.init.
+        auto const set_funcidx_core_type = [&]() noexcept
+        {
+            element_storage.reftype = reference_type::funcref;
+            element_storage.core_type = wasm1p1_element_details::element_legacy_carrier_type(
+                ::uwvm2::parser::wasm::standard::wasm1p1::features::to_value_type(element_storage.reftype));
+            element_storage.core_type.nullable = false;
+            element_storage.has_core_type = true;
+        };
+        auto& element_section{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<element_section_storage_t<Fs...>>(module_storage.sections)};
         auto const& para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
         auto const counts{wasm1p1_element_details::get_module_counts(module_storage)};
+        auto const& typesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+            ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Fs...>>(module_storage.sections)};
 
         auto const require_bulk_memory = [&]() UWVM_THROWS
         {
@@ -781,6 +689,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1p1_feature_required;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
+            // All four expression-form flags call this existing gate, including
+            // empty expression vectors. Funcidx forms never acquire this bit.
+            if(!element_section.requires_reference_types)
+            { element_section.reference_types_diagnostic_value = static_cast<wasm_u32>(fet_type); }
+            element_section.requires_reference_types = true;
         };
 
         auto const require_multiple_tables = [&]() UWVM_THROWS
@@ -836,9 +749,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // [before_element_payload ...] offset_expr ... elem_payload ... (section_end)
             // [           safe          ] unsafe (could be the section_end)
             //                            ^^ section_curr
-            // parse_and_check_i32_const_expr_valid checks the whole i32 constant expression against section_end and returns its end pointer.
+            // parse_and_check_table_const_expr_valid checks the complete selected-address constant expression against section_end and returns its end pointer.
             // Pointer move: replace section_curr with the helper result after checking the whole offset expression.
-            section_curr = wasm1p1_data_details::parse_and_check_i32_const_expr_valid(element_storage.expr, module_storage, section_curr, section_end, err);
+            section_curr = wasm1p1_data_details::parse_and_check_table_const_expr_valid(
+                element_storage.expr, module_storage, element_storage.table_idx, section_curr, section_end, err, fs_para);
 
             // [before_element_payload ... offset_expr ...] elem_payload ... (section_end)
             // [                  safe                    ] unsafe (could be the section_end)
@@ -851,7 +765,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             {
                 element_storage.active = true;
                 element_storage.table_idx = 0u;
-                element_storage.reftype = reference_type::funcref;
+                set_funcidx_core_type();
                 parse_active_offset();
                 wasm1p1_element_details::check_active_table(element_storage, module_storage, counts, section_curr, err);
                 // parse_funcidx_vector checks the vector count and every funcidx against section_end before returning the tail pointer.
@@ -866,7 +780,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             case ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_element_type_t::passive_funcidx:
             {
                 require_bulk_memory();
-                element_storage.reftype = reference_type::funcref;
+                set_funcidx_core_type();
                 // parse_elemkind_funcref checks one elemkind byte and returns the first byte after it.
                 // Pointer move: replace section_curr with the first byte after the checked elemkind.
                 section_curr = wasm1p1_element_details::parse_elemkind_funcref(section_curr, section_end, err);
@@ -887,7 +801,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             {
                 require_multiple_tables();
                 element_storage.active = true;
-                element_storage.reftype = reference_type::funcref;
+                set_funcidx_core_type();
                 parse_tableidx();
                 parse_active_offset();
                 // parse_elemkind_funcref checks one elemkind byte and returns the first byte after it.
@@ -911,7 +825,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             {
                 require_bulk_memory();
                 element_storage.declarative = true;
-                element_storage.reftype = reference_type::funcref;
+                set_funcidx_core_type();
                 // parse_elemkind_funcref checks one elemkind byte and returns the first byte after it.
                 // Pointer move: replace section_curr with the first byte after the checked elemkind.
                 section_curr = wasm1p1_element_details::parse_elemkind_funcref(section_curr, section_end, err);
@@ -949,9 +863,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             {
                 require_bulk_memory();
                 require_reference_types();
-                // parse_reftype checks one reference-type byte and returns the first byte after it.
+                // parse_reftype checks the complete reference type and returns the first byte after it.
                 // Pointer move: replace section_curr with the first byte after the checked reftype.
-                section_curr = wasm1p1_element_details::parse_reftype(element_storage.reftype, section_curr, section_end, err, fs_para);
+                section_curr = wasm1p1_element_details::parse_reftype(element_storage.reftype, element_storage.core_type, element_storage.has_core_type,
+                    element_section.requires_function_references, element_section.requires_gc, element_section.requires_exceptions, section_curr, section_end, err, fs_para, typesec.types.size(), typesec.core3_context);
 
                 // [before_element_payload ... reftype] expr_vec ... (section_end)
                 // [              safe               ] unsafe (could be the section_end)
@@ -972,9 +887,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 element_storage.active = true;
                 parse_tableidx();
                 parse_active_offset();
-                // parse_reftype checks one reference-type byte and returns the first byte after it.
+                // parse_reftype checks the complete reference type and returns the first byte after it.
                 // Pointer move: replace section_curr with the first byte after the checked reftype.
-                section_curr = wasm1p1_element_details::parse_reftype(element_storage.reftype, section_curr, section_end, err, fs_para);
+                section_curr = wasm1p1_element_details::parse_reftype(element_storage.reftype, element_storage.core_type, element_storage.has_core_type,
+                    element_section.requires_function_references, element_section.requires_gc, element_section.requires_exceptions, section_curr, section_end, err, fs_para, typesec.types.size(), typesec.core3_context);
 
                 // [before_element_payload ... tableidx ... offset_expr ... reftype] expr_vec ... (section_end)
                 // [                                  safe                        ] unsafe (could be the section_end)
@@ -994,9 +910,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 require_bulk_memory();
                 require_reference_types();
                 element_storage.declarative = true;
-                // parse_reftype checks one reference-type byte and returns the first byte after it.
+                // parse_reftype checks the complete reference type and returns the first byte after it.
                 // Pointer move: replace section_curr with the first byte after the checked reftype.
-                section_curr = wasm1p1_element_details::parse_reftype(element_storage.reftype, section_curr, section_end, err, fs_para);
+                section_curr = wasm1p1_element_details::parse_reftype(element_storage.reftype, element_storage.core_type, element_storage.has_core_type,
+                    element_section.requires_function_references, element_section.requires_gc, element_section.requires_exceptions, section_curr, section_end, err, fs_para, typesec.types.size(), typesec.core3_context);
 
                 // [before_element_payload ... reftype] expr_vec ... (section_end)
                 // [              safe               ] unsafe (could be the section_end)

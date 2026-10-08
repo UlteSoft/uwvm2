@@ -4,6 +4,8 @@ using ::fast_io::basic_io_scatter_t;
 using ::fast_io::char_literal_v;
 using ::fast_io::pr_rsv_size;
 using ::fast_io::pr_rsv_to_iterator_unchecked;
+using ::fast_io::for_overwrite_t;
+using ::fast_io::for_overwrite;
 
 using ::fast_io::io_alias_type_t;
 
@@ -42,6 +44,7 @@ using ::fast_io::cstr_nlen;
 
 using ::fast_io::parse_by_scan;
 using ::fast_io::parse_code;
+using ::fast_io::parse_result;
 
 using ::fast_io::io_dup;
 using ::fast_io::open_mode;
@@ -164,8 +167,15 @@ using ::fast_io::manipulators::floating_point_default_scalar_flags;
 using ::fast_io::manipulators::address_default_scalar_flags;
 using ::fast_io::manipulators::scalar_manip_t;
 
+using ::fast_io::manipulators::chvw_t;
+using ::fast_io::manipulators::chvw;
+
 using ::fast_io::manipulators::member_function_pointer_holder_t;
 using ::fast_io::manipulators::whole_get_t;
+
+using ::fast_io::manipulators::le_get;
+using ::fast_io::manipulators::be_get;
+using ::fast_io::manipulators::le_put;
 
 using ::fast_io::manipulators::leb128_get;
 using ::fast_io::manipulators::leb128_put;
@@ -248,7 +258,19 @@ using ::fast_io::manipulators::hexfloat0x_get;
 
 namespace char_category
 {
+    // Match the hosted/core header's public C character-category family.
+    using ::fast_io::char_category::is_c_alnum;
+    using ::fast_io::char_category::is_c_alpha;
+    using ::fast_io::char_category::is_c_blank;
+    using ::fast_io::char_category::is_c_cntrl;
     using ::fast_io::char_category::is_c_digit;
+    using ::fast_io::char_category::is_c_graph;
+    using ::fast_io::char_category::is_c_lower;
+    using ::fast_io::char_category::is_c_print;
+    using ::fast_io::char_category::is_c_punct;
+    using ::fast_io::char_category::is_c_space;
+    using ::fast_io::char_category::is_c_upper;
+    using ::fast_io::char_category::is_c_xdigit;
     using ::fast_io::char_category::is_dos_file_invalid_character;
 }
 

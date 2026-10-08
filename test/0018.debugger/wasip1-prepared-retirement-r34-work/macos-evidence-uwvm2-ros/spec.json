@@ -1,0 +1,72 @@
+{
+  "scope": "R34 actual old native cohort retirement and candidate closed-ready/discard; original unstripped qualified arm64 binaries",
+  "cases": [
+    {
+      "label": "debug_checkpoint_prepared_retirement-instruction",
+      "argv": [
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-prepared-retirement-r34-work/macos/uwvm2-ros/debug_checkpoint_prepared_retirement.exe",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-prepared-retirement-r34-work/macos/uwvm2-ros/debug_checkpoint_retirement_cohort.wasm",
+        "instruction"
+      ],
+      "checks": 2,
+      "counted": false,
+      "pattern": "^CHECKPOINT_PREPARED_RETIREMENT policy=instruction actual_workers=([0-9]+) .*whole_restore=0 PASS$"
+    },
+    {
+      "label": "debug_checkpoint_prepared_retirement-unwind",
+      "argv": [
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-prepared-retirement-r34-work/macos/uwvm2-ros/debug_checkpoint_prepared_retirement.exe",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-prepared-retirement-r34-work/macos/uwvm2-ros/debug_checkpoint_retirement_cohort.wasm",
+        "unwind"
+      ],
+      "checks": 2,
+      "counted": false,
+      "pattern": "^CHECKPOINT_PREPARED_RETIREMENT policy=unwind actual_workers=([0-9]+) .*whole_restore=0 PASS$"
+    },
+    {
+      "label": "debug_checkpoint_native_cohort_retirement-instruction",
+      "argv": [
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-prepared-retirement-r34-work/macos/uwvm2-ros/debug_checkpoint_native_cohort_retirement.exe",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-prepared-retirement-r34-work/macos/uwvm2-ros/debug_checkpoint_retirement_cohort.wasm",
+        "instruction"
+      ],
+      "checks": 2,
+      "counted": false,
+      "pattern": "^CHECKPOINT_NATIVE_COHORT_RETIREMENT policy=instruction actual_workers=([0-9]+) .*whole_restore=0 PASS$"
+    },
+    {
+      "label": "debug_checkpoint_native_cohort_retirement-unwind",
+      "argv": [
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-prepared-retirement-r34-work/macos/uwvm2-ros/debug_checkpoint_native_cohort_retirement.exe",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-prepared-retirement-r34-work/macos/uwvm2-ros/debug_checkpoint_retirement_cohort.wasm",
+        "unwind"
+      ],
+      "checks": 2,
+      "counted": false,
+      "pattern": "^CHECKPOINT_NATIVE_COHORT_RETIREMENT policy=unwind actual_workers=([0-9]+) .*whole_restore=0 PASS$"
+    },
+    {
+      "label": "debug_wasip1_prepared_retirement-instruction",
+      "argv": [
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-prepared-retirement-r34-work/macos/uwvm2-ros/debug_wasip1_prepared_retirement.exe",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-prepared-retirement-r34-work/macos/uwvm2-ros/debug_wasip1_checkpoint.wasm",
+        "instruction"
+      ],
+      "checks": null,
+      "counted": true,
+      "pattern": "^CHECKPOINT_WASIP1_PREPARED_RETIREMENT policy=instruction checks=([0-9]+) .*whole_restore=0 PASS$"
+    },
+    {
+      "label": "debug_wasip1_prepared_retirement-unwind",
+      "argv": [
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-prepared-retirement-r34-work/macos/uwvm2-ros/debug_wasip1_prepared_retirement.exe",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-prepared-retirement-r34-work/macos/uwvm2-ros/debug_wasip1_checkpoint.wasm",
+        "unwind"
+      ],
+      "checks": null,
+      "counted": true,
+      "pattern": "^CHECKPOINT_WASIP1_PREPARED_RETIREMENT policy=unwind checks=([0-9]+) .*whole_restore=0 PASS$"
+    }
+  ],
+  "limit_bytes": 2147483648
+}

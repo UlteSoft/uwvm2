@@ -117,7 +117,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
     {
         if(module_index >= preloaded_dl.size()) [[unlikely]] { return; }
 
-        auto const& module{preloaded_dl.index_unchecked(module_index)};
+        auto& module{preloaded_dl.index_unchecked(module_index)};
+        module.wasm_dl_storage.retain_function_records();
         auto const begin{module.wasm_dl_storage.capi_function_vec.function_begin};
         auto const size{module.wasm_dl_storage.capi_function_vec.function_size};
         if(begin == nullptr || size == 0uz) [[unlikely]] { return; }
@@ -138,7 +139,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
     {
         if(module_index >= weak_symbol.size()) [[unlikely]] { return; }
 
-        auto const& module{weak_symbol.index_unchecked(module_index)};
+        auto& module{weak_symbol.index_unchecked(module_index)};
+        module.wasm_wws_storage.retain_function_records();
         auto const begin{module.wasm_wws_storage.capi_function_vec.function_begin};
         auto const size{module.wasm_wws_storage.capi_function_vec.function_size};
         if(begin == nullptr || size == 0uz) [[unlikely]] { return; }

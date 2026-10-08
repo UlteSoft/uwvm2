@@ -1,0 +1,484 @@
+{
+  "schema": "fused-i32-dual-sink-source-only-finite-variants-v1",
+  "actual_compiled": false,
+  "variants": [
+    {
+      "name": "combine0-delay0-byref",
+      "test_defines": [],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine0-delay0-musttail",
+      "test_defines": [
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine0-delay1-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine0-delay1-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine0-delay2-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine0-delay2-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine0-delay3-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine0-delay3-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine1-delay0-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine1-delay0-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine1-delay1-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine1-delay1-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine1-delay2-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine1-delay2-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine1-delay3-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine1-delay3-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine2-delay0-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine2-delay0-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine2-delay1-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine2-delay1-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine2-delay2-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine2-delay2-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine2-delay3-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine2-delay3-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine3-delay0-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine3-delay0-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine3-delay1-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine3-delay1-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine3-delay2-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine3-delay2-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine3-delay3-byref",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "test_undefines": [
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    },
+    {
+      "name": "combine3-delay3-musttail",
+      "test_defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY",
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "test_undefines": [],
+      "fresh_runtime_and_provider_required": true,
+      "native_executed": false
+    }
+  ]
+}

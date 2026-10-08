@@ -1,0 +1,8519 @@
+{
+  "scope": "Finite supported ASCII character grammar; owned syntax/numeric DATA, not producer or VM stop qualification. Unsupported multi-character literals are refused rather than silently reduced.",
+  "cases": [
+    {
+      "expression": "' '",
+      "accepted": true,
+      "bits": 32,
+      "reads": 0
+    },
+    {
+      "expression": "(' ' + 1)",
+      "accepted": true,
+      "bits": 33,
+      "reads": 0
+    },
+    {
+      "expression": "value + ' '",
+      "accepted": true,
+      "bits": 39,
+      "reads": 1
+    },
+    {
+      "expression": "0 && ' '",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || ' '",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? ' ' : (1 / 0)",
+      "accepted": true,
+      "bits": 32,
+      "reads": 0
+    },
+    {
+      "expression": "'  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '  '",
+      "accepted": false
+    },
+    {
+      "expression": "'   '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '   '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '   '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '   '",
+      "accepted": false
+    },
+    {
+      "expression": "'!'",
+      "accepted": true,
+      "bits": 33,
+      "reads": 0
+    },
+    {
+      "expression": "('!' + 1)",
+      "accepted": true,
+      "bits": 34,
+      "reads": 0
+    },
+    {
+      "expression": "value + '!'",
+      "accepted": true,
+      "bits": 40,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '!'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '!'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '!' : (1 / 0)",
+      "accepted": true,
+      "bits": 33,
+      "reads": 0
+    },
+    {
+      "expression": "'! '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '! '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '! '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '! '",
+      "accepted": false
+    },
+    {
+      "expression": "'!  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '!  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '!  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '!  '",
+      "accepted": false
+    },
+    {
+      "expression": "'\"'",
+      "accepted": true,
+      "bits": 34,
+      "reads": 0
+    },
+    {
+      "expression": "('\"' + 1)",
+      "accepted": true,
+      "bits": 35,
+      "reads": 0
+    },
+    {
+      "expression": "value + '\"'",
+      "accepted": true,
+      "bits": 41,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '\"'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\"'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '\"' : (1 / 0)",
+      "accepted": true,
+      "bits": 34,
+      "reads": 0
+    },
+    {
+      "expression": "'\" '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\" '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\" '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\" '",
+      "accepted": false
+    },
+    {
+      "expression": "'\"  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\"  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\"  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\"  '",
+      "accepted": false
+    },
+    {
+      "expression": "'#'",
+      "accepted": true,
+      "bits": 35,
+      "reads": 0
+    },
+    {
+      "expression": "('#' + 1)",
+      "accepted": true,
+      "bits": 36,
+      "reads": 0
+    },
+    {
+      "expression": "value + '#'",
+      "accepted": true,
+      "bits": 42,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '#'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '#'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '#' : (1 / 0)",
+      "accepted": true,
+      "bits": 35,
+      "reads": 0
+    },
+    {
+      "expression": "'# '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '# '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '# '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '# '",
+      "accepted": false
+    },
+    {
+      "expression": "'#  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '#  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '#  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '#  '",
+      "accepted": false
+    },
+    {
+      "expression": "'$'",
+      "accepted": true,
+      "bits": 36,
+      "reads": 0
+    },
+    {
+      "expression": "('$' + 1)",
+      "accepted": true,
+      "bits": 37,
+      "reads": 0
+    },
+    {
+      "expression": "value + '$'",
+      "accepted": true,
+      "bits": 43,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '$'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '$'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '$' : (1 / 0)",
+      "accepted": true,
+      "bits": 36,
+      "reads": 0
+    },
+    {
+      "expression": "'$ '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '$ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '$ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '$ '",
+      "accepted": false
+    },
+    {
+      "expression": "'$  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '$  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '$  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '$  '",
+      "accepted": false
+    },
+    {
+      "expression": "'%'",
+      "accepted": true,
+      "bits": 37,
+      "reads": 0
+    },
+    {
+      "expression": "('%' + 1)",
+      "accepted": true,
+      "bits": 38,
+      "reads": 0
+    },
+    {
+      "expression": "value + '%'",
+      "accepted": true,
+      "bits": 44,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '%'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '%'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '%' : (1 / 0)",
+      "accepted": true,
+      "bits": 37,
+      "reads": 0
+    },
+    {
+      "expression": "'% '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '% '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '% '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '% '",
+      "accepted": false
+    },
+    {
+      "expression": "'%  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '%  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '%  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '%  '",
+      "accepted": false
+    },
+    {
+      "expression": "'&'",
+      "accepted": true,
+      "bits": 38,
+      "reads": 0
+    },
+    {
+      "expression": "('&' + 1)",
+      "accepted": true,
+      "bits": 39,
+      "reads": 0
+    },
+    {
+      "expression": "value + '&'",
+      "accepted": true,
+      "bits": 45,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '&'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '&'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '&' : (1 / 0)",
+      "accepted": true,
+      "bits": 38,
+      "reads": 0
+    },
+    {
+      "expression": "'& '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '& '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '& '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '& '",
+      "accepted": false
+    },
+    {
+      "expression": "'&  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '&  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '&  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '&  '",
+      "accepted": false
+    },
+    {
+      "expression": "'('",
+      "accepted": true,
+      "bits": 40,
+      "reads": 0
+    },
+    {
+      "expression": "('(' + 1)",
+      "accepted": true,
+      "bits": 41,
+      "reads": 0
+    },
+    {
+      "expression": "value + '('",
+      "accepted": true,
+      "bits": 47,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '('",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '('",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '(' : (1 / 0)",
+      "accepted": true,
+      "bits": 40,
+      "reads": 0
+    },
+    {
+      "expression": "'( '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '( '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '( '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '( '",
+      "accepted": false
+    },
+    {
+      "expression": "'(  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '(  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '(  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '(  '",
+      "accepted": false
+    },
+    {
+      "expression": "')'",
+      "accepted": true,
+      "bits": 41,
+      "reads": 0
+    },
+    {
+      "expression": "(')' + 1)",
+      "accepted": true,
+      "bits": 42,
+      "reads": 0
+    },
+    {
+      "expression": "value + ')'",
+      "accepted": true,
+      "bits": 48,
+      "reads": 1
+    },
+    {
+      "expression": "0 && ')'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || ')'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? ')' : (1 / 0)",
+      "accepted": true,
+      "bits": 41,
+      "reads": 0
+    },
+    {
+      "expression": "') '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && ') '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || ') '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : ') '",
+      "accepted": false
+    },
+    {
+      "expression": "')  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && ')  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || ')  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : ')  '",
+      "accepted": false
+    },
+    {
+      "expression": "'*'",
+      "accepted": true,
+      "bits": 42,
+      "reads": 0
+    },
+    {
+      "expression": "('*' + 1)",
+      "accepted": true,
+      "bits": 43,
+      "reads": 0
+    },
+    {
+      "expression": "value + '*'",
+      "accepted": true,
+      "bits": 49,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '*'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '*'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '*' : (1 / 0)",
+      "accepted": true,
+      "bits": 42,
+      "reads": 0
+    },
+    {
+      "expression": "'* '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '* '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '* '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '* '",
+      "accepted": false
+    },
+    {
+      "expression": "'*  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '*  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '*  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '*  '",
+      "accepted": false
+    },
+    {
+      "expression": "'+'",
+      "accepted": true,
+      "bits": 43,
+      "reads": 0
+    },
+    {
+      "expression": "('+' + 1)",
+      "accepted": true,
+      "bits": 44,
+      "reads": 0
+    },
+    {
+      "expression": "value + '+'",
+      "accepted": true,
+      "bits": 50,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '+'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '+'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '+' : (1 / 0)",
+      "accepted": true,
+      "bits": 43,
+      "reads": 0
+    },
+    {
+      "expression": "'+ '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '+ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '+ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '+ '",
+      "accepted": false
+    },
+    {
+      "expression": "'+  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '+  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '+  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '+  '",
+      "accepted": false
+    },
+    {
+      "expression": "','",
+      "accepted": true,
+      "bits": 44,
+      "reads": 0
+    },
+    {
+      "expression": "(',' + 1)",
+      "accepted": true,
+      "bits": 45,
+      "reads": 0
+    },
+    {
+      "expression": "value + ','",
+      "accepted": true,
+      "bits": 51,
+      "reads": 1
+    },
+    {
+      "expression": "0 && ','",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || ','",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? ',' : (1 / 0)",
+      "accepted": true,
+      "bits": 44,
+      "reads": 0
+    },
+    {
+      "expression": "', '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && ', '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || ', '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : ', '",
+      "accepted": false
+    },
+    {
+      "expression": "',  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && ',  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || ',  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : ',  '",
+      "accepted": false
+    },
+    {
+      "expression": "'-'",
+      "accepted": true,
+      "bits": 45,
+      "reads": 0
+    },
+    {
+      "expression": "('-' + 1)",
+      "accepted": true,
+      "bits": 46,
+      "reads": 0
+    },
+    {
+      "expression": "value + '-'",
+      "accepted": true,
+      "bits": 52,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '-'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '-'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '-' : (1 / 0)",
+      "accepted": true,
+      "bits": 45,
+      "reads": 0
+    },
+    {
+      "expression": "'- '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '- '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '- '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '- '",
+      "accepted": false
+    },
+    {
+      "expression": "'-  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '-  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '-  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '-  '",
+      "accepted": false
+    },
+    {
+      "expression": "'.'",
+      "accepted": true,
+      "bits": 46,
+      "reads": 0
+    },
+    {
+      "expression": "('.' + 1)",
+      "accepted": true,
+      "bits": 47,
+      "reads": 0
+    },
+    {
+      "expression": "value + '.'",
+      "accepted": true,
+      "bits": 53,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '.'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '.'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '.' : (1 / 0)",
+      "accepted": true,
+      "bits": 46,
+      "reads": 0
+    },
+    {
+      "expression": "'. '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '. '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '. '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '. '",
+      "accepted": false
+    },
+    {
+      "expression": "'.  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '.  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '.  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '.  '",
+      "accepted": false
+    },
+    {
+      "expression": "'/'",
+      "accepted": true,
+      "bits": 47,
+      "reads": 0
+    },
+    {
+      "expression": "('/' + 1)",
+      "accepted": true,
+      "bits": 48,
+      "reads": 0
+    },
+    {
+      "expression": "value + '/'",
+      "accepted": true,
+      "bits": 54,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '/'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '/'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '/' : (1 / 0)",
+      "accepted": true,
+      "bits": 47,
+      "reads": 0
+    },
+    {
+      "expression": "'/ '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '/ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '/ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '/ '",
+      "accepted": false
+    },
+    {
+      "expression": "'/  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '/  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '/  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '/  '",
+      "accepted": false
+    },
+    {
+      "expression": "'0'",
+      "accepted": true,
+      "bits": 48,
+      "reads": 0
+    },
+    {
+      "expression": "('0' + 1)",
+      "accepted": true,
+      "bits": 49,
+      "reads": 0
+    },
+    {
+      "expression": "value + '0'",
+      "accepted": true,
+      "bits": 55,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '0'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '0'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '0' : (1 / 0)",
+      "accepted": true,
+      "bits": 48,
+      "reads": 0
+    },
+    {
+      "expression": "'0 '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '0 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '0 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '0 '",
+      "accepted": false
+    },
+    {
+      "expression": "'0  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '0  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '0  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '0  '",
+      "accepted": false
+    },
+    {
+      "expression": "'1'",
+      "accepted": true,
+      "bits": 49,
+      "reads": 0
+    },
+    {
+      "expression": "('1' + 1)",
+      "accepted": true,
+      "bits": 50,
+      "reads": 0
+    },
+    {
+      "expression": "value + '1'",
+      "accepted": true,
+      "bits": 56,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '1'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '1'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '1' : (1 / 0)",
+      "accepted": true,
+      "bits": 49,
+      "reads": 0
+    },
+    {
+      "expression": "'1 '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '1 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '1 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '1 '",
+      "accepted": false
+    },
+    {
+      "expression": "'1  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '1  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '1  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '1  '",
+      "accepted": false
+    },
+    {
+      "expression": "'2'",
+      "accepted": true,
+      "bits": 50,
+      "reads": 0
+    },
+    {
+      "expression": "('2' + 1)",
+      "accepted": true,
+      "bits": 51,
+      "reads": 0
+    },
+    {
+      "expression": "value + '2'",
+      "accepted": true,
+      "bits": 57,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '2'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '2'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '2' : (1 / 0)",
+      "accepted": true,
+      "bits": 50,
+      "reads": 0
+    },
+    {
+      "expression": "'2 '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '2 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '2 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '2 '",
+      "accepted": false
+    },
+    {
+      "expression": "'2  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '2  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '2  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '2  '",
+      "accepted": false
+    },
+    {
+      "expression": "'3'",
+      "accepted": true,
+      "bits": 51,
+      "reads": 0
+    },
+    {
+      "expression": "('3' + 1)",
+      "accepted": true,
+      "bits": 52,
+      "reads": 0
+    },
+    {
+      "expression": "value + '3'",
+      "accepted": true,
+      "bits": 58,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '3'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '3'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '3' : (1 / 0)",
+      "accepted": true,
+      "bits": 51,
+      "reads": 0
+    },
+    {
+      "expression": "'3 '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '3 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '3 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '3 '",
+      "accepted": false
+    },
+    {
+      "expression": "'3  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '3  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '3  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '3  '",
+      "accepted": false
+    },
+    {
+      "expression": "'4'",
+      "accepted": true,
+      "bits": 52,
+      "reads": 0
+    },
+    {
+      "expression": "('4' + 1)",
+      "accepted": true,
+      "bits": 53,
+      "reads": 0
+    },
+    {
+      "expression": "value + '4'",
+      "accepted": true,
+      "bits": 59,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '4'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '4'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '4' : (1 / 0)",
+      "accepted": true,
+      "bits": 52,
+      "reads": 0
+    },
+    {
+      "expression": "'4 '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '4 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '4 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '4 '",
+      "accepted": false
+    },
+    {
+      "expression": "'4  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '4  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '4  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '4  '",
+      "accepted": false
+    },
+    {
+      "expression": "'5'",
+      "accepted": true,
+      "bits": 53,
+      "reads": 0
+    },
+    {
+      "expression": "('5' + 1)",
+      "accepted": true,
+      "bits": 54,
+      "reads": 0
+    },
+    {
+      "expression": "value + '5'",
+      "accepted": true,
+      "bits": 60,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '5'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '5'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '5' : (1 / 0)",
+      "accepted": true,
+      "bits": 53,
+      "reads": 0
+    },
+    {
+      "expression": "'5 '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '5 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '5 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '5 '",
+      "accepted": false
+    },
+    {
+      "expression": "'5  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '5  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '5  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '5  '",
+      "accepted": false
+    },
+    {
+      "expression": "'6'",
+      "accepted": true,
+      "bits": 54,
+      "reads": 0
+    },
+    {
+      "expression": "('6' + 1)",
+      "accepted": true,
+      "bits": 55,
+      "reads": 0
+    },
+    {
+      "expression": "value + '6'",
+      "accepted": true,
+      "bits": 61,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '6'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '6'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '6' : (1 / 0)",
+      "accepted": true,
+      "bits": 54,
+      "reads": 0
+    },
+    {
+      "expression": "'6 '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '6 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '6 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '6 '",
+      "accepted": false
+    },
+    {
+      "expression": "'6  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '6  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '6  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '6  '",
+      "accepted": false
+    },
+    {
+      "expression": "'7'",
+      "accepted": true,
+      "bits": 55,
+      "reads": 0
+    },
+    {
+      "expression": "('7' + 1)",
+      "accepted": true,
+      "bits": 56,
+      "reads": 0
+    },
+    {
+      "expression": "value + '7'",
+      "accepted": true,
+      "bits": 62,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '7'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '7'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '7' : (1 / 0)",
+      "accepted": true,
+      "bits": 55,
+      "reads": 0
+    },
+    {
+      "expression": "'7 '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '7 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '7 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '7 '",
+      "accepted": false
+    },
+    {
+      "expression": "'7  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '7  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '7  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '7  '",
+      "accepted": false
+    },
+    {
+      "expression": "'8'",
+      "accepted": true,
+      "bits": 56,
+      "reads": 0
+    },
+    {
+      "expression": "('8' + 1)",
+      "accepted": true,
+      "bits": 57,
+      "reads": 0
+    },
+    {
+      "expression": "value + '8'",
+      "accepted": true,
+      "bits": 63,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '8'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '8'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '8' : (1 / 0)",
+      "accepted": true,
+      "bits": 56,
+      "reads": 0
+    },
+    {
+      "expression": "'8 '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '8 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '8 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '8 '",
+      "accepted": false
+    },
+    {
+      "expression": "'8  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '8  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '8  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '8  '",
+      "accepted": false
+    },
+    {
+      "expression": "'9'",
+      "accepted": true,
+      "bits": 57,
+      "reads": 0
+    },
+    {
+      "expression": "('9' + 1)",
+      "accepted": true,
+      "bits": 58,
+      "reads": 0
+    },
+    {
+      "expression": "value + '9'",
+      "accepted": true,
+      "bits": 64,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '9'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '9'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '9' : (1 / 0)",
+      "accepted": true,
+      "bits": 57,
+      "reads": 0
+    },
+    {
+      "expression": "'9 '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '9 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '9 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '9 '",
+      "accepted": false
+    },
+    {
+      "expression": "'9  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '9  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '9  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '9  '",
+      "accepted": false
+    },
+    {
+      "expression": "':'",
+      "accepted": true,
+      "bits": 58,
+      "reads": 0
+    },
+    {
+      "expression": "(':' + 1)",
+      "accepted": true,
+      "bits": 59,
+      "reads": 0
+    },
+    {
+      "expression": "value + ':'",
+      "accepted": true,
+      "bits": 65,
+      "reads": 1
+    },
+    {
+      "expression": "0 && ':'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || ':'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? ':' : (1 / 0)",
+      "accepted": true,
+      "bits": 58,
+      "reads": 0
+    },
+    {
+      "expression": "': '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && ': '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || ': '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : ': '",
+      "accepted": false
+    },
+    {
+      "expression": "':  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && ':  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || ':  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : ':  '",
+      "accepted": false
+    },
+    {
+      "expression": "';'",
+      "accepted": true,
+      "bits": 59,
+      "reads": 0
+    },
+    {
+      "expression": "(';' + 1)",
+      "accepted": true,
+      "bits": 60,
+      "reads": 0
+    },
+    {
+      "expression": "value + ';'",
+      "accepted": true,
+      "bits": 66,
+      "reads": 1
+    },
+    {
+      "expression": "0 && ';'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || ';'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? ';' : (1 / 0)",
+      "accepted": true,
+      "bits": 59,
+      "reads": 0
+    },
+    {
+      "expression": "'; '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '; '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '; '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '; '",
+      "accepted": false
+    },
+    {
+      "expression": "';  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && ';  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || ';  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : ';  '",
+      "accepted": false
+    },
+    {
+      "expression": "'<'",
+      "accepted": true,
+      "bits": 60,
+      "reads": 0
+    },
+    {
+      "expression": "('<' + 1)",
+      "accepted": true,
+      "bits": 61,
+      "reads": 0
+    },
+    {
+      "expression": "value + '<'",
+      "accepted": true,
+      "bits": 67,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '<'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '<'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '<' : (1 / 0)",
+      "accepted": true,
+      "bits": 60,
+      "reads": 0
+    },
+    {
+      "expression": "'< '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '< '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '< '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '< '",
+      "accepted": false
+    },
+    {
+      "expression": "'<  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '<  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '<  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '<  '",
+      "accepted": false
+    },
+    {
+      "expression": "'='",
+      "accepted": true,
+      "bits": 61,
+      "reads": 0
+    },
+    {
+      "expression": "('=' + 1)",
+      "accepted": true,
+      "bits": 62,
+      "reads": 0
+    },
+    {
+      "expression": "value + '='",
+      "accepted": true,
+      "bits": 68,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '='",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '='",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '=' : (1 / 0)",
+      "accepted": true,
+      "bits": 61,
+      "reads": 0
+    },
+    {
+      "expression": "'= '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '= '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '= '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '= '",
+      "accepted": false
+    },
+    {
+      "expression": "'=  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '=  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '=  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '=  '",
+      "accepted": false
+    },
+    {
+      "expression": "'>'",
+      "accepted": true,
+      "bits": 62,
+      "reads": 0
+    },
+    {
+      "expression": "('>' + 1)",
+      "accepted": true,
+      "bits": 63,
+      "reads": 0
+    },
+    {
+      "expression": "value + '>'",
+      "accepted": true,
+      "bits": 69,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '>'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '>'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '>' : (1 / 0)",
+      "accepted": true,
+      "bits": 62,
+      "reads": 0
+    },
+    {
+      "expression": "'> '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '> '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '> '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '> '",
+      "accepted": false
+    },
+    {
+      "expression": "'>  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '>  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '>  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '>  '",
+      "accepted": false
+    },
+    {
+      "expression": "'?'",
+      "accepted": true,
+      "bits": 63,
+      "reads": 0
+    },
+    {
+      "expression": "('?' + 1)",
+      "accepted": true,
+      "bits": 64,
+      "reads": 0
+    },
+    {
+      "expression": "value + '?'",
+      "accepted": true,
+      "bits": 70,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '?'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '?'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '?' : (1 / 0)",
+      "accepted": true,
+      "bits": 63,
+      "reads": 0
+    },
+    {
+      "expression": "'? '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '? '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '? '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '? '",
+      "accepted": false
+    },
+    {
+      "expression": "'?  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '?  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '?  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '?  '",
+      "accepted": false
+    },
+    {
+      "expression": "'@'",
+      "accepted": true,
+      "bits": 64,
+      "reads": 0
+    },
+    {
+      "expression": "('@' + 1)",
+      "accepted": true,
+      "bits": 65,
+      "reads": 0
+    },
+    {
+      "expression": "value + '@'",
+      "accepted": true,
+      "bits": 71,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '@'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '@'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '@' : (1 / 0)",
+      "accepted": true,
+      "bits": 64,
+      "reads": 0
+    },
+    {
+      "expression": "'@ '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '@ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '@ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '@ '",
+      "accepted": false
+    },
+    {
+      "expression": "'@  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '@  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '@  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '@  '",
+      "accepted": false
+    },
+    {
+      "expression": "'A'",
+      "accepted": true,
+      "bits": 65,
+      "reads": 0
+    },
+    {
+      "expression": "('A' + 1)",
+      "accepted": true,
+      "bits": 66,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'A'",
+      "accepted": true,
+      "bits": 72,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'A'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'A'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'A' : (1 / 0)",
+      "accepted": true,
+      "bits": 65,
+      "reads": 0
+    },
+    {
+      "expression": "'A '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'A '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'A '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'A '",
+      "accepted": false
+    },
+    {
+      "expression": "'A  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'A  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'A  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'A  '",
+      "accepted": false
+    },
+    {
+      "expression": "'B'",
+      "accepted": true,
+      "bits": 66,
+      "reads": 0
+    },
+    {
+      "expression": "('B' + 1)",
+      "accepted": true,
+      "bits": 67,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'B'",
+      "accepted": true,
+      "bits": 73,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'B'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'B'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'B' : (1 / 0)",
+      "accepted": true,
+      "bits": 66,
+      "reads": 0
+    },
+    {
+      "expression": "'B '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'B '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'B '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'B '",
+      "accepted": false
+    },
+    {
+      "expression": "'B  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'B  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'B  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'B  '",
+      "accepted": false
+    },
+    {
+      "expression": "'C'",
+      "accepted": true,
+      "bits": 67,
+      "reads": 0
+    },
+    {
+      "expression": "('C' + 1)",
+      "accepted": true,
+      "bits": 68,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'C'",
+      "accepted": true,
+      "bits": 74,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'C'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'C'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'C' : (1 / 0)",
+      "accepted": true,
+      "bits": 67,
+      "reads": 0
+    },
+    {
+      "expression": "'C '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'C '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'C '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'C '",
+      "accepted": false
+    },
+    {
+      "expression": "'C  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'C  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'C  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'C  '",
+      "accepted": false
+    },
+    {
+      "expression": "'D'",
+      "accepted": true,
+      "bits": 68,
+      "reads": 0
+    },
+    {
+      "expression": "('D' + 1)",
+      "accepted": true,
+      "bits": 69,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'D'",
+      "accepted": true,
+      "bits": 75,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'D'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'D'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'D' : (1 / 0)",
+      "accepted": true,
+      "bits": 68,
+      "reads": 0
+    },
+    {
+      "expression": "'D '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'D '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'D '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'D '",
+      "accepted": false
+    },
+    {
+      "expression": "'D  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'D  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'D  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'D  '",
+      "accepted": false
+    },
+    {
+      "expression": "'E'",
+      "accepted": true,
+      "bits": 69,
+      "reads": 0
+    },
+    {
+      "expression": "('E' + 1)",
+      "accepted": true,
+      "bits": 70,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'E'",
+      "accepted": true,
+      "bits": 76,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'E'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'E'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'E' : (1 / 0)",
+      "accepted": true,
+      "bits": 69,
+      "reads": 0
+    },
+    {
+      "expression": "'E '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'E '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'E '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'E '",
+      "accepted": false
+    },
+    {
+      "expression": "'E  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'E  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'E  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'E  '",
+      "accepted": false
+    },
+    {
+      "expression": "'F'",
+      "accepted": true,
+      "bits": 70,
+      "reads": 0
+    },
+    {
+      "expression": "('F' + 1)",
+      "accepted": true,
+      "bits": 71,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'F'",
+      "accepted": true,
+      "bits": 77,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'F'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'F'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'F' : (1 / 0)",
+      "accepted": true,
+      "bits": 70,
+      "reads": 0
+    },
+    {
+      "expression": "'F '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'F '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'F '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'F '",
+      "accepted": false
+    },
+    {
+      "expression": "'F  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'F  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'F  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'F  '",
+      "accepted": false
+    },
+    {
+      "expression": "'G'",
+      "accepted": true,
+      "bits": 71,
+      "reads": 0
+    },
+    {
+      "expression": "('G' + 1)",
+      "accepted": true,
+      "bits": 72,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'G'",
+      "accepted": true,
+      "bits": 78,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'G'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'G'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'G' : (1 / 0)",
+      "accepted": true,
+      "bits": 71,
+      "reads": 0
+    },
+    {
+      "expression": "'G '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'G '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'G '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'G '",
+      "accepted": false
+    },
+    {
+      "expression": "'G  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'G  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'G  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'G  '",
+      "accepted": false
+    },
+    {
+      "expression": "'H'",
+      "accepted": true,
+      "bits": 72,
+      "reads": 0
+    },
+    {
+      "expression": "('H' + 1)",
+      "accepted": true,
+      "bits": 73,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'H'",
+      "accepted": true,
+      "bits": 79,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'H'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'H'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'H' : (1 / 0)",
+      "accepted": true,
+      "bits": 72,
+      "reads": 0
+    },
+    {
+      "expression": "'H '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'H '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'H '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'H '",
+      "accepted": false
+    },
+    {
+      "expression": "'H  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'H  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'H  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'H  '",
+      "accepted": false
+    },
+    {
+      "expression": "'I'",
+      "accepted": true,
+      "bits": 73,
+      "reads": 0
+    },
+    {
+      "expression": "('I' + 1)",
+      "accepted": true,
+      "bits": 74,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'I'",
+      "accepted": true,
+      "bits": 80,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'I'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'I'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'I' : (1 / 0)",
+      "accepted": true,
+      "bits": 73,
+      "reads": 0
+    },
+    {
+      "expression": "'I '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'I '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'I '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'I '",
+      "accepted": false
+    },
+    {
+      "expression": "'I  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'I  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'I  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'I  '",
+      "accepted": false
+    },
+    {
+      "expression": "'J'",
+      "accepted": true,
+      "bits": 74,
+      "reads": 0
+    },
+    {
+      "expression": "('J' + 1)",
+      "accepted": true,
+      "bits": 75,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'J'",
+      "accepted": true,
+      "bits": 81,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'J'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'J'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'J' : (1 / 0)",
+      "accepted": true,
+      "bits": 74,
+      "reads": 0
+    },
+    {
+      "expression": "'J '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'J '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'J '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'J '",
+      "accepted": false
+    },
+    {
+      "expression": "'J  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'J  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'J  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'J  '",
+      "accepted": false
+    },
+    {
+      "expression": "'K'",
+      "accepted": true,
+      "bits": 75,
+      "reads": 0
+    },
+    {
+      "expression": "('K' + 1)",
+      "accepted": true,
+      "bits": 76,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'K'",
+      "accepted": true,
+      "bits": 82,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'K'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'K'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'K' : (1 / 0)",
+      "accepted": true,
+      "bits": 75,
+      "reads": 0
+    },
+    {
+      "expression": "'K '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'K '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'K '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'K '",
+      "accepted": false
+    },
+    {
+      "expression": "'K  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'K  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'K  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'K  '",
+      "accepted": false
+    },
+    {
+      "expression": "'L'",
+      "accepted": true,
+      "bits": 76,
+      "reads": 0
+    },
+    {
+      "expression": "('L' + 1)",
+      "accepted": true,
+      "bits": 77,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'L'",
+      "accepted": true,
+      "bits": 83,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'L'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'L'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'L' : (1 / 0)",
+      "accepted": true,
+      "bits": 76,
+      "reads": 0
+    },
+    {
+      "expression": "'L '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'L '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'L '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'L '",
+      "accepted": false
+    },
+    {
+      "expression": "'L  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'L  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'L  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'L  '",
+      "accepted": false
+    },
+    {
+      "expression": "'M'",
+      "accepted": true,
+      "bits": 77,
+      "reads": 0
+    },
+    {
+      "expression": "('M' + 1)",
+      "accepted": true,
+      "bits": 78,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'M'",
+      "accepted": true,
+      "bits": 84,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'M'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'M'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'M' : (1 / 0)",
+      "accepted": true,
+      "bits": 77,
+      "reads": 0
+    },
+    {
+      "expression": "'M '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'M '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'M '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'M '",
+      "accepted": false
+    },
+    {
+      "expression": "'M  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'M  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'M  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'M  '",
+      "accepted": false
+    },
+    {
+      "expression": "'N'",
+      "accepted": true,
+      "bits": 78,
+      "reads": 0
+    },
+    {
+      "expression": "('N' + 1)",
+      "accepted": true,
+      "bits": 79,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'N'",
+      "accepted": true,
+      "bits": 85,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'N'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'N'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'N' : (1 / 0)",
+      "accepted": true,
+      "bits": 78,
+      "reads": 0
+    },
+    {
+      "expression": "'N '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'N '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'N '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'N '",
+      "accepted": false
+    },
+    {
+      "expression": "'N  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'N  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'N  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'N  '",
+      "accepted": false
+    },
+    {
+      "expression": "'O'",
+      "accepted": true,
+      "bits": 79,
+      "reads": 0
+    },
+    {
+      "expression": "('O' + 1)",
+      "accepted": true,
+      "bits": 80,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'O'",
+      "accepted": true,
+      "bits": 86,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'O'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'O'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'O' : (1 / 0)",
+      "accepted": true,
+      "bits": 79,
+      "reads": 0
+    },
+    {
+      "expression": "'O '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'O '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'O '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'O '",
+      "accepted": false
+    },
+    {
+      "expression": "'O  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'O  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'O  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'O  '",
+      "accepted": false
+    },
+    {
+      "expression": "'P'",
+      "accepted": true,
+      "bits": 80,
+      "reads": 0
+    },
+    {
+      "expression": "('P' + 1)",
+      "accepted": true,
+      "bits": 81,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'P'",
+      "accepted": true,
+      "bits": 87,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'P'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'P'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'P' : (1 / 0)",
+      "accepted": true,
+      "bits": 80,
+      "reads": 0
+    },
+    {
+      "expression": "'P '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'P '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'P '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'P '",
+      "accepted": false
+    },
+    {
+      "expression": "'P  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'P  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'P  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'P  '",
+      "accepted": false
+    },
+    {
+      "expression": "'Q'",
+      "accepted": true,
+      "bits": 81,
+      "reads": 0
+    },
+    {
+      "expression": "('Q' + 1)",
+      "accepted": true,
+      "bits": 82,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'Q'",
+      "accepted": true,
+      "bits": 88,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'Q'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'Q'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'Q' : (1 / 0)",
+      "accepted": true,
+      "bits": 81,
+      "reads": 0
+    },
+    {
+      "expression": "'Q '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'Q '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'Q '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'Q '",
+      "accepted": false
+    },
+    {
+      "expression": "'Q  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'Q  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'Q  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'Q  '",
+      "accepted": false
+    },
+    {
+      "expression": "'R'",
+      "accepted": true,
+      "bits": 82,
+      "reads": 0
+    },
+    {
+      "expression": "('R' + 1)",
+      "accepted": true,
+      "bits": 83,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'R'",
+      "accepted": true,
+      "bits": 89,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'R'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'R'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'R' : (1 / 0)",
+      "accepted": true,
+      "bits": 82,
+      "reads": 0
+    },
+    {
+      "expression": "'R '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'R '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'R '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'R '",
+      "accepted": false
+    },
+    {
+      "expression": "'R  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'R  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'R  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'R  '",
+      "accepted": false
+    },
+    {
+      "expression": "'S'",
+      "accepted": true,
+      "bits": 83,
+      "reads": 0
+    },
+    {
+      "expression": "('S' + 1)",
+      "accepted": true,
+      "bits": 84,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'S'",
+      "accepted": true,
+      "bits": 90,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'S'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'S'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'S' : (1 / 0)",
+      "accepted": true,
+      "bits": 83,
+      "reads": 0
+    },
+    {
+      "expression": "'S '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'S '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'S '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'S '",
+      "accepted": false
+    },
+    {
+      "expression": "'S  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'S  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'S  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'S  '",
+      "accepted": false
+    },
+    {
+      "expression": "'T'",
+      "accepted": true,
+      "bits": 84,
+      "reads": 0
+    },
+    {
+      "expression": "('T' + 1)",
+      "accepted": true,
+      "bits": 85,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'T'",
+      "accepted": true,
+      "bits": 91,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'T'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'T'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'T' : (1 / 0)",
+      "accepted": true,
+      "bits": 84,
+      "reads": 0
+    },
+    {
+      "expression": "'T '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'T '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'T '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'T '",
+      "accepted": false
+    },
+    {
+      "expression": "'T  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'T  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'T  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'T  '",
+      "accepted": false
+    },
+    {
+      "expression": "'U'",
+      "accepted": true,
+      "bits": 85,
+      "reads": 0
+    },
+    {
+      "expression": "('U' + 1)",
+      "accepted": true,
+      "bits": 86,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'U'",
+      "accepted": true,
+      "bits": 92,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'U'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'U'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'U' : (1 / 0)",
+      "accepted": true,
+      "bits": 85,
+      "reads": 0
+    },
+    {
+      "expression": "'U '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'U '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'U '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'U '",
+      "accepted": false
+    },
+    {
+      "expression": "'U  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'U  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'U  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'U  '",
+      "accepted": false
+    },
+    {
+      "expression": "'V'",
+      "accepted": true,
+      "bits": 86,
+      "reads": 0
+    },
+    {
+      "expression": "('V' + 1)",
+      "accepted": true,
+      "bits": 87,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'V'",
+      "accepted": true,
+      "bits": 93,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'V'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'V'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'V' : (1 / 0)",
+      "accepted": true,
+      "bits": 86,
+      "reads": 0
+    },
+    {
+      "expression": "'V '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'V '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'V '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'V '",
+      "accepted": false
+    },
+    {
+      "expression": "'V  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'V  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'V  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'V  '",
+      "accepted": false
+    },
+    {
+      "expression": "'W'",
+      "accepted": true,
+      "bits": 87,
+      "reads": 0
+    },
+    {
+      "expression": "('W' + 1)",
+      "accepted": true,
+      "bits": 88,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'W'",
+      "accepted": true,
+      "bits": 94,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'W'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'W'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'W' : (1 / 0)",
+      "accepted": true,
+      "bits": 87,
+      "reads": 0
+    },
+    {
+      "expression": "'W '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'W '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'W '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'W '",
+      "accepted": false
+    },
+    {
+      "expression": "'W  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'W  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'W  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'W  '",
+      "accepted": false
+    },
+    {
+      "expression": "'X'",
+      "accepted": true,
+      "bits": 88,
+      "reads": 0
+    },
+    {
+      "expression": "('X' + 1)",
+      "accepted": true,
+      "bits": 89,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'X'",
+      "accepted": true,
+      "bits": 95,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'X'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'X'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'X' : (1 / 0)",
+      "accepted": true,
+      "bits": 88,
+      "reads": 0
+    },
+    {
+      "expression": "'X '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'X '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'X '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'X '",
+      "accepted": false
+    },
+    {
+      "expression": "'X  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'X  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'X  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'X  '",
+      "accepted": false
+    },
+    {
+      "expression": "'Y'",
+      "accepted": true,
+      "bits": 89,
+      "reads": 0
+    },
+    {
+      "expression": "('Y' + 1)",
+      "accepted": true,
+      "bits": 90,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'Y'",
+      "accepted": true,
+      "bits": 96,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'Y'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'Y'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'Y' : (1 / 0)",
+      "accepted": true,
+      "bits": 89,
+      "reads": 0
+    },
+    {
+      "expression": "'Y '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'Y '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'Y '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'Y '",
+      "accepted": false
+    },
+    {
+      "expression": "'Y  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'Y  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'Y  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'Y  '",
+      "accepted": false
+    },
+    {
+      "expression": "'Z'",
+      "accepted": true,
+      "bits": 90,
+      "reads": 0
+    },
+    {
+      "expression": "('Z' + 1)",
+      "accepted": true,
+      "bits": 91,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'Z'",
+      "accepted": true,
+      "bits": 97,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'Z'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'Z'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'Z' : (1 / 0)",
+      "accepted": true,
+      "bits": 90,
+      "reads": 0
+    },
+    {
+      "expression": "'Z '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'Z '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'Z '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'Z '",
+      "accepted": false
+    },
+    {
+      "expression": "'Z  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'Z  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'Z  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'Z  '",
+      "accepted": false
+    },
+    {
+      "expression": "'['",
+      "accepted": true,
+      "bits": 91,
+      "reads": 0
+    },
+    {
+      "expression": "('[' + 1)",
+      "accepted": true,
+      "bits": 92,
+      "reads": 0
+    },
+    {
+      "expression": "value + '['",
+      "accepted": true,
+      "bits": 98,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '['",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '['",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '[' : (1 / 0)",
+      "accepted": true,
+      "bits": 91,
+      "reads": 0
+    },
+    {
+      "expression": "'[ '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '[ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '[ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '[ '",
+      "accepted": false
+    },
+    {
+      "expression": "'[  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '[  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '[  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '[  '",
+      "accepted": false
+    },
+    {
+      "expression": "']'",
+      "accepted": true,
+      "bits": 93,
+      "reads": 0
+    },
+    {
+      "expression": "(']' + 1)",
+      "accepted": true,
+      "bits": 94,
+      "reads": 0
+    },
+    {
+      "expression": "value + ']'",
+      "accepted": true,
+      "bits": 100,
+      "reads": 1
+    },
+    {
+      "expression": "0 && ']'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || ']'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? ']' : (1 / 0)",
+      "accepted": true,
+      "bits": 93,
+      "reads": 0
+    },
+    {
+      "expression": "'] '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '] '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '] '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '] '",
+      "accepted": false
+    },
+    {
+      "expression": "']  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && ']  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || ']  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : ']  '",
+      "accepted": false
+    },
+    {
+      "expression": "'^'",
+      "accepted": true,
+      "bits": 94,
+      "reads": 0
+    },
+    {
+      "expression": "('^' + 1)",
+      "accepted": true,
+      "bits": 95,
+      "reads": 0
+    },
+    {
+      "expression": "value + '^'",
+      "accepted": true,
+      "bits": 101,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '^'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '^'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '^' : (1 / 0)",
+      "accepted": true,
+      "bits": 94,
+      "reads": 0
+    },
+    {
+      "expression": "'^ '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '^ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '^ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '^ '",
+      "accepted": false
+    },
+    {
+      "expression": "'^  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '^  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '^  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '^  '",
+      "accepted": false
+    },
+    {
+      "expression": "'_'",
+      "accepted": true,
+      "bits": 95,
+      "reads": 0
+    },
+    {
+      "expression": "('_' + 1)",
+      "accepted": true,
+      "bits": 96,
+      "reads": 0
+    },
+    {
+      "expression": "value + '_'",
+      "accepted": true,
+      "bits": 102,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '_'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '_'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '_' : (1 / 0)",
+      "accepted": true,
+      "bits": 95,
+      "reads": 0
+    },
+    {
+      "expression": "'_ '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '_ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '_ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '_ '",
+      "accepted": false
+    },
+    {
+      "expression": "'_  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '_  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '_  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '_  '",
+      "accepted": false
+    },
+    {
+      "expression": "'`'",
+      "accepted": true,
+      "bits": 96,
+      "reads": 0
+    },
+    {
+      "expression": "('`' + 1)",
+      "accepted": true,
+      "bits": 97,
+      "reads": 0
+    },
+    {
+      "expression": "value + '`'",
+      "accepted": true,
+      "bits": 103,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '`'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '`'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '`' : (1 / 0)",
+      "accepted": true,
+      "bits": 96,
+      "reads": 0
+    },
+    {
+      "expression": "'` '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '` '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '` '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '` '",
+      "accepted": false
+    },
+    {
+      "expression": "'`  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '`  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '`  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '`  '",
+      "accepted": false
+    },
+    {
+      "expression": "'a'",
+      "accepted": true,
+      "bits": 97,
+      "reads": 0
+    },
+    {
+      "expression": "('a' + 1)",
+      "accepted": true,
+      "bits": 98,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'a'",
+      "accepted": true,
+      "bits": 104,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'a'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'a'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'a' : (1 / 0)",
+      "accepted": true,
+      "bits": 97,
+      "reads": 0
+    },
+    {
+      "expression": "'a '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'a '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'a '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'a '",
+      "accepted": false
+    },
+    {
+      "expression": "'a  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'a  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'a  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'a  '",
+      "accepted": false
+    },
+    {
+      "expression": "'b'",
+      "accepted": true,
+      "bits": 98,
+      "reads": 0
+    },
+    {
+      "expression": "('b' + 1)",
+      "accepted": true,
+      "bits": 99,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'b'",
+      "accepted": true,
+      "bits": 105,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'b'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'b'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'b' : (1 / 0)",
+      "accepted": true,
+      "bits": 98,
+      "reads": 0
+    },
+    {
+      "expression": "'b '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'b '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'b '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'b '",
+      "accepted": false
+    },
+    {
+      "expression": "'b  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'b  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'b  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'b  '",
+      "accepted": false
+    },
+    {
+      "expression": "'c'",
+      "accepted": true,
+      "bits": 99,
+      "reads": 0
+    },
+    {
+      "expression": "('c' + 1)",
+      "accepted": true,
+      "bits": 100,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'c'",
+      "accepted": true,
+      "bits": 106,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'c'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'c'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'c' : (1 / 0)",
+      "accepted": true,
+      "bits": 99,
+      "reads": 0
+    },
+    {
+      "expression": "'c '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'c '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'c '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'c '",
+      "accepted": false
+    },
+    {
+      "expression": "'c  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'c  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'c  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'c  '",
+      "accepted": false
+    },
+    {
+      "expression": "'d'",
+      "accepted": true,
+      "bits": 100,
+      "reads": 0
+    },
+    {
+      "expression": "('d' + 1)",
+      "accepted": true,
+      "bits": 101,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'd'",
+      "accepted": true,
+      "bits": 107,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'd'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'd'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'd' : (1 / 0)",
+      "accepted": true,
+      "bits": 100,
+      "reads": 0
+    },
+    {
+      "expression": "'d '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'd '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'd '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'd '",
+      "accepted": false
+    },
+    {
+      "expression": "'d  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'd  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'd  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'd  '",
+      "accepted": false
+    },
+    {
+      "expression": "'e'",
+      "accepted": true,
+      "bits": 101,
+      "reads": 0
+    },
+    {
+      "expression": "('e' + 1)",
+      "accepted": true,
+      "bits": 102,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'e'",
+      "accepted": true,
+      "bits": 108,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'e'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'e'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'e' : (1 / 0)",
+      "accepted": true,
+      "bits": 101,
+      "reads": 0
+    },
+    {
+      "expression": "'e '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'e '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'e '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'e '",
+      "accepted": false
+    },
+    {
+      "expression": "'e  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'e  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'e  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'e  '",
+      "accepted": false
+    },
+    {
+      "expression": "'f'",
+      "accepted": true,
+      "bits": 102,
+      "reads": 0
+    },
+    {
+      "expression": "('f' + 1)",
+      "accepted": true,
+      "bits": 103,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'f'",
+      "accepted": true,
+      "bits": 109,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'f'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'f'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'f' : (1 / 0)",
+      "accepted": true,
+      "bits": 102,
+      "reads": 0
+    },
+    {
+      "expression": "'f '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'f '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'f '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'f '",
+      "accepted": false
+    },
+    {
+      "expression": "'f  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'f  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'f  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'f  '",
+      "accepted": false
+    },
+    {
+      "expression": "'g'",
+      "accepted": true,
+      "bits": 103,
+      "reads": 0
+    },
+    {
+      "expression": "('g' + 1)",
+      "accepted": true,
+      "bits": 104,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'g'",
+      "accepted": true,
+      "bits": 110,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'g'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'g'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'g' : (1 / 0)",
+      "accepted": true,
+      "bits": 103,
+      "reads": 0
+    },
+    {
+      "expression": "'g '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'g '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'g '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'g '",
+      "accepted": false
+    },
+    {
+      "expression": "'g  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'g  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'g  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'g  '",
+      "accepted": false
+    },
+    {
+      "expression": "'h'",
+      "accepted": true,
+      "bits": 104,
+      "reads": 0
+    },
+    {
+      "expression": "('h' + 1)",
+      "accepted": true,
+      "bits": 105,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'h'",
+      "accepted": true,
+      "bits": 111,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'h'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'h'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'h' : (1 / 0)",
+      "accepted": true,
+      "bits": 104,
+      "reads": 0
+    },
+    {
+      "expression": "'h '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'h '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'h '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'h '",
+      "accepted": false
+    },
+    {
+      "expression": "'h  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'h  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'h  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'h  '",
+      "accepted": false
+    },
+    {
+      "expression": "'i'",
+      "accepted": true,
+      "bits": 105,
+      "reads": 0
+    },
+    {
+      "expression": "('i' + 1)",
+      "accepted": true,
+      "bits": 106,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'i'",
+      "accepted": true,
+      "bits": 112,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'i'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'i'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'i' : (1 / 0)",
+      "accepted": true,
+      "bits": 105,
+      "reads": 0
+    },
+    {
+      "expression": "'i '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'i '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'i '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'i '",
+      "accepted": false
+    },
+    {
+      "expression": "'i  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'i  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'i  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'i  '",
+      "accepted": false
+    },
+    {
+      "expression": "'j'",
+      "accepted": true,
+      "bits": 106,
+      "reads": 0
+    },
+    {
+      "expression": "('j' + 1)",
+      "accepted": true,
+      "bits": 107,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'j'",
+      "accepted": true,
+      "bits": 113,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'j'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'j'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'j' : (1 / 0)",
+      "accepted": true,
+      "bits": 106,
+      "reads": 0
+    },
+    {
+      "expression": "'j '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'j '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'j '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'j '",
+      "accepted": false
+    },
+    {
+      "expression": "'j  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'j  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'j  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'j  '",
+      "accepted": false
+    },
+    {
+      "expression": "'k'",
+      "accepted": true,
+      "bits": 107,
+      "reads": 0
+    },
+    {
+      "expression": "('k' + 1)",
+      "accepted": true,
+      "bits": 108,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'k'",
+      "accepted": true,
+      "bits": 114,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'k'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'k'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'k' : (1 / 0)",
+      "accepted": true,
+      "bits": 107,
+      "reads": 0
+    },
+    {
+      "expression": "'k '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'k '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'k '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'k '",
+      "accepted": false
+    },
+    {
+      "expression": "'k  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'k  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'k  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'k  '",
+      "accepted": false
+    },
+    {
+      "expression": "'l'",
+      "accepted": true,
+      "bits": 108,
+      "reads": 0
+    },
+    {
+      "expression": "('l' + 1)",
+      "accepted": true,
+      "bits": 109,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'l'",
+      "accepted": true,
+      "bits": 115,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'l'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'l'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'l' : (1 / 0)",
+      "accepted": true,
+      "bits": 108,
+      "reads": 0
+    },
+    {
+      "expression": "'l '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'l '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'l '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'l '",
+      "accepted": false
+    },
+    {
+      "expression": "'l  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'l  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'l  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'l  '",
+      "accepted": false
+    },
+    {
+      "expression": "'m'",
+      "accepted": true,
+      "bits": 109,
+      "reads": 0
+    },
+    {
+      "expression": "('m' + 1)",
+      "accepted": true,
+      "bits": 110,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'm'",
+      "accepted": true,
+      "bits": 116,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'm'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'm'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'm' : (1 / 0)",
+      "accepted": true,
+      "bits": 109,
+      "reads": 0
+    },
+    {
+      "expression": "'m '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'm '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'm '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'm '",
+      "accepted": false
+    },
+    {
+      "expression": "'m  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'm  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'm  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'm  '",
+      "accepted": false
+    },
+    {
+      "expression": "'n'",
+      "accepted": true,
+      "bits": 110,
+      "reads": 0
+    },
+    {
+      "expression": "('n' + 1)",
+      "accepted": true,
+      "bits": 111,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'n'",
+      "accepted": true,
+      "bits": 117,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'n'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'n'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'n' : (1 / 0)",
+      "accepted": true,
+      "bits": 110,
+      "reads": 0
+    },
+    {
+      "expression": "'n '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'n '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'n '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'n '",
+      "accepted": false
+    },
+    {
+      "expression": "'n  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'n  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'n  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'n  '",
+      "accepted": false
+    },
+    {
+      "expression": "'o'",
+      "accepted": true,
+      "bits": 111,
+      "reads": 0
+    },
+    {
+      "expression": "('o' + 1)",
+      "accepted": true,
+      "bits": 112,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'o'",
+      "accepted": true,
+      "bits": 118,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'o'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'o'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'o' : (1 / 0)",
+      "accepted": true,
+      "bits": 111,
+      "reads": 0
+    },
+    {
+      "expression": "'o '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'o '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'o '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'o '",
+      "accepted": false
+    },
+    {
+      "expression": "'o  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'o  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'o  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'o  '",
+      "accepted": false
+    },
+    {
+      "expression": "'p'",
+      "accepted": true,
+      "bits": 112,
+      "reads": 0
+    },
+    {
+      "expression": "('p' + 1)",
+      "accepted": true,
+      "bits": 113,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'p'",
+      "accepted": true,
+      "bits": 119,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'p'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'p'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'p' : (1 / 0)",
+      "accepted": true,
+      "bits": 112,
+      "reads": 0
+    },
+    {
+      "expression": "'p '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'p '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'p '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'p '",
+      "accepted": false
+    },
+    {
+      "expression": "'p  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'p  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'p  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'p  '",
+      "accepted": false
+    },
+    {
+      "expression": "'q'",
+      "accepted": true,
+      "bits": 113,
+      "reads": 0
+    },
+    {
+      "expression": "('q' + 1)",
+      "accepted": true,
+      "bits": 114,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'q'",
+      "accepted": true,
+      "bits": 120,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'q'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'q'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'q' : (1 / 0)",
+      "accepted": true,
+      "bits": 113,
+      "reads": 0
+    },
+    {
+      "expression": "'q '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'q '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'q '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'q '",
+      "accepted": false
+    },
+    {
+      "expression": "'q  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'q  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'q  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'q  '",
+      "accepted": false
+    },
+    {
+      "expression": "'r'",
+      "accepted": true,
+      "bits": 114,
+      "reads": 0
+    },
+    {
+      "expression": "('r' + 1)",
+      "accepted": true,
+      "bits": 115,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'r'",
+      "accepted": true,
+      "bits": 121,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'r'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'r'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'r' : (1 / 0)",
+      "accepted": true,
+      "bits": 114,
+      "reads": 0
+    },
+    {
+      "expression": "'r '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'r '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'r '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'r '",
+      "accepted": false
+    },
+    {
+      "expression": "'r  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'r  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'r  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'r  '",
+      "accepted": false
+    },
+    {
+      "expression": "'s'",
+      "accepted": true,
+      "bits": 115,
+      "reads": 0
+    },
+    {
+      "expression": "('s' + 1)",
+      "accepted": true,
+      "bits": 116,
+      "reads": 0
+    },
+    {
+      "expression": "value + 's'",
+      "accepted": true,
+      "bits": 122,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 's'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 's'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 's' : (1 / 0)",
+      "accepted": true,
+      "bits": 115,
+      "reads": 0
+    },
+    {
+      "expression": "'s '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 's '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 's '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 's '",
+      "accepted": false
+    },
+    {
+      "expression": "'s  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 's  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 's  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 's  '",
+      "accepted": false
+    },
+    {
+      "expression": "'t'",
+      "accepted": true,
+      "bits": 116,
+      "reads": 0
+    },
+    {
+      "expression": "('t' + 1)",
+      "accepted": true,
+      "bits": 117,
+      "reads": 0
+    },
+    {
+      "expression": "value + 't'",
+      "accepted": true,
+      "bits": 123,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 't'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 't'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 't' : (1 / 0)",
+      "accepted": true,
+      "bits": 116,
+      "reads": 0
+    },
+    {
+      "expression": "'t '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 't '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 't '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 't '",
+      "accepted": false
+    },
+    {
+      "expression": "'t  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 't  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 't  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 't  '",
+      "accepted": false
+    },
+    {
+      "expression": "'u'",
+      "accepted": true,
+      "bits": 117,
+      "reads": 0
+    },
+    {
+      "expression": "('u' + 1)",
+      "accepted": true,
+      "bits": 118,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'u'",
+      "accepted": true,
+      "bits": 124,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'u'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'u'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'u' : (1 / 0)",
+      "accepted": true,
+      "bits": 117,
+      "reads": 0
+    },
+    {
+      "expression": "'u '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'u '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'u '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'u '",
+      "accepted": false
+    },
+    {
+      "expression": "'u  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'u  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'u  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'u  '",
+      "accepted": false
+    },
+    {
+      "expression": "'v'",
+      "accepted": true,
+      "bits": 118,
+      "reads": 0
+    },
+    {
+      "expression": "('v' + 1)",
+      "accepted": true,
+      "bits": 119,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'v'",
+      "accepted": true,
+      "bits": 125,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'v'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'v'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'v' : (1 / 0)",
+      "accepted": true,
+      "bits": 118,
+      "reads": 0
+    },
+    {
+      "expression": "'v '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'v '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'v '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'v '",
+      "accepted": false
+    },
+    {
+      "expression": "'v  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'v  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'v  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'v  '",
+      "accepted": false
+    },
+    {
+      "expression": "'w'",
+      "accepted": true,
+      "bits": 119,
+      "reads": 0
+    },
+    {
+      "expression": "('w' + 1)",
+      "accepted": true,
+      "bits": 120,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'w'",
+      "accepted": true,
+      "bits": 126,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'w'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'w'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'w' : (1 / 0)",
+      "accepted": true,
+      "bits": 119,
+      "reads": 0
+    },
+    {
+      "expression": "'w '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'w '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'w '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'w '",
+      "accepted": false
+    },
+    {
+      "expression": "'w  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'w  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'w  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'w  '",
+      "accepted": false
+    },
+    {
+      "expression": "'x'",
+      "accepted": true,
+      "bits": 120,
+      "reads": 0
+    },
+    {
+      "expression": "('x' + 1)",
+      "accepted": true,
+      "bits": 121,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'x'",
+      "accepted": true,
+      "bits": 127,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'x'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'x'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'x' : (1 / 0)",
+      "accepted": true,
+      "bits": 120,
+      "reads": 0
+    },
+    {
+      "expression": "'x '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'x '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'x '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'x '",
+      "accepted": false
+    },
+    {
+      "expression": "'x  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'x  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'x  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'x  '",
+      "accepted": false
+    },
+    {
+      "expression": "'y'",
+      "accepted": true,
+      "bits": 121,
+      "reads": 0
+    },
+    {
+      "expression": "('y' + 1)",
+      "accepted": true,
+      "bits": 122,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'y'",
+      "accepted": true,
+      "bits": 128,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'y'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'y'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'y' : (1 / 0)",
+      "accepted": true,
+      "bits": 121,
+      "reads": 0
+    },
+    {
+      "expression": "'y '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'y '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'y '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'y '",
+      "accepted": false
+    },
+    {
+      "expression": "'y  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'y  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'y  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'y  '",
+      "accepted": false
+    },
+    {
+      "expression": "'z'",
+      "accepted": true,
+      "bits": 122,
+      "reads": 0
+    },
+    {
+      "expression": "('z' + 1)",
+      "accepted": true,
+      "bits": 123,
+      "reads": 0
+    },
+    {
+      "expression": "value + 'z'",
+      "accepted": true,
+      "bits": 129,
+      "reads": 1
+    },
+    {
+      "expression": "0 && 'z'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || 'z'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 'z' : (1 / 0)",
+      "accepted": true,
+      "bits": 122,
+      "reads": 0
+    },
+    {
+      "expression": "'z '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'z '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'z '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'z '",
+      "accepted": false
+    },
+    {
+      "expression": "'z  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'z  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'z  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'z  '",
+      "accepted": false
+    },
+    {
+      "expression": "'{'",
+      "accepted": true,
+      "bits": 123,
+      "reads": 0
+    },
+    {
+      "expression": "('{' + 1)",
+      "accepted": true,
+      "bits": 124,
+      "reads": 0
+    },
+    {
+      "expression": "value + '{'",
+      "accepted": true,
+      "bits": 130,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '{'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '{'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '{' : (1 / 0)",
+      "accepted": true,
+      "bits": 123,
+      "reads": 0
+    },
+    {
+      "expression": "'{ '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '{ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '{ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '{ '",
+      "accepted": false
+    },
+    {
+      "expression": "'{  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '{  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '{  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '{  '",
+      "accepted": false
+    },
+    {
+      "expression": "'|'",
+      "accepted": true,
+      "bits": 124,
+      "reads": 0
+    },
+    {
+      "expression": "('|' + 1)",
+      "accepted": true,
+      "bits": 125,
+      "reads": 0
+    },
+    {
+      "expression": "value + '|'",
+      "accepted": true,
+      "bits": 131,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '|'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '|'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '|' : (1 / 0)",
+      "accepted": true,
+      "bits": 124,
+      "reads": 0
+    },
+    {
+      "expression": "'| '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '| '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '| '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '| '",
+      "accepted": false
+    },
+    {
+      "expression": "'|  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '|  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '|  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '|  '",
+      "accepted": false
+    },
+    {
+      "expression": "'}'",
+      "accepted": true,
+      "bits": 125,
+      "reads": 0
+    },
+    {
+      "expression": "('}' + 1)",
+      "accepted": true,
+      "bits": 126,
+      "reads": 0
+    },
+    {
+      "expression": "value + '}'",
+      "accepted": true,
+      "bits": 132,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '}'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '}'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '}' : (1 / 0)",
+      "accepted": true,
+      "bits": 125,
+      "reads": 0
+    },
+    {
+      "expression": "'} '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '} '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '} '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '} '",
+      "accepted": false
+    },
+    {
+      "expression": "'}  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '}  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '}  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '}  '",
+      "accepted": false
+    },
+    {
+      "expression": "'~'",
+      "accepted": true,
+      "bits": 126,
+      "reads": 0
+    },
+    {
+      "expression": "('~' + 1)",
+      "accepted": true,
+      "bits": 127,
+      "reads": 0
+    },
+    {
+      "expression": "value + '~'",
+      "accepted": true,
+      "bits": 133,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '~'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '~'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '~' : (1 / 0)",
+      "accepted": true,
+      "bits": 126,
+      "reads": 0
+    },
+    {
+      "expression": "'~ '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '~ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '~ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '~ '",
+      "accepted": false
+    },
+    {
+      "expression": "'~  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '~  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '~  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '~  '",
+      "accepted": false
+    },
+    {
+      "expression": "'\\n'",
+      "accepted": true,
+      "bits": 10,
+      "reads": 0
+    },
+    {
+      "expression": "('\\n' + 1)",
+      "accepted": true,
+      "bits": 11,
+      "reads": 0
+    },
+    {
+      "expression": "value + '\\n'",
+      "accepted": true,
+      "bits": 17,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '\\n'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\n'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '\\n' : (1 / 0)",
+      "accepted": true,
+      "bits": 10,
+      "reads": 0
+    },
+    {
+      "expression": "'\\n '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\n '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\n '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\n '",
+      "accepted": false
+    },
+    {
+      "expression": "'\\n  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\n  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\n  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\n  '",
+      "accepted": false
+    },
+    {
+      "expression": "'\\r'",
+      "accepted": true,
+      "bits": 13,
+      "reads": 0
+    },
+    {
+      "expression": "('\\r' + 1)",
+      "accepted": true,
+      "bits": 14,
+      "reads": 0
+    },
+    {
+      "expression": "value + '\\r'",
+      "accepted": true,
+      "bits": 20,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '\\r'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\r'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '\\r' : (1 / 0)",
+      "accepted": true,
+      "bits": 13,
+      "reads": 0
+    },
+    {
+      "expression": "'\\r '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\r '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\r '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\r '",
+      "accepted": false
+    },
+    {
+      "expression": "'\\r  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\r  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\r  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\r  '",
+      "accepted": false
+    },
+    {
+      "expression": "'\\t'",
+      "accepted": true,
+      "bits": 9,
+      "reads": 0
+    },
+    {
+      "expression": "('\\t' + 1)",
+      "accepted": true,
+      "bits": 10,
+      "reads": 0
+    },
+    {
+      "expression": "value + '\\t'",
+      "accepted": true,
+      "bits": 16,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '\\t'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\t'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '\\t' : (1 / 0)",
+      "accepted": true,
+      "bits": 9,
+      "reads": 0
+    },
+    {
+      "expression": "'\\t '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\t '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\t '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\t '",
+      "accepted": false
+    },
+    {
+      "expression": "'\\t  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\t  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\t  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\t  '",
+      "accepted": false
+    },
+    {
+      "expression": "'\\0'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "('\\0' + 1)",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "value + '\\0'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '\\0'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\0'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '\\0' : (1 / 0)",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "'\\0 '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\0 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\0 '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\0 '",
+      "accepted": false
+    },
+    {
+      "expression": "'\\0  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\0  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\0  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\0  '",
+      "accepted": false
+    },
+    {
+      "expression": "'\\\\'",
+      "accepted": true,
+      "bits": 92,
+      "reads": 0
+    },
+    {
+      "expression": "('\\\\' + 1)",
+      "accepted": true,
+      "bits": 93,
+      "reads": 0
+    },
+    {
+      "expression": "value + '\\\\'",
+      "accepted": true,
+      "bits": 99,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '\\\\'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\\\'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '\\\\' : (1 / 0)",
+      "accepted": true,
+      "bits": 92,
+      "reads": 0
+    },
+    {
+      "expression": "'\\\\ '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\\\ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\\\ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\\\ '",
+      "accepted": false
+    },
+    {
+      "expression": "'\\\\  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\\\  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\\\  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\\\  '",
+      "accepted": false
+    },
+    {
+      "expression": "'\\''",
+      "accepted": true,
+      "bits": 39,
+      "reads": 0
+    },
+    {
+      "expression": "('\\'' + 1)",
+      "accepted": true,
+      "bits": 40,
+      "reads": 0
+    },
+    {
+      "expression": "value + '\\''",
+      "accepted": true,
+      "bits": 46,
+      "reads": 1
+    },
+    {
+      "expression": "0 && '\\''",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\''",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? '\\'' : (1 / 0)",
+      "accepted": true,
+      "bits": 39,
+      "reads": 0
+    },
+    {
+      "expression": "'\\' '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\' '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\' '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\' '",
+      "accepted": false
+    },
+    {
+      "expression": "'\\'  '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\'  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\'  '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\'  '",
+      "accepted": false
+    },
+    {
+      "expression": "'''",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '''",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '''",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '''",
+      "accepted": false
+    },
+    {
+      "expression": "'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '",
+      "accepted": false
+    },
+    {
+      "expression": "''",
+      "accepted": false
+    },
+    {
+      "expression": "0 && ''",
+      "accepted": false
+    },
+    {
+      "expression": "1 || ''",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : ''",
+      "accepted": false
+    },
+    {
+      "expression": "'a",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'a",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'a",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'a",
+      "accepted": false
+    },
+    {
+      "expression": "'\\",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\",
+      "accepted": false
+    },
+    {
+      "expression": "'\\'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\'",
+      "accepted": false
+    },
+    {
+      "expression": "'ab'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'ab'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'ab'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'ab'",
+      "accepted": false
+    },
+    {
+      "expression": "'a''b'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'a''b'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'a''b'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'a''b'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\n\\t'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\n\\t'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\n\\t'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\n\\t'",
+      "accepted": false
+    },
+    {
+      "expression": "'\n'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\n'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\n'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\n'",
+      "accepted": false
+    },
+    {
+      "expression": "'\r'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\r'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\r'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\r'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\x41'",
+      "accepted": true,
+      "bits": 65,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\x41'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\x41'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\x41'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\u0041'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\u0041'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\u0041'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\u0041'",
+      "accepted": false
+    },
+    {
+      "expression": "u8'ab'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && u8'ab'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || u8'ab'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : u8'ab'",
+      "accepted": false
+    },
+    {
+      "expression": "'é'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && 'é'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || 'é'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : 'é'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\ '",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\ '",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\ '",
+      "accepted": false
+    },
+    {
+      "expression": "'\\!'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\!'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\!'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\!'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\\"'",
+      "accepted": true,
+      "bits": 34,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\\"'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\\"'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\\"'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\#'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\#'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\#'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\#'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\$'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\$'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\$'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\$'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\%'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\%'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\%'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\%'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\&'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\&'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\&'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\&'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\('",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\('",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\('",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\('",
+      "accepted": false
+    },
+    {
+      "expression": "'\\)'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\)'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\)'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\)'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\*'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\*'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\*'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\*'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\+'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\+'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\+'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\+'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\,'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\,'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\,'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\,'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\-'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\-'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\-'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\-'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\.'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\.'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\.'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\.'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\/'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\/'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\/'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\/'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\1'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\1'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\1'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\1'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\2'",
+      "accepted": true,
+      "bits": 2,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\2'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\2'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\2'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\3'",
+      "accepted": true,
+      "bits": 3,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\3'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\3'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\3'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\4'",
+      "accepted": true,
+      "bits": 4,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\4'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\4'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\4'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\5'",
+      "accepted": true,
+      "bits": 5,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\5'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\5'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\5'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\6'",
+      "accepted": true,
+      "bits": 6,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\6'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\6'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\6'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\7'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\7'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\7'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\7'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\8'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\8'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\8'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\8'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\9'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\9'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\9'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\9'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\:'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\:'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\:'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\:'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\;'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\;'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\;'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\;'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\<'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\<'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\<'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\<'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\='",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\='",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\='",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\='",
+      "accepted": false
+    },
+    {
+      "expression": "'\\>'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\>'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\>'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\>'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\?'",
+      "accepted": true,
+      "bits": 63,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\?'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\?'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\?'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\@'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\@'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\@'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\@'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\A'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\A'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\A'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\A'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\B'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\B'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\B'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\B'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\C'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\C'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\C'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\C'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\D'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\D'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\D'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\D'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\E'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\E'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\E'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\E'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\F'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\F'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\F'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\F'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\G'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\G'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\G'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\G'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\H'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\H'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\H'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\H'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\I'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\I'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\I'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\I'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\J'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\J'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\J'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\J'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\K'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\K'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\K'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\K'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\L'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\L'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\L'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\L'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\M'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\M'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\M'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\M'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\N'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\N'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\N'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\N'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\O'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\O'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\O'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\O'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\P'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\P'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\P'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\P'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\Q'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\Q'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\Q'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\Q'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\R'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\R'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\R'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\R'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\S'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\S'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\S'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\S'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\T'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\T'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\T'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\T'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\U'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\U'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\U'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\U'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\V'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\V'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\V'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\V'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\W'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\W'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\W'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\W'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\X'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\X'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\X'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\X'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\Y'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\Y'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\Y'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\Y'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\Z'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\Z'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\Z'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\Z'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\['",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\['",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\['",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\['",
+      "accepted": false
+    },
+    {
+      "expression": "'\\]'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\]'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\]'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\]'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\^'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\^'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\^'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\^'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\_'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\_'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\_'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\_'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\`'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\`'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\`'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\`'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\a'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\a'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\a'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\a'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\b'",
+      "accepted": true,
+      "bits": 8,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\b'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\b'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\b'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\c'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\c'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\c'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\c'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\d'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\d'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\d'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\d'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\e'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\e'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\e'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\e'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\f'",
+      "accepted": true,
+      "bits": 12,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\f'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\f'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\f'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\g'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\g'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\g'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\g'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\h'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\h'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\h'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\h'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\i'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\i'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\i'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\i'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\j'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\j'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\j'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\j'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\k'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\k'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\k'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\k'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\l'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\l'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\l'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\l'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\m'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\m'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\m'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\m'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\o'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\o'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\o'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\o'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\p'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\p'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\p'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\p'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\q'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\q'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\q'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\q'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\s'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\s'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\s'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\s'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\u'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\u'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\u'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\u'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\v'",
+      "accepted": true,
+      "bits": 11,
+      "reads": 0
+    },
+    {
+      "expression": "0 && '\\v'",
+      "accepted": true,
+      "bits": 0,
+      "reads": 0
+    },
+    {
+      "expression": "1 || '\\v'",
+      "accepted": true,
+      "bits": 1,
+      "reads": 0
+    },
+    {
+      "expression": "1 ? 7 : '\\v'",
+      "accepted": true,
+      "bits": 7,
+      "reads": 0
+    },
+    {
+      "expression": "'\\w'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\w'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\w'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\w'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\x'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\x'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\x'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\x'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\y'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\y'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\y'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\y'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\z'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\z'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\z'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\z'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\{'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\{'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\{'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\{'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\|'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\|'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\|'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\|'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\}'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\}'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\}'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\}'",
+      "accepted": false
+    },
+    {
+      "expression": "'\\~'",
+      "accepted": false
+    },
+    {
+      "expression": "0 && '\\~'",
+      "accepted": false
+    },
+    {
+      "expression": "1 || '\\~'",
+      "accepted": false
+    },
+    {
+      "expression": "1 ? 7 : '\\~'",
+      "accepted": false
+    }
+  ],
+  "positive": 650,
+  "negative": 1152,
+  "character_escape_followup_20261007": {
+    "formerly_refused_known_ascii_rows_now_supported": 56,
+    "ordinary_ASCII_only": true
+  }
+}

@@ -1,0 +1,266 @@
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_guest_worker_registration.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_guest_worker_registration.h
+@@ -79,15 +79,22 @@
+             // Both smart pointers default-construct empty. Avoid nested default
+             // member initializers before the enclosing static array is complete.
+             mutable_owner live; // keeps actual thread/code/state on every NACK
+-            ::std::weak_ptr<worker> canonical; // completed retry identity too
++            // Completed owners belong to the separate weak canonical history.
+         };
+         inline static ::std::mutex registry_mutex_{};
+         inline static registry_slot registry_[256u]{};
++        // The 256 slots bound genuine, not-yet-joined native workers. A caller
++        // may retain a completed owner for retry without occupying a live slot.
++        // Weak history authenticates those control blocks without retaining
++        // native/source/launch resources. Expired entries are reused at launch.
++        inline static ::std::vector<::std::weak_ptr<worker>> canonical_registry_{};
+         inline static constinit thread_local worker* actual_worker_{};
+         template<typename A, typename B>
+         [[nodiscard]] static bool same_owner(A const& a, B const& b) noexcept
+         { return a && b && a.get() == b.get() && !a.owner_before(b) && !b.owner_before(a); }
+         [[nodiscard]] static mutable_owner resolve(llvm_jit_debug_guest_worker_owner const&) noexcept;
++        [[nodiscard]] static ::std::size_t register_actual_worker(mutable_owner const&);
++        static void unregister_unstarted_worker(mutable_owner const&, ::std::size_t) noexcept;
+         static void actual_worker_body(mutable_owner) noexcept;
+         static void scope_admitted(domain::participant const&) noexcept;
+         static void scope_leaving(domain::participant const&) noexcept;
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_guest_worker_registration_impl.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_guest_worker_registration_impl.h
+@@ -14,14 +14,43 @@
+     {
+         if(!supplied) { return {}; }
+         ::std::lock_guard lock{registry_mutex_};
+-        for(auto const& slot : registry_)
+-        {
+-            auto actual{slot.canonical.lock()};
++        for(auto const& canonical : canonical_registry_)
++        {
++            auto actual{canonical.lock()};
+             // Compare canonical strong control block BEFORE supplied pointee is
+             // read. An alias, native address or copied participant cannot enter.
+             if(same_owner(actual, supplied)) { return actual; }
+         }
+         return {};
++    }
++    ::std::size_t runtime_checkpoint_guest_worker_bridge::register_actual_worker(mutable_owner const& actual)
++    {
++        ::std::lock_guard lock{registry_mutex_};
++        ::std::size_t slot{256u};
++        for(::std::size_t index{};index!=256u;++index)
++        { if(!registry_[index].live) { slot=index;break; } }
++        if(slot==256u) { return slot; }
++        // ALL fallible history allocation precedes live registration and OS
++        // creation. No allocation is introduced in physical join/publication.
++        bool reused{};
++        for(auto& canonical:canonical_registry_)
++        {
++            if(canonical.expired()) { canonical=actual;reused=true;break; }
++        }
++        if(!reused) { canonical_registry_.emplace_back(actual); }
++        registry_[slot].live=actual;
++        return slot;
++    }
++    void runtime_checkpoint_guest_worker_bridge::unregister_unstarted_worker(
++        mutable_owner const& actual,::std::size_t slot) noexcept
++    {
++        ::std::lock_guard lock{registry_mutex_};
++        if(slot>=256u || !same_owner(registry_[slot].live,actual)) { return; }
++        // Actual factory still strongly pins this never-started object. Remove
++        // only its own canonical entry; concurrent factories keep their owners.
++        for(auto& canonical:canonical_registry_)
++        { if(same_owner(canonical.lock(),actual)) { canonical.reset();break; } }
++        registry_[slot].live.reset();
+     }
+     bool runtime_checkpoint_guest_worker_bridge::actual_tuple_current(worker const& actual) noexcept
+     {
+@@ -70,17 +99,7 @@
+             auto const admitted{runtime_checkpoint_host_bridge::begin_registered_worker_startup(actual->host_, actual->startup_)};
+             if(admitted != runtime_checkpoint_host_bridge::status::ok)
+             { return {result::admission_closed, {}}; }
+-            {
+-                ::std::lock_guard lock{registry_mutex_};
+-                for(::std::size_t index{}; index != 256u; ++index)
+-                {
+-                    if(!registry_[index].live && registry_[index].canonical.expired())
+-                    {
+-                        registry_[index].live = actual; registry_[index].canonical = actual;
+-                        slot_index = index; break;
+-                    }
+-                }
+-            }
++            slot_index = register_actual_worker(actual);
+             if(slot_index == 256u) { return {result::quota, {}}; }
+             // Allocate/construct the final unique native owner directly. The
+             // selected FastIO constructors throw only before a thread is owned;
+@@ -103,8 +122,7 @@
+             }
+             if(slot_index != 256u)
+             {
+-                ::std::lock_guard lock{registry_mutex_};
+-                registry_[slot_index].live.reset(); registry_[slot_index].canonical.reset();
++                unregister_unstarted_worker(actual,slot_index);
+             }
+             return {result::allocation_failure, {}};
+         }
+@@ -385,17 +403,7 @@
+                 worker::origin::restored_world}};
+             // No ordinary try_enter and NO initial startup host operation. The
+             // actual resume entry creates its closed-token lease and both ledgers.
+-            {
+-                ::std::lock_guard lock{registry_mutex_};
+-                for(::std::size_t index{}; index != 256u; ++index)
+-                {
+-                    if(!registry_[index].live && registry_[index].canonical.expired())
+-                    {
+-                        registry_[index].live = actual; registry_[index].canonical = actual;
+-                        slot_index = index; break;
+-                    }
+-                }
+-            }
++            slot_index = register_actual_worker(actual);
+             if(slot_index == 256u) { return {}; }
+             actual->native_.reset(new ::fast_io::native_thread{[actual]() noexcept { actual_worker_body(actual); }});
+             actual->published_.store(true, ::std::memory_order_release); return actual;
+@@ -406,8 +414,7 @@
+             { actual->published_.store(true, ::std::memory_order_release); return actual; }
+             if(slot_index != 256u)
+             {
+-                ::std::lock_guard lock{registry_mutex_};
+-                registry_[slot_index].live.reset(); registry_[slot_index].canonical.reset();
++                unregister_unstarted_worker(actual,slot_index);
+             }
+             return {};
+         }
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_guest_worker_registration.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_guest_worker_registration.h
+@@ -79,15 +79,22 @@
+             // Both smart pointers default-construct empty. Avoid nested default
+             // member initializers before the enclosing static array is complete.
+             mutable_owner live; // keeps actual thread/code/state on every NACK
+-            ::std::weak_ptr<worker> canonical; // completed retry identity too
++            // Completed owners belong to the separate weak canonical history.
+         };
+         inline static ::std::mutex registry_mutex_{};
+         inline static registry_slot registry_[256u]{};
++        // The 256 slots bound genuine, not-yet-joined native workers. A caller
++        // may retain a completed owner for retry without occupying a live slot.
++        // Weak history authenticates those control blocks without retaining
++        // native/source/launch resources. Expired entries are reused at launch.
++        inline static ::std::vector<::std::weak_ptr<worker>> canonical_registry_{};
+         inline static constinit thread_local worker* actual_worker_{};
+         template<typename A, typename B>
+         [[nodiscard]] static bool same_owner(A const& a, B const& b) noexcept
+         { return a && b && a.get() == b.get() && !a.owner_before(b) && !b.owner_before(a); }
+         [[nodiscard]] static mutable_owner resolve(llvm_jit_debug_guest_worker_owner const&) noexcept;
++        [[nodiscard]] static ::std::size_t register_actual_worker(mutable_owner const&);
++        static void unregister_unstarted_worker(mutable_owner const&, ::std::size_t) noexcept;
+         static void actual_worker_body(mutable_owner) noexcept;
+         static void scope_admitted(domain::participant const&) noexcept;
+         static void scope_leaving(domain::participant const&) noexcept;
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_guest_worker_registration_impl.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_guest_worker_registration_impl.h
+@@ -14,14 +14,43 @@
+     {
+         if(!supplied) { return {}; }
+         ::std::lock_guard lock{registry_mutex_};
+-        for(auto const& slot : registry_)
+-        {
+-            auto actual{slot.canonical.lock()};
++        for(auto const& canonical : canonical_registry_)
++        {
++            auto actual{canonical.lock()};
+             // Compare canonical strong control block BEFORE supplied pointee is
+             // read. An alias, native address or copied participant cannot enter.
+             if(same_owner(actual, supplied)) { return actual; }
+         }
+         return {};
++    }
++    ::std::size_t runtime_checkpoint_guest_worker_bridge::register_actual_worker(mutable_owner const& actual)
++    {
++        ::std::lock_guard lock{registry_mutex_};
++        ::std::size_t slot{256u};
++        for(::std::size_t index{};index!=256u;++index)
++        { if(!registry_[index].live) { slot=index;break; } }
++        if(slot==256u) { return slot; }
++        // ALL fallible history allocation precedes live registration and OS
++        // creation. No allocation is introduced in physical join/publication.
++        bool reused{};
++        for(auto& canonical:canonical_registry_)
++        {
++            if(canonical.expired()) { canonical=actual;reused=true;break; }
++        }
++        if(!reused) { canonical_registry_.emplace_back(actual); }
++        registry_[slot].live=actual;
++        return slot;
++    }
++    void runtime_checkpoint_guest_worker_bridge::unregister_unstarted_worker(
++        mutable_owner const& actual,::std::size_t slot) noexcept
++    {
++        ::std::lock_guard lock{registry_mutex_};
++        if(slot>=256u || !same_owner(registry_[slot].live,actual)) { return; }
++        // Actual factory still strongly pins this never-started object. Remove
++        // only its own canonical entry; concurrent factories keep their owners.
++        for(auto& canonical:canonical_registry_)
++        { if(same_owner(canonical.lock(),actual)) { canonical.reset();break; } }
++        registry_[slot].live.reset();
+     }
+     bool runtime_checkpoint_guest_worker_bridge::actual_tuple_current(worker const& actual) noexcept
+     {
+@@ -70,17 +99,7 @@
+             auto const admitted{runtime_checkpoint_host_bridge::begin_registered_worker_startup(actual->host_, actual->startup_)};
+             if(admitted != runtime_checkpoint_host_bridge::status::ok)
+             { return {result::admission_closed, {}}; }
+-            {
+-                ::std::lock_guard lock{registry_mutex_};
+-                for(::std::size_t index{}; index != 256u; ++index)
+-                {
+-                    if(!registry_[index].live && registry_[index].canonical.expired())
+-                    {
+-                        registry_[index].live = actual; registry_[index].canonical = actual;
+-                        slot_index = index; break;
+-                    }
+-                }
+-            }
++            slot_index = register_actual_worker(actual);
+             if(slot_index == 256u) { return {result::quota, {}}; }
+             // Allocate/construct the final unique native owner directly. The
+             // selected FastIO constructors throw only before a thread is owned;
+@@ -103,8 +122,7 @@
+             }
+             if(slot_index != 256u)
+             {
+-                ::std::lock_guard lock{registry_mutex_};
+-                registry_[slot_index].live.reset(); registry_[slot_index].canonical.reset();
++                unregister_unstarted_worker(actual,slot_index);
+             }
+             return {result::allocation_failure, {}};
+         }
+@@ -385,17 +403,7 @@
+                 worker::origin::restored_world}};
+             // No ordinary try_enter and NO initial startup host operation. The
+             // actual resume entry creates its closed-token lease and both ledgers.
+-            {
+-                ::std::lock_guard lock{registry_mutex_};
+-                for(::std::size_t index{}; index != 256u; ++index)
+-                {
+-                    if(!registry_[index].live && registry_[index].canonical.expired())
+-                    {
+-                        registry_[index].live = actual; registry_[index].canonical = actual;
+-                        slot_index = index; break;
+-                    }
+-                }
+-            }
++            slot_index = register_actual_worker(actual);
+             if(slot_index == 256u) { return {}; }
+             actual->native_.reset(new ::fast_io::native_thread{[actual]() noexcept { actual_worker_body(actual); }});
+             actual->published_.store(true, ::std::memory_order_release); return actual;
+@@ -406,8 +414,7 @@
+             { actual->published_.store(true, ::std::memory_order_release); return actual; }
+             if(slot_index != 256u)
+             {
+-                ::std::lock_guard lock{registry_mutex_};
+-                registry_[slot_index].live.reset(); registry_[slot_index].canonical.reset();
++                unregister_unstarted_worker(actual,slot_index);
+             }
+             return {};
+         }

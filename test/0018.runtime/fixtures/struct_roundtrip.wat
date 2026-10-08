@@ -1,0 +1,1 @@
+(module (type $s (struct (field i32))) (table 1 anyref) (func (export "_start") i32.const 0 i32.const 77 struct.new $s table.set 0 i32.const 0 table.get 0 ref.cast (ref $s) struct.get $s 0 i32.const 77 i32.ne if unreachable end))

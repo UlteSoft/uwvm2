@@ -1,0 +1,7 @@
+(module
+  (func $later (result i32) i32.const 47)
+  (func $probe (result i32)
+    ref.null exn ref.null exn i32.const 0 select (result (ref null exn)) drop
+    call $later)
+  (func (export "_start")
+    call $probe i32.const 47 i32.ne if unreachable end))

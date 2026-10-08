@@ -1,0 +1,351 @@
+--- a/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.cpp
++++ b/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.cpp
+@@ -1285,7 +1285,8 @@
+ void RuntimeDyldELF::resolveRISCVRelocation(const SectionEntry &Section,
+                                             uint64_t Offset, uint64_t Value,
+                                             uint32_t Type, int64_t Addend,
+-                                            SID SectionID) {
++                                            SID SectionID,
++                                            uint64_t CallStubOffset) {
+   switch (Type) {
+   default: {
+     std::string Err = "Unimplemented reloc type: " + std::to_string(Type);
+@@ -1296,8 +1297,27 @@
+     // Last 12 bits to the jalr instruction
+   case ELF::R_RISCV_CALL:
+   case ELF::R_RISCV_CALL_PLT: {
++    if (Offset > Section.getSize() || Section.getSize() - Offset < 8 ||
++        Offset > UINT32_MAX - 4)
++      report_fatal_error("RISC-V call relocation is outside its section");
+     uint64_t P = Section.getLoadAddressWithOffset(Offset);
+     uint64_t PCOffset = Value + Addend - P;
++    // RV64 AUIPC sign-extends its 32-bit result before adding the signed low
++    // 12 bits. The carry from bit 11 must therefore fit, too: checking the
++    // unrounded displacement alone incorrectly accepts the top 2 KiB. RV32
++    // address arithmetic wraps at XLEN and reaches the whole address space.
++    auto InRange = [](uint64_t Delta) {
++      return isInt<32>(static_cast<int64_t>(Delta + 0x800));
++    };
++    if (Arch == Triple::riscv64 && !InRange(PCOffset)) {
++      if (!CallStubOffset)
++        report_fatal_error("RISC-V call relocation out of range without a stub");
++      PCOffset = Section.getLoadAddressWithOffset(CallStubOffset) - P;
++      if (!InRange(PCOffset))
++        report_fatal_error("RISC-V call stub out of range");
++    }
++    // [safe: complete AUIPC/JALR pair within Section] [section_end]
++    //        Offset and Offset + 4 each designate a full four-byte instruction.
+     applyUTypeImmRISCV(Section.getAddressWithOffset(Offset), PCOffset);
+     applyITypeImmRISCV(Section.getAddressWithOffset(Offset + 4), PCOffset);
+     break;
+@@ -1494,7 +1514,8 @@
+     break;
+   case Triple::riscv32: // Fall through.
+   case Triple::riscv64:
+-    resolveRISCVRelocation(Section, Offset, Value, Type, Addend, SectionID);
++    resolveRISCVRelocation(Section, Offset, Value, Type, Addend, SectionID,
++                          SymOffset);
+     break;
+   default:
+     llvm_unreachable("Unsupported CPU type!");
+@@ -2359,6 +2380,56 @@
+       processSimpleRelocation(SectionID, Offset, RelType, Value);
+     }
+   } else if (Arch == Triple::riscv32 || Arch == Triple::riscv64) {
++    if (RelType == ELF::R_RISCV_CALL || RelType == ELF::R_RISCV_CALL_PLT) {
++      // Same-section calls do not depend on the eventual section address.
++      // External and cross-section targets can be anywhere in the RV64 address
++      // space, so reserve a full-range destination before final relocation.
++      // Keep the target relocation on the original call as well: resolution
++      // uses the direct call whenever possible, avoiding a needless extra jump.
++      uint64_t StubOffset = 0;
++      if (Arch == Triple::riscv64 && MemMgr.allowStubAllocation() &&
++          (Value.SymbolName || Value.SectionID != SectionID)) {
++        SectionEntry &Section = Sections[SectionID];
++        auto [It, Inserted] = Stubs.try_emplace(Value);
++        if (Inserted) {
++          StubOffset = alignTo(Section.getStubOffset(), getStubAlignment());
++          if (StubOffset > UINT32_MAX - getMaxStubSize())
++            report_fatal_error("RISC-V call stub section offset out of range");
++          It->second = StubOffset;
++          // computeSectionStubBufSize reserves one 24-byte entry per CALL,
++          // plus alignment padding. All later entries remain 8-byte aligned.
++          // [safe: reserved stub allocation] [allocation_end]
++          //        ^^ Stub denotes 24 writable bytes; literal at +16 is aligned.
++          auto *Stub = Section.getAddressWithOffset(StubOffset);
++          support::endian::write32le(Stub, 0x00000e17);      // auipc t3, 0
++          support::endian::write32le(Stub + 4, 0x010e3e03);  // ld t3, 16(t3)
++          support::endian::write32le(Stub + 8, 0x000e0067);  // jr t3
++          support::endian::write32le(Stub + 12, 0x00000013); // nop
++          // t3 is the same scratch register used by JITLink's RISC-V PLT.
++          // jr preserves ra and sp, so calls/tail calls and native unwinding
++          // retain their original return address and create no extra frame.
++          RelocationEntry TargetRE(SectionID, StubOffset + 16, ELF::R_RISCV_64,
++                                   Value.Addend);
++          if (Value.SymbolName)
++            addRelocationForSymbol(TargetRE, Value.SymbolName);
++          else
++            addRelocationForSection(TargetRE, Value.SectionID);
++          Section.advanceStubOffset(StubOffset - Section.getStubOffset() +
++                                    getMaxStubSize());
++        } else {
++          StubOffset = It->second;
++        }
++      }
++      // CALL's SymOffset is exclusively an optional stub offset, not the
++      // symbol offset used by other relocation kinds. The addend still includes
++      // local symbol offsets and is applied exactly once to both destinations.
++      RelocationEntry RE(SectionID, Offset, RelType, Value.Addend, StubOffset);
++      if (Value.SymbolName)
++        addRelocationForSymbol(RE, Value.SymbolName);
++      else
++        addRelocationForSection(RE, Value.SectionID);
++      return ++RelI;
++    }
+     // *_LO12 relocation receive information about a symbol from the
+     // corresponding *_HI20 relocation, so we have to collect this information
+     // before resolving
+@@ -3041,6 +3112,9 @@
+ }
+ 
+ bool RuntimeDyldELF::relocationNeedsStub(const RelocationRef &R) const {
++  if (Arch == Triple::riscv64)
++    return R.getType() == ELF::R_RISCV_CALL ||
++           R.getType() == ELF::R_RISCV_CALL_PLT;
+   if (Arch != Triple::x86_64)
+     return true;  // Conservative answer
+ 
+--- a/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.h
++++ b/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.h
+@@ -72,7 +72,7 @@
+ 
+   void resolveRISCVRelocation(const SectionEntry &Section, uint64_t Offset,
+                               uint64_t Value, uint32_t Type, int64_t Addend,
+-                              SID SectionID);
++                              SID SectionID, uint64_t CallStubOffset);
+ 
+   unsigned getMaxStubSize() const override {
+     if (Arch == Triple::aarch64 || Arch == Triple::aarch64_be)
+@@ -91,12 +91,14 @@
+       return 6; // 2-byte jmp instruction + 32-bit relative address
+     else if (Arch == Triple::systemz)
+       return 16;
++    else if (Arch == Triple::riscv64)
++      return 24; // auipc; ld; jr; nop; 64-bit destination
+     else
+       return 0;
+   }
+ 
+   Align getStubAlignment() override {
+-    if (Arch == Triple::systemz)
++    if (Arch == Triple::systemz || Arch == Triple::riscv64)
+       return Align(8);
+     else
+       return Align(1);
+--- a/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldImpl.h
++++ b/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldImpl.h
+@@ -136,7 +136,8 @@
+   };
+ 
+   /// SymOffset - Section offset of the relocation entry's symbol (used for GOT
+-  /// lookup).
++  /// lookup). For RISC-V CALL/CALL_PLT only, an optional same-section call stub
++  /// offset instead; zero means no stub was reserved.
+   union {
+     uint64_t SymOffset;
+     SectionPair Sections;
+--- /dev/null
++++ b/llvm/test/CodeGen/RISCV/rtdyld-call-range.s
+@@ -0,0 +1,47 @@
++# RUN: llvm-mc -triple=riscv64-linux-gnu -filetype=obj %s -o %T/riscv-call-range.o
++# RUN: llvm-rtdyld -verify -triple=riscv64-linux-gnu -map-section=riscv-call-range.o,.text=0x4000000000 -map-section=riscv-call-range.o,.text.other=0x6000000000 -dummy-extern=external_target=0x1122334455667780 -check=%S/rtdyld-call-range.check %T/riscv-call-range.o
++# The standalone Inputs/rtdyld-call-range.cpp additionally checks both rounded
++# range boundaries, near-call bypass, addends, tail calls, no-stub failure, RV32
++# XLEN wrapping, and two distinct target section mappings without executing code.
++
++.option norvc
++.option norelax
++.text
++.globl call_target
++call_target:
++.reloc ., R_RISCV_CALL, external_target
++  auipc ra, 0
++  jalr ra, 0(ra)
++  ret
++.globl tail_target
++tail_target:
++.reloc ., R_RISCV_CALL_PLT, external_target
++  auipc t1, 0
++  jalr zero, 0(t1)
++  ret
++.globl call_addend
++call_addend:
++.reloc ., R_RISCV_CALL_PLT, external_target+16
++  auipc ra, 0
++  jalr ra, 0(ra)
++  ret
++.globl call_local
++call_local:
++.reloc ., R_RISCV_CALL, local_target
++  auipc ra, 0
++  jalr ra, 0(ra)
++  ret
++.globl call_cross
++call_cross:
++.reloc ., R_RISCV_CALL_PLT, cross_target
++  auipc ra, 0
++  jalr ra, 0(ra)
++  ret
++.globl local_target
++local_target:
++  ret
++  .byte 0, 0 # Require padding before the eight-byte-aligned stub/literal area.
++.section .text.other,"ax",@progbits
++.globl cross_target
++cross_target:
++  ret
+--- /dev/null
++++ b/llvm/test/CodeGen/RISCV/rtdyld-call-range.check
+@@ -0,0 +1,6 @@
++# The stub uses t3, preserves ra/sp, and loads an aligned full-width address.
++# rtdyld-check: *{4}(stub_addr(riscv-call-range.o/.text, external_target) + 0) = 0x00000e17
++# rtdyld-check: *{4}(stub_addr(riscv-call-range.o/.text, external_target) + 4) = 0x010e3e03
++# rtdyld-check: *{4}(stub_addr(riscv-call-range.o/.text, external_target) + 8) = 0x000e0067
++# rtdyld-check: *{4}(stub_addr(riscv-call-range.o/.text, external_target) + 12) = 0x00000013
++# rtdyld-check: (*{4}(tail_target + 4)) & 0xfffff = 0x30067
+--- /dev/null
++++ b/llvm/test/CodeGen/RISCV/Inputs/rtdyld-call-range.cpp
+@@ -0,0 +1,133 @@
++// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
++// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
++// Standalone RuntimeDyld regression; compile against the repaired LLVM libraries
++// and pass RV64 and RV32 objects assembled from ../rtdyld-call-range.s.
++#include "llvm/ExecutionEngine/RuntimeDyld.h"
++#include "llvm/ExecutionEngine/SectionMemoryManager.h"
++#include "llvm/Object/ObjectFile.h"
++#include "llvm/Support/Endian.h"
++#include "llvm/Support/Error.h"
++#include "llvm/Support/MathExtras.h"
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++#include <map>
++#include <string>
++
++using namespace llvm;
++static unsigned Checks;
++static void check(bool Value) {
++  ++Checks;
++  if (!Value) {
++    std::fprintf(stderr, "FAIL RuntimeDyld RISC-V call check %u\n", Checks);
++    std::abort();
++  }
++}
++
++class Memory final : public SectionMemoryManager {
++public:
++  bool Stubs;
++  std::map<std::string, uint8_t *> Code;
++  explicit Memory(bool Stubs) : Stubs(Stubs) {}
++  bool allowStubAllocation() const override { return Stubs; }
++  uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment, unsigned ID,
++                               StringRef Name) override {
++    auto *Address = SectionMemoryManager::allocateCodeSection(Size, Alignment, ID,
++                                                             Name);
++    Code[Name.str()] = Address;
++    return Address;
++  }
++};
++
++class Resolver final : public LegacyJITSymbolResolver {
++public:
++  uint64_t Target;
++  explicit Resolver(uint64_t Target) : Target(Target) {}
++  JITSymbol findSymbolInLogicalDylib(const std::string &) override { return nullptr; }
++  JITSymbol findSymbol(const std::string &Name) override {
++    check(Name == "external_target");
++    return JITSymbol(Target, JITSymbolFlags::Exported);
++  }
++};
++
++static uint64_t verifyCall(RuntimeDyld &Dyld, Memory &Mem, char const *Name,
++                           uint64_t Target, uint64_t Base, bool RV32,
++                           bool Tail = false) {
++  auto *Code = static_cast<uint8_t *>(Dyld.getSymbolLocalAddress(Name));
++  check(Code != nullptr);
++  uint64_t PC = Dyld.getSymbol(Name).getAddress();
++  uint32_t Hi = support::endian::read32le(Code);
++  uint32_t Lo = support::endian::read32le(Code + 4);
++  // Immediate patching must retain the original AUIPC/JALR register fields,
++  // including rd=x0 for a tail call and its original t1 source register.
++  check((Hi & 0xfff) == (Tail ? 0x317u : 0x97u));
++  check((Lo & 0xfffff) == (Tail ? 0x30067u : 0x80e7u));
++  uint64_t Destination = PC + static_cast<int32_t>(Hi & 0xfffff000u) +
++                         SignExtend32<12>(Lo >> 20);
++  if (RV32) {
++    check(static_cast<uint32_t>(Destination) == static_cast<uint32_t>(Target));
++    return static_cast<uint32_t>(Destination);
++  }
++  uint64_t Delta = Target - PC;
++  if (isInt<32>(static_cast<int64_t>(Delta + 0x800))) {
++    check(Destination == Target); // A reachable call must bypass its stub.
++  } else {
++    check(Destination != Target);
++    check((Destination & 7) == 0);
++    check(Destination >= Base && Destination - Base < 4096);
++    // The loader's tiny section allocation includes these reserved stub bytes.
++    auto *Stub = Mem.Code.at(".text") + (Destination - Base);
++    check(support::endian::read32le(Stub) == 0x00000e17);
++    check(support::endian::read32le(Stub + 4) == 0x010e3e03);
++    check(support::endian::read32le(Stub + 8) == 0x000e0067);
++    check(support::endian::read32le(Stub + 12) == 0x00000013);
++    check(support::endian::read64le(Stub + 16) == Target);
++  }
++  return Destination;
++}
++
++static void run(char const *Object, uint64_t Base, uint64_t Target,
++                bool Stubs, bool RV32, bool FarCross) {
++  auto Binary = cantFail(object::ObjectFile::createObjectFile(Object));
++  Memory Mem(Stubs);
++  Resolver Symbols(Target);
++  RuntimeDyld Dyld(Mem, Symbols);
++  auto Loaded = Dyld.loadObject(*Binary.getBinary());
++  check(Loaded && !Dyld.hasError());
++  uint64_t Cross = FarCross ? Base + (1ull << 40) : Base + 0x10000;
++  if (RV32)
++    Cross = static_cast<uint32_t>(Cross);
++  Dyld.mapSectionAddress(Mem.Code.at(".text"), Base);
++  Dyld.mapSectionAddress(Mem.Code.at(".text.other"), Cross);
++  Dyld.resolveRelocations();
++  check(!Dyld.hasError());
++  auto Call = verifyCall(Dyld, Mem, "call_target", Target, Base, RV32);
++  auto Tail = verifyCall(Dyld, Mem, "tail_target", Target, Base, RV32, true);
++  verifyCall(Dyld, Mem, "call_addend", Target + 16, Base, RV32);
++  verifyCall(Dyld, Mem, "call_local", Dyld.getSymbol("local_target").getAddress(),
++             Base, RV32);
++  verifyCall(Dyld, Mem, "call_cross", Cross, Base, RV32);
++  if (!RV32 && Call != Target && Tail != Target)
++    check(Call == Tail); // The same target/addend reuses one local stub.
++}
++
++int main(int Argc, char **Argv) {
++  if (Argc == 3 && std::string(Argv[2]) == "--no-stubs-far") {
++    run(Argv[1], 0x4000000000, 0x6000000000, false, false, false);
++    std::fputs("FAIL expected a relocation range error\n", stderr);
++    return 1;
++  }
++  check(Argc == 3);
++  for (uint64_t Base : {0x4000000000ull, 0x7000000000ull}) {
++    for (int64_t Delta : {-0x10000000000ll, -0x80000802ll, -0x80000800ll,
++                           -0x1000ll, 0x1000ll, 0x7ffff7fell, 0x7ffff800ll,
++                           0x10000000000ll})
++      run(Argv[1], Base, Base + Delta, true, false, true);
++    run(Argv[1], Base, Base + 0x1000, false, false, false);
++  }
++  // AUIPC/JALR on RV32 wraps at XLEN: even a displacement whose unwrapped
++  // value is outside the RV64 rounded range must keep its original semantics.
++  for (uint64_t Target : {0x1000ull, 0x7ffffffeull, 0x80000000ull, 0xfffffff0ull})
++    run(Argv[2], 0x1000, Target, false, true, false);
++  std::printf("PASS RuntimeDyld RISC-V calls: %u checks\n", Checks);
++}

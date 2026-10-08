@@ -1,0 +1,83 @@
+--- a/src/uwvm2/uwvm/runtime/storage/wasm_module.h
++++ b/src/uwvm2/uwvm/runtime/storage/wasm_module.h
+@@ -332,6 +332,17 @@
+         wasm_binfmt1_final_wasm_const_expr_t const* initializer_expr{};
+         wasm_module_storage_t* owner_module_rt_ptr{};
+     };
++
++#if defined(UWVM_RUNTIME_LLVM_JIT)
++    // Cold notifications use the actual resolved table identity, including
++    // every imported alias. A standalone parser/initializer/translator leaves
++    // this hook null and does not acquire a runtime object link dependency.
++    // Full/lazy LLVM publication installs it; drained reset detaches it before
++    // destroying views. The existing runtime bridge serializes exact writes.
++    using llvm_jit_table_refresh_hook_t = void (*)(local_defined_table_storage_t*,
++        llvm_jit_call_indirect_table_mutation_kind, ::std::size_t, ::std::size_t) noexcept;
++    inline llvm_jit_table_refresh_hook_t llvm_jit_table_refresh_hook{};
++#endif
+ 
+     /// @brief Grow a live table without turning host allocation failure into a Wasm trap.
+     /// @note Tables are not shared by the threads proposal. The VM owns mutation and refreshes JIT views after success.
+--- a/src/uwvm2/runtime/lib/uwvm_runtime.default.cpp
++++ b/src/uwvm2/runtime/lib/uwvm_runtime.default.cpp
+@@ -6998,6 +6998,7 @@
+         {
+             // Runtime-module views point into per-record target vectors owned by g_runtime. Clear the borrowed addresses before
+             // destroying those vectors so reset/reload never leaves a dangling native dispatch view in otherwise-live storage.
++            ::uwvm2::uwvm::runtime::storage::llvm_jit_table_refresh_hook = nullptr;
+             details::clear_borrowed_llvm_jit_call_indirect_table_views(g_runtime.modules);
+         }
+ 
+@@ -7067,6 +7068,8 @@
+ 
+         inline constexpr void populate_llvm_jit_call_indirect_table_views() noexcept
+         {
++            // LLVM-only initialization uses the same optional storage-owned callback.
++            ::uwvm2::uwvm::runtime::storage::llvm_jit_table_refresh_hook = &llvm_jit_refresh_call_indirect_table_views;
+             // LLVM call_indirect lowers through compact table-view arrays. They are rebuilt after initialization/materialization so
+             // every table element points at an eagerly materialized raw entry or a runtime import bridge.
+             for(::std::size_t caller_module_id{}; caller_module_id != g_runtime.modules.size(); ++caller_module_id)
+--- a/src/uwvm2/uwvm/runtime/initializer/init.h
++++ b/src/uwvm2/uwvm/runtime/initializer/init.h
+@@ -6754,6 +6754,25 @@
+             else { function(memory.memory_begin, memory.memory_length); }
+         }
+ 
++        inline constexpr void refresh_active_element_call_indirect_view(
++            ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t* target_table,
++            ::std::size_t offset, ::std::size_t element_count) noexcept
++        {
++#if defined(UWVM_RUNTIME_LLVM_JIT)
++            // The initializer already resolved the actual target and proved
++            // [offset, offset + element_count) inside its live element vector.
++            // No pointer is advanced here. Each alias is refreshed by the
++            // existing exact-range runtime bridge, without reallocating views.
++            if(auto const refresh{::uwvm2::uwvm::runtime::storage::llvm_jit_table_refresh_hook}; refresh != nullptr)
++            {
++                refresh(target_table, ::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_mutation_kind::init,
++                    offset, element_count);
++            }
++#else
++            static_cast<void>(target_table); static_cast<void>(offset); static_cast<void>(element_count);
++#endif
++        }
++
+         inline constexpr void apply_wasm1_active_element_and_data_segments_for_module(
+             ::uwvm2::utils::container::u8string_view curr_module_name,
+             ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& curr_rt) noexcept
+@@ -7032,6 +7051,7 @@
+                             {
+                                 target_table->elems.index_unchecked(offset + i) = funcref_begin[i];
+                             }
++                            refresh_active_element_call_indirect_view(target_table, offset, element_count);
+                             ::uwvm2::uwvm::runtime::storage::drop_wasm_element_segment_payload(elem);
+                             continue;
+                         }
+@@ -7089,6 +7109,7 @@
+                     }
+ 
+                     // Instantiation applies an active segment and then implicitly drops its payload.
++                    refresh_active_element_call_indirect_view(target_table, offset, element_count);
+                     ::uwvm2::uwvm::runtime::storage::drop_wasm_element_segment_payload(elem);
+                 }
+ 

@@ -34,6 +34,7 @@
 # include "feature_def.h"
 # include "types.h"
 # include "data_count_section.h"
+# include "tag_section.h"
 # include "data_section.h"
 # include "element_section.h"
 # include "sequence.h"
@@ -69,6 +70,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
         using table_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<::uwvm2::parser::wasm::standard::wasm1::type::table_type,
                                                                                      ::uwvm2::parser::wasm::standard::wasm1p1::features::table_type>;
 
+        using memory_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<::uwvm2::parser::wasm::standard::wasm1::type::memory_type,
+                                                                                      ::uwvm2::parser::wasm::standard::wasm1p1::features::memory_type>;
+
         using global_type = ::uwvm2::parser::wasm::concepts::operation::type_replacer<::uwvm2::parser::wasm::standard::wasm1::type::global_type,
                                                                                       ::uwvm2::parser::wasm::standard::wasm1p1::features::global_type>;
 
@@ -94,7 +98,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
 
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         using binfmt_ver1_section_type =
-            ::uwvm2::utils::container::tuple<::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>>;
+            ::uwvm2::utils::container::tuple<::uwvm2::parser::wasm::standard::wasm1p1::features::data_count_section_storage_t<Fs...>,
+                                                ::uwvm2::parser::wasm::standard::wasm1p1::features::tag_section_storage_t<Fs...>>;
     };
 
     static_assert(::uwvm2::parser::wasm::concepts::wasm_feature<wasm1p1>);

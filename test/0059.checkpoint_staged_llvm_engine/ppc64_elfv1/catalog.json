@@ -1,0 +1,54 @@
+{
+  "kind": "SOURCE fixture DATA, actual assembly/load/endian/QEMU unrun",
+  "triples": [
+    "powerpc64-unknown-linux-gnu",
+    "powerpc64le-unknown-linux-gnu"
+  ],
+  "cases": [
+    {
+      "path": "test/0059.checkpoint_staged_llvm_engine/ppc64_elfv1/elfv1-owned-body.s",
+      "expect": "accept",
+      "sha256": "1c1c3d0cab6df879896ab4f65a6f347b28a0254a26166e50bdf62d093ffd68a3"
+    },
+    {
+      "path": "test/0059.checkpoint_staged_llvm_engine/ppc64_elfv1/elfv1-implicit-abi.s",
+      "expect": "accept",
+      "sha256": "90b3227624ab3aca942dba9c3273edf3191ca4468296588b7b65b572d00910b6"
+    },
+    {
+      "path": "test/0059.checkpoint_staged_llvm_engine/ppc64_elfv1/elfv1-positive-addend.s",
+      "expect": "accept",
+      "sha256": "e12c551641a7a150ff281c228ec3e82f4e021f5fcf2d29f2bb31355fa1e14983"
+    },
+    {
+      "path": "test/0059.checkpoint_staged_llvm_engine/ppc64_elfv1/elfv1-negative-addend.s",
+      "expect": "accept",
+      "sha256": "fea9288b7e6765177689661a7a88f5e0ef9bd1616f67dd748c67f2be645f0104"
+    },
+    {
+      "path": "test/0059.checkpoint_staged_llvm_engine/ppc64_elfv1/elfv1-truncated-descriptor.s",
+      "expect": "reject",
+      "sha256": "7e92b8d2132be805e7a4d5d288d6896108fe6d62fefca71a25c78e15825382a6"
+    },
+    {
+      "path": "test/0059.checkpoint_staged_llvm_engine/ppc64_elfv1/elfv1-no-entry-relocation.s",
+      "expect": "reject",
+      "sha256": "9bd743bd1f20da07994db14865cc335ba73d76e08d3c0b01fa1a8dfd372cb926"
+    },
+    {
+      "path": "test/0059.checkpoint_staged_llvm_engine/ppc64_elfv1/elfv1-body-past-text.s",
+      "expect": "reject",
+      "sha256": "f662cc21372c798642b69b8be3dc308bab98f9e363a0b2f63825e8809da94435"
+    },
+    {
+      "path": "test/0059.checkpoint_staged_llvm_engine/ppc64_elfv1/elfv1-entry-points-data.s",
+      "expect": "reject",
+      "sha256": "be0a53a8de9fff5334b9ad7ad3a9d79c1f8c5c60fd4e4645ad774321ee5d6f83"
+    },
+    {
+      "path": "test/0059.checkpoint_staged_llvm_engine/ppc64_elfv1/elfv2-descriptor-declined.s",
+      "expect": "reject",
+      "sha256": "e1a6299c6d5ec78f5009deb56ce1a380b183d0f546a4c13b4667c3306a8309a3"
+    }
+  ]
+}

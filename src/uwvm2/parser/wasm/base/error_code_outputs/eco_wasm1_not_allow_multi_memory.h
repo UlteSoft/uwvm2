@@ -41,7 +41,7 @@ if constexpr(::std::same_as<char_type, char>)
                 UWVM_WIN32_TEXTATTR_WHITE,
                 "(offset=",
                 ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                ") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. This restriction may be lifted in future versions.",
+                ") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. Enable Core 3.0 multi-memory with --wasm-feature-enable-multi-memory.",
                 UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -56,7 +56,7 @@ if constexpr(::std::same_as<char_type, char>)
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
         "(offset=",
         ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-        ") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. This restriction may be lifted in future versions.",
+        ") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. Enable Core 3.0 multi-memory with --wasm-feature-enable-multi-memory.",
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_RST_ALL));
     return;
 }
@@ -79,7 +79,7 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                 UWVM_WIN32_TEXTATTR_WHITE,
                 L"(offset=",
                 ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                L") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. This restriction may be lifted in future versions.",
+                L") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. Enable Core 3.0 multi-memory with --wasm-feature-enable-multi-memory.",
                 UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -94,7 +94,7 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
         L"(offset=",
         ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-        L") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. This restriction may be lifted in future versions.",
+        L") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. Enable Core 3.0 multi-memory with --wasm-feature-enable-multi-memory.",
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_RST_ALL));
     return;
 }
@@ -117,7 +117,7 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                 UWVM_WIN32_TEXTATTR_WHITE,
                 u8"(offset=",
                 ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                u8") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. This restriction may be lifted in future versions.",
+                u8") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. Enable Core 3.0 multi-memory with --wasm-feature-enable-multi-memory.",
                 UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -132,7 +132,7 @@ else if constexpr(::std::same_as<char_type, char8_t>)
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
         u8"(offset=",
         ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-        u8") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. This restriction may be lifted in future versions.",
+        u8") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. Enable Core 3.0 multi-memory with --wasm-feature-enable-multi-memory.",
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_RST_ALL));
     return;
 }
@@ -155,7 +155,7 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                 UWVM_WIN32_TEXTATTR_WHITE,
                 u"(offset=",
                 ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                u") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. This restriction may be lifted in future versions.",
+                u") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. Enable Core 3.0 multi-memory with --wasm-feature-enable-multi-memory.",
                 UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -170,7 +170,7 @@ else if constexpr(::std::same_as<char_type, char16_t>)
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
         u"(offset=",
         ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-        u") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. This restriction may be lifted in future versions.",
+        u") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. Enable Core 3.0 multi-memory with --wasm-feature-enable-multi-memory.",
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_RST_ALL));
     return;
 }
@@ -193,7 +193,7 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                 UWVM_WIN32_TEXTATTR_WHITE,
                 U"(offset=",
                 ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                U") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. This restriction may be lifted in future versions.",
+                U") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. Enable Core 3.0 multi-memory with --wasm-feature-enable-multi-memory.",
                 UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -208,7 +208,7 @@ else if constexpr(::std::same_as<char_type, char32_t>)
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
         U"(offset=",
         ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-        U") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. This restriction may be lifted in future versions.",
+        U") In the WebAssembly Release 1.0 (2019-07-20), at most one memory may be defined or imported in a single module, and all constructs implicitly reference this memory 0. Enable Core 3.0 multi-memory with --wasm-feature-enable-multi-memory.",
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_RST_ALL));
     return;
 }

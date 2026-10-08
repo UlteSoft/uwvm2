@@ -10,6 +10,10 @@ if(local_func_count != 0uz)
     // record instead of publishing inconsistent call-frame sizes.
     auto const abi_bytes{[](wasm_value_type t) constexpr noexcept -> ::std::size_t
                          {
+                             // Core 3 exnref has no named legacy enum member, but its complete
+                             // tagged reference has the same ABI footprint as externref.
+                             if(static_cast<unsigned>(t) == 0x69u)
+                             { return sizeof(::uwvm2::object::global::wasm_externref_t); }
                              switch(t)
                              {
                                  // i32/f32 occupy one 32-bit stack slot in the call bridge ABI.
@@ -51,6 +55,9 @@ if(local_func_count != 0uz)
         // Sum the parameter byte footprint in declaration order. The call bridge treats the
         // complete parameter list as a contiguous byte range immediately below the current stack top.
         ::std::size_t para_bytes{};
+        // [live parameter entries ...] unsafe (ft->parameter.end is one-past)
+        //  ^^ it: each `it != end` check proves the dereference; ++it may reach end,
+        //         where the next comparison ends iteration before another read.
         for(auto it{ft->parameter.begin}; it != ft->parameter.end; ++it)
         {
             auto const add{abi_bytes(*it)};
@@ -65,6 +72,9 @@ if(local_func_count != 0uz)
         // Sum the result byte footprint separately because the bridge rewrites the caller stack
         // from the argument area to the result area after the callee returns.
         ::std::size_t res_bytes{};
+        // [live result entries ...] unsafe (ft->result.end is one-past)
+        //  ^^ it: each `it != end` check proves the dereference; ++it may reach end,
+        //         where the next comparison ends iteration before another read.
         for(auto it{ft->result.begin}; it != ft->result.end; ++it)
         {
             auto const add{abi_bytes(*it)};

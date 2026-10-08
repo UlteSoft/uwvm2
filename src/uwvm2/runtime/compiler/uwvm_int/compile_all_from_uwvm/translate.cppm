@@ -41,6 +41,9 @@ module;
 
 export module uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm:translate;
 
+import uwvm2.validation.standard.wasm3.relaxed_simd;
+import uwvm2.validation.standard.wasm3.threads;
+import uwvm2.validation.standard.wasm3.tail_call;
 import fast_io;
 import uwvm2.utils.debug;
 import uwvm2.utils.intrinsics;
@@ -54,15 +57,17 @@ import uwvm2.parser.wasm.standard.wasm2.features;
 import uwvm2.parser.wasm.binfmt.binfmt_ver1;
 import uwvm2.validation.error;
 import uwvm2.validation.concepts;
-import uwvm2.validation.standard.wasm2;
+import uwvm2.validation.standard.wasm3;
 import uwvm2.object;
 // Exported SIMD translation templates name entities owned by this module;
 // importing optable alone only exposes the namespace alias.
 import uwvm2.runtime.compiler.shared.wasm1p1_simd;
+import uwvm2.runtime.compiler.shared.wasm_threads;
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.wasm.type;
 import uwvm2.uwvm.runtime.storage;
+import uwvm2.runtime.compiler.shared.wasm_exception_control;
 import uwvm2.uwvm.runtime.runtime_mode;
 import uwvm2.runtime.compiler.uwvm_int.optable;
 

@@ -505,8 +505,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
         table = 0x01u,
         memory = 0x02u,
         global = 0x03u,
+        tag = 0x04u, // Core 3; parser hooks reject this kind when the exception feature is absent.
         // extern_type_end: for concept, not standard
-        external_type_end = global
+        external_type_end = tag
     };
 
     inline constexpr external_types section_details(external_types type) noexcept { return type; }
@@ -545,6 +546,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
                 case external_types::table: return ::uwvm2::utils::container::string_view{"table"};
                 case external_types::memory: return ::uwvm2::utils::container::string_view{"memory"};
                 case external_types::global: return ::uwvm2::utils::container::string_view{"global"};
+                case external_types::tag: return ::uwvm2::utils::container::string_view{"tag"};
                 default: return ::uwvm2::utils::container::string_view{};
             }
         }
@@ -556,6 +558,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
                 case external_types::table: return ::uwvm2::utils::container::wstring_view{L"table"};
                 case external_types::memory: return ::uwvm2::utils::container::wstring_view{L"memory"};
                 case external_types::global: return ::uwvm2::utils::container::wstring_view{L"global"};
+                case external_types::tag: return ::uwvm2::utils::container::wstring_view{L"tag"};
                 default: return ::uwvm2::utils::container::wstring_view{};
             }
         }
@@ -567,6 +570,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
                 case external_types::table: return ::uwvm2::utils::container::u8string_view{u8"table"};
                 case external_types::memory: return ::uwvm2::utils::container::u8string_view{u8"memory"};
                 case external_types::global: return ::uwvm2::utils::container::u8string_view{u8"global"};
+                case external_types::tag: return ::uwvm2::utils::container::u8string_view{u8"tag"};
                 default: return ::uwvm2::utils::container::u8string_view{};
             }
         }
@@ -578,6 +582,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
                 case external_types::table: return ::uwvm2::utils::container::u16string_view{u"table"};
                 case external_types::memory: return ::uwvm2::utils::container::u16string_view{u"memory"};
                 case external_types::global: return ::uwvm2::utils::container::u16string_view{u"global"};
+                case external_types::tag: return ::uwvm2::utils::container::u16string_view{u"tag"};
                 default: return ::uwvm2::utils::container::u16string_view{};
             }
         }
@@ -589,6 +594,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
                 case external_types::table: return ::uwvm2::utils::container::u32string_view{U"table"};
                 case external_types::memory: return ::uwvm2::utils::container::u32string_view{U"memory"};
                 case external_types::global: return ::uwvm2::utils::container::u32string_view{U"global"};
+                case external_types::tag: return ::uwvm2::utils::container::u32string_view{U"tag"};
                 default: return ::uwvm2::utils::container::u32string_view{};
             }
         }
@@ -611,6 +617,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
                     case external_types::table: return ::fast_io::freestanding::my_copy_n("table", 5u, iter);
                     case external_types::memory: return ::fast_io::freestanding::my_copy_n("memory", 6u, iter);
                     case external_types::global: return ::fast_io::freestanding::my_copy_n("global", 6u, iter);
+                    case external_types::tag: return ::fast_io::freestanding::my_copy_n("tag", 3u, iter);
                     default: return iter;
                 }
             }
@@ -622,6 +629,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
                     case external_types::table: return ::fast_io::freestanding::my_copy_n(L"table", 5u, iter);
                     case external_types::memory: return ::fast_io::freestanding::my_copy_n(L"memory", 6u, iter);
                     case external_types::global: return ::fast_io::freestanding::my_copy_n(L"global", 6u, iter);
+                    case external_types::tag: return ::fast_io::freestanding::my_copy_n(L"tag", 3u, iter);
                     default: return iter;
                 }
             }
@@ -633,6 +641,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
                     case external_types::table: return ::fast_io::freestanding::my_copy_n(u8"table", 5u, iter);
                     case external_types::memory: return ::fast_io::freestanding::my_copy_n(u8"memory", 6u, iter);
                     case external_types::global: return ::fast_io::freestanding::my_copy_n(u8"global", 6u, iter);
+                    case external_types::tag: return ::fast_io::freestanding::my_copy_n(u8"tag", 3u, iter);
                     default: return iter;
                 }
             }
@@ -644,6 +653,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
                     case external_types::table: return ::fast_io::freestanding::my_copy_n(u"table", 5u, iter);
                     case external_types::memory: return ::fast_io::freestanding::my_copy_n(u"memory", 6u, iter);
                     case external_types::global: return ::fast_io::freestanding::my_copy_n(u"global", 6u, iter);
+                    case external_types::tag: return ::fast_io::freestanding::my_copy_n(u"tag", 3u, iter);
                     default: return iter;
                 }
             }
@@ -655,6 +665,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
                     case external_types::table: return ::fast_io::freestanding::my_copy_n(U"table", 5u, iter);
                     case external_types::memory: return ::fast_io::freestanding::my_copy_n(U"memory", 6u, iter);
                     case external_types::global: return ::fast_io::freestanding::my_copy_n(U"global", 6u, iter);
+                    case external_types::tag: return ::fast_io::freestanding::my_copy_n(U"tag", 3u, iter);
                     default: return iter;
                 }
             }

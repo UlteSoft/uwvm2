@@ -1,0 +1,195 @@
+GC / EH performance qualification, 2026-10-05, revision R7
+
+This source implements immutable packed numeric exception tuples, collection-local
+adjacent exact-token de-duplication, bounded sweep retirement batches, and a portable
+numeric array fill (512-byte seed then non-overlapping std::memcpy for >=2048 bytes).
+Reference arrays and overlap-sensitive array.copy keep their existing algorithms.
+No AVX2/AVX512/NEON/VSX intrinsic or forced alignment is introduced.
+
+Qualified experimental profile (all TUs must use the same values):
+  UWVM_USE_THREAD_LOCAL
+  UWVM_EXPERIMENTAL_GENERAL_GC_SLAB=1
+  UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS=1
+  UWVM_EXPERIMENTAL_COLLECTION_LOCAL_MEMBERSHIP=1
+  UWVM_EXPERIMENTAL_SINGLE_CAS_GC_PUBLICATION=1
+  UWVM_EXPERIMENTAL_PENDING_NUMERIC_FUSED_CATCH=1
+  UWVM_EXPERIMENTAL_GC_ARRAY_BYTE_PRESSURE=1
+These experimental flags are not enabled globally by this change. Fused numeric EH
+admits at most 256 payload fields; the non-fused limit remains 64. Indirect throws,
+throw_ref and larger payloads retain the native exception path.
+
+The new default-off byte-pressure option charges only packed i64/f64/v128 arrays
+of length >=256. The 1 MiB carrier charge is a scheduling hint, not an actual
+allocation/RSS limit. It retains the original 4096 allocation-attempt fallback and
+all actual guest-entry, root, cohort and exclusive collection gates. It must not
+be combined with managed numeric page / sealed cursor or other unqualified profile
+variants without testing those combinations. Module-form qualification is separate.
+
+Qualification took place on native x86_64 ssh linux in the existing physical cgroup:
+  /sys/fs/cgroup/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope
+  memory.max=68719476736; memory.swap.max=0
+All remote builds, tests, gdb and VTune used /tmp/wasm3-perf-20261004-host/enter.sh.
+Test code and products are under /tmp/wasm3-asm-opt-20261004 (host and Docker).
+Single-thread measurements use P-core 0; VTune hardware ROI uses P-core 2;
+actual shared-memory workers use 0,2,4,6. The cgroup is shared with other builds.
+The final 1129-record formal run had no memory.events OOM/max increments.
+
+JIT policy is passbuilder O3, full mode, cache disabled, call-stack none. Compilation
+and warmup are excluded from timers and hardware ROI. Timers retain amortized fixed
+host transitions, reset/check work and actual GC/EH runtime work. Hot runtime TU is
+O3; cold main/host API TUs are O1 -fno-inline-functions for both candidate and control.
+Do not describe these executables as an entirely O3 host build.
+
+Evidence: 91 cases (87 timed +4 expected trap cases), 3 reversed-order rounds,
+5 measured intervals after warmup; both repositories built and checked; 116 functional
+feature replays; 43 VTune hardware collections; 35 managed GC pause distributions;
+36 RSS/PSS gates; 72 native collector survival/fragmentation/actor cells. Actual
+shared-memory JIT execution is checked separately from automatic multi-thread GC.
+Raw-host GC escape, automatic multi-thread GC, reference EH with automatic GC,
+all Wasm 3.0 combinations and MODULE builds are not certified by this matrix.
+
+ASan/UBSan: packed fill + schema scheduling oracle 399215 checks each with general
+slab on/off; direct numeric tuple 24732 checks; fused bridge and cache lifecycle
+581 / 40814 checks; publication, membership/cohort rejection and allocator tests
+are preserved in the evidence. New fixtures here need their explicit probe/profile
+flags; exact compiler/link commands are saved in the external qualification archive.
+No tests were built or executed on the local macOS workspace.
+
+Source-only aarch64 and PowerPC64 BE/LE (POWER8/POWER10) code generation used the
+verbatim production fill fragment and LLVM22's full target backend. The installed
+LLVM23 ROS SDK lacks a PowerPC backend. This verifies emitted copy/vector code, not
+native throughput, the full VM ABI or cross-architecture conformance. No QEMU was
+used. Native aarch64/ppc64 hardware and a suitable SDK are required before claiming
+performance parity or tuning the 2048-byte/512-byte thresholds there.
+
+Remaining measured costs: many retained roots, scalar allocation/ownership locks,
+chunk fragmentation, indirect/throw_ref native DWARF unwinding. Several small/no-
+throw EH cases and narrow array cases have regressions; all rows are retained in
+report.html. DRC does not reclaim cycles as a tracing collector does, so its cycle
+throughput is not equivalent collection work. Wasmtime copying is reported separately.
+No claim that all GC/EH workloads are faster than Wasmtime is made.
+
+Report and raw receipts are exported to the task artifact directory, opt-v3/report.html
+and opt-v3/evidence-v7/. The saved source IDs refer to frozen /tmp test trees with
+private timing/diagnostic hooks. Local synchronization uses three-way task hunks and
+preserves concurrent workspace changes; the entire current local workspace was not
+rebuilt. See gc-eh-perf-20261005.json for immutable executable and source identities.
+
+Native correctness supplement, aggregate-pressure candidate, 2026-10-05
+
+The preceding R7 measurements remain historical evidence. The later frozen candidate
+adds a complete-carrier std::memcpy constructor path, an owned precise reference
+plan, direct LLVM vector insertion for scalar carriers, shared cold status traps,
+bounded wide aggregate scheduling, GC root metadata and SIMD lowering fixes.
+Only narrow qualified hunks were merged into the two evolving local workspaces.
+The whole current local workspace and its unrelated edits have not been rebuilt.
+
+Both frozen Linux native products passed, per repository: 1413 returning Wasm
+fixtures, 117 actual runtime traps verified in GDB, 92 invalid modules rejected,
+141 automatic-GC activation fixtures, and 12 control-flow/root fixtures.
+Additional evidence: 624 split-store runs (3888 prefix observations and 1296
+positive growth checks); 132 native status/input-release proofs; 60 checked
+shared-memory worker cells; 10 constructor component modes with 14572800 checks;
+18 trace boundary component cells; 10 wide foreign-cycle constructor modes;
+20 binary cache identity modes. ASan/UBSan and trace/slab-disabled configurations
+are included in the indicated component modes, not every full VM execution.
+
+Qualified profile (identical in all translation units and linked components):
+  UWVM_USE_THREAD_LOCAL
+  UWVM_EXPERIMENTAL_PRECISE_GC_TRACE_METADATA=1
+  UWVM_EXPERIMENTAL_INLINE_GC_TRACE_METADATA=1
+  UWVM_EXPERIMENTAL_LOCAL_FULL_GC_EXCEPTIONS=1
+  UWVM_EXPERIMENTAL_EXCEPTION_SOURCE_RETENTION=1
+  UWVM_EXPERIMENTAL_EXTERNAL_EXCEPTION_HANDLES=1
+  UWVM_EXPERIMENTAL_NATIVE_EXCEPTION_ROOTS=1
+  UWVM_EXPERIMENTAL_EXCEPTION_GC_GRAPH=1
+  UWVM_EXPERIMENTAL_REGISTERED_EXCEPTION_COLLECTION=1
+  UWVM_EXPERIMENTAL_GC_ARRAY_BYTE_PRESSURE=1
+  UWVM_EXPERIMENTAL_PENDING_NUMERIC_FUSED_CATCH=1
+  UWVM_EXPERIMENTAL_GENERAL_GC_SLAB=1
+  UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS=1
+  UWVM_EXPERIMENTAL_COLLECTION_LOCAL_MEMBERSHIP=1
+  UWVM_EXPERIMENTAL_SINGLE_CAS_GC_PUBLICATION=1
+
+The owned inline/reference metadata changes C++ layouts. Cache identity separates
+profiles; it cannot make differently built C++ objects ABI compatible.
+The new test decoder reads the actual length-prefixed binary cache format, rejects
+malformed/duplicate fields, and checks that disabled profiles omit the exact field.
+
+Complete-copy input must provide all 16 bytes of every gc_value carrier, with a
+valid source extent and no overlapping destination. Authenticate real reference
+fields before allocation, retain genuine owned references before publication, and
+normalize packed fields as required. Numeric token-shaped bits must not become
+roots. Preserve rejection atomicity, reference leases, and retired-token rejection.
+Use standard std::memcpy; no architecture-specific copy intrinsic is introduced.
+
+With GC_ARRAY_BYTE_PRESSURE enabled, explicit/default wide structs and fixed
+arrays (>8 fields) reuse the existing 1 MiB carrier scheduling budget. This is an
+estimated pressure charge, not a heap/RSS cap or a proof that an object is dead.
+Original actual-entry, root, host-escape, exception, cohort and exclusion gates
+remain mandatory. Data/element array constructors keep their original scheduling.
+The tiny constructor path keeps its previous code to avoid the measured prototype
+EH regression. Different collection counts are reported separately from time.
+
+Actual hardware comparison is still pending: the declared matrix has 2124
+Hotspots/microarchitecture cells; the clock matrix has 2118 process/interval cells.
+Completion markers alone do not qualify them. The independent audits check exact
+Wasm/ELF identity, ROI barriers, confinement, P-core affinity, counter validity,
+MUX reliability, truncation, oracle checks and verified raw archives.
+JIT and warmup are excluded; reset/check work and fixed host transitions remain.
+Hot runtime TU is O3; cold main/host API TUs are O1 with inlining disabled.
+Per-work timer percentiles and process HWM/RSS are not individual GC pauses or
+GC heap size. Allocation source counts are not guaranteed executed allocations
+after an engine performs legal optimization. No universal Wasmtime win is claimed.
+
+Threads are tested as a separate proposal alongside Core 1/2/3 feature families.
+UWVM's worker fixture shares one module/store and linear memory; Wasmtime's fixture
+uses independent Stores/heaps and one SharedMemory. Other native drivers use
+private instances for disjoint throughput. Unknown native entry disqualifies
+automatic collection; multi-worker results do not certify stop-the-world or
+concurrent automatic GC. Do not remove this gate to obtain a performance ranking.
+Wasmer worker C API uses Cranelift; its CLI comparison uses LLVM. WasmEdge
+interpreter fallback and failed SIMD oracles do not qualify as JIT measurements.
+Unsupported vendor feature combinations are explicit exclusions, never zero times.
+
+Wasmtime 49 DRC native C API and its explicit copying collector are distinct rows.
+The copying wrapper adds three WASI imports and changes function indices; its
+guest work is equivalent, but its whole module is not byte-identical to the C API
+fixture. DRC cycle throughput is not equivalent tracing/reclamation work.
+
+All remote commands continue through the original 64 GiB cgroup wrapper. P2
+hardware runs are serialized, worker cores are 0/2/4/6, compiles use P6. Temporary
+data is stored under Linux /tmp or this Docker cgroup's temporary filesystem.
+ENOSPC waits preserve evidence, and data-limit truncation causes recollection with
+a lower sampling frequency. Neither increases the cgroup or hardware data limit.
+AArch64 vector code generation is checked; the installed LLVM23 SDK has no
+PowerPC backend. Earlier R7 PPC copy codegen evidence does not qualify these new
+vector changes or native AArch64/PPC performance. No QEMU was used.
+
+Current-production-snapshot native integration supplement (2026-10-05)
+{
+  "qualified_main_snapshot": true,
+  "current_main": {
+    "returns": 1413,
+    "runtime_traps": 117,
+    "invalid_rejections": 92,
+    "source_id": "sha256:3af6143af80d56f639d4cc1e224634a8a769e214fb31fc297d93e38b078783d2",
+    "binary_sha256": "c0406055205b3b3592198e4c19813451e69121e680553da804d71014f383a473"
+  },
+  "source_scope": "Immutable production src plus matched fast_io/bizwen/boost headers; configured native LLVM23 SDK plus isolated native X86AsmParser object. This source snapshot is distinct from the aggregate-pressure performance ELF.",
+  "cgroup_memory_max": 68719476736,
+  "cgroup_swap_max": 0,
+  "native_architecture": "x86_64",
+  "current_ros_snapshot": {
+    "qualified": false,
+    "source_id": "sha256:cbd7dae0d4ef11baf55d390119cdf24d8931158d0df016567a92bf84fedc12d5",
+    "expected_llvm": "23.1.1-uwvm-ros.11",
+    "available_sdk": "23.1.1-uwvm-ros.10",
+    "reason": "Pinned-version check rejected current ROS snapshot. Guard preserved. Aggregate-pressure frozen ROS .10 correctness evidence is separate and remains valid; it does not qualify evolving ROS .11 src."
+  },
+  "performance_matrix_qualified": false,
+  "performance_hardware_expected": 2124,
+  "performance_clock_expected": 2118,
+  "evidence_local": "/Users/liyinan/.codex/visualizations/2026/10/04/01a10538-f171-7a53-830e-683e5a35908b/wasm3-optimization/wasm-validation-20261005/current-integration-and-closure-evidence-20261005T1819.tar.gz",
+  "evidence_scope": "Native CLI return/trap/invalid-module correctness. No local build/test execution; no individual automatic-GC pause quantiles or cross-architecture native performance qualification."
+}

@@ -1,0 +1,924 @@
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime.h
+@@ -587,7 +587,7 @@
+     enum class llvm_jit_checkpoint_prepare_status : unsigned char
+     { prepared_and_discarded, requires_llvm_jit_full, not_selected, invalid_request,
+       unavailable_capture, resource_preparation_declined, engine_preparation_declined, allocation_failed,
+-      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained, dispatch_binding_preparation_declined, indirect_binding_preparation_declined };
++      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained, dispatch_binding_preparation_declined, indirect_binding_preparation_declined, source_initializer_binding_preparation_declined };
+     struct llvm_jit_checkpoint_prepare_request
+     {
+         ::std::array<::std::byte,16u> recording_label{};
+@@ -609,6 +609,8 @@
+         ::std::size_t maximum_private_indirect_bindings{1048576u};
+         // Actual typed+resume native endpoint expectations, across all modules.
+         ::std::size_t maximum_private_native_endpoint_functions{65536u};
++        // Final main/preload initializer correspondence; no source seal is issued.
++        ::std::size_t maximum_private_source_initializer_modules{4096u};
+     };
+     struct llvm_jit_checkpoint_prepare_result
+     {
+@@ -656,6 +658,8 @@
+         bool runtime_indirect_bindings_prepared{}; // New-source private views; no guest permission.
+         ::std::size_t prepared_runtime_native_endpoint_functions{}, prepared_runtime_native_helper_bodies{}, prepared_runtime_native_symbol_claims{};
+         bool runtime_native_endpoint_capture_prepared{}; // Private DATA; LIVE seal/epoch are not issued.
++        ::std::size_t prepared_source_initializer_modules{}, prepared_source_initializer_preloads{};
++        bool runtime_source_initializer_bindings_prepared{}; // Fixed private DATA, no initializer serial.
+     };
+     struct llvm_jit_checkpoint_native_retirement_result
+     {
+@@ -667,6 +671,7 @@
+         bool execution_drained{}, native_workers_joined{}, all_frames_signalled{};
+         llvm_jit_checkpoint_prepare_result preparation{};
+         bool candidate_world_retained{}; // Diagnostic only; no world/entry is exposed.
++        bool source_initializer_bindings_rechecked_after_physical_join{}; // Actual closed-world preflight only.
+     };
+     // Cold native management only. Prepare a fresh candidate under the SAME
+     // complete stop, then retire/join the actual registered old cohort. Pending
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_native_retirement_state.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_native_retirement_state.h
+@@ -32,6 +32,8 @@
+         get_runtime_compilation_metadata_callback_depth() == 0u &&
+         get_llvm_jit_generated_bridge_scope_depth() == 0u && !g_debug_observer_active;
+ }
++[[nodiscard]] static bool check_actual_candidate_source_bindings(
++    ::std::shared_ptr<runtime_checkpoint_world_transaction> const&) noexcept;
+ static void finish_native_retirement_until(native_retirement_state& actual,
+     ::uwvm2::utils::thread::execution_domain::maintenance_transition const& maintenance) noexcept
+ {
+@@ -60,6 +62,12 @@
+         // The actual generation is drained AND the sealed native cohort has
+         // physically joined, including TLS destructors. Retain source, host
+         // gate, drain generation and candidate. No reset/open/publication here.
++        // Recheck the complete fixed source/parser/dense binding roster and
++        // unsealed candidate GC state AFTER this authentic drain and OS/TLS
++        // join. A copied diagnostic cannot satisfy these ownership checks.
++        if(!check_actual_candidate_source_bindings(actual.candidate))
++        { actual.result.status=outcome::failed_closed;return; }
++        actual.result.source_initializer_bindings_rechecked_after_physical_join=true;
+         actual.result.candidate_world_retained=true;
+         actual.result.status=outcome::prepared_world_ready_closed;
+         return;
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_preparation_api.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_preparation_api.h
+@@ -4,6 +4,9 @@
+ #if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+ extern "C++"
+ {
++    bool runtime_checkpoint_coherent_manager::check_actual_candidate_source_bindings(
++        ::std::shared_ptr<runtime_checkpoint_world_transaction> const& actual) noexcept
++    { return actual && actual->preflight_private_source_initializer_bindings(); }
+     void runtime_checkpoint_coherent_manager::prepare_and_discard_actual_world(
+         ::uwvm2::uwvm::debugger::checkpoint::state const& saved,source_owner const& source,
+         ::std::uint_least64_t epoch,::uwvm2::runtime::checkpoint::compilation_profile::owner const& current_profile,
+@@ -38,6 +41,9 @@
+                 request.maximum_native_payload_bytes,request.maximum_original_source_bytes,request.graph_budget,out)};
+             if(!prepared) { return; }
+             out.modules=prepared->modules_.size();
++            out.status=llvm_jit_checkpoint_prepare_status::source_initializer_binding_preparation_declined;
++            if(!prepared->prepare_private_source_initializer_bindings(source,epoch,request.maximum_private_source_initializer_modules,out))
++            { out.native_payload_bytes=prepared->native_bytes_;out.resource_diagnostic=static_cast<unsigned>(prepared->phase_);return; }
+ #if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
+             if(request.include_wasip1 && !environments.empty())
+             {
+@@ -58,7 +64,10 @@
+             auto const granularity{g_runtime.debug_granularity==llvm_jit_debug_safe_point_granularity::instruction?
+                 compile::llvm_jit_debug_safe_point_granularity::instruction:compile::llvm_jit_debug_safe_point_granularity::entry_loop};
+             if(!profile || !prepared->prepare_all_native_engines(profile,policy,granularity,request.maximum_private_native_endpoint_functions))
+-            { out.engine_diagnostic=prepared->engine_diagnostic_;out.native_payload_bytes=prepared->native_bytes_;return; }
++            {
++                out.engine_diagnostic=prepared->engine_diagnostic_;out.native_payload_bytes=prepared->native_bytes_;
++                out.resource_diagnostic=static_cast<unsigned>(prepared->phase_);return;
++            }
+             out.engines=prepared->engines_.size();out.functions=prepared->prepared_functions_;
+             out.prepared_runtime_native_endpoint_functions=prepared->prepared_native_endpoints_;
+             out.prepared_runtime_native_helper_bodies=prepared->prepared_native_helper_bodies_;
+@@ -80,6 +89,8 @@
+             if(!prepared->validate_private_world_root_installation(request.maximum_private_root_frames,out)) { return; }
+             out.status=llvm_jit_checkpoint_prepare_status::worker_root_preparation_declined;
+             if(!prepared->validate_private_world_root_workers(request.maximum_private_root_workers,out)) { return; }
++            if(!prepared->preflight_private_source_initializer_bindings())
++            { out.status=llvm_jit_checkpoint_prepare_status::source_initializer_binding_preparation_declined;return; }
+             out.status=llvm_jit_checkpoint_prepare_status::prepared_and_discarded;
+             out.wasip1_environments=environments.size();
+             out.wasip1_prepared_together=request.include_wasip1;
+@@ -138,6 +149,8 @@
+ }
+ #else
+ #if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS)
++extern "C++" bool runtime_checkpoint_coherent_manager::check_actual_candidate_source_bindings(
++    ::std::shared_ptr<runtime_checkpoint_world_transaction> const&) noexcept { return false; }
+ extern "C++" void runtime_checkpoint_coherent_manager::prepare_and_discard_actual_world(
+     ::uwvm2::uwvm::debugger::checkpoint::state const&,source_owner const&,
+     ::std::uint_least64_t,::uwvm2::runtime::checkpoint::compilation_profile::owner const&,
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_resources.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_resources.h
+@@ -1195,7 +1195,14 @@
+                 auto compiled{engine_type::prepare(*actual_module,modules_[owner].new_actual_id,actual_profile,bodies,stack_policy,granularity,this,&charge_staged_native_backing)};
+                 engine_diagnostic_=static_cast<unsigned>(compiled.status);
+                 if(compiled.status!=engine_type::preparation_status::ok || !compiled.data)
+-                { if(phase_==preparation_status::resources_prepared) { (void)fail(preparation_status::type_mismatch); }return false; }
++                {
++                    // The actual loader calls THIS world's quota callback. Keep
++                    // that refusal instead of reporting a broken endpoint table.
++                    if(phase_==preparation_status::quota_exceeded)
++                    { engine_diagnostic_=static_cast<unsigned>(engine_type::preparation_status::exhausted); }
++                    else if(phase_==preparation_status::resources_prepared) { (void)fail(preparation_status::type_mismatch); }
++                    return false;
++                }
+ #if defined(UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2) && UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2 == 1
+                 if(!compiled.data->native_endpoint_capture_qualified_ ||
+                    compiled.data->native_endpoint_expected_!=locals*2u ||
+@@ -1217,6 +1224,7 @@
+             return true; // Real engines/typedplans/aliases retained privately,
+                          // native range/CFI permission and VM epoch NOT published.
+         }
++# include "uwvm_runtime_checkpoint_world_source_initializer.h"
+ # include "uwvm_runtime_checkpoint_world_frames.h"
+ # include "uwvm_runtime_checkpoint_world_function_bindings.h"
+ # include "uwvm_runtime_checkpoint_world_indirect_bindings.h"
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_source_initializer.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_source_initializer.h
+@@ -0,0 +1,133 @@
++// Private world member fragment. Fixed source/initializer binding DATA is
++// prepared before retirement and rechecked after real OS/TLS join. It never
++// issues an initializer serial, source seal, epoch or execution permission.
++#pragma once
++struct source_initializer_binding
++{
++    module_type const* module{};
++    file_type const* file{};
++    ::std::size_t owner{SIZE_MAX}, preload{SIZE_MAX};
++};
++::std::vector<source_initializer_binding> source_initializer_bindings_{};
++decltype(source_type::builtin_wasip1_identity_) source_initializer_builtin_identity_{};
++decltype(source_type::builtin_wasip1_member_) source_initializer_builtin_member_{};
++decltype(source_type::builtin_wasip1_vector_begin_) source_initializer_builtin_vector_{};
++::std::size_t source_initializer_builtin_extent_{},source_initializer_main_{SIZE_MAX};
++::std::uint_least64_t source_initializer_observed_epoch_{},source_initializer_observed_serial_{};
++
++[[nodiscard]] bool source_initializer_original_current(source_owner const& original) const noexcept
++{
++    auto const selected=::uwvm2::uwvm::runtime::full::selected_full_source_owner_pin();
++    if(!source_type::has_canonical_owner(original) || !selected || original.get()!=selected.get() ||
++       original.owner_before(selected) || selected.owner_before(original) ||
++       !original->initialized_from_actual_state() || source_initializer_observed_epoch_==0u ||
++       source_initializer_observed_epoch_!=current_runtime_generation() ||
++       source_initializer_observed_serial_==0u || original->initializer_serial_!=source_initializer_observed_serial_ ||
++       ::uwvm2::runtime::gc::published_initializer_serial.load(::std::memory_order_acquire)!=source_initializer_observed_serial_ ||
++       original->registry_.size()!=modules_.size() ||
++       original->builtin_wasip1_identity_.get()!=source_initializer_builtin_identity_.get() ||
++       original->builtin_wasip1_identity_.owner_before(source_initializer_builtin_identity_) ||
++       source_initializer_builtin_identity_.owner_before(original->builtin_wasip1_identity_) ||
++       original->builtin_wasip1_member_!=source_initializer_builtin_member_ ||
++       original->builtin_wasip1_vector_begin_!=source_initializer_builtin_vector_ ||
++       original->builtin_wasip1_vector_extent_!=source_initializer_builtin_extent_) { return false; }
++    for(auto const& [name,module]:original->registry_)
++    {
++        static_cast<void>(name);
++        auto const dense=original->bound_initialized_module_id(::std::addressof(module));
++        // Canonical old source and its genuine finalized dense binding precede
++        // every provider read. The builtin method resolves the real selected
++        // loader/vector membership, never a saved host pointer or provider name.
++        if(dense==SIZE_MAX || original->actual_validated_file(dense,source_initializer_observed_epoch_,::std::addressof(module))==nullptr ||
++           !original->actual_no_unadapted_native_memory_provider(dense,source_initializer_observed_epoch_,::std::addressof(module)))
++        { return false; }
++    }
++    return true;
++}
++
++[[nodiscard]] bool preflight_private_source_initializer_bindings() const noexcept
++{
++    if(phase_!=preparation_status::resources_prepared || !source_type::has_canonical_owner(prepared_source_) ||
++       !context_ || !context_->all_actual_resource_records_filled() || !staged_gc_.publication_preflight() ||
++       prepared_source_->initialized_ || prepared_source_->initializer_serial_!=0u || prepared_source_->main_module_!=nullptr ||
++       prepared_source_->main_module_id_!=SIZE_MAX || prepared_source_->full_validation_complete_ || prepared_source_->validation_epoch_!=0u ||
++       prepared_source_->preload_files_.size()!=prepared_source_->preload_bindings_.size() ||
++       prepared_source_->registry_.size()!=modules_.size() || source_initializer_bindings_.size()!=modules_.size() ||
++       source_initializer_bindings_.size()!=actual_dense_module_owners_.size() || source_initializer_main_>=source_initializer_bindings_.size())
++    { return false; }
++    auto const original=::uwvm2::uwvm::runtime::full::selected_full_source_owner_pin();
++    if(!source_initializer_original_current(original)) { return false; }
++    ::std::size_t mains{},preloads{};
++    for(::std::size_t dense{};dense<source_initializer_bindings_.size();++dense)
++    {
++        auto const& row=source_initializer_bindings_[dense];auto const owner=actual_dense_module_owners_[dense];
++        if(owner>=modules_.size() || row.owner!=owner || row.module!=modules_[owner].actual || row.file!=modules_[owner].file ||
++           modules_[owner].new_actual_id!=dense || context_->unpublished_file_for_module(row.module)!=row.file) { return false; }
++        // All pointers have matched genuine nonmoving candidate registry/parser
++        // members before their phase/name/declaration fields are read.
++        auto const& phase=row.module->gc_collection_phase;
++        if(phase.initializer_serial!=0u || phase.native_storage_owned || phase.initialized || phase.active_segments_ready) { return false; }
++        auto const declaration=prepared_source_->checkpoint_declarations_.find(row.file->module_name);
++        if(declaration==prepared_source_->checkpoint_declarations_.end()) { return false; }
++        using kind=::uwvm2::uwvm::wasm::type::module_type_t;
++        if(row.preload==SIZE_MAX)
++        {
++            if(dense!=source_initializer_main_ || row.file!=::std::addressof(prepared_source_->file_) ||
++               declaration->second.type!=kind::exec_wasm || declaration->second.module_storage_ptr.wf!=row.file || ++mains!=1u) { return false; }
++        }
++        else
++        {
++            if(row.preload>=prepared_source_->preload_files_.size() ||
++               row.file!=::std::addressof(prepared_source_->preload_files_.index_unchecked(row.preload)) ||
++               declaration->second.type!=kind::preloaded_wasm || declaration->second.module_storage_ptr.wf!=row.file) { return false; }
++            auto const& unpublished=prepared_source_->preload_bindings_[row.preload];
++            if(unpublished.module!=nullptr || unpublished.id!=SIZE_MAX || unpublished.validation_epoch!=0u) { return false; }
++            ++preloads;
++        }
++    }
++    return mains==1u && preloads==prepared_source_->preload_files_.size();
++}
++
++[[nodiscard]] bool prepare_private_source_initializer_bindings(source_owner const& original,
++    ::std::uint_least64_t observed_epoch,::std::size_t maximum_modules,llvm_jit_checkpoint_prepare_result& out)
++{
++    if(!source_initializer_bindings_.empty() || phase_!=preparation_status::resources_prepared ||
++       !source_type::has_canonical_owner(original) || modules_.empty() || modules_.size()!=actual_dense_module_owners_.size())
++    { return fail(preparation_status::source_mismatch); }
++    if(modules_.size()>maximum_modules || modules_.size()>source_initializer_bindings_.max_size() ||
++       !charge_native(modules_.size(),sizeof(source_initializer_binding))) { return fail(preparation_status::quota_exceeded); }
++    // Actual selected loader provenance only; the strong record retains no
++    // implementation and confers no host admission. No old source/store/engine
++    // is retained by this candidate. A later publisher must check it again.
++    source_initializer_observed_epoch_=observed_epoch;source_initializer_observed_serial_=original->initializer_serial_;
++    source_initializer_builtin_identity_=original->builtin_wasip1_identity_;
++    source_initializer_builtin_member_=original->builtin_wasip1_member_;
++    source_initializer_builtin_vector_=original->builtin_wasip1_vector_begin_;
++    source_initializer_builtin_extent_=original->builtin_wasip1_vector_extent_;
++    if(!source_initializer_original_current(original)) { return fail(preparation_status::source_mismatch); }
++    source_initializer_bindings_.resize(modules_.size());
++    for(::std::size_t dense{};dense<source_initializer_bindings_.size();++dense)
++    {
++        auto const owner=actual_dense_module_owners_[dense];
++        if(owner>=modules_.size() || modules_[owner].new_actual_id!=dense ||
++           context_->unpublished_file_for_module(modules_[owner].actual)!=modules_[owner].file)
++        { return fail(preparation_status::source_mismatch); }
++        auto& row=source_initializer_bindings_[dense];row={modules_[owner].actual,modules_[owner].file,owner,SIZE_MAX};
++        if(row.file==::std::addressof(prepared_source_->file_))
++        {
++            if(source_initializer_main_!=SIZE_MAX) { return fail(preparation_status::source_mismatch); }
++            source_initializer_main_=dense;
++        }
++        else
++        {
++            for(::std::size_t n{};n<prepared_source_->preload_files_.size();++n)
++            { if(row.file==::std::addressof(prepared_source_->preload_files_.index_unchecked(n))) { row.preload=n;break; } }
++            if(row.preload==SIZE_MAX) { return fail(preparation_status::source_mismatch); }
++        }
++    }
++    if(!preflight_private_source_initializer_bindings()) { return fail(preparation_status::source_mismatch); }
++    out.prepared_source_initializer_modules=source_initializer_bindings_.size();
++    out.prepared_source_initializer_preloads=prepared_source_->preload_files_.size();
++    out.runtime_source_initializer_bindings_prepared=true;
++    return true;
++}
+--- a/uwvm2-ros/src/uwvm2/uwvm/debugger/wasip1_checkpoint.md
++++ b/uwvm2-ros/src/uwvm2/uwvm/debugger/wasip1_checkpoint.md
+@@ -768,3 +768,18 @@
+ maximum_private_native_endpoint_functions 默认 65,536，合计 typed/resume 期望并在生成候选 engine 前拒绝超限。object 解码和完整 symbol claim 的私有 backing 计入原 maximum_native_payload_bytes；配额或端点观察失败不会退休旧 worker。结果的 runtime_native_endpoint_capture_prepared 和计数只有诊断作用。未启用 NativeOwnerTable V2 时不宣称捕获端点。
+ 
+ Wasm checkpoint 检测到 WASIp1 时仍须同一次 stop 中同时 checkpoint WASIp1；文件内容和外部 I/O 不属于状态回滚。
++
++
++候选整体 world 还会预先准备 main/preload 的 source initializer 对应表：每个记录必须匹配新 source 实际 parser 文件、不可移动 registry 成员及真实 dense 顺序，GC staging 资源全部填充且保持未发布。maximum_private_source_initializer_modules 默认 4096，并在创建新 engine 前拒绝超额；内存由 maximum_native_payload_bytes 计费。真实旧 guest drain 和 OS/TLS join 完成后，管理器再次检查该表、旧 world 的当前 source/epoch/initializer serial 和实际 builtin WASIp1 loader 归属，才报告 prepared_world_ready_closed。两个 source/epoch 的完整发布与恢复线程启动仍是独立未完成步骤；这里没有发放新 initializer serial、source seal、执行权限或 VM/host ASM 调试上下文。Wasm 与 WASIp1 仍须在同一停止点一起 checkpoint。
++
++
++R38 native object quota diagnostics: the private actual-object/symbol ledger
++reserves 16 times the loaded object byte count, plus individual symbol storage,
++before decoding. The public native payload default stays 256 MiB. Large modules
++with thousands of instruction resume landings may need an explicitly larger
++request budget; the complete instance test uses 512 MiB and the two-module
++preload test uses 768 MiB. Both continue to exercise smaller budget refusal. A loader quota refusal now reports the actual
++resource phase (quota_exceeded, diagnostic 9) and engine exhausted (diagnostic
++5), while malformed endpoint declarations, observer setup and freeze checks
++retain distinct engine diagnostics (7, 8 and 9). These are private preparation
++results; no candidate is published and the original paused world stays intact.
+--- a/uwvm2-ros/test/0017.runtime/debug_checkpoint_complete_instance_runtime.cc
++++ b/uwvm2-ros/test/0017.runtime/debug_checkpoint_complete_instance_runtime.cc
+@@ -401,6 +401,11 @@
+                     auto const* inherited{gc::current_root_frames()};
+                     lib::llvm_jit_checkpoint_prepare_request prepare{};
+                     prepare.recording_label=label;prepare.graph_budget=cap;
++                    // Thousands of native resume landings also reserve the
++                    // complete object/symbol workspace. This explicit test
++                    // budget preserves the public 256 MiB default and all
++                    // real process/cgroup limits.
++                    prepare.maximum_native_payload_bytes=512u*1024u*1024u;
+                     auto expect_refused=[](lib::llvm_jit_checkpoint_prepare_result const& data)
+                     { REQUIRE(data.status!=lib::llvm_jit_checkpoint_prepare_status::prepared_and_discarded && data.engines==0u); };
+                     auto invalid=prepare;invalid.recording_label={};
+@@ -415,6 +420,14 @@
+                     ::std::array<lib::llvm_jit_checkpoint_thread_capture_owner,2u> duplicate{captured[0u],captured[0u]};
+                     expect_refused(lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,duplicate,prepare));
+                     expect_refused(lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,{captured.data(),1u},prepare));
++                    auto source_limited=prepare;source_limited.maximum_private_source_initializer_modules=0u;
++                    auto const source_epoch=lib::observe_compiler_runtime_generation_host_api();
++                    auto const source_serial=::uwvm2::runtime::gc::published_initializer_serial.load(::std::memory_order_acquire);
++                    auto source_refused=lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,captured,source_limited);
++                    REQUIRE(source_refused.status==lib::llvm_jit_checkpoint_prepare_status::source_initializer_binding_preparation_declined &&
++                        !source_refused.runtime_source_initializer_bindings_prepared && source_refused.engines==0u);
++                    REQUIRE(lib::observe_compiler_runtime_generation_host_api()==source_epoch &&
++                        ::uwvm2::runtime::gc::published_initializer_serial.load(::std::memory_order_acquire)==source_serial);
+                     auto prepared=lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,captured,prepare);
+                     ::fast_io::print(::fast_io::out(),"WORLD_PREPARATION status=",::fast_io::mnp::dec(static_cast<unsigned>(prepared.status)),
+                         " resource=",::fast_io::mnp::dec(prepared.resource_diagnostic)," engine=",::fast_io::mnp::dec(prepared.engine_diagnostic),
+@@ -436,6 +449,8 @@
+                         " debug_tls_restored=",prepared.private_debug_tls_restored,"\n");
+                     REQUIRE(prepared.status==lib::llvm_jit_checkpoint_prepare_status::prepared_and_discarded &&
+                         prepared.data_error==cp::error::none && prepared.modules==1u &&
++                        prepared.runtime_source_initializer_bindings_prepared && prepared.prepared_source_initializer_modules==1u &&
++                        prepared.prepared_source_initializer_preloads==0u &&
+                         prepared.engines==1u && prepared.functions!=0u && prepared.prepared_threads==2u && prepared.prepared_frames==2u &&
+                         prepared.prepared_root_carriers!=0u && prepared.native_payload_bytes<=prepare.maximum_native_payload_bytes);
+                     REQUIRE(prepared.validated_private_root_scopes==2u && prepared.installed_private_root_frames==6u &&
+@@ -446,6 +461,20 @@
+                         prepared.private_worker_roots_restored && gc::current_root_frames()==inherited);
+                     REQUIRE(prepared.prepared_private_debug_workers==2u && prepared.enrolled_private_debug_workers==2u &&
+                         prepared.private_debug_cohort_held && prepared.private_debug_tls_restored);
++#if defined(UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2) && UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2 == 1
++                    if(positives==0u)
++                    {
++                        auto object_small=prepare;object_small.maximum_native_payload_bytes=1024u*1024u;
++                        auto object_refused=lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,captured,object_small);
++                        REQUIRE(object_refused.status==lib::llvm_jit_checkpoint_prepare_status::engine_preparation_declined &&
++                            object_refused.engine_diagnostic==5u && object_refused.resource_diagnostic==9u &&
++                            object_refused.engines==0u && !object_refused.runtime_native_endpoint_capture_prepared &&
++                            object_refused.native_payload_bytes<=object_small.maximum_native_payload_bytes);
++                        REQUIRE(gc::current_root_frames()==inherited &&
++                            lib::observe_compiler_runtime_generation_host_api()==source_epoch &&
++                            gc::published_initializer_serial.load(::std::memory_order_acquire)==source_serial);
++                    }
++#endif
+                     auto workers_small=prepare;workers_small.maximum_private_root_workers=1u;
+                     auto workers_refused=lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,captured,workers_small);
+                     REQUIRE(workers_refused.status==lib::llvm_jit_checkpoint_prepare_status::worker_root_preparation_declined &&
+--- a/uwvm2-ros/test/0017.runtime/debug_checkpoint_complete_preload_runtime.cc
++++ b/uwvm2-ros/test/0017.runtime/debug_checkpoint_complete_preload_runtime.cc
+@@ -450,6 +450,11 @@
+                     check_graph(*actual.graph,cap,label,main_id,provider_id,main_original,provider_original);
+                     lib::llvm_jit_checkpoint_prepare_request prepare{};
+                     prepare.recording_label=label;prepare.graph_budget=cap;
++                    // Thousands of native resume landings also reserve the
++                    // complete object/symbol workspace. This explicit test
++                    // budget preserves the public 256 MiB default and all
++                    // real process/cgroup limits.
++                    prepare.maximum_native_payload_bytes=768u*1024u*1024u;
+                     auto expect_refused=[](lib::llvm_jit_checkpoint_prepare_result const& data)
+                     { REQUIRE(data.status!=lib::llvm_jit_checkpoint_prepare_status::prepared_and_discarded && data.engines==0u); };
+                     auto invalid=prepare;invalid.recording_label={};
+@@ -464,6 +469,14 @@
+                     ::std::array<lib::llvm_jit_checkpoint_thread_capture_owner,2u> duplicate{captured[0u],captured[0u]};
+                     expect_refused(lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,duplicate,prepare));
+                     expect_refused(lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,{captured.data(),1u},prepare));
++                    auto source_limited=prepare;source_limited.maximum_private_source_initializer_modules=1u;
++                    auto const source_epoch=lib::observe_compiler_runtime_generation_host_api();
++                    auto const source_serial=::uwvm2::runtime::gc::published_initializer_serial.load(::std::memory_order_acquire);
++                    auto source_refused=lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,captured,source_limited);
++                    REQUIRE(source_refused.status==lib::llvm_jit_checkpoint_prepare_status::source_initializer_binding_preparation_declined &&
++                        !source_refused.runtime_source_initializer_bindings_prepared && source_refused.engines==0u);
++                    REQUIRE(lib::observe_compiler_runtime_generation_host_api()==source_epoch &&
++                        ::uwvm2::runtime::gc::published_initializer_serial.load(::std::memory_order_acquire)==source_serial);
+                     auto prepared=lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,captured,prepare);
+                     ::fast_io::print(::fast_io::out(),"WORLD_PREPARATION status=",::fast_io::mnp::dec(static_cast<unsigned>(prepared.status)),
+                         " resource=",::fast_io::mnp::dec(prepared.resource_diagnostic)," engine=",::fast_io::mnp::dec(prepared.engine_diagnostic),
+@@ -485,6 +498,8 @@
+                         " debug_tls_restored=",prepared.private_debug_tls_restored,"\n");
+                     REQUIRE(prepared.status==lib::llvm_jit_checkpoint_prepare_status::prepared_and_discarded &&
+                         prepared.data_error==cp::error::none && prepared.modules==2u &&
++                        prepared.runtime_source_initializer_bindings_prepared && prepared.prepared_source_initializer_modules==2u &&
++                        prepared.prepared_source_initializer_preloads==1u &&
+                         prepared.engines==2u && prepared.functions!=0u && prepared.prepared_threads==2u && prepared.prepared_frames==2u &&
+                         prepared.prepared_root_carriers!=0u && prepared.native_payload_bytes<=prepare.maximum_native_payload_bytes);
+                     REQUIRE(prepared.started_private_root_workers==2u && prepared.enrolled_private_root_workers==2u &&
+--- a/uwvm2-ros/test/0017.runtime/debug_checkpoint_prepared_retirement_runtime.cc
++++ b/uwvm2-ros/test/0017.runtime/debug_checkpoint_prepared_retirement_runtime.cc
+@@ -360,6 +360,11 @@
+     auto invalid{prepare_request};invalid.recording_label={};
+     auto denied{lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline())};
+     REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::invalid_request && !denied.operation);
++    invalid=prepare_request;invalid.maximum_private_source_initializer_modules=0u;
++    denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
++    REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::source_initializer_binding_preparation_declined &&
++        !denied.operation && !denied.candidate_world_retained && !denied.preparation.runtime_source_initializer_bindings_prepared && denied.preparation.engines==0u);
++    REQUIRE(state->control->capture(state->ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch);
+     invalid=prepare_request;invalid.maximum_private_dispatch_bindings=1u;
+     denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
+     REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined && !denied.operation && !denied.candidate_world_retained);
+@@ -391,6 +396,9 @@
+         pending.preparation.data_error==::uwvm2::uwvm::debugger::checkpoint::error::none &&
+         pending.preparation.modules==1u && pending.preparation.engines==1u && pending.preparation.prepared_threads==2u &&
+         pending.preparation.started_private_root_workers==2u && pending.preparation.joined_private_root_workers==2u);
++    REQUIRE(pending.preparation.runtime_source_initializer_bindings_prepared &&
++        pending.preparation.prepared_source_initializer_modules==pending.preparation.modules && pending.preparation.prepared_source_initializer_preloads==0u &&
++        !pending.source_initializer_bindings_rechecked_after_physical_join);
+     REQUIRE(pending.preparation.runtime_dispatch_bindings_prepared &&
+         pending.preparation.prepared_runtime_defined_bindings==pending.preparation.functions &&
+         pending.preparation.prepared_runtime_defined_bindings==3u && pending.preparation.prepared_runtime_import_bindings==0u &&
+@@ -478,7 +486,7 @@
+     { ::std::lock_guard lock{windows->mutex}; windows->release_tls[1u-first_tls] = true; windows->changed.notify_all(); }
+     auto joined{lib::llvm_jit_checkpoint_continue_native_retirement_host_api(operation,deadline())};
+     ::fast_io::print(::fast_io::out(),"NATIVE_COHORT stage=join status=",::fast_io::mnp::dec(static_cast<unsigned>(joined.status)),"\n");
+-    REQUIRE(joined.status==outcome::prepared_world_ready_closed && joined.operation==operation &&
++    REQUIRE(joined.status==outcome::prepared_world_ready_closed && joined.operation==operation && joined.source_initializer_bindings_rechecked_after_physical_join &&
+         joined.execution_drained && joined.native_workers_joined && joined.candidate_world_retained && joined.workers==2u);
+     legacy_refused(); // physical join alone must NOT reopen the retained original world.
+     REQUIRE(lib::llvm_jit_checkpoint_discard_prepared_instance_host_api(wrong_address,deadline()).status==outcome::stale_owner);
+--- a/uwvm2-ros/test/0017.runtime/debug_wasip1_prepared_retirement_runtime.cc
++++ b/uwvm2-ros/test/0017.runtime/debug_wasip1_prepared_retirement_runtime.cc
+@@ -149,7 +149,13 @@
+     require(strict.status==outcome::preparation_declined && strict.preparation.wasip1_status==lib::llvm_jit_wasip1_environment_capsule_status::unsupported_resource && !strict.operation,"strict policy refuses retained original stdio before retirement");
+     require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"preparation failures leave old guest paused and unchanged");
+     request.require_managed_wasip1_resources=false;
+-    auto limited=request;limited.maximum_private_dispatch_bindings=1u;
++    auto limited=request;limited.maximum_private_source_initializer_modules=0u;
++    auto source_refused{lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,limited,deadline())};
++    require(source_refused.status==outcome::preparation_declined && source_refused.preparation.status==lib::llvm_jit_checkpoint_prepare_status::source_initializer_binding_preparation_declined &&
++        !source_refused.operation && !source_refused.candidate_world_retained && !source_refused.preparation.runtime_source_initializer_bindings_prepared && source_refused.preparation.engines==0u,
++        "source initializer quota refuses before engine allocation and old WASI retirement");
++    require(state->control->capture(state->ticket).result==::uwvm2::utils::thread::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"source binding refusal preserves the same pause and runtime epoch");
++    limited=request;limited.maximum_private_dispatch_bindings=1u;
+     auto bindings_refused=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,limited,deadline());
+     require(bindings_refused.status==outcome::preparation_declined && bindings_refused.preparation.status==lib::llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined && !bindings_refused.operation,"private dispatch budget refuses before old worker retirement");
+     require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"dispatch failure leaves original WASI guest unchanged");
+@@ -167,6 +173,9 @@
+     ::fast_io::print(::fast_io::out(),"WASIP1_PREPARED_RETIREMENT stage=execution status=",::fast_io::mnp::dec(static_cast<unsigned>(pending.status))," prepare=",::fast_io::mnp::dec(static_cast<unsigned>(pending.preparation.status)),"\n");
+     require(pending.status==outcome::pending_execution && pending.operation && pending.candidate_world_retained,"candidate survives pending execution drain");
+     require(pending.preparation.status==lib::llvm_jit_checkpoint_prepare_status::prepared_and_retained && pending.preparation.data_error==::uwvm2::uwvm::debugger::checkpoint::error::none && pending.preparation.wasip1_installed_privately && pending.preparation.wasip1_prepared_together && pending.preparation.wasip1_environments==1u && pending.preparation.prepared_wasip1_memories==1u && pending.preparation.joined_private_root_workers==1u,"new WASI memory and complete private candidate retained together");
++    require(pending.preparation.runtime_source_initializer_bindings_prepared &&
++        pending.preparation.prepared_source_initializer_modules==pending.preparation.modules && pending.preparation.prepared_source_initializer_preloads==0u &&
++        !pending.source_initializer_bindings_rechecked_after_physical_join,"source initializer bindings remain private before physical join");
+     require(pending.preparation.runtime_dispatch_bindings_prepared && pending.preparation.prepared_runtime_defined_bindings==pending.preparation.functions && pending.preparation.prepared_runtime_import_bindings>0u && pending.preparation.prepared_runtime_defined_pointer_ranges>0u,"new source owns complete defined and builtin WASI dispatch bindings");
+     require(pending.preparation.runtime_indirect_bindings_prepared && pending.preparation.prepared_runtime_type_bindings>0u,"private caller type bindings prepared");
+ #if defined(UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2) && UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2 == 1
+@@ -189,7 +198,7 @@
+     auto early{lib::llvm_jit_checkpoint_discard_prepared_instance_host_api(operation,short_deadline())};require(early.status==outcome::pending_native_join && early.candidate_world_retained,"discard cannot bypass unfinished TLS death");
+     { ::std::lock_guard lock{windows->mutex};windows->release_tls=true;windows->changed.notify_all(); }
+     auto ready{lib::llvm_jit_checkpoint_continue_native_retirement_host_api(operation,deadline())};
+-    require(ready.status==outcome::prepared_world_ready_closed && ready.native_workers_joined && ready.candidate_world_retained,"private candidate ready only after physical join");blocked();
++    require(ready.status==outcome::prepared_world_ready_closed && ready.native_workers_joined && ready.candidate_world_retained && ready.source_initializer_bindings_rechecked_after_physical_join,"private candidate ready only after physical join");blocked();
+     require(lib::observe_compiler_runtime_generation_host_api()==epoch && launch->output==0xa5a5a5a5u,"no candidate publication or original return output");
+     auto discarded{lib::llvm_jit_checkpoint_discard_prepared_instance_host_api(operation,deadline())};
+     require(discarded.status==outcome::retired_and_joined && !discarded.candidate_world_retained && discarded.all_frames_signalled,"explicit discard releases private candidate and reopens same instance");
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime.h
+@@ -587,7 +587,7 @@
+     enum class llvm_jit_checkpoint_prepare_status : unsigned char
+     { prepared_and_discarded, requires_llvm_jit_full, not_selected, invalid_request,
+       unavailable_capture, resource_preparation_declined, engine_preparation_declined, allocation_failed,
+-      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained, dispatch_binding_preparation_declined, indirect_binding_preparation_declined };
++      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained, dispatch_binding_preparation_declined, indirect_binding_preparation_declined, source_initializer_binding_preparation_declined };
+     struct llvm_jit_checkpoint_prepare_request
+     {
+         ::std::array<::std::byte,16u> recording_label{};
+@@ -609,6 +609,8 @@
+         ::std::size_t maximum_private_indirect_bindings{1048576u};
+         // Actual typed+resume native endpoint expectations, across all modules.
+         ::std::size_t maximum_private_native_endpoint_functions{65536u};
++        // Final main/preload initializer correspondence; no source seal is issued.
++        ::std::size_t maximum_private_source_initializer_modules{4096u};
+     };
+     struct llvm_jit_checkpoint_prepare_result
+     {
+@@ -656,6 +658,8 @@
+         bool runtime_indirect_bindings_prepared{}; // New-source private views; no guest permission.
+         ::std::size_t prepared_runtime_native_endpoint_functions{}, prepared_runtime_native_helper_bodies{}, prepared_runtime_native_symbol_claims{};
+         bool runtime_native_endpoint_capture_prepared{}; // Private DATA; LIVE seal/epoch are not issued.
++        ::std::size_t prepared_source_initializer_modules{}, prepared_source_initializer_preloads{};
++        bool runtime_source_initializer_bindings_prepared{}; // Fixed private DATA, no initializer serial.
+     };
+     struct llvm_jit_checkpoint_native_retirement_result
+     {
+@@ -667,6 +671,7 @@
+         bool execution_drained{}, native_workers_joined{}, all_frames_signalled{};
+         llvm_jit_checkpoint_prepare_result preparation{};
+         bool candidate_world_retained{}; // Diagnostic only; no world/entry is exposed.
++        bool source_initializer_bindings_rechecked_after_physical_join{}; // Actual closed-world preflight only.
+     };
+     // Cold native management only. Prepare a fresh candidate under the SAME
+     // complete stop, then retire/join the actual registered old cohort. Pending
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_native_retirement_state.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_native_retirement_state.h
+@@ -32,6 +32,8 @@
+         get_runtime_compilation_metadata_callback_depth() == 0u &&
+         get_llvm_jit_generated_wasm_bridge_entry_depth() == 0u && !g_debug_observer_active;
+ }
++[[nodiscard]] static bool check_actual_candidate_source_bindings(
++    ::std::shared_ptr<runtime_checkpoint_world_transaction> const&) noexcept;
+ static void finish_native_retirement_until(native_retirement_state& actual,
+     ::uwvm2::utils::thread::execution_domain::maintenance_transition const& maintenance) noexcept
+ {
+@@ -60,6 +62,12 @@
+         // The actual generation is drained AND the sealed native cohort has
+         // physically joined, including TLS destructors. Retain source, host
+         // gate, drain generation and candidate. No reset/open/publication here.
++        // Recheck the complete fixed source/parser/dense binding roster and
++        // unsealed candidate GC state AFTER this authentic drain and OS/TLS
++        // join. A copied diagnostic cannot satisfy these ownership checks.
++        if(!check_actual_candidate_source_bindings(actual.candidate))
++        { actual.result.status=outcome::failed_closed;return; }
++        actual.result.source_initializer_bindings_rechecked_after_physical_join=true;
+         actual.result.candidate_world_retained=true;
+         actual.result.status=outcome::prepared_world_ready_closed;
+         return;
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_preparation_api.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_preparation_api.h
+@@ -4,6 +4,9 @@
+ #if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+ extern "C++"
+ {
++    bool runtime_checkpoint_coherent_manager::check_actual_candidate_source_bindings(
++        ::std::shared_ptr<runtime_checkpoint_world_transaction> const& actual) noexcept
++    { return actual && actual->preflight_private_source_initializer_bindings(); }
+     void runtime_checkpoint_coherent_manager::prepare_and_discard_actual_world(
+         ::uwvm2::uwvm::debugger::checkpoint::state const& saved,source_owner const& source,
+         ::std::uint_least64_t epoch,::uwvm2::runtime::checkpoint::compilation_profile::owner const& current_profile,
+@@ -38,6 +41,9 @@
+                 request.maximum_native_payload_bytes,request.maximum_original_source_bytes,request.graph_budget,out)};
+             if(!prepared) { return; }
+             out.modules=prepared->modules_.size();
++            out.status=llvm_jit_checkpoint_prepare_status::source_initializer_binding_preparation_declined;
++            if(!prepared->prepare_private_source_initializer_bindings(source,epoch,request.maximum_private_source_initializer_modules,out))
++            { out.native_payload_bytes=prepared->native_bytes_;out.resource_diagnostic=static_cast<unsigned>(prepared->phase_);return; }
+ #if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
+             if(request.include_wasip1 && !environments.empty())
+             {
+@@ -58,7 +64,10 @@
+             auto const granularity{g_runtime.debug_granularity==llvm_jit_debug_safe_point_granularity::instruction?
+                 compile::llvm_jit_debug_safe_point_granularity::instruction:compile::llvm_jit_debug_safe_point_granularity::entry_loop};
+             if(!profile || !prepared->prepare_all_native_engines(profile,policy,granularity,request.maximum_private_native_endpoint_functions))
+-            { out.engine_diagnostic=prepared->engine_diagnostic_;out.native_payload_bytes=prepared->native_bytes_;return; }
++            {
++                out.engine_diagnostic=prepared->engine_diagnostic_;out.native_payload_bytes=prepared->native_bytes_;
++                out.resource_diagnostic=static_cast<unsigned>(prepared->phase_);return;
++            }
+             out.engines=prepared->engines_.size();out.functions=prepared->prepared_functions_;
+             out.prepared_runtime_native_endpoint_functions=prepared->prepared_native_endpoints_;
+             out.prepared_runtime_native_helper_bodies=prepared->prepared_native_helper_bodies_;
+@@ -80,6 +89,8 @@
+             if(!prepared->validate_private_world_root_installation(request.maximum_private_root_frames,out)) { return; }
+             out.status=llvm_jit_checkpoint_prepare_status::worker_root_preparation_declined;
+             if(!prepared->validate_private_world_root_workers(request.maximum_private_root_workers,out)) { return; }
++            if(!prepared->preflight_private_source_initializer_bindings())
++            { out.status=llvm_jit_checkpoint_prepare_status::source_initializer_binding_preparation_declined;return; }
+             out.status=llvm_jit_checkpoint_prepare_status::prepared_and_discarded;
+             out.wasip1_environments=environments.size();
+             out.wasip1_prepared_together=request.include_wasip1;
+@@ -138,6 +149,8 @@
+ }
+ #else
+ #if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS)
++extern "C++" bool runtime_checkpoint_coherent_manager::check_actual_candidate_source_bindings(
++    ::std::shared_ptr<runtime_checkpoint_world_transaction> const&) noexcept { return false; }
+ extern "C++" void runtime_checkpoint_coherent_manager::prepare_and_discard_actual_world(
+     ::uwvm2::uwvm::debugger::checkpoint::state const&,source_owner const&,
+     ::std::uint_least64_t,::uwvm2::runtime::checkpoint::compilation_profile::owner const&,
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_resources.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_resources.h
+@@ -1195,7 +1195,14 @@
+                 auto compiled{engine_type::prepare(*actual_module,modules_[owner].new_actual_id,actual_profile,bodies,stack_policy,granularity,this,&charge_staged_native_backing)};
+                 engine_diagnostic_=static_cast<unsigned>(compiled.status);
+                 if(compiled.status!=engine_type::preparation_status::ok || !compiled.data)
+-                { if(phase_==preparation_status::resources_prepared) { (void)fail(preparation_status::type_mismatch); }return false; }
++                {
++                    // The actual loader calls THIS world's quota callback. Keep
++                    // that refusal instead of reporting a broken endpoint table.
++                    if(phase_==preparation_status::quota_exceeded)
++                    { engine_diagnostic_=static_cast<unsigned>(engine_type::preparation_status::exhausted); }
++                    else if(phase_==preparation_status::resources_prepared) { (void)fail(preparation_status::type_mismatch); }
++                    return false;
++                }
+ #if defined(UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2) && UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2 == 1
+                 if(!compiled.data->native_endpoint_capture_qualified_ ||
+                    compiled.data->native_endpoint_expected_!=locals*2u ||
+@@ -1217,6 +1224,7 @@
+             return true; // Real engines/typedplans/aliases retained privately,
+                          // native range/CFI permission and VM epoch NOT published.
+         }
++# include "uwvm_runtime_checkpoint_world_source_initializer.h"
+ # include "uwvm_runtime_checkpoint_world_frames.h"
+ # include "uwvm_runtime_checkpoint_world_function_bindings.h"
+ # include "uwvm_runtime_checkpoint_world_indirect_bindings.h"
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_source_initializer.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_source_initializer.h
+@@ -0,0 +1,133 @@
++// Private world member fragment. Fixed source/initializer binding DATA is
++// prepared before retirement and rechecked after real OS/TLS join. It never
++// issues an initializer serial, source seal, epoch or execution permission.
++#pragma once
++struct source_initializer_binding
++{
++    module_type const* module{};
++    file_type const* file{};
++    ::std::size_t owner{SIZE_MAX}, preload{SIZE_MAX};
++};
++::std::vector<source_initializer_binding> source_initializer_bindings_{};
++decltype(source_type::builtin_wasip1_identity_) source_initializer_builtin_identity_{};
++decltype(source_type::builtin_wasip1_member_) source_initializer_builtin_member_{};
++decltype(source_type::builtin_wasip1_vector_begin_) source_initializer_builtin_vector_{};
++::std::size_t source_initializer_builtin_extent_{},source_initializer_main_{SIZE_MAX};
++::std::uint_least64_t source_initializer_observed_epoch_{},source_initializer_observed_serial_{};
++
++[[nodiscard]] bool source_initializer_original_current(source_owner const& original) const noexcept
++{
++    auto const selected=::uwvm2::uwvm::runtime::full::selected_full_source_owner_pin();
++    if(!source_type::has_canonical_owner(original) || !selected || original.get()!=selected.get() ||
++       original.owner_before(selected) || selected.owner_before(original) ||
++       !original->initialized_from_actual_state() || source_initializer_observed_epoch_==0u ||
++       source_initializer_observed_epoch_!=current_runtime_generation() ||
++       source_initializer_observed_serial_==0u || original->initializer_serial_!=source_initializer_observed_serial_ ||
++       ::uwvm2::runtime::gc::published_initializer_serial.load(::std::memory_order_acquire)!=source_initializer_observed_serial_ ||
++       original->registry_.size()!=modules_.size() ||
++       original->builtin_wasip1_identity_.get()!=source_initializer_builtin_identity_.get() ||
++       original->builtin_wasip1_identity_.owner_before(source_initializer_builtin_identity_) ||
++       source_initializer_builtin_identity_.owner_before(original->builtin_wasip1_identity_) ||
++       original->builtin_wasip1_member_!=source_initializer_builtin_member_ ||
++       original->builtin_wasip1_vector_begin_!=source_initializer_builtin_vector_ ||
++       original->builtin_wasip1_vector_extent_!=source_initializer_builtin_extent_) { return false; }
++    for(auto const& [name,module]:original->registry_)
++    {
++        static_cast<void>(name);
++        auto const dense=original->bound_initialized_module_id(::std::addressof(module));
++        // Canonical old source and its genuine finalized dense binding precede
++        // every provider read. The builtin method resolves the real selected
++        // loader/vector membership, never a saved host pointer or provider name.
++        if(dense==SIZE_MAX || original->actual_validated_file(dense,source_initializer_observed_epoch_,::std::addressof(module))==nullptr ||
++           !original->actual_no_unadapted_native_memory_provider(dense,source_initializer_observed_epoch_,::std::addressof(module)))
++        { return false; }
++    }
++    return true;
++}
++
++[[nodiscard]] bool preflight_private_source_initializer_bindings() const noexcept
++{
++    if(phase_!=preparation_status::resources_prepared || !source_type::has_canonical_owner(prepared_source_) ||
++       !context_ || !context_->all_actual_resource_records_filled() || !staged_gc_.publication_preflight() ||
++       prepared_source_->initialized_ || prepared_source_->initializer_serial_!=0u || prepared_source_->main_module_!=nullptr ||
++       prepared_source_->main_module_id_!=SIZE_MAX || prepared_source_->full_validation_complete_ || prepared_source_->validation_epoch_!=0u ||
++       prepared_source_->preload_files_.size()!=prepared_source_->preload_bindings_.size() ||
++       prepared_source_->registry_.size()!=modules_.size() || source_initializer_bindings_.size()!=modules_.size() ||
++       source_initializer_bindings_.size()!=actual_dense_module_owners_.size() || source_initializer_main_>=source_initializer_bindings_.size())
++    { return false; }
++    auto const original=::uwvm2::uwvm::runtime::full::selected_full_source_owner_pin();
++    if(!source_initializer_original_current(original)) { return false; }
++    ::std::size_t mains{},preloads{};
++    for(::std::size_t dense{};dense<source_initializer_bindings_.size();++dense)
++    {
++        auto const& row=source_initializer_bindings_[dense];auto const owner=actual_dense_module_owners_[dense];
++        if(owner>=modules_.size() || row.owner!=owner || row.module!=modules_[owner].actual || row.file!=modules_[owner].file ||
++           modules_[owner].new_actual_id!=dense || context_->unpublished_file_for_module(row.module)!=row.file) { return false; }
++        // All pointers have matched genuine nonmoving candidate registry/parser
++        // members before their phase/name/declaration fields are read.
++        auto const& phase=row.module->gc_collection_phase;
++        if(phase.initializer_serial!=0u || phase.native_storage_owned || phase.initialized || phase.active_segments_ready) { return false; }
++        auto const declaration=prepared_source_->checkpoint_declarations_.find(row.file->module_name);
++        if(declaration==prepared_source_->checkpoint_declarations_.end()) { return false; }
++        using kind=::uwvm2::uwvm::wasm::type::module_type_t;
++        if(row.preload==SIZE_MAX)
++        {
++            if(dense!=source_initializer_main_ || row.file!=::std::addressof(prepared_source_->file_) ||
++               declaration->second.type!=kind::exec_wasm || declaration->second.module_storage_ptr.wf!=row.file || ++mains!=1u) { return false; }
++        }
++        else
++        {
++            if(row.preload>=prepared_source_->preload_files_.size() ||
++               row.file!=::std::addressof(prepared_source_->preload_files_.index_unchecked(row.preload)) ||
++               declaration->second.type!=kind::preloaded_wasm || declaration->second.module_storage_ptr.wf!=row.file) { return false; }
++            auto const& unpublished=prepared_source_->preload_bindings_[row.preload];
++            if(unpublished.module!=nullptr || unpublished.id!=SIZE_MAX || unpublished.validation_epoch!=0u) { return false; }
++            ++preloads;
++        }
++    }
++    return mains==1u && preloads==prepared_source_->preload_files_.size();
++}
++
++[[nodiscard]] bool prepare_private_source_initializer_bindings(source_owner const& original,
++    ::std::uint_least64_t observed_epoch,::std::size_t maximum_modules,llvm_jit_checkpoint_prepare_result& out)
++{
++    if(!source_initializer_bindings_.empty() || phase_!=preparation_status::resources_prepared ||
++       !source_type::has_canonical_owner(original) || modules_.empty() || modules_.size()!=actual_dense_module_owners_.size())
++    { return fail(preparation_status::source_mismatch); }
++    if(modules_.size()>maximum_modules || modules_.size()>source_initializer_bindings_.max_size() ||
++       !charge_native(modules_.size(),sizeof(source_initializer_binding))) { return fail(preparation_status::quota_exceeded); }
++    // Actual selected loader provenance only; the strong record retains no
++    // implementation and confers no host admission. No old source/store/engine
++    // is retained by this candidate. A later publisher must check it again.
++    source_initializer_observed_epoch_=observed_epoch;source_initializer_observed_serial_=original->initializer_serial_;
++    source_initializer_builtin_identity_=original->builtin_wasip1_identity_;
++    source_initializer_builtin_member_=original->builtin_wasip1_member_;
++    source_initializer_builtin_vector_=original->builtin_wasip1_vector_begin_;
++    source_initializer_builtin_extent_=original->builtin_wasip1_vector_extent_;
++    if(!source_initializer_original_current(original)) { return fail(preparation_status::source_mismatch); }
++    source_initializer_bindings_.resize(modules_.size());
++    for(::std::size_t dense{};dense<source_initializer_bindings_.size();++dense)
++    {
++        auto const owner=actual_dense_module_owners_[dense];
++        if(owner>=modules_.size() || modules_[owner].new_actual_id!=dense ||
++           context_->unpublished_file_for_module(modules_[owner].actual)!=modules_[owner].file)
++        { return fail(preparation_status::source_mismatch); }
++        auto& row=source_initializer_bindings_[dense];row={modules_[owner].actual,modules_[owner].file,owner,SIZE_MAX};
++        if(row.file==::std::addressof(prepared_source_->file_))
++        {
++            if(source_initializer_main_!=SIZE_MAX) { return fail(preparation_status::source_mismatch); }
++            source_initializer_main_=dense;
++        }
++        else
++        {
++            for(::std::size_t n{};n<prepared_source_->preload_files_.size();++n)
++            { if(row.file==::std::addressof(prepared_source_->preload_files_.index_unchecked(n))) { row.preload=n;break; } }
++            if(row.preload==SIZE_MAX) { return fail(preparation_status::source_mismatch); }
++        }
++    }
++    if(!preflight_private_source_initializer_bindings()) { return fail(preparation_status::source_mismatch); }
++    out.prepared_source_initializer_modules=source_initializer_bindings_.size();
++    out.prepared_source_initializer_preloads=prepared_source_->preload_files_.size();
++    out.runtime_source_initializer_bindings_prepared=true;
++    return true;
++}
+--- a/uwvm2/src/uwvm2/uwvm/debugger/wasip1_checkpoint.md
++++ b/uwvm2/src/uwvm2/uwvm/debugger/wasip1_checkpoint.md
+@@ -768,3 +768,18 @@
+ maximum_private_native_endpoint_functions 默认 65,536，合计 typed/resume 期望并在生成候选 engine 前拒绝超限。object 解码和完整 symbol claim 的私有 backing 计入原 maximum_native_payload_bytes；配额或端点观察失败不会退休旧 worker。结果的 runtime_native_endpoint_capture_prepared 和计数只有诊断作用。未启用 NativeOwnerTable V2 时不宣称捕获端点。
+ 
+ Wasm checkpoint 检测到 WASIp1 时仍须同一次 stop 中同时 checkpoint WASIp1；文件内容和外部 I/O 不属于状态回滚。
++
++
++候选整体 world 还会预先准备 main/preload 的 source initializer 对应表：每个记录必须匹配新 source 实际 parser 文件、不可移动 registry 成员及真实 dense 顺序，GC staging 资源全部填充且保持未发布。maximum_private_source_initializer_modules 默认 4096，并在创建新 engine 前拒绝超额；内存由 maximum_native_payload_bytes 计费。真实旧 guest drain 和 OS/TLS join 完成后，管理器再次检查该表、旧 world 的当前 source/epoch/initializer serial 和实际 builtin WASIp1 loader 归属，才报告 prepared_world_ready_closed。两个 source/epoch 的完整发布与恢复线程启动仍是独立未完成步骤；这里没有发放新 initializer serial、source seal、执行权限或 VM/host ASM 调试上下文。Wasm 与 WASIp1 仍须在同一停止点一起 checkpoint。
++
++
++R38 native object quota diagnostics: the private actual-object/symbol ledger
++reserves 16 times the loaded object byte count, plus individual symbol storage,
++before decoding. The public native payload default stays 256 MiB. Large modules
++with thousands of instruction resume landings may need an explicitly larger
++request budget; the complete instance test uses 512 MiB and the two-module
++preload test uses 768 MiB. Both continue to exercise smaller budget refusal. A loader quota refusal now reports the actual
++resource phase (quota_exceeded, diagnostic 9) and engine exhausted (diagnostic
++5), while malformed endpoint declarations, observer setup and freeze checks
++retain distinct engine diagnostics (7, 8 and 9). These are private preparation
++results; no candidate is published and the original paused world stays intact.
+--- a/uwvm2/test/0017.runtime/debug_checkpoint_complete_instance_runtime.cc
++++ b/uwvm2/test/0017.runtime/debug_checkpoint_complete_instance_runtime.cc
+@@ -401,6 +401,11 @@
+                     auto const* inherited{gc::current_root_frames()};
+                     lib::llvm_jit_checkpoint_prepare_request prepare{};
+                     prepare.recording_label=label;prepare.graph_budget=cap;
++                    // Thousands of native resume landings also reserve the
++                    // complete object/symbol workspace. This explicit test
++                    // budget preserves the public 256 MiB default and all
++                    // real process/cgroup limits.
++                    prepare.maximum_native_payload_bytes=512u*1024u*1024u;
+                     auto expect_refused=[](lib::llvm_jit_checkpoint_prepare_result const& data)
+                     { REQUIRE(data.status!=lib::llvm_jit_checkpoint_prepare_status::prepared_and_discarded && data.engines==0u); };
+                     auto invalid=prepare;invalid.recording_label={};
+@@ -415,6 +420,14 @@
+                     ::std::array<lib::llvm_jit_checkpoint_thread_capture_owner,2u> duplicate{captured[0u],captured[0u]};
+                     expect_refused(lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,duplicate,prepare));
+                     expect_refused(lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,{captured.data(),1u},prepare));
++                    auto source_limited=prepare;source_limited.maximum_private_source_initializer_modules=0u;
++                    auto const source_epoch=lib::observe_compiler_runtime_generation_host_api();
++                    auto const source_serial=::uwvm2::runtime::gc::published_initializer_serial.load(::std::memory_order_acquire);
++                    auto source_refused=lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,captured,source_limited);
++                    REQUIRE(source_refused.status==lib::llvm_jit_checkpoint_prepare_status::source_initializer_binding_preparation_declined &&
++                        !source_refused.runtime_source_initializer_bindings_prepared && source_refused.engines==0u);
++                    REQUIRE(lib::observe_compiler_runtime_generation_host_api()==source_epoch &&
++                        ::uwvm2::runtime::gc::published_initializer_serial.load(::std::memory_order_acquire)==source_serial);
+                     auto prepared=lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,captured,prepare);
+                     ::fast_io::print(::fast_io::out(),"WORLD_PREPARATION status=",::fast_io::mnp::dec(static_cast<unsigned>(prepared.status)),
+                         " resource=",::fast_io::mnp::dec(prepared.resource_diagnostic)," engine=",::fast_io::mnp::dec(prepared.engine_diagnostic),
+@@ -436,6 +449,8 @@
+                         " debug_tls_restored=",prepared.private_debug_tls_restored,"\n");
+                     REQUIRE(prepared.status==lib::llvm_jit_checkpoint_prepare_status::prepared_and_discarded &&
+                         prepared.data_error==cp::error::none && prepared.modules==1u &&
++                        prepared.runtime_source_initializer_bindings_prepared && prepared.prepared_source_initializer_modules==1u &&
++                        prepared.prepared_source_initializer_preloads==0u &&
+                         prepared.engines==1u && prepared.functions!=0u && prepared.prepared_threads==2u && prepared.prepared_frames==2u &&
+                         prepared.prepared_root_carriers!=0u && prepared.native_payload_bytes<=prepare.maximum_native_payload_bytes);
+                     REQUIRE(prepared.validated_private_root_scopes==2u && prepared.installed_private_root_frames==6u &&
+@@ -446,6 +461,20 @@
+                         prepared.private_worker_roots_restored && gc::current_root_frames()==inherited);
+                     REQUIRE(prepared.prepared_private_debug_workers==2u && prepared.enrolled_private_debug_workers==2u &&
+                         prepared.private_debug_cohort_held && prepared.private_debug_tls_restored);
++#if defined(UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2) && UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2 == 1
++                    if(positives==0u)
++                    {
++                        auto object_small=prepare;object_small.maximum_native_payload_bytes=1024u*1024u;
++                        auto object_refused=lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,captured,object_small);
++                        REQUIRE(object_refused.status==lib::llvm_jit_checkpoint_prepare_status::engine_preparation_declined &&
++                            object_refused.engine_diagnostic==5u && object_refused.resource_diagnostic==9u &&
++                            object_refused.engines==0u && !object_refused.runtime_native_endpoint_capture_prepared &&
++                            object_refused.native_payload_bytes<=object_small.maximum_native_payload_bytes);
++                        REQUIRE(gc::current_root_frames()==inherited &&
++                            lib::observe_compiler_runtime_generation_host_api()==source_epoch &&
++                            gc::published_initializer_serial.load(::std::memory_order_acquire)==source_serial);
++                    }
++#endif
+                     auto workers_small=prepare;workers_small.maximum_private_root_workers=1u;
+                     auto workers_refused=lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,captured,workers_small);
+                     REQUIRE(workers_refused.status==lib::llvm_jit_checkpoint_prepare_status::worker_root_preparation_declined &&
+--- a/uwvm2/test/0017.runtime/debug_checkpoint_complete_preload_runtime.cc
++++ b/uwvm2/test/0017.runtime/debug_checkpoint_complete_preload_runtime.cc
+@@ -450,6 +450,11 @@
+                     check_graph(*actual.graph,cap,label,main_id,provider_id,main_original,provider_original);
+                     lib::llvm_jit_checkpoint_prepare_request prepare{};
+                     prepare.recording_label=label;prepare.graph_budget=cap;
++                    // Thousands of native resume landings also reserve the
++                    // complete object/symbol workspace. This explicit test
++                    // budget preserves the public 256 MiB default and all
++                    // real process/cgroup limits.
++                    prepare.maximum_native_payload_bytes=768u*1024u*1024u;
+                     auto expect_refused=[](lib::llvm_jit_checkpoint_prepare_result const& data)
+                     { REQUIRE(data.status!=lib::llvm_jit_checkpoint_prepare_status::prepared_and_discarded && data.engines==0u); };
+                     auto invalid=prepare;invalid.recording_label={};
+@@ -464,6 +469,14 @@
+                     ::std::array<lib::llvm_jit_checkpoint_thread_capture_owner,2u> duplicate{captured[0u],captured[0u]};
+                     expect_refused(lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,duplicate,prepare));
+                     expect_refused(lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,{captured.data(),1u},prepare));
++                    auto source_limited=prepare;source_limited.maximum_private_source_initializer_modules=1u;
++                    auto const source_epoch=lib::observe_compiler_runtime_generation_host_api();
++                    auto const source_serial=::uwvm2::runtime::gc::published_initializer_serial.load(::std::memory_order_acquire);
++                    auto source_refused=lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,captured,source_limited);
++                    REQUIRE(source_refused.status==lib::llvm_jit_checkpoint_prepare_status::source_initializer_binding_preparation_declined &&
++                        !source_refused.runtime_source_initializer_bindings_prepared && source_refused.engines==0u);
++                    REQUIRE(lib::observe_compiler_runtime_generation_host_api()==source_epoch &&
++                        ::uwvm2::runtime::gc::published_initializer_serial.load(::std::memory_order_acquire)==source_serial);
+                     auto prepared=lib::llvm_jit_checkpoint_prepare_instance_host_api(ticket,captured,prepare);
+                     ::fast_io::print(::fast_io::out(),"WORLD_PREPARATION status=",::fast_io::mnp::dec(static_cast<unsigned>(prepared.status)),
+                         " resource=",::fast_io::mnp::dec(prepared.resource_diagnostic)," engine=",::fast_io::mnp::dec(prepared.engine_diagnostic),
+@@ -485,6 +498,8 @@
+                         " debug_tls_restored=",prepared.private_debug_tls_restored,"\n");
+                     REQUIRE(prepared.status==lib::llvm_jit_checkpoint_prepare_status::prepared_and_discarded &&
+                         prepared.data_error==cp::error::none && prepared.modules==2u &&
++                        prepared.runtime_source_initializer_bindings_prepared && prepared.prepared_source_initializer_modules==2u &&
++                        prepared.prepared_source_initializer_preloads==1u &&
+                         prepared.engines==2u && prepared.functions!=0u && prepared.prepared_threads==2u && prepared.prepared_frames==2u &&
+                         prepared.prepared_root_carriers!=0u && prepared.native_payload_bytes<=prepare.maximum_native_payload_bytes);
+                     REQUIRE(prepared.started_private_root_workers==2u && prepared.enrolled_private_root_workers==2u &&
+--- a/uwvm2/test/0017.runtime/debug_checkpoint_prepared_retirement_runtime.cc
++++ b/uwvm2/test/0017.runtime/debug_checkpoint_prepared_retirement_runtime.cc
+@@ -360,6 +360,11 @@
+     auto invalid{prepare_request};invalid.recording_label={};
+     auto denied{lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline())};
+     REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::invalid_request && !denied.operation);
++    invalid=prepare_request;invalid.maximum_private_source_initializer_modules=0u;
++    denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
++    REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::source_initializer_binding_preparation_declined &&
++        !denied.operation && !denied.candidate_world_retained && !denied.preparation.runtime_source_initializer_bindings_prepared && denied.preparation.engines==0u);
++    REQUIRE(state->control->capture(state->ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch);
+     invalid=prepare_request;invalid.maximum_private_dispatch_bindings=1u;
+     denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
+     REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined && !denied.operation && !denied.candidate_world_retained);
+@@ -391,6 +396,9 @@
+         pending.preparation.data_error==::uwvm2::uwvm::debugger::checkpoint::error::none &&
+         pending.preparation.modules==1u && pending.preparation.engines==1u && pending.preparation.prepared_threads==2u &&
+         pending.preparation.started_private_root_workers==2u && pending.preparation.joined_private_root_workers==2u);
++    REQUIRE(pending.preparation.runtime_source_initializer_bindings_prepared &&
++        pending.preparation.prepared_source_initializer_modules==pending.preparation.modules && pending.preparation.prepared_source_initializer_preloads==0u &&
++        !pending.source_initializer_bindings_rechecked_after_physical_join);
+     REQUIRE(pending.preparation.runtime_dispatch_bindings_prepared &&
+         pending.preparation.prepared_runtime_defined_bindings==pending.preparation.functions &&
+         pending.preparation.prepared_runtime_defined_bindings==3u && pending.preparation.prepared_runtime_import_bindings==0u &&
+@@ -478,7 +486,7 @@
+     { ::std::lock_guard lock{windows->mutex}; windows->release_tls[1u-first_tls] = true; windows->changed.notify_all(); }
+     auto joined{lib::llvm_jit_checkpoint_continue_native_retirement_host_api(operation,deadline())};
+     ::fast_io::print(::fast_io::out(),"NATIVE_COHORT stage=join status=",::fast_io::mnp::dec(static_cast<unsigned>(joined.status)),"\n");
+-    REQUIRE(joined.status==outcome::prepared_world_ready_closed && joined.operation==operation &&
++    REQUIRE(joined.status==outcome::prepared_world_ready_closed && joined.operation==operation && joined.source_initializer_bindings_rechecked_after_physical_join &&
+         joined.execution_drained && joined.native_workers_joined && joined.candidate_world_retained && joined.workers==2u);
+     legacy_refused(); // physical join alone must NOT reopen the retained original world.
+     REQUIRE(lib::llvm_jit_checkpoint_discard_prepared_instance_host_api(wrong_address,deadline()).status==outcome::stale_owner);
+--- a/uwvm2/test/0017.runtime/debug_wasip1_prepared_retirement_runtime.cc
++++ b/uwvm2/test/0017.runtime/debug_wasip1_prepared_retirement_runtime.cc
+@@ -149,7 +149,13 @@
+     require(strict.status==outcome::preparation_declined && strict.preparation.wasip1_status==lib::llvm_jit_wasip1_environment_capsule_status::unsupported_resource && !strict.operation,"strict policy refuses retained original stdio before retirement");
+     require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"preparation failures leave old guest paused and unchanged");
+     request.require_managed_wasip1_resources=false;
+-    auto limited=request;limited.maximum_private_dispatch_bindings=1u;
++    auto limited=request;limited.maximum_private_source_initializer_modules=0u;
++    auto source_refused{lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,limited,deadline())};
++    require(source_refused.status==outcome::preparation_declined && source_refused.preparation.status==lib::llvm_jit_checkpoint_prepare_status::source_initializer_binding_preparation_declined &&
++        !source_refused.operation && !source_refused.candidate_world_retained && !source_refused.preparation.runtime_source_initializer_bindings_prepared && source_refused.preparation.engines==0u,
++        "source initializer quota refuses before engine allocation and old WASI retirement");
++    require(state->control->capture(state->ticket).result==::uwvm2::utils::thread::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"source binding refusal preserves the same pause and runtime epoch");
++    limited=request;limited.maximum_private_dispatch_bindings=1u;
+     auto bindings_refused=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,limited,deadline());
+     require(bindings_refused.status==outcome::preparation_declined && bindings_refused.preparation.status==lib::llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined && !bindings_refused.operation,"private dispatch budget refuses before old worker retirement");
+     require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"dispatch failure leaves original WASI guest unchanged");
+@@ -167,6 +173,9 @@
+     ::fast_io::print(::fast_io::out(),"WASIP1_PREPARED_RETIREMENT stage=execution status=",::fast_io::mnp::dec(static_cast<unsigned>(pending.status))," prepare=",::fast_io::mnp::dec(static_cast<unsigned>(pending.preparation.status)),"\n");
+     require(pending.status==outcome::pending_execution && pending.operation && pending.candidate_world_retained,"candidate survives pending execution drain");
+     require(pending.preparation.status==lib::llvm_jit_checkpoint_prepare_status::prepared_and_retained && pending.preparation.data_error==::uwvm2::uwvm::debugger::checkpoint::error::none && pending.preparation.wasip1_installed_privately && pending.preparation.wasip1_prepared_together && pending.preparation.wasip1_environments==1u && pending.preparation.prepared_wasip1_memories==1u && pending.preparation.joined_private_root_workers==1u,"new WASI memory and complete private candidate retained together");
++    require(pending.preparation.runtime_source_initializer_bindings_prepared &&
++        pending.preparation.prepared_source_initializer_modules==pending.preparation.modules && pending.preparation.prepared_source_initializer_preloads==0u &&
++        !pending.source_initializer_bindings_rechecked_after_physical_join,"source initializer bindings remain private before physical join");
+     require(pending.preparation.runtime_dispatch_bindings_prepared && pending.preparation.prepared_runtime_defined_bindings==pending.preparation.functions && pending.preparation.prepared_runtime_import_bindings>0u && pending.preparation.prepared_runtime_defined_pointer_ranges>0u,"new source owns complete defined and builtin WASI dispatch bindings");
+     require(pending.preparation.runtime_indirect_bindings_prepared && pending.preparation.prepared_runtime_type_bindings>0u,"private caller type bindings prepared");
+ #if defined(UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2) && UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2 == 1
+@@ -189,7 +198,7 @@
+     auto early{lib::llvm_jit_checkpoint_discard_prepared_instance_host_api(operation,short_deadline())};require(early.status==outcome::pending_native_join && early.candidate_world_retained,"discard cannot bypass unfinished TLS death");
+     { ::std::lock_guard lock{windows->mutex};windows->release_tls=true;windows->changed.notify_all(); }
+     auto ready{lib::llvm_jit_checkpoint_continue_native_retirement_host_api(operation,deadline())};
+-    require(ready.status==outcome::prepared_world_ready_closed && ready.native_workers_joined && ready.candidate_world_retained,"private candidate ready only after physical join");blocked();
++    require(ready.status==outcome::prepared_world_ready_closed && ready.native_workers_joined && ready.candidate_world_retained && ready.source_initializer_bindings_rechecked_after_physical_join,"private candidate ready only after physical join");blocked();
+     require(lib::observe_compiler_runtime_generation_host_api()==epoch && launch->output==0xa5a5a5a5u,"no candidate publication or original return output");
+     auto discarded{lib::llvm_jit_checkpoint_discard_prepared_instance_host_api(operation,deadline())};
+     require(discarded.status==outcome::retired_and_joined && !discarded.candidate_world_retained && discarded.all_frames_signalled,"explicit discard releases private candidate and reopens same instance");

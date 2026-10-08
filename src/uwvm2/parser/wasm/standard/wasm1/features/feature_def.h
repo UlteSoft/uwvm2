@@ -44,6 +44,7 @@
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm3/type/recursive_type.h>
 # include <uwvm2/parser/wasm/standard/wasm1/section/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/opcode/impl.h>
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
@@ -187,6 +188,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     {
         union storage_t
         {
+            ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 tag_type_index;
             ::uwvm2::parser::wasm::standard::wasm1::features::final_function_type<Fs...> const* function;
             static_assert(::std::is_trivially_copyable_v<decltype(function)> && ::std::is_trivially_destructible_v<decltype(function)>);
 
@@ -467,6 +469,60 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 ++curr_importdesc_counter;
                 break;
             }
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::tag:
+            {
+                // After ADL degradation, pointer access is safe.
+                auto& curr_importdesc_counter{extern_type_details_wrapper.importdesc_counter_ptr[4u]};
+
+                if constexpr(::std::same_as<char_type, char>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                     "tag[",
+                                                                     curr_importdesc_counter,
+                                                                     "]: {",
+                                                                     extern_type_details_wrapper.extern_type_ptr->storage.tag_type_index,
+                                                                     "}");
+                }
+                else if constexpr(::std::same_as<char_type, wchar_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                     L"tag[",
+                                                                     curr_importdesc_counter,
+                                                                     L"]: {",
+                                                                     extern_type_details_wrapper.extern_type_ptr->storage.tag_type_index,
+                                                                     L"}");
+                }
+                else if constexpr(::std::same_as<char_type, char8_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                     u8"tag[",
+                                                                     curr_importdesc_counter,
+                                                                     u8"]: {",
+                                                                     extern_type_details_wrapper.extern_type_ptr->storage.tag_type_index,
+                                                                     u8"}");
+                }
+                else if constexpr(::std::same_as<char_type, char16_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                     u"tag[",
+                                                                     curr_importdesc_counter,
+                                                                     u"]: {",
+                                                                     extern_type_details_wrapper.extern_type_ptr->storage.tag_type_index,
+                                                                     u"}");
+                }
+                else if constexpr(::std::same_as<char_type, char32_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                     U"tag[",
+                                                                     curr_importdesc_counter,
+                                                                     U"]: {",
+                                                                     extern_type_details_wrapper.extern_type_ptr->storage.tag_type_index,
+                                                                     U"}");
+                }
+
+                ++curr_importdesc_counter;
+                break;
+            }
             [[unlikely]] default:
             {
                 if constexpr(::std::same_as<char_type, char>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "unknown"); }
@@ -493,6 +549,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
     namespace details::wasm1_import_section_details_print
     {
+        // Rich Core 3 table/global wrappers use the public stream formatter.
+        // Only select the bounded reserve/context path when every variant
+        // actually supplies that protocol; otherwise use print_define above.
+        // This also keeps the legacy bounded context path for MVP wrappers.
+        template <typename Char, typename... Fs>
+        concept reserve_body_supported = requires(Char* curr, wasm1_final_extern_type<Fs...> const& value)
+        {
+            print_reserve_size(::fast_io::io_reserve_type<Char, decltype(section_details(value.storage.table))>, section_details(value.storage.table));
+            { print_reserve_define(::fast_io::io_reserve_type<Char, decltype(section_details(value.storage.table))>, curr,
+                                   section_details(value.storage.table)) } -> ::std::same_as<Char*>;
+            print_reserve_size(::fast_io::io_reserve_type<Char, decltype(section_details(value.storage.memory))>, section_details(value.storage.memory));
+            { print_reserve_define(::fast_io::io_reserve_type<Char, decltype(section_details(value.storage.memory))>, curr,
+                                   section_details(value.storage.memory)) } -> ::std::same_as<Char*>;
+            print_reserve_size(::fast_io::io_reserve_type<Char, decltype(section_details(value.storage.global))>, section_details(value.storage.global));
+            { print_reserve_define(::fast_io::io_reserve_type<Char, decltype(section_details(value.storage.global))>, curr,
+                                   section_details(value.storage.global)) } -> ::std::same_as<Char*>;
+        };
+
         template <::std::integral char_type, ::std::size_t n>
         inline constexpr ::std::size_t literal_size(char_type const (&)[n]) noexcept
         {
@@ -510,6 +584,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(table_prefix, "table[");
         UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(memory_prefix, "memory[");
         UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(global_prefix, "global[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(tag_prefix, "tag[");
         UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(body_prefix, "]: {");
         UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(right_brace, "}");
         UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(unknown, "unknown");
@@ -540,6 +615,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     }  // namespace details::wasm1_import_section_details_print
 
     template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        requires details::wasm1_import_section_details_print::reserve_body_supported<char_type, Fs...>
     inline constexpr ::std::size_t print_reserve_static_stack_size(
         ::fast_io::io_reserve_type_t<char_type, wasm1_final_extern_type_section_details_wrapper_t<Fs...>>) noexcept
     {
@@ -548,6 +624,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     }
 
     template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        requires details::wasm1_import_section_details_print::reserve_body_supported<char_type, Fs...>
     inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<char_type, wasm1_final_extern_type_section_details_wrapper_t<Fs...>>,
                                                       wasm1_final_extern_type_section_details_wrapper_t<Fs...> const extern_type_details_wrapper) noexcept
     {
@@ -574,12 +651,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     details::wasm1_import_section_details_print::global_prefix<char_type>(),
                     details::wasm1_import_section_details_print::literal_size(details::wasm1_import_section_details_print::global_prefix<char_type>()),
                     section_details(extern_type_details_wrapper.extern_type_ptr->storage.global));
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::tag:
+                return details::wasm1_import_section_details_print::literal_size(details::wasm1_import_section_details_print::tag_prefix<char_type>()) +
+                    2uz * print_reserve_size(::fast_io::io_reserve_type<char_type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>) +
+                    details::wasm1_import_section_details_print::literal_size(details::wasm1_import_section_details_print::body_prefix<char_type>()) +
+                    details::wasm1_import_section_details_print::literal_size(details::wasm1_import_section_details_print::right_brace<char_type>());
             [[unlikely]] default:
                 return details::wasm1_import_section_details_print::literal_size(details::wasm1_import_section_details_print::unknown<char_type>());
         }
     }
 
     template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        requires details::wasm1_import_section_details_print::reserve_body_supported<char_type, Fs...>
     inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, wasm1_final_extern_type_section_details_wrapper_t<Fs...>>,
                                                      char_type* iter,
                                                      wasm1_final_extern_type_section_details_wrapper_t<Fs...> const extern_type_details_wrapper) noexcept
@@ -637,6 +720,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     details::wasm1_import_section_details_print::global_prefix<char_type>(),
                     curr_importdesc_counter,
                     section_details(extern_type_details_wrapper.extern_type_ptr->storage.global));
+                ++curr_importdesc_counter;
+                return iter;
+            }
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::tag:
+            {
+                auto& curr_importdesc_counter{extern_type_details_wrapper.importdesc_counter_ptr[4u]};
+                // [reserved output ... end] writer consumes only its precomputed reservation.
+                // ^^ iter advances to the first unwritten character; no input cursor changes.
+                iter = details::wasm1_import_section_details_print::copy_indexed_body(
+                    iter,
+                    details::wasm1_import_section_details_print::tag_prefix<char_type>(),
+                    curr_importdesc_counter,
+                    extern_type_details_wrapper.extern_type_ptr->storage.tag_type_index);
                 ++curr_importdesc_counter;
                 return iter;
             }
@@ -1448,6 +1544,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 table_idx;
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memory_idx;
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 global_idx;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 tag_idx;
     };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -1597,6 +1694,34 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
                 break;
             }
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::tag:
+            {
+                // After ADL degradation, pointer access is safe.
+                auto const curr_sign{export_type_details_wrapper.export_type_ptr->storage.tag_idx};
+
+                if constexpr(::std::same_as<char_type, char>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "tag[", curr_sign, "]");
+                }
+                else if constexpr(::std::same_as<char_type, wchar_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"tag[", curr_sign, L"]");
+                }
+                else if constexpr(::std::same_as<char_type, char8_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"tag[", curr_sign, u8"]");
+                }
+                else if constexpr(::std::same_as<char_type, char16_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"tag[", curr_sign, u"]");
+                }
+                else if constexpr(::std::same_as<char_type, char32_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"tag[", curr_sign, U"]");
+                }
+
+                break;
+            }
             [[unlikely]] default:
             {
                 if constexpr(::std::same_as<char_type, char>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "unknown"); }
@@ -1639,6 +1764,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(table_prefix, "table[");
         UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(memory_prefix, "memory[");
         UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(global_prefix, "global[");
+        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(tag_prefix, "tag[");
         UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(right_bracket, "]");
         UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(unknown, "unknown");
 
@@ -1691,6 +1817,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 return details::wasm1_export_section_details_print::index_body_size(
                     details::wasm1_export_section_details_print::global_prefix<char_type>(),
                     details::wasm1_export_section_details_print::literal_size(details::wasm1_export_section_details_print::global_prefix<char_type>()));
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::tag:
+                return details::wasm1_export_section_details_print::index_body_size(
+                    details::wasm1_export_section_details_print::tag_prefix<char_type>(),
+                    details::wasm1_export_section_details_print::literal_size(details::wasm1_export_section_details_print::tag_prefix<char_type>()));
             [[unlikely]] default: return details::wasm1_export_section_details_print::literal_size(details::wasm1_export_section_details_print::unknown<char_type>());
         }
     }
@@ -1722,6 +1852,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     iter,
                     details::wasm1_export_section_details_print::global_prefix<char_type>(),
                     export_type_details_wrapper.export_type_ptr->storage.global_idx);
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::tag:
+                return details::wasm1_export_section_details_print::copy_index_body(
+                    iter,
+                    details::wasm1_export_section_details_print::tag_prefix<char_type>(),
+                    export_type_details_wrapper.export_type_ptr->storage.tag_idx);
             [[unlikely]] default: return details::wasm1_export_section_details_print::copy_literal(iter, details::wasm1_export_section_details_print::unknown<char_type>());
         }
     }
@@ -2338,6 +2473,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     {
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 count{};
         ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> type{};
+        // Compile-time declaration metadata; it occupies existing padding on the qualified targets.
+        bool requires_function_references{};
+        // Core 3 exact heap/nullability survives the legacy execution-carrier projection.
+        // A false marker means the one-byte legacy type is authoritative.
+        ::uwvm2::parser::wasm::standard::wasm3::type::core_value_type core_type{};
+        bool has_core_type{};
     };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>

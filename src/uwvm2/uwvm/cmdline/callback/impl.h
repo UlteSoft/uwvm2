@@ -54,6 +54,7 @@
 # include "runtime_llvm_jit_policy.h"
 # include "runtime_llvm_jit_lazy_policy.h"
 # include "runtime_llvm_jit_full_policy.h"
+# include "runtime_llvm_jit_exception_dispatch.h"
 # include "runtime_llvm_jit_call_stack.h"
 # include "runtime_llvm_jit_cache_path.h"
 # include "runtime_debug_int.h"

@@ -1,0 +1,8 @@
+{
+  "upstream_commit": "6dfe1677ab8dffbc6ec13d53a1e0215d75147689",
+  "path": "libunwind/src/EHHeaderParser.hpp",
+  "upstream_sha256": "09a9460a2d7c6eba4f5f47e6e353cff3d283d3f6ff242a085cf9d7d591a1a7f1",
+  "patched_sha256": "b45b505688bdf27ef326f1e2b824fde8b44b4b9776979e6ba8a542fef07411c4",
+  "patch_sha256": "19a752e5ca9aa4eaa393782dcd5ccf97f0b233b45c707d0de7799f0b793e3b7c",
+  "scope": "ELF datarel|sdata4 fixed-stride lookup; generic fallback unchanged; x86-64 Linux tested"
+}

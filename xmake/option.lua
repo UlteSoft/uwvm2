@@ -135,6 +135,26 @@ option("enable-lto", function()
     set_default(true)
 end)
 
+option("linux-native-debug", function()
+    set_description("Enable Wasm-only Linux native debugging with a qualified LLVM native-owner-table-v2 SDK; the target signal ABI and JIT loader must be supported.")
+    set_default(false)
+end)
+
+option("linux-x64-native-debug", function()
+    set_description("Enable Wasm-only Linux x86-64 native debugging with a qualified LLVM native-owner-table-v2 SDK; unavailable ownership never falls back to VM text.")
+    set_default(false)
+end)
+
+option("macos-x64-native-step", function()
+    set_description("Enable the opt-in macOS x86-64 protected Mach machine-step backend; actual native SDK/runtime qualification is still required.")
+    set_default(false)
+end)
+
+option("macos-4gib-test", function()
+    set_description("Build macOS ARM64 release semantics with O0 and no LTO for a 4 GiB product qualification run; default release stays O3.")
+    set_default(false)
+end)
+
 option("static", function()
     set_description
     (
@@ -181,6 +201,17 @@ option("build-source-id", function()
         "default = none"
     )
     set_default("none")
+end)
+
+option("numeric-exception-fused", function()
+    set_description("Use fused catch and direct tuple publication in the admitted numeric exception island (Linux x86-64 LLVM JIT).")
+    set_default(false)
+end)
+
+option("gc-allocation-profile", function()
+    set_description("Select GC allocation policy: default or general-slab (Linux x86-64 LLVM JIT, packed arrays and serialized publication).")
+    set_default("default")
+    set_values("default", "general-slab")
 end)
 
 option("use-thread-local", function()

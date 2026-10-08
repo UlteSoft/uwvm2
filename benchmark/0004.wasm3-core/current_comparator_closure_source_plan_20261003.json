@@ -1,0 +1,590 @@
+{
+  "schema": "uwvm-current-comparator-closure-source-plan-v1",
+  "date": "2026-10-03",
+  "source_only": true,
+  "native_executed": false,
+  "download_executed": false,
+  "current_performance_passed": false,
+  "formal_acceptance": false,
+  "execution_ready": false,
+  "production_source_edited": false,
+  "existing_commandlist_ancestor": {
+    "path": "benchmark/0004.wasm3-core/current_wasm_reference_inner_commands_20261003_v2.json",
+    "bytes": 15088,
+    "sha256": "7f6558badcddb7fa8aa50cdd4e9e118d523925511c3bc4b8a25aecde8fbb1368"
+  },
+  "official_candidates_and_historical_tools": {
+    "wasmtime": {
+      "official_candidate_checked_2026_10_03": "49.0.1",
+      "official_source": "https://github.com/bytecodealliance/wasmtime/releases/tag/v49.0.1",
+      "historical_linux_executable": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+        "sha256": "c36ef7e6548600b09bcb34cb3ee4c138f3e7b01893347ec7f48fdb8e6050aa94"
+      },
+      "current_actual_executable": null,
+      "current_actual_version_receipt": null,
+      "current_official_asset_or_source_build_provenance": null,
+      "current_loaded_runtime_closure": null,
+      "current_cold_passed": false,
+      "execution_ready": false,
+      "requires": [
+        "Fresh exact executable/tool help/version and actual resolved loader/DSO files with bytes/SHA/before-after binding",
+        "Official release asset provenance/checksum or exact source/Cargo.lock/build flags/provider closure",
+        "Genuine current64GiB/swap0CG/P0/UID/birth/originalPIDFD/whole multiTID reference admission",
+        "Exact same-byte syntax/control cold under selected compiler and collector before timing"
+      ]
+    },
+    "wasmer": {
+      "official_candidate_checked_2026_10_03": "7.4.2",
+      "official_source": "https://github.com/wasmerio/wasmer/releases/tag/v7.4.2",
+      "historical_linux_executable": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmer74-unpacked/bin/wasmer",
+        "sha256": "701ceeaa596f710a6fb097c462de9f9571177d7484662b871719ab66a08a2949"
+      },
+      "current_actual_executable": null,
+      "current_actual_version_receipt": null,
+      "current_official_asset_or_source_build_provenance": null,
+      "current_loaded_runtime_closure": null,
+      "current_cold_passed": false,
+      "execution_ready": false,
+      "requires": [
+        "Fresh exact executable/tool help/version and actual resolved loader/DSO files with bytes/SHA/before-after binding",
+        "Official release asset provenance/checksum or exact source/Cargo.lock/build flags/provider closure",
+        "Genuine current64GiB/swap0CG/P0/UID/birth/originalPIDFD/whole multiTID reference admission",
+        "Exact same-byte syntax/control cold under selected compiler and collector before timing",
+        "Pin actual compiler backend(s) and actual libunwind/libLLVM/runtime providers; moderntry_table/throw_ref cold is independent of advertised olderEH"
+      ]
+    },
+    "wavm": {
+      "official_candidate_checked_2026_10_03": "nightly/2026-04-05 prerelease",
+      "official_source": "https://github.com/WAVM/WAVM/releases/tag/nightly/2026-04-05",
+      "historical_linux_executable": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wavm-nightly-2026-04-05/bin/wavm",
+        "sha256": "daf29ef8ebbd9eaa20a13115205b56fafd4b8cfd77b38333c647bb12851ecd23"
+      },
+      "current_actual_executable": null,
+      "current_actual_version_receipt": null,
+      "current_official_asset_or_source_build_provenance": null,
+      "current_loaded_runtime_closure": null,
+      "current_cold_passed": false,
+      "execution_ready": false,
+      "requires": [
+        "Fresh exact executable/tool help/version and actual resolved loader/DSO files with bytes/SHA/before-after binding",
+        "Official release asset provenance/checksum or exact source/Cargo.lock/build flags/provider closure",
+        "Genuine current64GiB/swap0CG/P0/UID/birth/originalPIDFD/whole multiTID reference admission",
+        "Exact same-byte syntax/control cold under selected compiler and collector before timing",
+        "Correct `version` subcommand; actual `help run`; libLLVM/loader closure and prerelease artifact provenance",
+        "GC/modern EH source unsupported in this pinned candidate; no translated substitute or timed rejection"
+      ]
+    },
+    "wasmedge": {
+      "official_candidate_checked_2026_10_03": "0.17.2",
+      "official_source": "https://github.com/WasmEdge/WasmEdge/releases/tag/0.17.2",
+      "historical_linux_executable": {
+        "version": "0.17.1",
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmedge-0.17.1/bin/wasmedge",
+        "sha256": "998ba3478bd1d6c0365cf2461608900b0356bfb2e37b71b7bdf587182ff8b365",
+        "same_as_official_current": false,
+        "old_JIT_SIGSEGV_does_not_qualify_new_0_17_2": true
+      },
+      "current_actual_executable": null,
+      "current_actual_version_receipt": null,
+      "current_official_asset_or_source_build_provenance": null,
+      "current_loaded_runtime_closure": null,
+      "current_cold_passed": false,
+      "execution_ready": false,
+      "requires": [
+        "Fresh exact executable/tool help/version and actual resolved loader/DSO files with bytes/SHA/before-after binding",
+        "Official release asset provenance/checksum or exact source/Cargo.lock/build flags/provider closure",
+        "Genuine current64GiB/swap0CG/P0/UID/birth/originalPIDFD/whole multiTID reference admission",
+        "Exact same-byte syntax/control cold under selected compiler and collector before timing",
+        "New 0.17.2 directory and original official asset checksum/source/backend/LLVM/provider/plugins under keeper CG; never overwrite0.17.1",
+        "Do not invent exact run/JIT/AOT flags before actual0.17.2 help"
+      ]
+    },
+    "openjdk-temurin": {
+      "official_candidate_checked_2026_10_03": "27+35",
+      "official_source": "https://github.com/adoptium/temurin27-binaries/releases/tag/jdk-27%2B35",
+      "historical_linux_executable": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/temurin27-unpacked/jdk-27+35/bin/java",
+        "sha256": "306db8c7d74a1b2b8aadc0b82a52adfa564c4855d746a36b70c5304c45d23af6"
+      },
+      "current_actual_executable": null,
+      "current_actual_version_receipt": null,
+      "current_official_asset_or_source_build_provenance": null,
+      "current_loaded_runtime_closure": null,
+      "current_cold_passed": false,
+      "execution_ready": false,
+      "requires": [
+        "Fresh exact executable/tool help/version and actual resolved loader/DSO files with bytes/SHA/before-after binding",
+        "Official release asset provenance/checksum or exact source/Cargo.lock/build flags/provider closure",
+        "Genuine current64GiB/swap0CG/P0/UID/birth/originalPIDFD/whole multiTID reference admission",
+        "Exact same-byte syntax/control cold under selected compiler and collector before timing",
+        "Actual JDK release/libjvm/JVMCI compiler+all loaded JNI/runtime DSOs",
+        "Actual G1 flag/heap selection and all ManagedRing*.class plus javac --release21 compilation receipt matching exact existing source",
+        "Source-equivalent managed ring only, not sameWasm; 8x250k warmups excluded from internal loop but included in whole process",
+        "Existing mainthread allocatedbytes/collection telemetry; noexactdynamicallocation count inferred frombytes"
+      ]
+    },
+    "graalvm-ce": {
+      "official_candidate_checked_2026_10_03": "25.4.4.1.1 / JDK25.0.4.1.1",
+      "official_source": "https://github.com/graalvm/graalvm-ce-builds/releases/tag/graal-25.4.4.1.1",
+      "historical_linux_executable": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/graalvm254-unpacked/graalvm-community-25.4.4.1.1+1.1/bin/java",
+        "sha256": "489bc8ef27770e9d222d8e55f0a8f5aa0800f821eb01ba2479e2ffd5882c0f8b"
+      },
+      "current_actual_executable": null,
+      "current_actual_version_receipt": null,
+      "current_official_asset_or_source_build_provenance": null,
+      "current_loaded_runtime_closure": null,
+      "current_cold_passed": false,
+      "execution_ready": false,
+      "requires": [
+        "Fresh exact executable/tool help/version and actual resolved loader/DSO files with bytes/SHA/before-after binding",
+        "Official release asset provenance/checksum or exact source/Cargo.lock/build flags/provider closure",
+        "Genuine current64GiB/swap0CG/P0/UID/birth/originalPIDFD/whole multiTID reference admission",
+        "Exact same-byte syntax/control cold under selected compiler and collector before timing",
+        "Actual JDK release/libjvm/JVMCI compiler+all loaded JNI/runtime DSOs",
+        "Actual G1 flag/heap selection and all ManagedRing*.class plus javac --release21 compilation receipt matching exact existing source",
+        "Source-equivalent managed ring only, not sameWasm; 8x250k warmups excluded from internal loop but included in whole process",
+        "Existing mainthread allocatedbytes/collection telemetry; noexactdynamicallocation count inferred frombytes"
+      ]
+    },
+    "dotnet": {
+      "official_candidate_checked_2026_10_03": "GA runtime10.0.12 / SDK10.0.401",
+      "official_source": "https://dotnet.microsoft.com/en-us/download/dotnet/10.0",
+      "historical_linux_executable": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/dotnet-10.0.401/dotnet",
+        "sha256": "01d89e0a0191052bfea616cd4ce624c8faf13b05bbddf7f64499c23e2a9d9269"
+      },
+      "current_actual_executable": null,
+      "current_actual_version_receipt": null,
+      "current_official_asset_or_source_build_provenance": null,
+      "current_loaded_runtime_closure": null,
+      "current_cold_passed": false,
+      "execution_ready": false,
+      "requires": [
+        "Fresh exact executable/tool help/version and actual resolved loader/DSO files with bytes/SHA/before-after binding",
+        "Official release asset provenance/checksum or exact source/Cargo.lock/build flags/provider closure",
+        "Genuine current64GiB/swap0CG/P0/UID/birth/originalPIDFD/whole multiTID reference admission",
+        "Exact same-byte syntax/control cold under selected compiler and collector before timing",
+        "--version isSDK; fresh --info and --list-runtimes plus actual selected Microsoft.NETCore.App version",
+        "Pin actual hostfxr/hostpolicy/coreclr/clrgc/System.Private.CoreLib, runtimeconfig/deps and all ManagedRing assemblies plus compile receipt",
+        "Selected workstationGC, tieredPGO and actual1GiB heap config are recorded; no env-only claim",
+        "SDK page maps10.0.401to10.0.12; doesnot authenticate an existing process runtime"
+      ]
+    }
+  },
+  "inventory_fixed_inner_commands": [
+    {
+      "tool": "wasmtime",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+        "--version"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "wasmtime",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+        "run",
+        "--help"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "wasmtime",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+        "run",
+        "-C",
+        "help"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "wasmtime",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+        "run",
+        "-W",
+        "help"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "wasmer",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmer74-unpacked/bin/wasmer",
+        "--version"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "wasmer",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmer74-unpacked/bin/wasmer",
+        "run",
+        "--help"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "wavm",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wavm-nightly-2026-04-05/bin/wavm",
+        "version"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "wavm",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wavm-nightly-2026-04-05/bin/wavm",
+        "help",
+        "run"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "openjdk-temurin",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/temurin27-unpacked/jdk-27+35/bin/java",
+        "-version"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "openjdk-temurin",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/temurin27-unpacked/jdk-27+35/bin/java",
+        "-XX:+PrintCommandLineFlags",
+        "-Xms256m",
+        "-Xmx1g",
+        "-XX:+UseG1GC",
+        "-version"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "graalvm-ce",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/graalvm254-unpacked/graalvm-community-25.4.4.1.1+1.1/bin/java",
+        "-version"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "graalvm-ce",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/graalvm254-unpacked/graalvm-community-25.4.4.1.1+1.1/bin/java",
+        "-XX:+PrintCommandLineFlags",
+        "-Xms256m",
+        "-Xmx1g",
+        "-XX:+UseG1GC",
+        "-version"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "dotnet",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/dotnet-10.0.401/dotnet",
+        "--version"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "dotnet",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/dotnet-10.0.401/dotnet",
+        "--info"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    },
+    {
+      "tool": "dotnet",
+      "argv": [
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/dotnet-10.0.401/dotnet",
+        "--list-runtimes"
+      ],
+      "not_a_launcher": true,
+      "keeperCG_required": true,
+      "execution_ready": false
+    }
+  ],
+  "original_immutable16M_samebyte_fixture": {
+    "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-gc-allocation-20260928/gc-allocation/fixtures/gc-allocation-ring-16000000.wasm",
+    "bytes": 191,
+    "sha256": "66874f9a4a0a5977b4ace1cc702f949c6c2627311dce0bcbe87c818c55516e3e",
+    "iterations": 16000000,
+    "root_slots": 1024,
+    "LCG_state_u32": 493211925,
+    "source_equivalent_managed_root_xor_u32": 1488018432,
+    "runtime_self_check": "_start traps unless finalLCG equals493211925",
+    "exact_native_component_or_alternate_wat_substitution": false,
+    "current_R3_product_samebyte_cold": false,
+    "current_reference_samebyte_cold": false
+  },
+  "first_finite_samebyte_ring_inner_command": {
+    "tool": "wasmtime",
+    "argv": [
+      "taskset",
+      "-c",
+      "0",
+      "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+      "run",
+      "-C",
+      "cache=n,compiler=cranelift,collector=copying",
+      "-W",
+      "all-proposals=n,bulk-memory=y,multi-value=y,reference-types=y,simd=y,function-references=y,gc=y",
+      "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-gc-allocation-20260928/gc-allocation/fixtures/gc-allocation-ring-16000000.wasm"
+    ],
+    "compiler": "cranelift",
+    "collector": "copying",
+    "cache": "disabled",
+    "measurement": "whole-process wait4; nointernaltimer/isolatedGC/ns-perthrow claimed",
+    "keeper_first_cold_then_serial_three_reverse_pairs": true,
+    "single_tid_hardware_profile_admitted": false,
+    "ready": false
+  },
+  "existing_samebyte_memory64_and_modernEH": {
+    "ancestor": {
+      "path": "benchmark/0004.wasm3-core/current_wasm_reference_inner_commands_20261003_v2.json",
+      "bytes": 15088,
+      "sha256": "7f6558badcddb7fa8aa50cdd4e9e118d523925511c3bc4b8a25aecde8fbb1368"
+    },
+    "fixture_names": [
+      "memory64-random-store-5000000",
+      "memory64-random-store-50000000",
+      "plain_normal",
+      "eh_normal",
+      "eh_throws"
+    ],
+    "fixtures": {
+      "memory64-random-store-5000000": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-memory64-20260928/memory64/fixtures/memory64-random-store-5000000.wasm",
+        "iterations": 5000000,
+        "sha256": "5ed7090a0cbafe866be3eae0bbfc76ceeed6b1cb607dc0bc6392f4a829269fd9",
+        "self_check": "_start exits zero iff scalar result is correct"
+      },
+      "memory64-random-store-50000000": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-memory64-20260928/memory64/fixtures/memory64-random-store-50000000.wasm",
+        "iterations": 50000000,
+        "sha256": "322641f90c7b80225e942031988918da63e925e725a72dd2dd1f6c4b28cb36cc",
+        "self_check": "_start exits zero iff scalar result is correct"
+      },
+      "plain_normal": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/gc-ring-quiet-host-r3b-20260928/fixtures/plain_normal.wasm",
+        "bytes": 177,
+        "sha256": "03c56518a1d2ed9d0149791e3a241ddff773395e51bd48aeb67a9160d5bdba01",
+        "iterations": 200000000,
+        "checksum": 1231817216,
+        "expected_catches": 0,
+        "self_check": "existing _start asserts checksum and catches, traps on mismatch",
+        "current_Ordinary_cold_qualified": true,
+        "wasmtime49_current_reference_cold_qualified": false
+      },
+      "eh_normal": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/gc-ring-quiet-host-r3b-20260928/fixtures/eh_normal.wasm",
+        "bytes": 262,
+        "sha256": "f2b9df696835bdd0f759885b77862e4a3de56b506a96f3edc41e54b20a63be8a",
+        "iterations": 200000000,
+        "checksum": 1231817216,
+        "expected_catches": 0,
+        "self_check": "existing _start asserts checksum and catches, traps on mismatch",
+        "current_Ordinary_cold_qualified": true,
+        "wasmtime49_current_reference_cold_qualified": false
+      },
+      "eh_throws": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/gc-ring-quiet-host-r3b-20260928/fixtures/eh_throws.wasm",
+        "bytes": 275,
+        "sha256": "560243a56c6b29dbe0337548fa96626db2c168e56ea69d88208cffa4dfc48560",
+        "iterations": 8000000,
+        "checksum": 2464256,
+        "expected_catches": 500000,
+        "self_check": "existing _start asserts checksum and catches, traps on mismatch",
+        "current_Ordinary_cold_qualified": true,
+        "wasmtime49_current_reference_cold_qualified": false
+      }
+    },
+    "fresh_reference_and_product_cold_required": true,
+    "prior_current_Ordinary_cold_flags_are_historical_only": true,
+    "do_not_silently_extend_counts": true
+  },
+  "new_modern_throw_ref_semantic_control": {
+    "path": "benchmark/0004.wasm3-core/fixtures/reference_modern_eh_throw_ref_20261003.wat",
+    "bytes": 1067,
+    "sha256": "46edaa518d70aba11da0bb28461c5d4c55f7db8b94f26abcb5d2a5ce4e2885dd",
+    "expected_payload": 47,
+    "expected_successful_typed_catches": 2,
+    "expected_throw_ref_uses": 2,
+    "features": [
+      "exceptions",
+      "exception-ref-global",
+      "catch_all_ref",
+      "throw_ref"
+    ],
+    "actual_wasm_tools_compilation": null,
+    "actual_compiled_wasm": null,
+    "current_cold_passed": false,
+    "performance_scope": "semantic control only"
+  },
+  "separate_long64M_EH_source": {
+    "path": "benchmark/0004.wasm3-core/fixtures/current_eh_throws_64000000_20261003.wat",
+    "bytes": 1411,
+    "sha256": "071c7291d0da39c2c2067d139bcd001e3f737ea5372abbd99f857f94d69b1cc8",
+    "iterations": 64000000,
+    "expected_catches": 4000000,
+    "checksum_u32": 300732416,
+    "actual_compiledbyte_binding": null,
+    "current_reference_cold_passed": false
+  },
+  "managed_immutable16M_source_equivalent": {
+    "iterations": 16000000,
+    "checksum_u32": 493211925,
+    "root_xor_u32": 1488018432,
+    "root_slots": 1024,
+    "warmup_rounds": 8,
+    "warmup_iterations": 250000,
+    "extra_wholeprocess_syntactic_warmup_allocations": 2000000,
+    "telemetry_arg": "--gc-telemetry",
+    "java_common": [
+      "-Xms256m",
+      "-Xmx1g",
+      "-XX:+UseG1GC"
+    ],
+    "dotnet_environment_delta": {
+      "DOTNET_TieredPGO": "1",
+      "DOTNET_gcServer": "0",
+      "DOTNET_GCHeapHardLimit": "0x40000000",
+      "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1"
+    },
+    "actual_classdir_dll_artifact_binding": null,
+    "current_cold_passed": false,
+    "sameWasm_bytes": false,
+    "dynamic_allocation_count": null,
+    "internal_loop_timer_includes": "language Run loop only",
+    "whole_process_includes": "load/JIT/warmup/loop/telemetry/root verification/cleanup",
+    "receipt_checker_source": {
+      "path": "benchmark/0004.wasm3-core/check_managed_immutable_ring_20261003.py",
+      "bytes": 5349,
+      "sha256": "32d647aad52dc91d3cd256c4a93ac16519863fc0f0c8b63fd47ad83997820b1d"
+    },
+    "telemetry_counts_not_API_ROI_counters": true
+  },
+  "thread_comparison": {
+    "core_atomic_nonspawning_controls": [
+      "atomic RMW",
+      "wait mismatch",
+      "notify empty"
+    ],
+    "thread_creation_sameWasm_hostembedding_ready": false,
+    "wasm_worker_fixture_and_host_API_closure": null,
+    "requires": [
+      "Exact sameCoreWasmworker function/checksum/importedsharedmemory",
+      "Hostspawn/join1and4workers actual count, Store ownership/lifetimes, stacksize/admission/cancel/error semanticreceipts",
+      "NoWASIp2p3 orWASIX substitute; VMmanaged startup remains distinctfromatomic hotloop",
+      "Java/.NETplatformthreads source-equivalent only; cannotqualify missingWasm hostbridge",
+      "Actual per-TID P0/UID/CG ownership; no silentwideningoriginalsingleTIDcounter guard"
+    ]
+  },
+  "source_pins": [
+    {
+      "path": "benchmark/0004.wasm3-core/managed/java/ManagedRing.java",
+      "bytes": 5622,
+      "sha256": "b88d74d40c357b832a1fd014bb07b825e057a53dd65b6fe653cd218510370c9e"
+    },
+    {
+      "path": "benchmark/0004.wasm3-core/managed/dotnet/Program.cs",
+      "bytes": 4827,
+      "sha256": "b1c9433fe0dcf55ad7bfc828ff965f87a57750c4d0260d17a0dd8c09253cc2cc"
+    },
+    {
+      "path": "benchmark/0004.wasm3-core/managed/dotnet/ManagedRing.csproj",
+      "bytes": 268,
+      "sha256": "64a04d1c8db977dcd104b173e3a0a7b576479d3c8dfbc4fa7498c82b41cca12c"
+    },
+    {
+      "path": "benchmark/0004.wasm3-core/managed_threads/java/ManagedThreads.java",
+      "bytes": 3754,
+      "sha256": "70af8c77c225d7e5952b02eb3a458b928e4f5a8c7648f4d8d59b07247db21fc6"
+    },
+    {
+      "path": "benchmark/0004.wasm3-core/managed_threads/dotnet/Program.cs",
+      "bytes": 3759,
+      "sha256": "0ed6f3b7c45db2c994c22c826029048e83c3ddd45ab0f9599149abbd8c3fced3"
+    },
+    {
+      "path": "benchmark/0004.wasm3-core/check_managed_immutable_ring_20261003.py",
+      "bytes": 5349,
+      "sha256": "32d647aad52dc91d3cd256c4a93ac16519863fc0f0c8b63fd47ad83997820b1d"
+    },
+    {
+      "path": "benchmark/0004.wasm3-core/fixtures/reference_modern_eh_throw_ref_20261003.wat",
+      "bytes": 1067,
+      "sha256": "46edaa518d70aba11da0bb28461c5d4c55f7db8b94f26abcb5d2a5ce4e2885dd"
+    },
+    {
+      "path": "benchmark/0004.wasm3-core/CURRENT_COMPARATOR_CLOSURE_PLAN_20261003.md",
+      "bytes": 11370,
+      "sha256": "f71d9ad6e33441d025013ec173666364915222bc70830336c31135d44ebd9845"
+    }
+  ],
+  "pure_receipt_checks": {
+    "last_roots_direct_loop_oracles": 5,
+    "synthetic_valid_receipts": 4,
+    "synthetic_corruptions_rejected": 128,
+    "native_run": false,
+    "WAT_parsed": false
+  },
+  "EH_A1_reviewed_finite_component": {
+    "plan_path": "/tmp/uwvm-native-eh-phase1-component-source-20261003-r1/keeper-plan.json",
+    "plan_sha256": "2c79ac18e0b0dbd164ee4e1c2b12c7d4ce521af9510f23e5fae083971833a00f",
+    "approval": "parent reviewed separatecontext; immutable historical falseflagsnot rewritten",
+    "temporaryprovider_only": true,
+    "default_OFF": true,
+    "prefix_only": true,
+    "original_eager_fulltrace_preserved": true,
+    "component_semantics_only": true,
+    "actual_provider_execution_pending": true
+  },
+  "scope_limits": [
+    "Historical actualexecutables and rows are not currentproduct/reference qualifications",
+    "WasmEdge0.17.1 SIGSEGV preserved;0.17.2candidate hasunknownactualresult",
+    "SDKfree nativeGCcomponent and mutable locks do notreplaceoriginalimmutabletable16M Wasm",
+    "Wholeprocess hardwarecounts include setup/cleanup, nottimedAPIloop",
+    "Rawsysfsfrequency observed notROI-normalizedGHz;temperature observation only",
+    "Sub100ms unqualified; newlongcountneedsseparateexplicit source/oracle/bytecontract",
+    "Alltrue downloads/builds/tests/profilers via soleLinuxkeeper CG, noMacnative, no newlauncher/guardian"
+  ]
+}

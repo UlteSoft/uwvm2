@@ -1,0 +1,81 @@
+{
+  "Mac_native_execution_permitted": false,
+  "actual_scopes_already_documented": [
+    {
+      "report": "checkpoint_s390x_clang22_r1_actual_20261003.json",
+      "scope": "Four standalone format3 true BE codec variants; no LLVM23 ROS/full VM restore qualification"
+    },
+    {
+      "report": "freebsd_sdk_oracle_cold_r2_planfix_actual_20261003.json",
+      "scope": "27 crosscompilation/header/ELF/loader/provider checks; no guest execution"
+    },
+    {
+      "report": "freebsd_clean_image_r2_actual_20261003.json",
+      "scope": "Clean bounded official QCOW materialization; no guest execution"
+    },
+    {
+      "report": "windows_raii_cold_r4_llvm_static_actual_20261003_r2.json",
+      "scope": "Four earlier SDK-only PE/static LLVM runtime provider/bridge checks; no new launcher or native guest behavior"
+    }
+  ],
+  "all_compilation_and_vm_commands_require_same_64GiB_swap0_original_PIDFD_guardian": true,
+  "current_serial_order": [
+    "Linux keeper CLI23",
+    "freebsd-anonymous-data-map-r4",
+    "windows-regular-launcher-fixed30-r2-identityfix"
+  ],
+  "execution_requires_keeper_explicit_exact_suite_release": true,
+  "items": [
+    {
+      "actual_executed": false,
+      "checked_launcher_sha256": "4fb8b692ce0c600681246ed325521c00a8091d9b332fc2b8fcefd2218298e7e3",
+      "commands_sha256": "f7c235db5fc00cf5947850256ba4527b1ff9bdd7a14146af4bd44e5fe36fcb81",
+      "full_ROS_bundled_product_qualified": false,
+      "guardian_sha256": "ac36f0fb88f7a7cd5f979481e718afb7b83f9251280c803778ac8013ee77a355",
+      "guest_qualified": false,
+      "id": "freebsd-anonymous-data-map-r4",
+      "scope": "Fixed five stages with disposable KVM 4GiB/4E/noNIC guest and four frozen FreeBSD SDK components; no whole ROS or checkpoint continuation qualification",
+      "source_manifest_sha256": "42af708e1fae58689c10100b94ef538eef07aa386654bd28f5a891f0b1bf3552",
+      "source_materialized_metadata_only": true,
+      "source_review_approved": true
+    },
+    {
+      "actual_executed": false,
+      "checked_launcher_sha256": "ea9abfb117d47b497795a30c145b08e5720e1d0da94627fb10cab566775a9b06",
+      "commands_sha256": "faf1380a382ec923a5731315cffaa5559e14d44757961acf14d0153fbeba7298",
+      "full_ROS_bundled_product_qualified": false,
+      "guardian_sha256": "16ade4cecc5b757f0b791d9129b1cc1d335871b77955df6ffe147967415c76df",
+      "guest_qualified": false,
+      "id": "windows-regular-launcher-fixed30-r2-identityfix",
+      "scope": "Fixed 30 standalone crosscompile/link/COFF-PE inspections, four SDK ABI1 header variants; no guest, native TF/GPR, NI, whole product or ROS bundled acceptance",
+      "source_manifest_sha256": "632779de33194b155eaad0fbbee6ec92030c762f020de9d4f48350a06839e50a",
+      "source_materialized_metadata_only": true,
+      "source_review_approved": true,
+      "true_1516_leaf_source_archive_sha256": "bf9a6f95d4709255cb2fcb004726016841e156d4c0948598b3b2c683a0ea002e"
+    },
+    {
+      "CXX_provider": "GNU libstdc++ GCC15 _GLIBCXX_USE_CXX11_ABI=1, EH0/RTTI0/PIC1",
+      "actual_executed": false,
+      "full_ROS_bundled_product_qualified": false,
+      "id": "AArch64-GNU-matching-LLVM-missing-MC-components",
+      "matching_source_id": "sha256:b23efab67c1a95dc28d598274e885c1616b152f22fce6b651064d10df8b41b12",
+      "not_executable_ready": true,
+      "original_source_manifest_sha256": "43bb4796ee6ff84b94bbd736fb5ca3bdaaf1fa0d67813dc5affe4aa128aaa717",
+      "recipe_sha256": "2f1b008d4cb595af3e27de573395261c13940ba45eabcbdd08d3c42cd2bcce46",
+      "scope": "Same-source GNU GCC15 ABI supplemental MCDisassembler/AArch64Disassembler/AArch64AsmParser, 2 original TblGen generators + 8 fresh compilation units + 3 new archives; source-only incomplete guarded binder",
+      "source_review_approved": false
+    }
+  ],
+  "kind": "source-only-plan",
+  "native_launch_enabled": false,
+  "preserved_refusals": [
+    "freebsd_paused_map_r3_attempt2_actual_rejection_20261003.json",
+    "freebsd_paused_map_r3_actual_budget_failure_20261003.json",
+    "freebsd_serial_vm_r2_actual_failure_20261003.json",
+    "freebsd_sdk_oracle_cold_r1_actual_failure_20261003.json",
+    "windows_raii_cold_r1_actual_failure_20261003.json",
+    "windows_raii_cold_r2_actual_failure_20261003.json",
+    "windows_raii_cold_r3_actual_failure_20261003.json"
+  ],
+  "schema": "uwvm-qemu-platform-source-queue-r4"
+}

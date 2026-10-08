@@ -1,0 +1,37 @@
+Wasm 调试修复与验证，2026-10-04
+
+修复已写入本机 uwvm2 和 uwvm2-ros 的共享工作树；编译、Wasm 验证器与实际 VM 执行均在 SSH linux 既有测试 cgroup 内进行。
+
+修复内容
+1. 真正阻塞中的 atomic.wait 可以响应暂停。32/64 位 wait、memory32/memory64、无限通知等待和有限超时均可连续暂停、读取实际类型化操作数、修改共享内存并恢复。保留原等待节点、通知和原始超时截止时间；暂停不重放 compare/enqueue，也不制造新 opcode 事件。
+2. 恢复型检查点的结构化控制流显式传递栈前缀 PHI，修正 if 的两个分支、end、loop 初始边/回边及异常分支中的 SSA 支配关系，消除复杂模块准备时 LLVM verifier 拒绝与 SIGILL。普通及只观测 profile 不加入这些前缀 PHI。
+3. 用项目既有安全 helper 检查 open basic block，修正 LLVM 23 对 getTerminator 的断言失败。
+4. 修正保存入口第一帧的账本条件：此时允许经过完整原有身份/拥有者/执行代次验证的干净空账本；非空父链仍要求完整。空账本不成为可捕获调用链，不提供 native PC 权限。外部 host 区间、待接续尾调用和 poisoned 账本仍被拒绝。
+5. 私有 continuation clone 使用 noinline + optnone，并向 LLVM New PM 注册 OptNoneInstrumentation。保留正常公开函数的原优化管线，LLVM verifier 与代码生成仍执行。测试用旧 leaf continuation 入口也已改为保留不可变 Wasm 输入。
+
+验证结果
+每个仓库：124 个真实 VM 用例全部通过，另 1 项账本回归通过。两仓库合计 248 个真实 VM 用例 + 2 项账本回归。每库重新编译 10 个 TU，检查全体冻结源码、实际编译依赖、编译器/SDK/库及 8 个实际二进制的哈希。
+真实 VM 每库分布：阻塞等待 32；类型化状态修改 8；嵌套恢复型控制流 10；超过 4 GiB memory64 压力 4；保存的单帧/嵌套调用真实续跑 4；CLI 单步 8、Wasm 特性矩阵 56（28 项 × 两种策略）、替换脚本 2。
+两种调用栈策略 instruction/unwind 都覆盖。真实续跑验证了旧执行仍存活时拒绝恢复、实际退出后执行真实恢复入口、保存的 locals/i31/操作数保持，以及不重复捕获点前的 global/memory 写入。
+大地址压力 fixture 保留 4096 个 nop 和 65537 页；恢复型样本本次普通版约 196–200 秒，ROS 版约 163–172 秒，旧候选同一样本约 1151–1174 秒。这是本次运行观测，非独占机器基准。
+最终所有必要回归和归档步骤的监护记录均通过：测试进程在既有 cgroup 内，本任务的进程树均已回收，未信号/接管其他任务，OOM 计数不增加。中途一次并行构建因共享 cgroup OOM 计数增加而被停止；清理本任务约 10 GiB 旧产物后重试通过。普通版早期 180 秒压力限时失败也保留，未计作通过；最终用 360 秒限时完整通过。旧测试诊断、编译/链接/validator 命令不计入真实 VM 用例。
+
+边界与并行工作
+阻塞中的 wait 不暴露 VM helper PC 给 asmdbg。正在等待的队列尚无完整可持久化恢复身份，因此仍拒绝把它变成完整实例快照/可退休恢复点；暂停、读取、修改、恢复同一等待节点已验证。上述保存入口续跑是 execution slice，不能等同于整实例内存/文件/GC 回滚。
+这是针对本次问题与所列矩阵的回归，不代表穷尽 WebAssembly 3.0 全部规范用例。
+测试绑定下面固定源码快照。期间其他 agent 在 runtime.default.cpp、checkpoint_coherent_data_manager.h、single_func_emit.h 中追加的 WASIp1、numeric memory 和 asm numeric materialization 改动均保留，没有覆盖；这些随后新增改动不纳入本次冻结快照的整体验证。我们的修复块保留在两个本机工作树。ROS 保持既有 full interpreter + full LLVM JIT 产品与 .10 SDK pin。本次新增 C++ I/O 与字符串构造使用 fast_io。
+
+源码标识
+uwvm2: sha256:e08df19da304b5af8fe63ba3fae6826dfc91c3bf388ca4b9f33ac2889be7927f
+uwvm2-ros: sha256:2b39fa78369cbd75d8d5f1f2a241221b73e8f104402bcb2c5e6738e02c162a6f
+
+SSH 最终证据目录
+/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/wasm-dbg-wait-checkpoint-20261004-1791101237384-r2-r8
+
+永久归档（两份冻结源码、CLI、依赖、配方与证据）
+/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/wasm-dbg-wait-checkpoint-20261004-1791101237384-r2-r8/final-source-cli-and-evidence.tar.gz
+SHA256: 9b8b2e414b48046282203c04c9909d08d71ac659b9caeb2313348b3fd1d4a94f
+大小: 115781171 bytes
+
+本机证据副本
+/tmp/wasm-dbg-wait-checkpoint-20261004-1791101237384/final-evidence

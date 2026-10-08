@@ -1,0 +1,24 @@
+--- a/llvm/lib/Target/ARM/ARMFastISel.cpp
++++ b/llvm/lib/Target/ARM/ARMFastISel.cpp
+@@ -2161,6 +2161,10 @@
+   SmallVector<Register, 4> RetRegs;
+ 
+   CallingConv::ID CC = F.getCallingConv();
++  // TailCC is supported by SelectionDAG, not this FastISel CC dispatcher.
++  // Decline before emitting return instructions or assigning ABI locations.
++  if (CC == CallingConv::Tail)
++    return false;
+   if (Ret->getNumOperands() > 0) {
+     SmallVector<ISD::OutputArg, 4> Outs;
+     GetReturnInfo(CC, F.getReturnType(), F.getAttributes(), Outs, TLI, DL);
+@@ -2381,6 +2385,10 @@
+ 
+   // Check the calling convention.
+   CallingConv::ID CC = CI->getCallingConv();
++  // A normal (notail) call can still use TailCC. Keep its actual ABI and
++  // allow SelectionDAG to lower it instead of entering the fatal dispatcher.
++  if (CC == CallingConv::Tail)
++    return false;
+ 
+   // TODO: Avoid some calling conventions?
+ 

@@ -1,0 +1,1 @@
+(module (memory 1) (tag (param v128)) (func (export "_start") i32.const 65528 v128.load align=1 drop))

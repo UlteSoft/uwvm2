@@ -91,6 +91,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::feature
         return ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<
             ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1>(parameters);
     }
+    /// @brief Read the concrete Wasm 1.1 policy without copying or removing const.
+    [[nodiscard]] inline constexpr auto const& wasm_binfmt_ver1_wasm1p1_parameter(
+        wasm_binfmt_ver1_feature_parameter_storage_t const& parameters) noexcept
+    {
+        return ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<
+            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1>(parameters);
+    }
+
     /// @brief Unified utf8 version
     using wasm_binfmt_ver1_text_format_wapper_t =
         decltype(::uwvm2::parser::wasm::standard::wasm1::features::get_final_text_format_wapper_from_tuple(wasm_binfmt1_features));

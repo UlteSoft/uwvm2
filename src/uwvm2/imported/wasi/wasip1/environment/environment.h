@@ -200,6 +200,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
         trace_wasip1_group_kind_t trace_wasip1_group_kind{trace_wasip1_group_kind_t::global};
         ::uwvm2::utils::container::u8string trace_wasip1_group_name_storage{};
         bool disable_utf8_check{};
+
+        // Native callers retain the ordinary field. Runtime-managed environments
+        // resolve immediate-caller memory without mutating shared resource policy.
+        memory_type* (*wasip1_memory_resolver)(wasip1_environment const*) noexcept{};
+
+        [[nodiscard]] inline constexpr memory_type* get_memory() const noexcept
+        {
+            return wasip1_memory_resolver == nullptr ? wasip1_memory : wasip1_memory_resolver(this);
+        }
+
     };
 
 }  // namespace uwvm2::imported::wasi::wasip1::environment

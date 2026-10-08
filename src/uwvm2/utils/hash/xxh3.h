@@ -134,141 +134,79 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
 
         inline constexpr ::std::uint_least16_t xxh_readLE16(::std::byte const* ptr) noexcept
         {
-            if UWVM_IF_CONSTEVAL
-            {
-                ::std::uint_least16_t res{};
-                unsigned shf{};
-                for(unsigned i{}; i != 2u; ++i)
-                {
-                    auto curr{::std::to_integer<::std::uint_least16_t>(ptr[i])};
-                    curr &= 0xFFu;
-
-                    res |= curr << shf;
-                    shf += 8u;
-                }
-                return res;
-            }
-            else
-            {
 #if CHAR_BIT > 8
-                ::std::uint_least16_t res{};
-                unsigned shf{};
-                for(unsigned i{}; i != 2u; ++i)
-                {
-                    auto curr{::std::to_integer<::std::uint_least16_t>(ptr[i])};
-                    curr &= 0xFFu;
+            ::std::uint_least16_t res{};
+            unsigned shf{};
+            for(unsigned i{}; i != 2u; ++i)
+            {
+                auto curr{::std::to_integer<::std::uint_least16_t>(ptr[i])};
+                curr &= 0xFFu;
 
-                    res |= curr << shf;
-                    shf += 8u;
-                }
-                return res;
-#else
-                ::std::uint16_t res;
-                ::std::memcpy(::std::addressof(res), ptr, sizeof(::std::uint16_t));
-                return ::fast_io::little_endian(res);
-#endif
+                res |= curr << shf;
+                shf += 8u;
             }
+            return res;
+#else
+            ::std::uint16_t value;
+            ::fast_io::freestanding::type_punning_from_bytes(ptr, value);
+            return ::fast_io::little_endian(value);
+#endif
         }
 
         inline constexpr ::std::uint_least32_t xxh_readLE32(::std::byte const* ptr) noexcept
         {
-            if UWVM_IF_CONSTEVAL
-            {
-                ::std::uint_least32_t res{};
-                unsigned shf{};
-                for(unsigned i{}; i != 4u; ++i)
-                {
-                    auto curr{::std::to_integer<::std::uint_least32_t>(ptr[i])};
-                    curr &= 0xFFu;
-
-                    res |= curr << shf;
-                    shf += 8u;
-                }
-                return res;
-            }
-            else
-            {
 #if CHAR_BIT > 8
-                ::std::uint_least32_t res{};
-                unsigned shf{};
-                for(unsigned i{}; i != 4u; ++i)
-                {
-                    auto curr{::std::to_integer<::std::uint_least32_t>(ptr[i])};
-                    curr &= 0xFFu;
+            ::std::uint_least32_t res{};
+            unsigned shf{};
+            for(unsigned i{}; i != 4u; ++i)
+            {
+                auto curr{::std::to_integer<::std::uint_least32_t>(ptr[i])};
+                curr &= 0xFFu;
 
-                    res |= curr << shf;
-                    shf += 8u;
-                }
-                return res;
-#else
-                ::std::uint32_t res;
-                ::std::memcpy(::std::addressof(res), ptr, sizeof(::std::uint32_t));
-                return ::fast_io::little_endian(res);
-#endif
+                res |= curr << shf;
+                shf += 8u;
             }
+            return res;
+#else
+            ::std::uint32_t value;
+            ::fast_io::freestanding::type_punning_from_bytes(ptr, value);
+            return ::fast_io::little_endian(value);
+#endif
         }
 
         inline constexpr ::std::uint_least64_t xxh_readLE64(::std::byte const* ptr) noexcept
         {
-            if UWVM_IF_CONSTEVAL
-            {
-                ::std::uint_least64_t res{};
-                unsigned shf{};
-                for(unsigned i{}; i != 8u; ++i)
-                {
-                    auto curr{::std::to_integer<::std::uint_least64_t>(ptr[i])};
-                    curr &= 0xFFu;
-
-                    res |= curr << shf;
-                    shf += 8u;
-                }
-                return res;
-            }
-            else
-            {
 #if CHAR_BIT > 8
-                ::std::uint_least64_t res{};
-                unsigned shf{};
-                for(unsigned i{}; i != 8u; ++i)
-                {
-                    auto curr{::std::to_integer<::std::uint_least64_t>(ptr[i])};
-                    curr &= 0xFFu;
+            ::std::uint_least64_t res{};
+            unsigned shf{};
+            for(unsigned i{}; i != 8u; ++i)
+            {
+                auto curr{::std::to_integer<::std::uint_least64_t>(ptr[i])};
+                curr &= 0xFFu;
 
-                    res |= curr << shf;
-                    shf += 8u;
-                }
-                return res;
-#else
-                ::std::uint64_t res;
-                ::std::memcpy(::std::addressof(res), ptr, sizeof(::std::uint64_t));
-                return ::fast_io::little_endian(res);
-#endif
+                res |= curr << shf;
+                shf += 8u;
             }
+            return res;
+#else
+            ::std::uint64_t value;
+            ::fast_io::freestanding::type_punning_from_bytes(ptr, value);
+            return ::fast_io::little_endian(value);
+#endif
         }
 
         inline constexpr void xxh_writeLE64(::std::byte* ptr, ::std::uint_least64_t value) noexcept
         {
-            if UWVM_IF_CONSTEVAL
-            {
-                for(unsigned i{}; i != 8u; ++i)
-                {
-                    ptr[i] = static_cast<::std::byte>(static_cast<::std::uint_least8_t>(value & 0xFFu));
-                    value >>= 8u;
-                }
-            }
-            else
-            {
 #if CHAR_BIT > 8
-                for(unsigned i{}; i != 8u; ++i)
-                {
-                    ptr[i] = static_cast<::std::byte>(static_cast<::std::uint_least8_t>(value & 0xFFu));
-                    value >>= 8u;
-                }
-#else
-                ::std::uint64_t const le{::fast_io::little_endian(static_cast<::std::uint64_t>(value))};
-                ::std::memcpy(ptr, ::std::addressof(le), sizeof(le));
-#endif
+            for(unsigned i{}; i != 8u; ++i)
+            {
+                ptr[i] = static_cast<::std::byte>(static_cast<::std::uint_least8_t>(value & 0xFFu));
+                value >>= 8u;
             }
+#else
+            ::std::uint64_t const le{::fast_io::little_endian(static_cast<::std::uint64_t>(value))};
+            ::fast_io::freestanding::type_punning_to_bytes(le, ptr);
+#endif
         }
 
         alignas(xxh3_max_align_len) inline constexpr ::std::byte xxh3_kSecret[192u]{

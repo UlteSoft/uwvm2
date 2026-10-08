@@ -20,6 +20,11 @@ xmake
 xmake i -o C:/uwvm2
 ```
 
+For Windows x64 LLVM-full debugging, the default build and install also produce
+`uwvm-debug-server.exe`. Build just the host broker with
+`xmake b uwvm-debug-server`; its [launch and connection instructions](../../tools/debug/README.windows.md)
+describe secure late attach. The `uwvm` executable must also be built with LLVM JIT.
+
 ## Windows 9x note (thread_local)
 
 Windows 9x targets (WIN95/WIN98/WINME) are only supported via the MinGW build. When targeting Windows 9x with libstdc++, pass `--use-thread-local=n`

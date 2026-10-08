@@ -291,7 +291,13 @@ enum class open_mode : ::std::uint_least64_t
 	dsync = static_cast<::std::uint_least64_t>(1) << 33,
 	//	POSIX O_DSYNC
 	rsync = static_cast<::std::uint_least64_t>(1) << 34,
+	// Native POSIX/NT/Win32: access and append do not imply creation or
+	// truncation. Only explicit creat/trunc/excl select the disposition.
+	explicit_disposition = static_cast<::std::uint_least64_t>(1) << 35,
 	//	POSIX O_RSYNC
+	// NT: omit FILE_WRITE_ATTRIBUTES. Other native platforms ignore this flag.
+	// Callers that set timestamps must keep the default attribute access.
+	no_write_attributes = static_cast<::std::uint_least64_t>(1) << 36,
 };
 
 inline constexpr open_mode operator&(open_mode x, open_mode y) noexcept

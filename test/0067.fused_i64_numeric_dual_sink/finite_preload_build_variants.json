@@ -1,0 +1,87 @@
+{
+  "schema": "source-only-integer-cached-preload-extra-recipes",
+  "component": "real_i64_numeric_dual_sink.cc",
+  "must_run_original24": true,
+  "recipes": [
+    {
+      "id": "cached-preload-delay0",
+      "defines": [
+        "UWVM2TEST_DUAL_I64_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_INSTRUCTION_REORDER",
+        "UWVM2TEST_DUAL_I64_PRELOAD_BATCH"
+      ],
+      "i32_slots": [
+        3,
+        6
+      ],
+      "i64_slots": [
+        6,
+        9
+      ],
+      "actual_target_qualified": false,
+      "real_runtime_preload_flag": true,
+      "pending_combine_level": "disable"
+    },
+    {
+      "id": "cached-preload-delay1",
+      "defines": [
+        "UWVM2TEST_DUAL_I64_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_INSTRUCTION_REORDER",
+        "UWVM2TEST_DUAL_I64_PRELOAD_BATCH",
+        "UWVM_ENABLE_UWVM_INT_SOFT_PUSH_DELAY"
+      ],
+      "i32_slots": [
+        3,
+        6
+      ],
+      "i64_slots": [
+        6,
+        9
+      ],
+      "actual_target_qualified": false,
+      "real_runtime_preload_flag": true,
+      "pending_combine_level": "disable"
+    },
+    {
+      "id": "cached-preload-delay2",
+      "defines": [
+        "UWVM2TEST_DUAL_I64_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_INSTRUCTION_REORDER",
+        "UWVM2TEST_DUAL_I64_PRELOAD_BATCH",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_PUSH_DELAY"
+      ],
+      "i32_slots": [
+        3,
+        6
+      ],
+      "i64_slots": [
+        6,
+        9
+      ],
+      "actual_target_qualified": false,
+      "real_runtime_preload_flag": true,
+      "pending_combine_level": "disable"
+    },
+    {
+      "id": "cached-preload-delay3",
+      "defines": [
+        "UWVM2TEST_DUAL_I64_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_INSTRUCTION_REORDER",
+        "UWVM2TEST_DUAL_I64_PRELOAD_BATCH",
+        "UWVM_ENABLE_UWVM_INT_SOFT_PUSH_DELAY",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_PUSH_DELAY"
+      ],
+      "i32_slots": [
+        3,
+        6
+      ],
+      "i64_slots": [
+        6,
+        9
+      ],
+      "actual_target_qualified": false,
+      "real_runtime_preload_flag": true,
+      "pending_combine_level": "disable"
+    }
+  ]
+}

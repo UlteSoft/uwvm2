@@ -25,7 +25,6 @@
 #ifndef UWVM_MODULE
 // std
 # include <algorithm>
-# include <array>
 # include <bit>
 # include <cstddef>
 # include <cstdint>
@@ -192,9 +191,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         // LEB128 keeps metadata compact while preserving an unambiguous byte representation for hashes and signatures.
         [[nodiscard]] inline constexpr ::std::size_t uleb128_size(::std::uint_least64_t v) noexcept
         {
-            ::std::size_t n{1uz};
-            while((v >>= 7u) != 0u) { ++n; }
-            return n;
+            char buffer[uint_least64_leb128_buffer_size]{};
+            auto field{::fast_io::mnp::leb128_put(v)};
+            auto const end{::fast_io::print_reserve_define(::fast_io::io_reserve_type<char, decltype(field)>, buffer, field)};
+            return static_cast<::std::size_t>(end - buffer);
         }
 
         [[nodiscard]] inline constexpr ::std::size_t key_value_size(::uwvm2::utils::container::u8string_view key, ::std::size_t value_size) noexcept
@@ -206,25 +206,34 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
         inline constexpr void append_bytes(::uwvm2::utils::container::vector<::std::byte>& out, ::std::byte const* first, ::std::byte const* last) noexcept
         {
-            for(; first != last; ++first) { out.push_back(*first); }
+            if(first == last) { return; }
+            auto const size{static_cast<::std::size_t>(last - first)};
+            if(size > out.max_size() - out.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const old_size{out.size()};
+            out.resize(old_size + size);
+            ::fast_io::freestanding::nonoverlapped_bytes_copy_n(first, size, out.data() + old_size);
+        }
+
+        template <::std::size_t Bits, typename UInt>
+        inline constexpr void append_le(::uwvm2::utils::container::vector<::std::byte>& out, UInt value) noexcept
+        {
+            constexpr auto width{Bits / 8uz};
+            auto const size{out.size()};
+            if(width > out.max_size() - size) [[unlikely]] { ::fast_io::fast_terminate(); }
+            out.resize(size + width);
+            auto const first{reinterpret_cast<unsigned char*>(out.data() + size)};
+            ::fast_io::basic_obuffer_view<unsigned char> output{first, first + width};
+            ::fast_io::io::print(output, ::fast_io::mnp::le_put<Bits>(value));
         }
 
         inline constexpr void append_u32_le(::uwvm2::utils::container::vector<::std::byte>& out, ::std::uint_least32_t v) noexcept
         {
-            static_assert(sizeof(::std::uint_least32_t) >= 4uz);
-            // The cache format is defined in bytes, not in native integer layout.
-            auto const le{::fast_io::little_endian(v)};
-            auto const first{reinterpret_cast<::std::byte const*>(::std::addressof(le))};
-            append_bytes(out, first, first + 4uz);
+            append_le<32>(out, v);
         }
 
         inline constexpr void append_u64_le(::uwvm2::utils::container::vector<::std::byte>& out, ::std::uint_least64_t v) noexcept
         {
-            static_assert(sizeof(::std::uint_least64_t) >= 8uz);
-            // Fixed little-endian encoding makes cache blobs portable across supported host endianness.
-            auto const le{::fast_io::little_endian(v)};
-            auto const first{reinterpret_cast<::std::byte const*>(::std::addressof(le))};
-            append_bytes(out, first, first + 8uz);
+            append_le<64>(out, v);
         }
 
         inline constexpr void append_u64_leb128(::uwvm2::utils::container::vector<::std::byte>& out, ::std::uint_least64_t v) noexcept
@@ -240,10 +249,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             static_assert(sizeof(::std::uint_least32_t) >= 4uz);
             if(static_cast<::std::size_t>(last - first) < 4uz) [[unlikely]] { return false; }
-            ::std::uint_least32_t v{};
-            ::std::memcpy(::std::addressof(v), first, 4uz);
+            auto const chars{reinterpret_cast<unsigned char const*>(first)};
+            auto const result{::fast_io::parse_by_scan(chars, chars + 4uz, ::fast_io::mnp::le_get<32>(out))};
+            if(result.code != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
             first += 4uz;
-            out = ::fast_io::little_endian(v);
             return true;
         }
 
@@ -251,10 +260,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         {
             static_assert(sizeof(::std::uint_least64_t) >= 8uz);
             if(static_cast<::std::size_t>(last - first) < 8uz) [[unlikely]] { return false; }
-            ::std::uint_least64_t v{};
-            ::std::memcpy(::std::addressof(v), first, 8uz);
+            auto const chars{reinterpret_cast<unsigned char const*>(first)};
+            auto const result{::fast_io::parse_by_scan(chars, chars + 8uz, ::fast_io::mnp::le_get<64>(out))};
+            if(result.code != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
             first += 8uz;
-            out = ::fast_io::little_endian(v);
             return true;
         }
 
@@ -400,19 +409,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::std::byte> serialize_fixed_header(cache_fixed_header const& header) noexcept
     {
-        ::uwvm2::utils::container::vector<::std::byte> out{};
-        out.reserve(cache_fixed_header_size);
+        ::uwvm2::utils::container::vector<::std::byte> out(cache_fixed_header_size, ::fast_io::for_overwrite);
         // Serialization is field-by-field so padding and compiler ABI never leak into the on-disk format.
-        details::append_bytes(out, header.magic, header.magic + 8uz);
-        details::append_u32_le(out, header.version);
-        details::append_u32_le(out, header.fixed_header_size);
-        details::append_u32_le(out, header.compression);
-        details::append_u32_le(out, header.signature);
-        details::append_u64_le(out, header.uncompressed_size);
-        details::append_u64_le(out, header.payload_size);
-        details::append_u64_le(out, header.isa_metadata_size);
-        details::append_u64_le(out, header.context_metadata_size);
-        details::append_u64_le(out, header.signature_size);
+        auto const first{reinterpret_cast<unsigned char*>(out.data())};
+        auto const magic{reinterpret_cast<unsigned char const*>(header.magic)};
+        ::fast_io::basic_obuffer_view<unsigned char> output{first, first + cache_fixed_header_size};
+        ::fast_io::io::print(output, ::fast_io::mnp::strvw(magic, magic + 8uz),
+                            ::fast_io::mnp::le_put<32>(header.version), ::fast_io::mnp::le_put<32>(header.fixed_header_size),
+                            ::fast_io::mnp::le_put<32>(header.compression), ::fast_io::mnp::le_put<32>(header.signature),
+                            ::fast_io::mnp::le_put<64>(header.uncompressed_size), ::fast_io::mnp::le_put<64>(header.payload_size),
+                            ::fast_io::mnp::le_put<64>(header.isa_metadata_size), ::fast_io::mnp::le_put<64>(header.context_metadata_size),
+                            ::fast_io::mnp::le_put<64>(header.signature_size));
         return out;
     }
 
@@ -420,13 +427,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     {
         if(static_cast<::std::size_t>(last - first) < cache_fixed_header_size) [[unlikely]] { return false; }
         // Parsing mirrors serialization exactly so unsupported layout changes become version failures, not partial reads.
-        for(::std::size_t i{}; i != 8uz; ++i) { header.magic[i] = first[i]; }
+        ::fast_io::freestanding::nonoverlapped_bytes_copy_n(first, 8uz, header.magic);
         first += 8uz;
-        return details::read_u32_le(first, last, header.version) && details::read_u32_le(first, last, header.fixed_header_size) &&
-               details::read_u32_le(first, last, header.compression) && details::read_u32_le(first, last, header.signature) &&
-               details::read_u64_le(first, last, header.uncompressed_size) && details::read_u64_le(first, last, header.payload_size) &&
-               details::read_u64_le(first, last, header.isa_metadata_size) && details::read_u64_le(first, last, header.context_metadata_size) &&
-               details::read_u64_le(first, last, header.signature_size);
+        auto const chars{reinterpret_cast<unsigned char const*>(first)};
+        ::fast_io::basic_ibuffer_view<unsigned char> input{chars, chars + cache_fixed_header_size - 8uz};
+        return ::fast_io::io::scan<true>(input, ::fast_io::mnp::le_get<32>(header.version), ::fast_io::mnp::le_get<32>(header.fixed_header_size),
+                                       ::fast_io::mnp::le_get<32>(header.compression), ::fast_io::mnp::le_get<32>(header.signature),
+                                       ::fast_io::mnp::le_get<64>(header.uncompressed_size), ::fast_io::mnp::le_get<64>(header.payload_size),
+                                       ::fast_io::mnp::le_get<64>(header.isa_metadata_size), ::fast_io::mnp::le_get<64>(header.context_metadata_size),
+                                       ::fast_io::mnp::le_get<64>(header.signature_size));
     }
 
     [[nodiscard]] inline constexpr cache_status parse_cache_blob(::std::byte const* first, ::std::byte const* last, cache_blob_view& view) noexcept

@@ -34,6 +34,7 @@ module;
 #include <concepts>
 #include <cstdlib>
 #include <memory>
+#include <utility>
 
 export module uwvm2.uwvm_predefine.utils.ansies:no_color;
 

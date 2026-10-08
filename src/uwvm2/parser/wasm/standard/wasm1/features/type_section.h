@@ -48,6 +48,10 @@
 # include <uwvm2/parser/wasm/standard/wasm1/section/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/opcode/impl.h>
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm3/type/function_signature.h>
+# include <uwvm2/parser/wasm/standard/wasm3/type/recursive_type.h>
+# include <uwvm2/parser/wasm/standard/wasm3/type/section_details.h>
+# include <uwvm2/validation/standard/wasm3/recursive_type_validation.h>
 # include "def.h"
 # include "feature_def.h"
 # include "parser_limit.h"
@@ -60,6 +64,16 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 {
+    namespace details
+    {
+        // Core 3 metadata needs the full printable declarations. The legacy
+        // context printer below only knows erased function ABI carriers; retain
+        // it for feature packs without Core 3 and use fast_io print_define for
+        // richer packs. This affects diagnostic output, never execution paths.
+        template<typename Feature>
+        inline constexpr bool core3_type_details_feature = requires(typename Feature::parameter const& parameter)
+        { parameter.disable_gc; parameter.disable_function_references; };
+    }
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     struct type_section_storage_t
     {
@@ -70,6 +84,59 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ::uwvm2::parser::wasm::standard::wasm1::section::section_span_view sec_span{};
 
         ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::features::final_type_type_t<Fs...>> types{};
+        ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm3::type::owned_function_signature<final_value_type_t<Fs...>>> owned_signatures{};
+        // Exact Core 3 definitions are retained separately from the executable ABI projection.
+        // Flat kind indices match `types` and `owned_signatures`, including aggregate slots.
+        ::uwvm2::parser::wasm::standard::wasm3::type::recursive_type_section core3_recursive_types{};
+        ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm3::type::composite_kind> core3_type_kinds{};
+        ::uwvm2::validation::standard::wasm3::recursive_type_context core3_context{};
+
+        // Aggregate the encoding requirement once, avoiding a complete type scan per validated function.
+        bool requires_function_references{};
+        bool requires_gc{};
+        bool requires_exceptions{};
+        bool requires_simd{}, requires_reference_types{}, requires_multi_value{};
+        // Parser-only visibility for forward function references inside the current rec group.
+        // Zero outside a group; never used by execution or copied into the runtime module.
+        ::std::size_t active_recursive_group_visible_types{};
+
+        inline constexpr type_section_storage_t() noexcept = default;
+        inline constexpr type_section_storage_t(type_section_storage_t&&) noexcept = default;
+        inline constexpr type_section_storage_t& operator=(type_section_storage_t&&) noexcept = default;
+        inline constexpr type_section_storage_t(type_section_storage_t const& other)
+            : sec_span{other.sec_span}, types{other.types}, owned_signatures{other.owned_signatures},
+              core3_recursive_types{other.core3_recursive_types}, core3_type_kinds{other.core3_type_kinds},
+              core3_context{other.core3_context},
+              requires_function_references{other.requires_function_references}, requires_gc{other.requires_gc},
+              requires_exceptions{other.requires_exceptions},
+              requires_simd{other.requires_simd}, requires_reference_types{other.requires_reference_types},
+              requires_multi_value{other.requires_multi_value},
+              active_recursive_group_visible_types{other.active_recursive_group_visible_types}
+        {
+            // Borrowed legacy signatures still point into the caller-owned module image. Owned Core 3 views must
+            // instead refer to this copy's carrier allocations; no pointers into the source copy may survive.
+            // Custom feature packs may replace the function record entirely. Only the existing function
+            // representation uses this owned-signature adapter; other type-section records retain their copy semantics.
+            if constexpr(::std::same_as<final_type_type_t<Fs...>, final_function_type<Fs...>>)
+            {
+                for(auto const& signature : owned_signatures)
+                {
+                    // Parser-published type_index < types.size(); the corresponding type vector was copied above.
+                    ::uwvm2::parser::wasm::standard::wasm3::type::bind_owned_function_signature(
+                        signature, types.index_unchecked(signature.type_index));
+                }
+            }
+        }
+        inline constexpr type_section_storage_t& operator=(type_section_storage_t const& other)
+        {
+            if(this != ::std::addressof(other))
+            {
+                type_section_storage_t temporary{other};
+                *this = ::std::move(temporary);
+            }
+            return *this;
+        }
+
     };
 
     /// @brief Define functions for value_type against wasm1 for checking value_type
@@ -126,6 +193,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         //              ^^ section_curr
         //
         // parse_by_scan below bounds-checks the parameter vector length against section_end.
+
+        auto& typesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<type_section_storage_t<Fs...>>(module_storage.sections)};
+        // The outer binary count counts rec groups, but an inner member contributes one flat
+        // type. It cannot prove capacity for a subsequent bare 0x60, so both the owned and
+        // borrowed unchecked insertion paths require an explicit slot here.
+        if constexpr((::std::same_as<wasm1, Fs> || ...))
+        {
+            auto const& limit{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1>(fs_para).parser_limit};
+            if(typesec.types.size() >= limit.max_type_sec_types) [[unlikely]]
+            {
+                err.err_curr = section_curr; // Borrowed section cursor; may be section_end, never dereferenced here.
+                err.err_selectable.exceed_the_max_parser_limit.name = u8"typesec_types";
+                err.err_selectable.exceed_the_max_parser_limit.value = typesec.types.size() + 1uz;
+                err.err_selectable.exceed_the_max_parser_limit.maxval = limit.max_type_sec_types;
+                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::exceed_the_max_parser_limit;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+        }
+        typesec.types.reserve(typesec.types.size() + 1uz);
+
+        // A feature may replace the byte-borrowing function-signature decoder with an owned representation.
+        // [0x60] vectors ... section_end
+        // [safe] unsafe (could be section_end)
+        //        ^^ section_curr: the extension commits this cursor only after a complete bounded decode.
+        if constexpr(requires { define_parse_owned_function_signature(sec_adl, module_storage, section_curr, section_end, err, fs_para); })
+        {
+            if(define_parse_owned_function_signature(sec_adl, module_storage, section_curr, section_end, err, fs_para))
+            { return section_curr; }
+        }
 
         using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
         using value_type_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> const*;
@@ -212,6 +308,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // check parameters
             // The range [ft.parameter.begin, ft.parameter.end) is inside the already length-checked parameter payload above,
             // so dereferencing parameter_curr only reads bytes proven to belong to the current section.
+            // [parameter values ... current ... end): != end proves each current type is live.
+            // [safe                              ] ++current advances by one only after visiting a live value,
+            //                                      remaining in this allocation or reaching its checked endpoint.
             for(auto parameter_curr{ft.parameter.begin}; parameter_curr != ft.parameter.end; ++parameter_curr)
             {
                 if(!check_typesec_value_type(sec_adl, *parameter_curr, fs_para)) [[unlikely]]
@@ -222,6 +321,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::illegal_value_type;
                     ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                 }
+                // The enclosing length check and current != end prove this actual declaration read.
+                // Optional feature ADL records exact requirements in this same existing traversal.
+                if constexpr(requires { define_record_typesec_value_requirements(sec_adl, typesec, *parameter_curr); })
+                { define_record_typesec_value_requirements(sec_adl, typesec, *parameter_curr); }
             }
         }
 
@@ -338,6 +441,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // check results
             // The range [ft.result.begin, ft.result.end) is inside the already length-checked result payload above,
             // so dereferencing result_curr only reads bytes proven to belong to the current section.
+            // [result values ... current ... end): != end proves each current type is live.
+            // [safe                              ] ++current advances by one only after visiting a live value,
+            //                                      remaining in this allocation or reaching its checked endpoint.
             for(auto result_curr{ft.result.begin}; result_curr != ft.result.end; ++result_curr)
             {
                 if(!check_typesec_value_type(sec_adl, *result_curr, fs_para)) [[unlikely]]
@@ -348,11 +454,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::illegal_value_type;
                     ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                 }
+                // The enclosing length check and current != end prove this actual declaration read.
+                // Optional feature ADL records exact requirements in this same existing traversal.
+                if constexpr(requires { define_record_typesec_value_requirements(sec_adl, typesec, *result_curr); })
+                { define_record_typesec_value_requirements(sec_adl, typesec, *result_curr); }
             }
+            // All result values/counts are admitted before this scalar metadata is published.
+            typesec.requires_multi_value |= result_len > 1u;
         }
 
         // push back
-        auto& typesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<type_section_storage_t<Fs...>>(module_storage.sections)};
         typesec.types.push_back_unchecked(::std::move(ft));
 
         return section_curr;
@@ -378,6 +489,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         // [... prefix] ...
         // [   safe   ] unsafe (could be the section_end)
         //              ^^ section_curr
+
+        // Core 3 rec groups are a feature-aware parser extension. The wrapper itself must be
+        // decoded before an inner 0x60 function can reuse the existing bounded signature decoder.
+        if(static_cast<::std::uint_least8_t>(prefix) == 0x4eu)
+        {
+            if constexpr(requires { define_parse_core3_recursive_function_group(
+                sec_adl, module_storage, section_curr, section_end, err, fs_para, prefix_module_ptr); })
+            {
+                // [0x4e] group length and members ... section_end
+                // [safe ] unsafe (possibly section_end)
+                //        ^^ section_curr: the extension validates each move before returning its final cursor.
+                return define_parse_core3_recursive_function_group(
+                    sec_adl, module_storage, section_curr, section_end, err, fs_para, prefix_module_ptr);
+            }
+        }
 
         switch(prefix)
         {
@@ -473,6 +599,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
         typesec.sec_span.sec_begin = reinterpret_cast<wasm_byte_const_may_alias_ptr>(section_begin);
         typesec.sec_span.sec_end = reinterpret_cast<wasm_byte_const_may_alias_ptr>(section_end);
+
+        // The GC-enabled decoder retains composite kinds, field layouts, and recursive groups.
+        // It consumes the same caller-proven [section_begin, section_end) byte range transactionally.
+        if constexpr(requires { define_parse_core3_complete_type_section(
+            sec_adl, module_storage, section_begin, section_end, err, fs_para); })
+        {
+            if(define_parse_core3_complete_type_section(
+                sec_adl, module_storage, section_begin, section_end, err, fs_para)) { return; }
+        }
 
         auto section_curr{section_begin};
 
@@ -591,7 +726,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
             // handle it
             ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<::uwvm2::parser::wasm::standard::wasm1::features::final_type_type_t<Fs...>> type_adl{};
+            // [checked outer prefix][checked member/group payload] ... section_end
+            // [safe                                                   ] unsafe (possibly section_end)
+            //                                                         ^^ section_curr: handler commits only bounded moves.
             section_curr = define_type_prefix_handler(sec_adl, type_adl, prefix, module_storage, section_curr, section_end, err, fs_para, prefix_module_ptr);
+            // The outer count measures rec groups, not flat member type indices. Enforce the
+            // flat limit after every entry as well, including a bare 0x60 after a large group.
+            if constexpr((::std::same_as<wasm1, Fs> || ...))
+            {
+                auto const& limit{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1>(fs_para).parser_limit};
+                if(typesec.types.size() > limit.max_type_sec_types) [[unlikely]]
+                {
+                    err.err_curr = section_curr; // Bounded handler result; diagnostic may equal section_end.
+                    err.err_selectable.exceed_the_max_parser_limit.name = u8"typesec_types";
+                    err.err_selectable.exceed_the_max_parser_limit.value = typesec.types.size();
+                    err.err_selectable.exceed_the_max_parser_limit.maxval = limit.max_type_sec_types;
+                    err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::exceed_the_max_parser_limit;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+            }
         }
 
         // [... ] (section_end)
@@ -828,6 +981,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
         if(type_section_size)
         {
+            auto const& storage{*type_section_details_wrapper.type_section_storage_ptr};
+            if(!storage.core3_recursive_types.groups.empty())
+            {
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                    ::uwvm2::parser::wasm::standard::wasm3::type::section_details(storage.core3_recursive_types));
+                return;
+            }
+            if(!storage.owned_signatures.empty())
+            {
+                namespace core3 = ::uwvm2::parser::wasm::standard::wasm3::type;
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ::fast_io::mnp::code_cvt(u8"\nType["),
+                    ::fast_io::mnp::dec(storage.types.size()), ::fast_io::mnp::code_cvt(u8"]:\n"));
+                for(auto const& signature : storage.owned_signatures)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ::fast_io::mnp::code_cvt(u8" - type["),
+                        ::fast_io::mnp::dec(signature.type_index), ::fast_io::mnp::code_cvt(u8"]: "),
+                        core3::function_type_details_t{::std::addressof(signature.parameters), ::std::addressof(signature.results)},
+                        ::fast_io::mnp::code_cvt(::uwvm2::utils::container::u8string_view{u8"\n"}));
+                }
+                return;
+            }
             auto const type_size{type_section_details_wrapper.type_section_storage_ptr->types.size()};
 
             if constexpr(::std::same_as<char_type, char>)
@@ -907,10 +1081,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
 #ifndef UWVM_MODULE
     template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        requires(!(details::core3_type_details_feature<Fs> || ...))
     inline constexpr auto print_context_type(::fast_io::io_reserve_type_t<char_type, type_section_storage_section_details_wrapper_t<Fs...>>) noexcept
     { return ::fast_io::io_type_t<::uwvm2::parser::wasm::standard::wasm1::features::details::type_section_print::context>{}; }
 
     template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        requires(!(details::core3_type_details_feature<Fs> || ...))
     inline constexpr ::std::size_t print_context_static_buffer_size(
         ::fast_io::io_reserve_type_t<char_type, type_section_storage_section_details_wrapper_t<Fs...>>) noexcept
     {

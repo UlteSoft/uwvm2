@@ -443,6 +443,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::std::memcpy(const_cast<::std::byte*>(imm_ip), ::std::addressof(imm), sizeof(imm));
         }
 
+        // bytecode: [poll handler][complete poll immediate][successor handler] | stream_end
+        //           [complete emitted instruction       ][dispatchable slot] safe
+        // ^^ type...[0] takes next_ip after the translator-emitted poll immediate.
         type...[0] = next_ip;
         opfunc_t next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -501,7 +504,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                imm.local_bytes,
                                                ::std::addressof(imm.compile_state_address)))
             {
+                // [result bytes written by OSR ...] remaining allocation
+                // [safe                            ] ^ new stack top (possibly one-past).
+                // The emitter reserves at least result_bytes even for tail-only
+                // exits. The callback returns only after the native chain finishes.
+                // tiered OSR result: operand_base [callback-written result bytes] | frame_end
+                // [safe result_bytes separately reserved in compiler maximum   ] unsafe (past frame_end)
+                // ^^ typeref...[1u] advances by imm.result_bytes after the successful callback; no per-op guard is needed.
                 typeref...[1u] += imm.result_bytes;
+                // [bytecode ...] remains owned by the suspended interpreter frame.
+                // nullptr terminates byref dispatch; it is never dereferenced.
                 typeref...[0u] = nullptr;
                 return;
             }
@@ -510,6 +522,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::std::memcpy(const_cast<::std::byte*>(imm_ip), ::std::addressof(imm), sizeof(imm));
         }
 
+        // bytecode: [poll handler][complete poll immediate][successor handler] | stream_end
+        //           [complete emitted instruction       ][dispatchable slot] safe
+        // ^^ typeref...[0] takes next_ip after the translator-emitted poll immediate.
         typeref...[0u] = next_ip;
     }
 
@@ -574,6 +589,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
 
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ type...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         type...[0] += sizeof(jmp_ip);
 
         // curr_uwvmint_br_if jmp_ip next_op_false
@@ -589,6 +607,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 # endif
         if(cond)
         {
+            // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+            //               [complete target pointer slot] safe for dispatch
+            // ^^ type...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
             type...[0] = jmp_ip;
 
             // next_op_true (*jmp_ip) ...
@@ -639,6 +660,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
 
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ type...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         type...[0] += sizeof(jmp_ip);
 
         // Pop condition from operand stack memory (updates stack pointer `type...[1]`).
@@ -649,6 +673,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 # endif
         if(cond)
         {
+            // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+            //               [complete target pointer slot] safe for dispatch
+            // ^^ type...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
             type...[0] = jmp_ip;
 
             ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -693,6 +720,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), typeref...[0], sizeof(jmp_ip));
 
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ typeref...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         typeref...[0] += sizeof(jmp_ip);
 
         // curr_uwvmint_br_if jmp_ip next_op_false
@@ -705,6 +735,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         if(cond)
         {
+            // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+            //               [complete target pointer slot] safe for dispatch
+            // ^^ typeref...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
             typeref...[0] = jmp_ip;
 
             // next_op_true (*jmp_ip) ...
@@ -853,6 +886,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::size_t max_size;  // no init
         ::std::memcpy(::std::addressof(max_size), type...[0], sizeof(max_size));
 
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ type...[0] advances by sizeof(max_size); translation emitted the matching typed slot.
         type...[0] += sizeof(max_size);
 
         // curr_uwvmint_br_table max_size table[0] table[1] ... table[max_size]
@@ -869,6 +905,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), type...[0] + idx * sizeof(jmp_ip), sizeof(jmp_ip));
 
+        // final bytecode: [br_table][max_size][table[0] ... table[max_size]] ... [target opfunc] | end
+        //                         [idx <= max_size; every entry emitted]         [full slot] safe
+        // ^^ type...[0] selects a final label fixup within this function's pinned code buffer.
         type...[0] = jmp_ip;
 
         // next_opfunc (*jmp_ip) ...
@@ -912,6 +951,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::size_t max_size;  // no init
         ::std::memcpy(::std::addressof(max_size), typeref...[0], sizeof(max_size));
 
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ typeref...[0] advances by sizeof(max_size); translation emitted the matching typed slot.
         typeref...[0] += sizeof(max_size);
 
         // curr_uwvmint_br_table max_size table[0] table[1] ... table[max_size]
@@ -928,6 +970,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), typeref...[0] + idx * sizeof(jmp_ip), sizeof(jmp_ip));
 
+        // final bytecode: [br_table][max_size][table[0] ... table[max_size]] ... [target opfunc] | end
+        //                         [idx <= max_size; every entry emitted]         [full slot] safe
+        // ^^ typeref...[0] selects a final label fixup within this function's pinned code buffer.
         typeref...[0] = jmp_ip;
 
         // next_opfunc (*jmp_ip) ...

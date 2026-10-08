@@ -1,0 +1,83 @@
+{
+  "schema": "uwvm-declaration-original-binary-source-v1",
+  "native_execution_passed": false,
+  "cases": [
+    {
+      "name": "zero_v128",
+      "feature": "simd",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a06010401007b0b",
+      "sha256": "177cef1b9d3022b76f784c21c25815829b5b22a99b8dca8fe7dd6864d29543f3",
+      "zero_count_type_offset": 36,
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "local",
+      "before_source_prediction": "source prediction: existing local run gate follows actual encoded type"
+    },
+    {
+      "name": "zero_externref",
+      "feature": "reference-types",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a06010401006f0b",
+      "sha256": "748621b62f9e829affa004e7e92d455e312f23f12d131e4f7c19f2ff2efffa60",
+      "zero_count_type_offset": 36,
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "local",
+      "before_source_prediction": "source prediction: existing local run gate follows actual encoded type"
+    },
+    {
+      "name": "zero_nonnull_func",
+      "feature": "function-references",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a070105010064700b",
+      "sha256": "729512828d51839e847f50846810d6b9a5cdb663d2d01a41e3fc32704d384d41",
+      "zero_count_type_offset": 36,
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "local",
+      "before_source_prediction": "source prediction: existing local run gate follows actual encoded type"
+    },
+    {
+      "name": "zero_nullable_func",
+      "feature": "function-references",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a070105010063700b",
+      "sha256": "4dd43256f12694065574be44bcdfd6c49940344712fe74d8d0816da4864d7a62",
+      "zero_count_type_offset": 36,
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "accept",
+      "expected_subject": "none",
+      "before_source_prediction": "source prediction: existing local run gate follows actual encoded type"
+    },
+    {
+      "name": "zero_nonnull_any",
+      "feature": "function-references",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a0701050100646e0b",
+      "sha256": "b0f09d324bb2e6a1c51a648f14c65306b7ec4155159f82d604c77194a101a052",
+      "zero_count_type_offset": 36,
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "accept",
+      "expected_subject": "none",
+      "before_source_prediction": "source prediction: existing local run gate follows actual encoded type"
+    },
+    {
+      "name": "zero_nonnull_any_references",
+      "feature": "reference-types",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a0701050100646e0b",
+      "sha256": "b0f09d324bb2e6a1c51a648f14c65306b7ec4155159f82d604c77194a101a052",
+      "zero_count_type_offset": 36,
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "local",
+      "before_source_prediction": "source prediction: existing local run gate follows actual encoded type"
+    },
+    {
+      "name": "explicit_nullable_func_table",
+      "feature": "reference-types",
+      "hex": "0061736d010000000104016000000302010004050163700000070a01065f737461727400000a040102000b",
+      "sha256": "a04bc8e7b87fb9f96a448f5ea2730480701729266e4128e546e411e531ff32d6",
+      "declaration_prefix_offset": 21,
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "table",
+      "before_source_prediction": "source prediction: parse_explicit_declaration_value_type requires reference-types for source_prefix 0x63, but shared runtime table flags retain only function-reference requirement"
+    }
+  ]
+}

@@ -1,0 +1,220 @@
+{
+  "ROS_bundled_LLVM23_product_qualified": false,
+  "actual_VEH_GPR_cancellation_handle_death_qualified": false,
+  "actual_bridge_assembly_review_qualified": true,
+  "actual_guest_executed": false,
+  "actual_remaining_roster": [
+    10154
+  ],
+  "all_original_known_PIDFDs_readable": true,
+  "all_original_root_PIDFDs_readable_and_reaped_zero": true,
+  "all_original_stages_passed": true,
+  "arbitrary_bridge_PC_SEH_unwind_qualified": false,
+  "bridge_review_scope": "standalone four actual COFF bridge instruction shape and actual poll/arm call binding only",
+  "commands_sha256": "5165070318caba42685a4f25a9fdb77e92d0b77d0ffa7bb99cd62808a10cbf44",
+  "executed_commands": 30,
+  "guard_sha256": "54c4d1077b9edd7ad5ab315d08242750f173c1293f775b16c348601fa7938a95",
+  "independent_static_review": {
+    "conclusion": "No definite new narrow bridge ASM/relocation blocker identified.",
+    "limits": [
+      "Historical external developer ABI1 SDK, not ROS vendored production provider.",
+      "Guest execution and product-three-TU ABI qualification false in actual records.",
+      "No hardware GPR/TF/NI, controller close/reset lifecycle, or arbitrary naked-bridge-PC SEH unwind qualification inferred from static code/imports.",
+      "Previous tiny note freeze attempt failed ENOSPC before writing; original evidence untouched."
+    ],
+    "notes_archive": "/tmp/uwvm-windows-r4-four-bridge-debug-asm-peer-review-20261003-r1.tar.gz",
+    "notes_archive_sha256": "76754ef4abb18ea29eeb3216b00c21abbd9604e8d70961a973c6900398a0b48e",
+    "review_sha256": "2e9d865e069e11bd0a7648f1885ae3f4dcbfeb9f0d2de260ff972b71c276c2a1"
+  },
+  "memory_events_after": {
+    "high": 0,
+    "low": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_group_kill": 0,
+    "oom_kill": 0
+  },
+  "memory_max_bytes": 68719476736,
+  "named_module_qualified": false,
+  "original_receipts_sha256": "13ed6da0e0f03ac2375bb7cfadf72a1d290e6dbd41bd2e86a9651072f027c0e6",
+  "original_retirement_sha256": "63e599c8964215f82cdf998a662013a0f5a74306cab5057aabf2364158869a92",
+  "peak_actual_owned_RSS_bytes": 448225280,
+  "raw_archive_sha256": "9c9aa733441516361a9debaab03965665c9bbe47011b4e20b04e5f0beea825fc",
+  "raw_evidence_local": "/tmp/uwvm-qemu-windows-raii-cold-r4-llvm-static-attempt1-small-evidence",
+  "raw_manifest_sha256": "68a6e1f588d69e1fd3e20bf759e2bada263f33940076e1709661b42ed4bf7026",
+  "schema": "uwvm-qemu-windows-raii-cold-r4-llvm-static-actual-v2",
+  "scope": "standalone fresh immutable Windows SDK RAII component crossbuild only",
+  "source_manifest_sha256": "f34df8d18c3a0bf901609c0a99da30f07769c6b9288b8af0c4723b8bc0480e28",
+  "sum_actual_stage_wall_seconds": 54.69743276100053,
+  "swap_max_bytes": 0,
+  "ticket_id": "4c2a13b421e248d3844fe41c9b7fb75c",
+  "ticket_state": "retired",
+  "variants": [
+    {
+      "DLL_runtime_closure_qualified": false,
+      "GNU_unwind_runtime_rejected": true,
+      "PE_machine": 34404,
+      "PE_optional_magic": 523,
+      "SDK_static_runtime_provider_bound": true,
+      "actual_DLL_import_names": [
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "kernel32.dll",
+        "ntdll.dll"
+      ],
+      "actual_LLVM_archive_paths": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-w64-windows-gnu/libclang_rt.builtins.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a"
+      ],
+      "binary": {
+        "bytes": 885760,
+        "device": 66307,
+        "inode": 20371318,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-cold-build-20261003-r4-llvm-static/uwvm2-ros-eh/native-step.exe",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-cold-build-20261003-r4-llvm-static/uwvm2-ros-eh/native-step.exe",
+        "sha256": "6af5f3431986e7434f706cbffcc0e7f3a7a8532ebc474b5f951075e588a86f0a"
+      },
+      "guest_execution_accepted": false,
+      "label": "uwvm2-ros-eh",
+      "product_three_tu_abi_qualified": false,
+      "static_runtime_recipe": [
+        "--rtlib=compiler-rt",
+        "--unwindlib=libunwind",
+        "-static-libgcc",
+        "-static-libstdc++"
+      ]
+    },
+    {
+      "DLL_runtime_closure_qualified": false,
+      "GNU_unwind_runtime_rejected": true,
+      "PE_machine": 34404,
+      "PE_optional_magic": 523,
+      "SDK_static_runtime_provider_bound": true,
+      "actual_DLL_import_names": [
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "kernel32.dll",
+        "ntdll.dll"
+      ],
+      "actual_LLVM_archive_paths": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-w64-windows-gnu/libclang_rt.builtins.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a"
+      ],
+      "binary": {
+        "bytes": 879104,
+        "device": 66307,
+        "inode": 20371322,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-cold-build-20261003-r4-llvm-static/uwvm2-ros-noeh/native-step.exe",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-cold-build-20261003-r4-llvm-static/uwvm2-ros-noeh/native-step.exe",
+        "sha256": "8ded78d93bf3f6a5b94cbddffe31a8ad3bca9555571c443d1059c2dc5d265862"
+      },
+      "guest_execution_accepted": false,
+      "label": "uwvm2-ros-noeh",
+      "product_three_tu_abi_qualified": false,
+      "static_runtime_recipe": [
+        "--rtlib=compiler-rt",
+        "--unwindlib=libunwind",
+        "-static-libgcc",
+        "-static-libstdc++"
+      ]
+    },
+    {
+      "DLL_runtime_closure_qualified": false,
+      "GNU_unwind_runtime_rejected": true,
+      "PE_machine": 34404,
+      "PE_optional_magic": 523,
+      "SDK_static_runtime_provider_bound": true,
+      "actual_DLL_import_names": [
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "kernel32.dll",
+        "ntdll.dll"
+      ],
+      "actual_LLVM_archive_paths": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-w64-windows-gnu/libclang_rt.builtins.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a"
+      ],
+      "binary": {
+        "bytes": 885248,
+        "device": 66307,
+        "inode": 20371326,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-cold-build-20261003-r4-llvm-static/uwvm2-eh/native-step.exe",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-cold-build-20261003-r4-llvm-static/uwvm2-eh/native-step.exe",
+        "sha256": "89f5a6d1654024b1222d7e2e3b0fbb2126822d4fa5a68d665c9560828fbb6f2f"
+      },
+      "guest_execution_accepted": false,
+      "label": "uwvm2-eh",
+      "product_three_tu_abi_qualified": false,
+      "static_runtime_recipe": [
+        "--rtlib=compiler-rt",
+        "--unwindlib=libunwind",
+        "-static-libgcc",
+        "-static-libstdc++"
+      ]
+    },
+    {
+      "DLL_runtime_closure_qualified": false,
+      "GNU_unwind_runtime_rejected": true,
+      "PE_machine": 34404,
+      "PE_optional_magic": 523,
+      "SDK_static_runtime_provider_bound": true,
+      "actual_DLL_import_names": [
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "kernel32.dll",
+        "ntdll.dll"
+      ],
+      "actual_LLVM_archive_paths": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-w64-windows-gnu/libclang_rt.builtins.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a"
+      ],
+      "binary": {
+        "bytes": 878592,
+        "device": 66307,
+        "inode": 20503183,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-cold-build-20261003-r4-llvm-static/uwvm2-noeh/native-step.exe",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-cold-build-20261003-r4-llvm-static/uwvm2-noeh/native-step.exe",
+        "sha256": "6baf64b509aa7ccc0319da544a28dc75abe2201bedb67982b4ef8b26b8311572"
+      },
+      "guest_execution_accepted": false,
+      "label": "uwvm2-noeh",
+      "product_three_tu_abi_qualified": false,
+      "static_runtime_recipe": [
+        "--rtlib=compiler-rt",
+        "--unwindlib=libunwind",
+        "-static-libgcc",
+        "-static-libstdc++"
+      ]
+    }
+  ],
+  "verified_raw_members": 65,
+  "whole_VM_restore_qualified": false
+}

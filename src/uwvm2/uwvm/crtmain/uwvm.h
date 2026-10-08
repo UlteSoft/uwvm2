@@ -39,11 +39,18 @@
 # include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
-# include <uwvm2/uwvm/cmdline/impl.h>
-# include <uwvm2/uwvm/run/impl.h>
+# if defined(UWVM_MACOS_4GIB_TEST)
+#  include "low_memory_entry.h"
+#  include <uwvm2/uwvm/run/retval.h>
+# else
+#  include <uwvm2/uwvm/cmdline/impl.h>
+#  include <uwvm2/uwvm/run/impl.h>
+# endif
 # include <uwvm2/uwvm/crtmain/global/impl.h>
 // callback
-# include <uwvm2/uwvm/cmdline/callback/impl.h>
+# if !defined(UWVM_MACOS_4GIB_TEST)
+#  include <uwvm2/uwvm/cmdline/callback/impl.h>
+# endif
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -58,17 +65,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
     /// @return     exit value
     inline constexpr int uwvm_uz_u8main(::std::size_t argc, char8_t const* const* argv) noexcept
     {
-        switch(::uwvm2::uwvm::cmdline::parsing(argc, argv))
+#if defined(UWVM_MACOS_4GIB_TEST)
+        using parsing_return_val = ::uwvm2::uwvm::crtmain::low_memory::parse_status;
+        auto const parsing_result{::uwvm2::uwvm::crtmain::low_memory::parse(argc, argv)};
+#else
+        using parsing_return_val = ::uwvm2::uwvm::cmdline::parsing_return_val;
+        auto const parsing_result{::uwvm2::uwvm::cmdline::parsing(argc, argv)};
+#endif
+        switch(parsing_result)
         {
-            case ::uwvm2::uwvm::cmdline::parsing_return_val::def:
+            case parsing_return_val::def:
             {
                 break;
             }
-            case ::uwvm2::uwvm::cmdline::parsing_return_val::return0:
+            case parsing_return_val::return0:
             {
                 return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
             }
-            case ::uwvm2::uwvm::cmdline::parsing_return_val::returnm1:
+            case parsing_return_val::returnm1:
             {
                 return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
             }
@@ -81,7 +95,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
             }
         }
 
+#if defined(UWVM_MACOS_4GIB_TEST)
+        return ::uwvm2::uwvm::crtmain::low_memory::run();
+#else
         return ::uwvm2::uwvm::run::run();
+#endif
     }
 
     /// @brief    whole process time
@@ -112,21 +130,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
             if(argc > size_t_max) [[unlikely]]
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                     u8"[error] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"argc \"",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                     argc,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"\" exceeds the maximum value of size_t :\"",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_GREEN),
                                     size_t_max,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"\".",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL),
                                     u8"\n\n");
                 return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
             }
@@ -136,17 +154,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
         if(argc < 0) [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                 u8"[error] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8"argc \"",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                 argc,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8"\" is less than zero.",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL),
                                 u8"\n\n");
             return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
         }

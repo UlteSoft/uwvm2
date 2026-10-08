@@ -1,0 +1,508 @@
+{
+  "created_utc": "2026-10-02T22:17:52.577625+00:00",
+  "execute_ready": false,
+  "native_qualified": false,
+  "next_gate": "Fresh parent-owned all-three-TU product and matching MCJIT/host-callee assembly must demonstrate two actual local authentication walks before production implementation is proposed",
+  "primary_spec": {
+    "observed_title": "WebAssembly 3.0 (2026-10-02)",
+    "sections": [
+      "exec-table-get",
+      "exec-ref-cast",
+      "exec-struct-get"
+    ],
+    "url": "https://webassembly.github.io/spec/core/exec/instructions.html"
+  },
+  "prior_native_component_5_2_percent_is_original_wasm": false,
+  "production_modified_by_packet": false,
+  "proposal": {
+    "path": "benchmark/0004.wasm3-core/GC_IMMUTABLE_TABLE_CAST_SOURCE_PROPOSAL_20261003.md",
+    "sha256": "995a9c155b3c038916aa7c0c96c35931fc22dfc1c58cbfb11a66a57426bf8bbe",
+    "size": 8745
+  },
+  "schema": "uwvm.gc.immutable-table-cast.source-proposal.v1",
+  "source_observations": [
+    {
+      "path": "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h",
+      "repo": "ordinary",
+      "sections": [
+        {
+          "anchor": "[[nodiscard]] inline bool llvm_jit_runtime_table_is_funcref(",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/table-family.txt",
+          "first_line": 5282,
+          "label": "table-family",
+          "last_line": 5304,
+          "sha256": "70cf9e155edc2cf4a804bea815f5af0751004c62f39d2e5355515c5e5d613175",
+          "size": 1085
+        },
+        {
+          "anchor": "inline constexpr void llvm_jit_table_get_bridge(",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/table-get.txt",
+          "first_line": 5616,
+          "label": "table-get",
+          "last_line": 5700,
+          "sha256": "c0b730aa8f6662e7eb4daff49fe896957aaa3514f8146756718716e50b8854a1",
+          "size": 5229
+        },
+        {
+          "anchor": "inline constexpr void llvm_jit_table_set_bridge(",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/table-set.txt",
+          "first_line": 5702,
+          "label": "table-set",
+          "last_line": 5791,
+          "sha256": "4a4fc0c59fd4fbbbaf82bf107838a6575d337b6a2ee5e1e16aca4879e5f8b1ad",
+          "size": 5119
+        },
+        {
+          "anchor": "// Only metadata is produced here:",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/provenance.txt",
+          "first_line": 7070,
+          "label": "provenance",
+          "last_line": 7087,
+          "sha256": "8cb41a889357cbbd1c632640078e75b330b837729580956f738ecb5d91b7fa3b",
+          "size": 1191
+        },
+        {
+          "anchor": "// Source-level instruction points are a compile-time choice.",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/debug-boundary.txt",
+          "first_line": 7264,
+          "label": "debug-boundary",
+          "last_line": 7291,
+          "sha256": "cd99dacb188ef9fbcf84a731c33124fcaac577b30388cab4c170b2da08d12c8f",
+          "size": 1958
+        },
+        {
+          "anchor": "// Emit a call to a C++ runtime bridge function",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/bridge-call.txt",
+          "first_line": 9293,
+          "label": "bridge-call",
+          "last_line": 9308,
+          "sha256": "52cf3f3b34014b270bd0615f53f3b6ef80ccca17c1d2f06004672aff38880497",
+          "size": 1352
+        },
+        {
+          "anchor": "auto const emit_table_get_call_unsealed{",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/table-get-emitter.txt",
+          "first_line": 11789,
+          "label": "table-get-emitter",
+          "last_line": 11830,
+          "sha256": "b75b8d416ccaa6c470ec58a2baeb0a039acb2e1dbd65f8940dad628f85cf3e6e",
+          "size": 3563
+        },
+        {
+          "anchor": "// Loop, else and end points belong to their post-PHI target blocks.",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/opcode-boundary.txt",
+          "first_line": 13437,
+          "label": "opcode-boundary",
+          "last_line": 13478,
+          "sha256": "0e2bb30ea67d5f332a614c7d90bad74fac24fcccc3bdea4ec0c95e9f19445906",
+          "size": 2755
+        },
+        {
+          "anchor": "// These direct Wasm 1.1 opcodes are intentionally outside the MVP opcode enum.",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/bounded-table-get-decode.txt",
+          "first_line": 14037,
+          "label": "bounded-table-get-decode",
+          "last_line": 14058,
+          "sha256": "1dd3cec6fa39e2b4d7788e765a09f24c6d6b6336d11e3864a3de9f927bca3de3",
+          "size": 1263
+        }
+      ],
+      "sha256": "87388083c3bc3387634c4ab2f0b29ccc57899f5e59824f34c4397d2abce8e067",
+      "size": 914120
+    },
+    {
+      "path": "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h",
+      "repo": "ordinary",
+      "sections": [
+        {
+          "anchor": "inline ::std::uintptr_t llvm_jit_gc_immutable_struct_cast_bridge(",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h/immutable-cast-bridge.txt",
+          "first_line": 326,
+          "label": "immutable-cast-bridge",
+          "last_line": 361,
+          "sha256": "fa3fb28d7a512fe0ebf48a2a9db4701000de42993ee7c33095b342eb5fa8dbab",
+          "size": 2015
+        },
+        {
+          "anchor": "[[nodiscard]] inline bool llvm_jit_gc_immutable_cast_witness_type(",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h/immutable-cast-layout.txt",
+          "first_line": 363,
+          "label": "immutable-cast-layout",
+          "last_line": 450,
+          "sha256": "f3b64d4c861ae4af1eed33aabbd0c4f4db186c0431398683e9a40bb9714fc9aa",
+          "size": 5540
+        },
+        {
+          "anchor": "[[nodiscard]] inline bool try_emit_runtime_local_func_llvm_jit_gc_ref_test_cast(",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h/validated-cast-emitter.txt",
+          "first_line": 502,
+          "label": "validated-cast-emitter",
+          "last_line": 555,
+          "sha256": "7eae1f55480b7b2cfb59f92f8f481038979906c36a423604b5d815c72c8b96ca",
+          "size": 3167
+        },
+        {
+          "anchor": "// Consume an adjacent checked cast",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h/immediate-getter.txt",
+          "first_line": 691,
+          "label": "immediate-getter",
+          "last_line": 779,
+          "sha256": "b81dd5ed778fe9cdc0cc2b5da3cf0257c11a0ad9912431e248c376659dacb1d7",
+          "size": 6203
+        },
+        {
+          "anchor": "    auto const* witness_field{allow_cast_witness ?",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h/getter-eligibility.txt",
+          "first_line": 800,
+          "label": "getter-eligibility",
+          "last_line": 833,
+          "sha256": "5656fd00ff863c9734a4e2009da083c0f12067630cf09cd1af469e34395c509a",
+          "size": 2494
+        }
+      ],
+      "sha256": "c83a2540769cb8028a6174228f73b304d5fa92337b0da714913923cc36eec465",
+      "size": 77577
+    },
+    {
+      "path": "src/uwvm2/uwvm/runtime/storage/gc_object.h",
+      "repo": "ordinary",
+      "sections": [
+        {
+          "anchor": "        [[nodiscard]] inline object* checked_local_object(",
+          "excerpt": "excerpts/ordinary/src/uwvm2/uwvm/runtime/storage/gc_object.h/checked-local-object.txt",
+          "first_line": 2232,
+          "label": "checked-local-object",
+          "last_line": 2267,
+          "sha256": "b32fba9cbffbeb9de5acf8273cfb85cfc5d10a4dabd82c7cbb6d915322f5800c",
+          "size": 2186
+        },
+        {
+          "anchor": "        // Compiler-only cast witness, never a Wasm value/guest address.",
+          "excerpt": "excerpts/ordinary/src/uwvm2/uwvm/runtime/storage/gc_object.h/immutable-native-cast.txt",
+          "first_line": 3796,
+          "label": "immutable-native-cast",
+          "last_line": 3924,
+          "sha256": "3d3da32586d89ced0ebf8817f1f4631be0d49593013e0e0eaeca7e034dd51f23",
+          "size": 8406
+        },
+        {
+          "anchor": "        // Call when a GC/extern reference first crosses a module boundary,",
+          "excerpt": "excerpts/ordinary/src/uwvm2/uwvm/runtime/storage/gc_object.h/retain-caller-reference.txt",
+          "first_line": 3925,
+          "label": "retain-caller-reference",
+          "last_line": 4006,
+          "sha256": "596520618acc677e54f6c3a3b372eaca45b34e4a81e6181578ea0b611c4ffd99",
+          "size": 4760
+        }
+      ],
+      "sha256": "18c617171c0debe088ef88fc4e17515f50fbc3a47424d0cd4a87652a6dc7a0f6",
+      "size": 298999
+    },
+    {
+      "path": "src/uwvm2/uwvm/runtime/storage/wasm_module.h",
+      "repo": "ordinary",
+      "sections": [
+        {
+          "anchor": "    [[nodiscard]] inline runtime_table_reference_family runtime_table_family(",
+          "excerpt": "excerpts/ordinary/src/uwvm2/uwvm/runtime/storage/wasm_module.h/resolved-table-family.txt",
+          "first_line": 989,
+          "label": "resolved-table-family",
+          "last_line": 1007,
+          "sha256": "dfd719adc214de7517a5993c484ae63fac61f16732cf07650d0360d0e56de8b3",
+          "size": 958
+        },
+        {
+          "anchor": "    [[nodiscard]] inline gc_object_status retain_runtime_table_reference(",
+          "excerpt": "excerpts/ordinary/src/uwvm2/uwvm/runtime/storage/wasm_module.h/retain-table-reference.txt",
+          "first_line": 1025,
+          "label": "retain-table-reference",
+          "last_line": 1052,
+          "sha256": "4c07f275ccabea2453418a88a99c8223c0407e6b8bf8727e12cb53ffcde71871",
+          "size": 1524
+        }
+      ],
+      "sha256": "632143bf582afd2cf978f8d8d1ce1304f4712491c8e05b619f25a352b5590236",
+      "size": 67202
+    },
+    {
+      "path": "src/uwvm2/runtime/llvm_jit_cache/llvm_object_cache.h",
+      "repo": "ordinary",
+      "sections": [
+        {
+          "anchor": "inline constexpr void notifyObjectCompiled(",
+          "excerpt": "excerpts/ordinary/src/uwvm2/runtime/llvm_jit_cache/llvm_object_cache.h/actual-object-capture.txt",
+          "first_line": 195,
+          "label": "actual-object-capture",
+          "last_line": 260,
+          "sha256": "a68efe44e8ae1142722ca2b5045912c537758b41ce161eb353ac7e520ede8c11",
+          "size": 3854
+        }
+      ],
+      "sha256": "d483149958f17488062eea4498165d8381954cf41a9638dfdee074792b026a80",
+      "size": 14482
+    },
+    {
+      "path": "benchmark/0004.wasm3-core/generate.py",
+      "repo": "ordinary",
+      "sections": [
+        {
+          "anchor": "    elif case == \"gc-allocation-ring\":",
+          "excerpt": "excerpts/ordinary/benchmark/0004.wasm3-core/generate.py/original-wasm-producer.txt",
+          "first_line": 325,
+          "label": "original-wasm-producer",
+          "last_line": 358,
+          "sha256": "a5c38c6f54b0f36db53a1b272ec961f081fc8c7c8d18ca79e14b5765a30536ff",
+          "size": 1743
+        }
+      ],
+      "sha256": "48f5edd953e81452ef7ddd307c32e89d56e0897800ac3cc05793b4d65a665de7",
+      "size": 27137
+    },
+    {
+      "path": "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h",
+      "repo": "ros",
+      "sections": [
+        {
+          "anchor": "[[nodiscard]] inline bool llvm_jit_runtime_table_is_funcref(",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/table-family.txt",
+          "first_line": 5250,
+          "label": "table-family",
+          "last_line": 5272,
+          "sha256": "70cf9e155edc2cf4a804bea815f5af0751004c62f39d2e5355515c5e5d613175",
+          "size": 1085
+        },
+        {
+          "anchor": "inline constexpr void llvm_jit_table_get_bridge(",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/table-get.txt",
+          "first_line": 5584,
+          "label": "table-get",
+          "last_line": 5668,
+          "sha256": "c0b730aa8f6662e7eb4daff49fe896957aaa3514f8146756718716e50b8854a1",
+          "size": 5229
+        },
+        {
+          "anchor": "inline constexpr void llvm_jit_table_set_bridge(",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/table-set.txt",
+          "first_line": 5670,
+          "label": "table-set",
+          "last_line": 5759,
+          "sha256": "4a4fc0c59fd4fbbbaf82bf107838a6575d337b6a2ee5e1e16aca4879e5f8b1ad",
+          "size": 5119
+        },
+        {
+          "anchor": "// Only metadata is produced here:",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/provenance.txt",
+          "first_line": 6997,
+          "label": "provenance",
+          "last_line": 7014,
+          "sha256": "8cb41a889357cbbd1c632640078e75b330b837729580956f738ecb5d91b7fa3b",
+          "size": 1191
+        },
+        {
+          "anchor": "// Source-level instruction points are a compile-time choice.",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/debug-boundary.txt",
+          "first_line": 7191,
+          "label": "debug-boundary",
+          "last_line": 7218,
+          "sha256": "cd99dacb188ef9fbcf84a731c33124fcaac577b30388cab4c170b2da08d12c8f",
+          "size": 1958
+        },
+        {
+          "anchor": "// Emit a call to a C++ runtime bridge function",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/bridge-call.txt",
+          "first_line": 8747,
+          "label": "bridge-call",
+          "last_line": 8762,
+          "sha256": "52cf3f3b34014b270bd0615f53f3b6ef80ccca17c1d2f06004672aff38880497",
+          "size": 1352
+        },
+        {
+          "anchor": "auto const emit_table_get_call_unsealed{",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/table-get-emitter.txt",
+          "first_line": 10935,
+          "label": "table-get-emitter",
+          "last_line": 10976,
+          "sha256": "b75b8d416ccaa6c470ec58a2baeb0a039acb2e1dbd65f8940dad628f85cf3e6e",
+          "size": 3563
+        },
+        {
+          "anchor": "// Loop, else and end points belong to their post-PHI target blocks.",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/opcode-boundary.txt",
+          "first_line": 12581,
+          "label": "opcode-boundary",
+          "last_line": 12622,
+          "sha256": "294e173d83992c962c6aa339213f36b284152463fd5e46345b1f66b6c7d6dfd4",
+          "size": 2955
+        },
+        {
+          "anchor": "// These direct Wasm 1.1 opcodes are intentionally outside the MVP opcode enum.",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h/bounded-table-get-decode.txt",
+          "first_line": 13181,
+          "label": "bounded-table-get-decode",
+          "last_line": 13202,
+          "sha256": "1dd3cec6fa39e2b4d7788e765a09f24c6d6b6336d11e3864a3de9f927bca3de3",
+          "size": 1263
+        }
+      ],
+      "sha256": "413c85742929c9f978232569eaf654fb6b6ee33fae4f5e2b69f89a41cba361fb",
+      "size": 852741
+    },
+    {
+      "path": "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h",
+      "repo": "ros",
+      "sections": [
+        {
+          "anchor": "inline ::std::uintptr_t llvm_jit_gc_immutable_struct_cast_bridge(",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h/immutable-cast-bridge.txt",
+          "first_line": 326,
+          "label": "immutable-cast-bridge",
+          "last_line": 361,
+          "sha256": "fa3fb28d7a512fe0ebf48a2a9db4701000de42993ee7c33095b342eb5fa8dbab",
+          "size": 2015
+        },
+        {
+          "anchor": "[[nodiscard]] inline bool llvm_jit_gc_immutable_cast_witness_type(",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h/immutable-cast-layout.txt",
+          "first_line": 363,
+          "label": "immutable-cast-layout",
+          "last_line": 450,
+          "sha256": "f3b64d4c861ae4af1eed33aabbd0c4f4db186c0431398683e9a40bb9714fc9aa",
+          "size": 5540
+        },
+        {
+          "anchor": "[[nodiscard]] inline bool try_emit_runtime_local_func_llvm_jit_gc_ref_test_cast(",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h/validated-cast-emitter.txt",
+          "first_line": 502,
+          "label": "validated-cast-emitter",
+          "last_line": 555,
+          "sha256": "7eae1f55480b7b2cfb59f92f8f481038979906c36a423604b5d815c72c8b96ca",
+          "size": 3167
+        },
+        {
+          "anchor": "// Consume an adjacent checked cast",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h/immediate-getter.txt",
+          "first_line": 691,
+          "label": "immediate-getter",
+          "last_line": 779,
+          "sha256": "b81dd5ed778fe9cdc0cc2b5da3cf0257c11a0ad9912431e248c376659dacb1d7",
+          "size": 6203
+        },
+        {
+          "anchor": "    auto const* witness_field{allow_cast_witness ?",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h/getter-eligibility.txt",
+          "first_line": 800,
+          "label": "getter-eligibility",
+          "last_line": 833,
+          "sha256": "5656fd00ff863c9734a4e2009da083c0f12067630cf09cd1af469e34395c509a",
+          "size": 2494
+        }
+      ],
+      "sha256": "c83a2540769cb8028a6174228f73b304d5fa92337b0da714913923cc36eec465",
+      "size": 77577
+    },
+    {
+      "path": "src/uwvm2/uwvm/runtime/storage/gc_object.h",
+      "repo": "ros",
+      "sections": [
+        {
+          "anchor": "        [[nodiscard]] inline object* checked_local_object(",
+          "excerpt": "excerpts/ros/src/uwvm2/uwvm/runtime/storage/gc_object.h/checked-local-object.txt",
+          "first_line": 2232,
+          "label": "checked-local-object",
+          "last_line": 2267,
+          "sha256": "b32fba9cbffbeb9de5acf8273cfb85cfc5d10a4dabd82c7cbb6d915322f5800c",
+          "size": 2186
+        },
+        {
+          "anchor": "        // Compiler-only cast witness, never a Wasm value/guest address.",
+          "excerpt": "excerpts/ros/src/uwvm2/uwvm/runtime/storage/gc_object.h/immutable-native-cast.txt",
+          "first_line": 3796,
+          "label": "immutable-native-cast",
+          "last_line": 3924,
+          "sha256": "3d3da32586d89ced0ebf8817f1f4631be0d49593013e0e0eaeca7e034dd51f23",
+          "size": 8406
+        },
+        {
+          "anchor": "        // Call when a GC/extern reference first crosses a module boundary,",
+          "excerpt": "excerpts/ros/src/uwvm2/uwvm/runtime/storage/gc_object.h/retain-caller-reference.txt",
+          "first_line": 3925,
+          "label": "retain-caller-reference",
+          "last_line": 4006,
+          "sha256": "596520618acc677e54f6c3a3b372eaca45b34e4a81e6181578ea0b611c4ffd99",
+          "size": 4760
+        }
+      ],
+      "sha256": "18c617171c0debe088ef88fc4e17515f50fbc3a47424d0cd4a87652a6dc7a0f6",
+      "size": 298999
+    },
+    {
+      "path": "src/uwvm2/uwvm/runtime/storage/wasm_module.h",
+      "repo": "ros",
+      "sections": [
+        {
+          "anchor": "    [[nodiscard]] inline runtime_table_reference_family runtime_table_family(",
+          "excerpt": "excerpts/ros/src/uwvm2/uwvm/runtime/storage/wasm_module.h/resolved-table-family.txt",
+          "first_line": 989,
+          "label": "resolved-table-family",
+          "last_line": 1007,
+          "sha256": "dfd719adc214de7517a5993c484ae63fac61f16732cf07650d0360d0e56de8b3",
+          "size": 958
+        },
+        {
+          "anchor": "    [[nodiscard]] inline gc_object_status retain_runtime_table_reference(",
+          "excerpt": "excerpts/ros/src/uwvm2/uwvm/runtime/storage/wasm_module.h/retain-table-reference.txt",
+          "first_line": 1025,
+          "label": "retain-table-reference",
+          "last_line": 1052,
+          "sha256": "4c07f275ccabea2453418a88a99c8223c0407e6b8bf8727e12cb53ffcde71871",
+          "size": 1524
+        }
+      ],
+      "sha256": "632143bf582afd2cf978f8d8d1ce1304f4712491c8e05b619f25a352b5590236",
+      "size": 67202
+    },
+    {
+      "path": "src/uwvm2/runtime/llvm_jit_cache/llvm_object_cache.h",
+      "repo": "ros",
+      "sections": [
+        {
+          "anchor": "inline constexpr void notifyObjectCompiled(",
+          "excerpt": "excerpts/ros/src/uwvm2/runtime/llvm_jit_cache/llvm_object_cache.h/actual-object-capture.txt",
+          "first_line": 195,
+          "label": "actual-object-capture",
+          "last_line": 260,
+          "sha256": "a68efe44e8ae1142722ca2b5045912c537758b41ce161eb353ac7e520ede8c11",
+          "size": 3854
+        }
+      ],
+      "sha256": "512260955bc16d0d7ecb54e8a52027205419871bf3ea950eee712a19ada1b86a",
+      "size": 14464
+    },
+    {
+      "path": "benchmark/0004.wasm3-core/generate.py",
+      "repo": "ros",
+      "sections": [
+        {
+          "anchor": "    elif case == \"gc-allocation-ring\":",
+          "excerpt": "excerpts/ros/benchmark/0004.wasm3-core/generate.py/original-wasm-producer.txt",
+          "first_line": 325,
+          "label": "original-wasm-producer",
+          "last_line": 358,
+          "sha256": "a5c38c6f54b0f36db53a1b272ec961f081fc8c7c8d18ca79e14b5765a30536ff",
+          "size": 1743
+        }
+      ],
+      "sha256": "48f5edd953e81452ef7ddd307c32e89d56e0897800ac3cc05793b4d65a665de7",
+      "size": 27137
+    }
+  ],
+  "source_scope": "Working source observations and excerpts only; not a compiled source closure or product identity",
+  "wasm": {
+    "bytes_in_packet": false,
+    "case": "gc-allocation-ring",
+    "iterations": 16000000,
+    "returned_state": 493211925,
+    "roots": 1024,
+    "sha256": "66874f9a4a0a5977b4ace1cc702f949c6c2627311dce0bcbe87c818c55516e3e"
+  }
+}

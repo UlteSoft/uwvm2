@@ -18,6 +18,8 @@
 
 namespace uwvm2::runtime::lib
 {
+    extern "C++" bool full_compile_prepare_host_api() noexcept { return false; }
+
     extern "C++" void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config cfg) noexcept
     {
         static_cast<void>(main_module_name);
@@ -36,7 +38,17 @@ namespace uwvm2::runtime::lib
 
     extern "C++" void runtime_stop_before_proc_exit_host_api() noexcept {}
 
+    extern "C++" llvm_jit_full_source_publication_view llvm_jit_full_source_publication_host_api(
+        ::std::size_t module_id) noexcept
+    { (void)module_id; return {}; }
+
     extern "C++" void reset_runtime_state_host_api() noexcept {}
+
+#if defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+    extern "C++" bool replace_full_source_after_drain_host_api(
+        bool (*initialize_source)(void*) noexcept, void* context) noexcept
+    { (void)initialize_source; (void)context; return false; }
+#endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
     extern "C++" void llvm_jit_reset_runtime_state_host_api() noexcept { reset_runtime_state_host_api(); }

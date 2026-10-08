@@ -1,0 +1,55 @@
+{
+  "schema": "uwvm-qemu-component-actual-failure-v1",
+  "suite": "windows-raii-cold-r1-attempt1",
+  "repository": "uwvm2-ros",
+  "variant": "eh",
+  "planned_stages": 26,
+  "executed_stages": 2,
+  "stage_returncodes": [
+    [
+      "input-before",
+      0
+    ],
+    [
+      "uwvm2-ros-eh-compile",
+      1
+    ]
+  ],
+  "diagnostic": "fixture:303 fast_io::mnp::strvw(self,self_length) has no ptr/length overload; actual public API is iterator pair or range",
+  "source_manifest_sha256": "2893d8263494c435c7ad6d4e4eac31b3722fea05447f8b3a3c9e621379f55be9",
+  "source_archive_sha256": "180dacb4528cedee57cefcecf3266d7c20a5ac1ffc2fa6974432d88d2b8d624a",
+  "native_target": "x86_64-w64-windows-gnu",
+  "actual_target_provider": "Windows SDK libc++ ABI1 __1",
+  "actual_coff_object_created": false,
+  "actual_pe_created": false,
+  "actual_guest_executed": false,
+  "qualification_passed": false,
+  "original_pidfd_retirement_verified": true,
+  "ticket_id": "db94eb65db9942709d09e7bbd7a5bb93",
+  "ticket_state": "retired",
+  "lane_retirement_sha256": "4ddf9e41d2b524fb6f9d19723f52f72f29334ae2a38c86608a6ff378807ce6fb",
+  "original_receipts_sha256": "464574fe64b1e07e906b4d67253d79b40eaf75f37ed7e18bd7229bdd22deb422",
+  "memory_max_bytes": 68719476736,
+  "swap_max_bytes": 0,
+  "compile_cpu_pool": "16-31",
+  "aggregate_owned_rss_peak_bytes": 426520576,
+  "memory_events_after": {
+    "low": 0,
+    "high": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_kill": 0,
+    "oom_group_kill": 0
+  },
+  "remaining_roster": [
+    10154
+  ],
+  "raw_packet": {
+    "path": "/tmp/uwvm-qemu-windows-raii-cold-r1-attempt1-small-evidence",
+    "members": 12,
+    "bytes": 540679,
+    "sha256": "9651c328371088d4f381e0ca2ba06e76845f96e5f954ca4c34fe5c678eed615d"
+  },
+  "owner_source_fix_required": true,
+  "old_r3_product_binaries_qualified": false
+}

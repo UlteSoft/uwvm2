@@ -27,4 +27,5 @@
 # include <uwvm2/validation/standard/wasm1/impl.h>
 # include <uwvm2/validation/standard/wasm1p1/impl.h>
 # include <uwvm2/validation/standard/wasm2/impl.h>
+# include <uwvm2/validation/standard/wasm3/impl.h>
 #endif
