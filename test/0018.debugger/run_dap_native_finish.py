@@ -101,7 +101,7 @@ def main():
         current, root_point = live.breakpoint_begin(client, start, 2)
         record["root_synchronization_stop"] = current
         client.evaluate(f"delete {root_point}")
-        point_reply = client.evaluate(f"break 0 {recursive} 0")
+        point_reply = client.evaluate(f"breakwasm 0 {recursive} 0")
         identifier = re.search(rb"breakpoint ([0-9]+)", point_reply)
         live.require(identifier is not None, "actual recursive breakpoint", point_reply)
         point = int(identifier[1])

@@ -82,6 +82,7 @@ namespace uwvm2::utils::control::win32_abi
     UWVM_WIN32_NOEXCEPT_IMPORT(BOOL, GetOverlappedResult, 16, (HANDLE arg0, LPOVERLAPPED arg1, LPDWORD arg2, BOOL arg3), (arg0, arg1, arg2, arg3));
     UWVM_WIN32_NOEXCEPT_IMPORT(DWORD, GetProcessIdOfThread, 4, (HANDLE arg0), (arg0));
     UWVM_WIN32_NOEXCEPT_IMPORT(BOOL, GetThreadContext, 8, (HANDLE arg0, LPCONTEXT arg1), (arg0, arg1));
+    UWVM_WIN32_NOEXCEPT_IMPORT(BOOL, SetThreadContext, 8, (HANDLE arg0, CONST CONTEXT* arg1), (arg0, arg1));
     UWVM_WIN32_NOEXCEPT_IMPORT(BOOL, GetTokenInformation, 20, (HANDLE arg0, TOKEN_INFORMATION_CLASS arg1, LPVOID arg2, DWORD arg3, PDWORD arg4), (arg0, arg1, arg2, arg3, arg4));
     UWVM_WIN32_NOEXCEPT_IMPORT(BOOL, InitializeProcThreadAttributeList, 16, (LPPROC_THREAD_ATTRIBUTE_LIST arg0, DWORD arg1, DWORD arg2, PSIZE_T arg3), (arg0, arg1, arg2, arg3));
     UWVM_WIN32_NOEXCEPT_IMPORT(BOOL, InitializeSecurityDescriptor, 8, (PSECURITY_DESCRIPTOR arg0, DWORD arg1), (arg0, arg1));

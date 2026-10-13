@@ -192,7 +192,7 @@ static void policy_round(char const* binary,char const* wasm,char const* policy,
         prompt(reply_output);
         require(contains(send("help"),"info wasip1 args|env|fds|preopens"),"public help");
         require(!ok(send("info wasip1 args 0")),"prepared refusal");
-        require(contains(send("break 0 4 7"),"breakpoint"),"set actual Wasm break");
+        require(contains(send("breakwasm 0 4 7"),"breakpoint"),"set actual Wasm break");
         send("continue");
         auto const deadline{std::chrono::steady_clock::now()+std::chrono::seconds{20}};
         fast_io::string stopped;
@@ -244,8 +244,8 @@ static void policy_round(char const* binary,char const* wasm,char const* policy,
         send("delete 1");send("continue");
         fast_io::string exited;
         do { fast_io::this_thread::sleep_for(std::chrono::milliseconds{5});exited=send("status");if(std::chrono::steady_clock::now()>deadline+std::chrono::seconds{20}) { throw std::runtime_error{"guest exit timeout"}; } }
-        while(!contains(exited,"guest exited:"));
-        require(contains(exited,"guest exited: 0"),"real guest reads restored argv and env");
+        while(!contains(exited,"Program exited"));
+        require(contains(exited,"Program exited normally."),"real guest reads restored argv and env");
         auto trace{send("trace wasip1 read 0 64")};
         for(auto name:{"name=args_sizes_get","name=args_get","name=environ_sizes_get","name=environ_get"})
         { require(contains(trace,name),name); }

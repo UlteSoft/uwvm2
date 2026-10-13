@@ -137,7 +137,7 @@ class Console:
         end = time.monotonic() + 30
         while True:
             reply = self.send('wait')
-            if b'guest exited: 0' in reply:
+            if b'Program exited normally.' in reply:
                 break
             assert time.monotonic() < end, (self.name, 'guest timeout', reply)
         assert marker in self.log, (self.name, self.log[-4000:])
@@ -231,7 +231,7 @@ def main() -> int:
                             timeout=30)
         logs['regular-hardlink'] = result.stdout
         assert result.returncode == 0 and regular_marker in result.stdout, result.stdout[-4000:]
-        assert b'guest exited: 0' in result.stdout and source.read_bytes() == commands
+        assert b'Program exited normally.' in result.stdout and source.read_bytes() == commands
         assert alias.read_bytes() == commands and (mount / 'benign').exists()
 
         master, slave = pty.openpty()

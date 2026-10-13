@@ -5,7 +5,7 @@
     {
         llvm_jit_debug_native_return_continuation() = default;
         llvm_jit_debug_native_activation_cursor_owner cursor_{};
-        void const* session_{};
+        [[maybe_unused]] void const* session_{};
         // Runtime-only comparison evidence. No address/register/stack fields
         // are declared in the public return-plan query or its serialization.
         struct evidence
@@ -377,7 +377,7 @@
                     boundaries[boundary_count++] = {parent_key,recovered.return_pc};
 #endif
                 }
-                ::std::uintptr_t parent_sp{recovered.cfa};
+                [[maybe_unused]] ::std::uintptr_t parent_sp{recovered.cfa};
 #if (defined(__riscv) && __riscv_xlen == 64) || (defined(__aarch64__) && defined(__AARCH64EL__) && __SIZEOF_POINTER__ == 8) || (defined(__loongarch64) && __SIZEOF_POINTER__ == 8) || (defined(__mips__) && defined(__mips64) && __SIZEOF_POINTER__ == 8 && defined(__mips_isa_rev) && __mips_isa_rev == 2 && !defined(__mips16) && !defined(__mips_micromips)) || (defined(__i386__) && __SIZEOF_POINTER__ == 4)
                 // Validate the actual software-step return CFA for EVERY recovered
                 // frame, including a backtrace-only query with no event seal.
@@ -652,7 +652,7 @@
     {
         ::std::mutex g_debug_native_return_continuation_mutex{};
         ::std::weak_ptr<llvm_jit_debug_native_return_continuation const> g_debug_native_return_continuations[256u]{};
-        [[nodiscard]] llvm_jit_debug_native_return_continuation_owner canonical_native_return_continuation(
+        [[nodiscard, maybe_unused]] llvm_jit_debug_native_return_continuation_owner canonical_native_return_continuation(
             llvm_jit_debug_native_return_continuation_owner const& supplied) noexcept
         {
             if(!supplied) { return {}; }

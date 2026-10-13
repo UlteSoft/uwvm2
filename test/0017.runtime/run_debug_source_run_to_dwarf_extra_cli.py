@@ -53,7 +53,7 @@ try:
    else:assert new['function']==leaf and len(new['physical_functions'])==len(old['physical_functions'])+1,(old,new)
    row.update(origin=old,destination=new,actual_target=target);s.finish_guest();row['passed']=True
   finally:
-   s.console.finish();row.update(quit_returncode=s.console.child.returncode,managed_shutdown_complete=b'managed shutdown complete' in s.console.transcript)
+   s.console.finish();row.update(quit_returncode=s.console.child.returncode,managed_shutdown_complete=s.console.normal_quit_completed)
    assert row['quit_returncode']==0 and row['managed_shutdown_complete'];publish()
  assert all(sha(p)==h for p,h in pins.items());d.update(passed=True,inputs_after_unchanged=True)
 except BaseException as e:d['error']=repr(e);raise

@@ -13,9 +13,12 @@ module;
 #include <span>
 #include <utility>
 #include <vector>
+#include <atomic>
+#include <mutex>
 export module uwvm2.runtime.checkpoint.materialization;
 import fast_io;
 import uwvm2.parser.wasm.standard.wasm3.type;
+import uwvm2.object.global;
 #define UWVM_MODULE
 #define UWVM_MODULE_EXPORT export
 #include "materialization.h"

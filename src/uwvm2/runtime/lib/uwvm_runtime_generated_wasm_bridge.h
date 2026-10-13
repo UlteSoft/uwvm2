@@ -101,11 +101,31 @@ namespace uwvm2::runtime::lib::details
     // or recording/restore authority.
     extern "C++" ::std::uintptr_t llvm_jit_checkpoint_observer_workspace_abi_bridge(
         ::std::size_t compiler_bytes) noexcept;
+    // Linux x86_64 generated observer entry uses the native two-register
+    // aggregate return. No token/pointer is exposed as a Wasm value.
+    struct llvm_jit_checkpoint_observer_entry_result
+    {
+        ::std::uint64_t incarnation;
+        ::std::uintptr_t workspace;
+    };
+    extern "C++" llvm_jit_checkpoint_observer_entry_result llvm_jit_checkpoint_observer_activation_enter_abi_bridge(
+        ::std::size_t compiler_bytes, ::std::uintptr_t module_id, ::std::uintptr_t function_index,
+        ::std::uint64_t compiled_generation) noexcept;
+    // Same authentic native entry/bind and exact active extent. Small final
+    // payloads use bounded constant-size native clearing, before publication.
+    extern "C++" llvm_jit_checkpoint_observer_entry_result llvm_jit_checkpoint_observer_small_enter_abi_bridge(
+        ::std::size_t compiler_bytes, ::std::uintptr_t module_id, ::std::uintptr_t function_index,
+        ::std::uint64_t compiled_generation) noexcept;
     extern "C++" void llvm_jit_checkpoint_observer_workspace_leave_abi_bridge(::std::uintptr_t compiler_buffer) noexcept;
     extern "C++" ::std::uint64_t llvm_jit_checkpoint_activation_enter_abi_bridge(
         ::std::uintptr_t module_id, ::std::uintptr_t function_index, ::std::uint64_t compiled_generation) noexcept;
     extern "C++" void llvm_jit_checkpoint_activation_leave_abi_bridge(
         ::std::uint64_t incarnation, ::std::uintptr_t exit_kind) noexcept;
+    extern "C++" void llvm_jit_checkpoint_observer_activation_leave_abi_bridge(
+        ::std::uint64_t incarnation, ::std::uintptr_t exit_kind, ::std::uintptr_t compiler_buffer) noexcept;
+    // Compiler-known ordinary return; genuine workspace/frame retirement.
+    extern "C++" void llvm_jit_checkpoint_observer_return_abi_bridge(
+        ::std::uint64_t incarnation, ::std::uintptr_t compiler_buffer) noexcept;
 
     // Selected resumable full-JIT import edges only. Resolve the actual owned
     // final leaf and count a foreign operation BEFORE provider entry; these

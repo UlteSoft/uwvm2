@@ -84,6 +84,10 @@ llvm_jit_debug_shutdown_start runtime_debug_shutdown_bridge::begin(
                 ::std::lock_guard lock{mutex_};
                 if(actual_request_ || runtime_checkpoint_retirement_bridge::management_blocked()) { return {result::busy, {}}; }
                 actual_request_ = prepared;
+                // A numeric gate has one effective-demand byte. Latch full
+                // collection before publishing the real shutdown request;
+                // concurrent/late selective publishers cannot clear it.
+                ::uwvm2::runtime::checkpoint::observation_probe_hints::force_collection_until_configured();
                 // Publish actual ownership/negative management gate before any
                 // admitted guest resumes. New replacement commit checks this
                 // negative atomic gate; an already-owned ALL-park commit must
@@ -274,10 +278,8 @@ namespace details
 {
     extern "C++" void const* llvm_jit_debug_shutdown_flag_address_host_api() noexcept
     {
-#if defined(__linux__)
         if constexpr(::std::atomic<bool>::is_always_lock_free && sizeof(::std::atomic<bool>) == 1u && sizeof(bool) == 1u)
         { return runtime_debug_shutdown_bridge::requested_address(); }
-#endif
         return nullptr;
     }
     extern "C++" void llvm_jit_debug_shutdown_poll_abi_bridge(::std::uint64_t incarnation,

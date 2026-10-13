@@ -66,7 +66,7 @@ def qualify(watchdog: Path, binary: Path, wasm: Path, suffix: bytes) -> dict:
     console = Console(watchdog, binary, None, wasm, 'unwind')
     try:
         assert b'prepared; no Wasm instruction executed' in console.send('status')
-        assert b'breakpoint' in console.send(f'break 0 {entry} 0')
+        assert b'breakpoint' in console.send(f'breakwasm 0 {entry} 0')
         console.send('continue')
         stopped = console.until(b'stopped: breakpoint')
         for _ in range(128):
@@ -82,7 +82,7 @@ def qualify(watchdog: Path, binary: Path, wasm: Path, suffix: bytes) -> dict:
         second = stepped.split(b'  source ', 1)[1].split(b'\n', 1)[0]
         assert first != second, (wasm, first, second)
         console.send('continue')
-        console.until(b'guest exited: 0')
+        console.until(b'Program exited normally.')
         peak, log = console.close()
         return {'file': wasm.name, 'entry_index': entry,
                 'first_source': first.decode(errors='replace'),
@@ -104,7 +104,7 @@ def qualify_frame_policy(watchdog: Path, binary: Path, wasm: Path,
     destination = caller
     console = Console(watchdog, binary, None, wasm, 'unwind')
     try:
-        assert b'breakpoint' in console.send(f'break 0 {origin} 0')
+        assert b'breakpoint' in console.send(f'breakwasm 0 {origin} 0')
         console.send('continue')
         stopped = console.until(b'stopped: breakpoint')
         for _ in range(64):
@@ -119,7 +119,7 @@ def qualify_frame_policy(watchdog: Path, binary: Path, wasm: Path,
         assert b'stopped: selected participant step' in stepped, stepped
         assert f'function={destination}'.encode() in stepped and b'  source ' in stepped, stepped
         console.send('continue')
-        console.until(b'guest exited: 0')
+        console.until(b'Program exited normally.')
         peak, log = console.close()
         return {'policy': policy, 'origin_function': origin,
                 'destination_function': destination,
@@ -134,7 +134,7 @@ def qualify_source_break(watchdog: Path, binary: Path, wasm: Path,
     source_path, line, _column = source_location.rsplit(':', 2)
     console = Console(watchdog, binary, None, wasm, 'unwind')
     try:
-        installed = console.send(f'break-source 0 {source_path}:{line}')
+        installed = console.send(f'breaksource 0 {source_path}:{line}')
         assert b'breakpoint 1 source=' in installed, installed
         console.send('continue')
         stopped = console.until(b'stopped: breakpoint')

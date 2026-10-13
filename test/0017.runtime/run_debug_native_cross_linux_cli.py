@@ -176,7 +176,7 @@ for policy in args.policy or ('instruction', 'unwind'):
     try:
         initial = console.send('step asm 1')
         assert b'error: command or thread is not valid' in initial, initial
-        assert b'registered' in console.send('break 0 0 0')
+        assert b'registered' in console.send('breakwasm 0 0 0')
         console.send('continue')
         deadline = time.monotonic() + args.native_walk_timeout
         while True:

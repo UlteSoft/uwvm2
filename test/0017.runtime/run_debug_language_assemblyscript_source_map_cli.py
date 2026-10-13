@@ -59,10 +59,10 @@ def main():
                 '-Rllvm-exception-dispatch', 'native-unwind', '-Rllvm-cache-path', 'disable', '--run', str(a.wasm)]
         row['argv'] = argv; c = metadata.Console(argv, a.out / 'console.log')
         assert b'prepared; no Wasm instruction executed' in send('status')
-        reply = send(f'break-source 0 {declared}:{markers[0]}')
+        reply = send(f'breaksource 0 {declared}:{markers[0]}')
         bid = re.search(rb'breakpoint (\d+)', reply); assert bid is not None, reply
         table = send('info breakpoints')
-        assert b'error:' in send(f'break-source 0 {declared}.absent:{markers[0]}')
+        assert b'error:' in send(f'breaksource 0 {declared}.absent:{markers[0]}')
         assert table == send('info breakpoints')
         send('continue')
         for _ in range(20):
@@ -125,8 +125,8 @@ def main():
                 origin = after
             reply = send('finish' if a.aliases else f'step source {thread} out')
             assert b'error:' not in reply, reply
-            if b'guest exited:' in reply:
-                assert len(origin['physical_functions']) == 1 and b'guest exited: 0' in reply, (origin,reply)
+            if b'Program exited' in reply:
+                assert len(origin['physical_functions']) == 1 and b'Program exited normally.' in reply, (origin,reply)
                 already_exited = True
                 row['source_step_results'].append(dict(policy='out',before=origin,actual_guest_exit=True))
             else:
@@ -142,9 +142,9 @@ def main():
         if not already_exited:
             send('continue')
         for _ in range(20):
-            result = b'guest exited: 0' if already_exited else send('wait')
-            if b'guest exited:' in result:
-                assert b'guest exited: 0' in result; break
+            result = b'Program exited normally.' if already_exited else send('wait')
+            if b'Program exited' in result:
+                assert b'Program exited normally.' in result; break
         else:
             raise AssertionError('actual AssemblyScript workload exit missing')
         row['passed'] = True
@@ -158,7 +158,7 @@ def main():
                 row.update(passed=False, close_error=repr(e)); raise
             finally:
                 row['quit_returncode'] = c.child.returncode
-                row['managed_shutdown_complete'] = b'managed shutdown complete' in c.transcript
+                row['managed_shutdown_complete'] = c.normal_quit_completed
                 if row['quit_returncode'] != 0 or not row['managed_shutdown_complete']:
                     row['passed'] = False
         row['inputs_after'] = {str(p): sha(p) for p in paths}

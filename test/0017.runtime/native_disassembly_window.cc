@@ -77,6 +77,15 @@ int main()
     auto const forward_page{nd::decode_window_with(one_pass,large,0x1000u,0x1000u+60000u,0,0,32u)};
     CHECK(forward_page.available && forward_page.count==32u && one_pass.calls==60032u);
     for(::std::size_t i{};i<32u;++i) { CHECK(forward_page.instructions[i].pc==0x1000u+60000u+i); }
+    CHECK(nd::decode_window_with(fake,large,0x1000u,0x1000u,0,70000,1u).instructions[0u].pc==0x1000u+70000u);
+    CHECK(nd::decode_window_with(fake,large,0x1000u,0x1000u+70000u,0,-70000,1u).instructions[0u].pc==0x1000u);
+    CHECK(command("disassemble-range 3 17 1 0 70000 0").kind==dbg::console_command_kind::assembly_disassemble_range);
+    struct fixed_decoder : decoder { unsigned fixed_instruction_bytes() const { return 4u; } };
+    fixed_decoder fixed{};::std::array<::std::uint8_t,40u> slots{};slots.fill(4u);
+    auto const fixed_page{nd::decode_window_with(fixed,slots,0x1000u,0x1010u,0,-5,12u)};
+    CHECK(fixed_page.available && !fixed_page.instructions[0u] && fixed_page.instructions[1u].pc==0x1000u &&
+          fixed_page.instructions[10u].pc==0x1024u && !fixed_page.instructions[11u] && fixed.calls==10u);
+    CHECK(!nd::decode_window_with(fixed,slots,0x1000u,0x1010u,1,0,1u).available);
     large[69999u] = 0u;
     auto const gap{nd::decode_window_with(fake, large, 0x1000u, 0x1000u + 69998u, 0, 0, 3u)};
     CHECK(gap.available && gap.instructions[0u] && !gap.instructions[1u] && !gap.instructions[2u]);
@@ -108,7 +117,7 @@ int main()
     CHECK(parsed.kind == dbg::console_command_kind::assembly_disassemble_range && parsed.disassembly_resolve_symbols);
     CHECK(parsed.disassembly_byte_offset == -65536 && parsed.disassembly_instruction_offset == -200 && parsed.payload_size == 8u);
     for(auto const* invalid : {"disassemble-range 3 17 0 0 0 1","disassemble-range 3 17 33 0 0 1",
-        "disassemble-range 3 17 1 -65537 0 1","disassemble-range 3 17 1 0 8705 1",
+        "disassemble-range 3 17 1 -65537 0 1","disassemble-range 3 17 1 0 9223372036854775807 1",
         "disassemble-range 3 17 1 0 -9223372036854775808 1","disassemble-range 3 17 1 0 0 2",
         "disassemble-range 3 17 1 0x1000 0 1","disassemble-range 3 17 1 0 0 1;quit",
         "disassemble-range 0 17 1 0 0 1","disassemble-range 3 0 1 0 0 1"})

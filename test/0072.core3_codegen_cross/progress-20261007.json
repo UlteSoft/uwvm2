@@ -6154,5 +6154,135 @@
       "complete_function_extents": 372,
       "counts_include_separate_independently_executed_cohorts": true
     }
+  },
+  "current_source_bound_successors_20261008_r16": {
+    "scope": "Frozen paired R16 MIPS64EL N64 R2 selected full O0-O3 SIMD/control/tail and actual main T2; genuine ROS12 incremental provider. No complete Core3/threads/all-ISA/hardware claim.",
+    "source_identities": {
+      "uwvm2": "sha256:37eaf6ad28d1c6cfe521e3ee900e0f07c108619188c54092c53d0d7c91c4c538",
+      "uwvm2-ros": "sha256:f640c75ed344c63a4f48e1187e80f2cb50ccb961458770c3e581758930838aaf"
+    },
+    "qualified_reports": {
+      "prefix": {
+        "file": "cgopt-mips64el-r16-codegen-prefix.qualification.json",
+        "sha256": "a7f95fe9108d91c3e801c23974e7374c7175025e9ed7c2e1b20b8daffa0b84c2",
+        "totals": {
+          "uncached_numeric": 66,
+          "signed_cache": 396,
+          "authenticated_warm": 264,
+          "runtime_processes": 462,
+          "bounded_Wasm_function_extents": 88
+        }
+      },
+      "debug": {
+        "file": "cgopt-mips64el-r16-debug-long-branches.qualification.json",
+        "sha256": "c78f52dc074acbb5fe85b2902660271ea096ba847ddaba19f7a58d55befd954d",
+        "totals": {
+          "runtime_processes": 16,
+          "ordinary_processes": 8,
+          "debug_processes": 8,
+          "semantic_byte_checks": 61696,
+          "debug_byte_checks": 61696,
+          "typed_operand_stops": 16,
+          "same_stop_operand_reads": 32
+        }
+      },
+      "T2": {
+        "file": "cgopt-mips64el-r16-simd-sign-t2.qualification.json",
+        "sha256": "2ef2c64f0ae326682eed289f43a333615a1c0aad90252817b6ecc589cb757a47",
+        "totals": {
+          "runtime_processes": 42,
+          "uncached_processes": 6,
+          "signed_processes": 36,
+          "authenticated_warm_processes": 24,
+          "complete_actual_full_T2_function_extents": 12,
+          "checked_calls": 168000000,
+          "bit_checks": 2016000000
+        }
+      }
+    },
+    "finite_archives": {
+      "prefix": {
+        "descriptor": "cgopt-mips64el-r16-prefix-archive.json",
+        "descriptor_sha256": "8a5cca262eb7bbadd32a701d9a41d529248e3e7b5ecaef04641444fa503d74e2"
+      },
+      "debug-t2": {
+        "descriptor": "cgopt-mips64el-r16-debug-t2-archive.json",
+        "descriptor_sha256": "00d8c7548571cad9c15bf2697b02fd948b22b2c44d23f4da1b5464aa29f6be11"
+      }
+    },
+    "selected_disjoint_cohort_totals": {
+      "runtime_processes": 520,
+      "bounded_Wasm_function_extents": 100,
+      "signed_cache_processes": 432,
+      "authenticated_warm_processes": 288
+    },
+    "native_component_separate_from_Wasm_totals": {
+      "generated_function_bytes": 160088,
+      "executions": 2,
+      "outside_function_R_MIPS_26_relocations": 0
+    },
+    "O0_no_MSA_sign_regression_resolved": true,
+    "large_Wasm_debug_full_O0_O1_O2_O3_both_repos": "passed",
+    "actual_main_full_T2_sign_and_cache": "passed; ROS full-only",
+    "pending": [
+      "Other genuine ISA/ABI SDK and products",
+      "Complete Core3 and requested threads corpus",
+      "Interpreter fusion/delay codegen and host C++ O3",
+      "MIPS no-MSA SIMD rounding helper efficiency",
+      "Full big-endian MIPS VM/cache/tail",
+      "Hardware throughput"
+    ],
+    "current_next": "MIPS no-MSA SIMD rounding helper correctness/codegen review"
+  },
+  "current_source_bound_successors_20261008_r17_rounding": {
+    "scope": "Selected paired frozen R17 genuine Linux MIPS64EL N64 R2 full O0-O3/main lazy, interpreter current extra/heavy product, signed default/explicit fresh-process caches, actual main full T2 lazy/verified-lazy O1-O3 SIMD rounding. Exact rational/allowed-NaN semantics; no complete Core3/threads/all-ISA/hardware or current live-tree claim.",
+    "source_identities": {
+      "uwvm2": "sha256:99f74d6253fb16dd83d771292d0a45a166e13e1a499dd6aaea086621649db8cd",
+      "uwvm2-ros": "sha256:2115261f01a068d050e548ae5bae67f6d25b377cb64505365809eb30a9a2048a"
+    },
+    "receipt": "mips64el_r17_simd_rounding.qualification.json",
+    "receipt_sha256": "59a8d2597af7c8b205263dc443334a4ba0dd2d529dbeda9de4103de77837ce9c",
+    "selected_results": {
+      "uncached_interpreter": 48,
+      "uncached_LLVM": 132,
+      "signed_cache": 792,
+      "authenticated_warm": 528,
+      "bounded_Wasm_functions": 132,
+      "ordinary_lane_checks": 37800,
+      "signed_lane_checks": 166320,
+      "runtime_processes": 1014,
+      "total_signed_processes": 828,
+      "total_warm_processes": 552,
+      "total_bounded_Wasm_functions": 144
+    },
+    "actual_main_T2": {
+      "uncached_processes": 6,
+      "signed_processes": 36,
+      "authenticated_warm_processes": 24,
+      "runtime_processes": 42,
+      "complete_full_T2_function_extents": 12,
+      "checked_calls": 168000000,
+      "bit_checks": 4032000000,
+      "all_checked_calls_in_T2_claimed": false
+    },
+    "BE_LE_native_component": {
+      "lane_checks": 16289792,
+      "bounded_extents": 128,
+      "FCSR_rounding_modes": 4
+    },
+    "universal_cache_revision": "simd-round-lowering=mips-n64-no-msa-bounded-native-v1",
+    "hardware_throughput_qualified": false,
+    "pending": [
+      "Other genuine Linux ISA/ABI products",
+      "Complete Core3/requested threads",
+      "Interpreter selected fusion/delay codegen and host C++ O3",
+      "Further f32 guard/mask instruction compression and hardware throughput",
+      "Complete big-endian MIPS VM/cache/tail"
+    ],
+    "finite_evidence_archive": "/Users/liyinan/Documents/MacroModel/wasm-core3-debug-audit-20261007-r1/cgopt-mips64el-r17-rounding-evidence-r1.tar.gz",
+    "finite_evidence_archive_sha256": "06d803a82f9fd8bcd1343efed14ac5b173a7bd93219039729ad015b22b4b594c",
+    "finite_evidence_archive_bytes": 12089640,
+    "archive_private_keys_included": false,
+    "archive_SDK_archives_included": false
   }
 }

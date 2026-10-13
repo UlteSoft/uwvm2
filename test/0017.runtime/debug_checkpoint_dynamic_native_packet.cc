@@ -67,6 +67,63 @@ int main()
     require(observed_ref.kind == global::wasm_ref_kind::wasm_i31 && observed_ref.storage.wasm_i31.get_s() == -17,
         "exact i31 operand carrier; never dereference opaque reference bits");
     auto const prior{accepted};
+    cp::activation_identity const identity{1u,0u,1u,9u};
+    cp::shadow_ledger reusable{source->get().profile};
+    require(reusable.enter(identity,source)==cp::status::ok &&
+        reusable.materialize_compiler_native_data(identity,source,2u,payload,flags)==cp::status::ok,"direct compiler packet materialization");
+    auto const storage{reusable.frames_while_actually_stopped().back().values.data()};
+    for(unsigned iteration{};iteration<10000u;++iteration)
+    {
+        auto const changed_bits{nan64 ^ static_cast<::std::uint64_t>(iteration)};
+        put(payload,3u,changed_bits);
+        auto const site{iteration%2u ? 1u : 2u};
+        auto const length{source->get().sites[site-1u].slots.size()};
+        require(reusable.materialize_compiler_native_data(identity,source,site,::std::span<::std::byte const>{payload}.first(length*cp::native_slot_bytes),flags)==cp::status::ok,
+            "alternating exact pre-op operand extents remain valid");
+        auto const& frame{reusable.frames_while_actually_stopped().back()};
+        require(frame.values.data()==storage && frame.site==site && frame.values.size()==length,"steady-state capture reuses activation storage");
+        for(::std::size_t i{};i<length;++i)
+        {
+            auto expected_bits{prior->values()[i].bits};
+            if(i==3u) { ::std::memcpy(expected_bits.data(),::std::addressof(changed_bits),sizeof(changed_bits)); }
+            require(frame.values[i].declaration==prior->values()[i].declaration && frame.values[i].bits==expected_bits,
+                "direct capture preserves complete original-index values and bits");
+        }
+    }
+    auto const previous_values{reusable.frames_while_actually_stopped().back().values};
+    auto const borrowed{reusable.compiler_top_plan(identity)};
+    require(borrowed != nullptr && borrowed->get() == source.get(), "producer borrows exact entry-retained plan");
+    for(unsigned member{}; member != 4u; ++member)
+    {
+        auto wrong{identity};
+        if(member == 0u) { ++wrong.incarnation; }
+        if(member == 1u) { ++wrong.parent; }
+        if(member == 2u) { ++wrong.continuation; }
+        if(member == 3u) { ++wrong.runtime_epoch; }
+        require(reusable.compiler_top_plan(wrong) == nullptr, "producer cannot borrow a different live activation");
+    }
+    auto invalid_flags{flags};invalid_flags.back()=2u;
+    require(reusable.materialize_compiler_native_data(identity,source,2u,payload,invalid_flags)==cp::status::invalid_layout,"late invalid flag rejects before direct packet writes");
+    auto const& retained{reusable.frames_while_actually_stopped().back()};
+    require(retained.site==1u && retained.values.size()==previous_values.size() && retained.values.data()==storage,"failed packet leaves old frame intact");
+    for(::std::size_t i{};i<previous_values.size();++i)
+    { require(retained.values[i].bits==previous_values[i].bits,"failed packet preserves old bytes"); }
+    require(reusable.materialize_compiler_native_data(identity,source,2u,payload,flags)==cp::status::invalid_layout,"capture failure stays sticky");
+    require(reusable.compiler_top_plan(identity) == nullptr, "poisoned recording cannot lend a cached plan");
+    put(payload,3u,nan64);
+    cp::shadow_ledger reference_failure{source->get().profile};
+    require(reference_failure.enter(identity,source)==cp::status::ok &&
+        reference_failure.materialize_compiler_native_data(identity,source,2u,payload,flags)==cp::status::ok,
+        "reference failure fixture holds a complete prior packet");
+    put(payload,3u,::std::uint64_t{42u});
+    global::wasm_global_ref_t bad_reference{};bad_reference.kind=global::wasm_ref_kind::wasm_func;
+    put(payload,6u,bad_reference);
+    require(reference_failure.materialize_compiler_native_data(identity,source,2u,payload,flags)==cp::status::invalid_reference,
+        "late parser reference rejected before modifying earlier numeric values");
+    auto const& reference_retained{reference_failure.frames_while_actually_stopped().back()};
+    for(::std::size_t i{};i<prior->values().size();++i)
+    { require(reference_retained.values[i].bits==prior->values()[i].bits,"invalid late reference leaves every previous byte intact"); }
+    put(payload,3u,nan64);put(payload,6u,assigned);
     auto malformed{flags}; malformed[5u] = 2u;
     require(cp::dynamic_native_packet::copy_compiler_packet(source, 2u, payload, malformed, accepted) == cp::status::invalid_layout && accepted == prior,
         "late noncanonical flag rejected before payload publication");

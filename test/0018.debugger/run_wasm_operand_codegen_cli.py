@@ -42,7 +42,7 @@ def main():
         try:
             if enabled:
                 c=OperandConsole([*runner,argv[0],'-Rdbg',*argv[1:]],a.out/'on.log');c.prompt()
-                assert b'registered' in c.send('break 0 0 6') # actual final end, pre-op stack contains the result
+                assert b'registered' in c.send('breakwasm 0 0 6') # actual final end, pre-op stack contains the result
                 c.send('continue');limit=time.monotonic()+a.stop_timeout
                 while b'stopped:' not in c.send('status'):
                     assert time.monotonic()<limit;time.sleep(.01)

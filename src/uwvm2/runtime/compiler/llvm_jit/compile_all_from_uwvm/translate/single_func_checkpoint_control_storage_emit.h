@@ -5,13 +5,39 @@
     return state.checkpoint_plan != nullptr && state.checkpoint_plan->profile &&
         state.checkpoint_plan->profile->purpose() == cp::compilation_purpose::observe_values;
 }
+// Compiler-only selection on the actual fused entry constant. No extra
+// guest instructions or new payload initialization gap are introduced.
+inline constexpr ::std::uint64_t checkpoint_observer_small_entry_limit{64u};
+[[nodiscard]] inline bool prepare_checkpoint_observer_small_entry(runtime_local_func_llvm_jit_emit_state_t& state) noexcept
+{
+    auto const allocation{state.checkpoint_observer_workspace_allocation};
+    if(allocation == nullptr || allocation->arg_size() != 4u) { return true; }
+    auto const extent{checkpoint_observer_allocation_extent(state)};
+    if(extent == nullptr || extent->isZero()) { return false; }
+    auto const marker{allocation->getMetadata("uwvm.debug.observer.entry.small")};
+    if(extent->getZExtValue() > checkpoint_observer_small_entry_limit) { return marker == nullptr; }
+    auto const bridge{get_llvm_runtime_bridge_function_symbol_value_unwrapped<
+        ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_observer_small_enter_abi_bridge>(
+            *state.ir_builder,allocation->getFunctionType())};
+    if(bridge == nullptr || (marker != nullptr && allocation->getCalledOperand() != bridge)) { return false; }
+    allocation->setCalledOperand(bridge);
+    allocation->setMetadata("uwvm.debug.observer.entry.small",::llvm::MDNode::get(state.llvm_function->getContext(),{}));
+    return true;
+}
 [[nodiscard]] inline bool prepare_runtime_local_func_llvm_jit_checkpoint_observer_workspace(
     runtime_local_func_llvm_jit_emit_state_t& state) noexcept
 {
     if(!checkpoint_observer_workspace_selected(state) ||
        state.checkpoint_plan->producer_availability != ::uwvm2::runtime::checkpoint::status::ok) { return true; }
     if(!state.emit_debug_safe_points || !state.debug_activation_enabled || state.debug_activation_token == nullptr ||
-       state.ir_builder == nullptr || state.checkpoint_observer_workspace != nullptr) { return false; }
+       state.ir_builder == nullptr) { return false; }
+    if(state.checkpoint_observer_workspace != nullptr)
+    {
+        auto const pointer{::llvm::dyn_cast<::llvm::IntToPtrInst>(state.checkpoint_observer_workspace)};
+        if(pointer == nullptr || !checkpoint_observer_workspace_result_matches(state,pointer->getOperand(0u))) { return false; }
+        return prepare_checkpoint_observer_small_entry(state) &&
+            prepare_runtime_local_func_llvm_jit_canonical_numeric_locals(state);
+    }
     auto& builder{*state.ir_builder};
     auto const integer{builder.getIntNTy(static_cast<unsigned>(sizeof(::std::uintptr_t) * CHAR_BIT))};
     auto const type{::llvm::FunctionType::get(integer, {integer}, false)};
@@ -26,7 +52,8 @@
     state.checkpoint_observer_workspace_allocation = call;
     call->setDoesNotThrow();
     state.checkpoint_observer_workspace = builder.CreateIntToPtr(call, ::llvm::PointerType::get(builder.getContext(), 0u));
-    return state.checkpoint_observer_workspace != nullptr;
+    return state.checkpoint_observer_workspace != nullptr &&
+        prepare_runtime_local_func_llvm_jit_canonical_numeric_locals(state);
 }
 // Grow only this actual entry CallInst's compiler-owned constant. The sealed
 // object is emitted AFTER validation of every site; no run-time reallocation,
@@ -42,7 +69,40 @@
     auto const old{::llvm::dyn_cast<::llvm::ConstantInt>(allocation->getArgOperand(0u))};
     if(old == nullptr) { return false; }
     auto const bytes{locals * cp::observer_local_metadata_bytes + slots * cp::native_slot_bytes};
-    if(bytes > old->getZExtValue()) { allocation->setArgOperand(0u, ::llvm::ConstantInt::get(old->getType(), bytes)); }
+    if(bytes > old->getZExtValue())
+    {
+        if(allocation->getMetadata("uwvm.debug.observer.entry.small") != nullptr)
+        {
+            if(allocation->arg_size() != 4u || !prepare_checkpoint_observer_small_entry(state)) { return false; }
+            if(bytes > checkpoint_observer_small_entry_limit)
+            {
+                auto const bridge{get_llvm_runtime_bridge_function_symbol_value_unwrapped<
+                    ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_observer_activation_enter_abi_bridge>(
+                        *state.ir_builder,allocation->getFunctionType())};
+                if(bridge == nullptr) { return false; }
+                allocation->setCalledOperand(bridge);allocation->setMetadata("uwvm.debug.observer.entry.small",nullptr);
+            }
+        }
+        allocation->setArgOperand(0u,::llvm::ConstantInt::get(old->getType(),bytes));
+    }
+    return true;
+}
+// The actual workspace allocator bound this private cell to the live native
+// activation. Publish only after every typed packet and executed-flag store.
+// Cold reads and GC census validate the current reference carriers and flags;
+// observing a marker never grants native memory, object or restore rights.
+[[nodiscard]] inline bool publish_runtime_local_func_llvm_jit_observer_site(
+    runtime_local_func_llvm_jit_emit_state_t& state,
+    ::uwvm2::runtime::checkpoint::safepoint_layout const& site) noexcept
+{
+    if(!checkpoint_observer_workspace_selected(state) || state.checkpoint_observer_workspace == nullptr)
+    { return false; }
+    namespace cp = ::uwvm2::runtime::checkpoint;
+    auto& builder{*state.ir_builder};
+    auto const cell{builder.CreateInBoundsGEP(builder.getInt8Ty(),state.checkpoint_observer_workspace,
+        builder.getInt64(-static_cast<::std::int64_t>(cp::observer_site_bytes)))};
+    auto const store{builder.CreateStore(builder.getInt64(site.identifier),cell)};
+    store->setAlignment(::llvm::Align{1u}); store->setVolatile(true);
     return true;
 }
 // Only the privately selected resumable profile needs persistent if entry

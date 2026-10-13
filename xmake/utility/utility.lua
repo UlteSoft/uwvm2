@@ -633,6 +633,11 @@ function add_linkflags_to_target(target, flags, link_field)
 end
 
 local function _find_llvm_config_tool()
+    local configured = get_config("llvm-config")
+    if configured and configured ~= "auto" then
+        assert(os.isfile(configured), "Configured llvm-config does not exist: " .. configured)
+        return {program = configured, version = os.iorunv(configured, {"--version"}):trim()}
+    end
     local env_program = os.getenv("LLVM_CONFIG")
     if env_program and env_program ~= "" then
         local tool = find_tool("llvm-config", { program = env_program, version = true })
@@ -774,6 +779,14 @@ local function _llvm_direct_link_names(base_components, target_components)
 end
 
 local function _filter_llvm_dynamic_link_flags(flags, direct_link_names)
+    -- An SDK may provide static component archives even with --static=none.
+    -- Archives do not carry transitive dependencies: preserve llvm-config's
+    -- complete closure instead of applying the shared-library optimization.
+    for _, flag in ipairs(os.argv(flags or "")) do
+        if _endswith(flag:lower(), ".a") or _endswith(flag:lower(), ".lib") then
+            return flags
+        end
+    end
     local keep = {}
     for _, name in ipairs(direct_link_names or {}) do
         keep[name] = true
@@ -785,7 +798,7 @@ local function _filter_llvm_dynamic_link_flags(flags, direct_link_names)
     local monolithic_seen = {}
     for _, flag in ipairs(os.argv(flags or "")) do
         local link_name = _llvm_link_name_from_flag(flag)
-        if link_name == "LLVM" or link_name:match("^LLVM%-") then
+        if link_name and (link_name == "LLVM" or link_name:match("^LLVM%-")) then
             _append_unique_string(monolithic, monolithic_seen, flag)
         elseif link_name and keep[link_name] then
             _append_unique_string(filtered, filtered_seen, flag)
@@ -916,7 +929,7 @@ function get_llvm_jit_options()
     local link_static = static_mode == "non-system" or static_mode == "compiler"
 
     local cache_key = table.concat({
-        "llvm-jit-v21-native-disassembler-embedded-dwarf",
+        "llvm-jit-v24-static-sdk-native-define",
         llvm_config.program,
         llvm_config.version or "",
         get_config("plat") or "",
@@ -948,10 +961,23 @@ function get_llvm_jit_options()
     local result = {
         llvm_config = llvm_config.program,
         llvm_version = llvm_config.version,
+        llvm_full_version = _run_llvm_config(llvm_config, { "--version" }),
         llvm_components = components,
         static_mode = static_mode
     }
     local seen = {}
+    -- This belongs to the shared SDK option: target on_load callbacks may be
+    -- replaced by later platform callbacks and leave CLI/runtime inconsistent.
+    local sdk_version = result.llvm_full_version or result.llvm_version or ""
+    local owner_revision = tonumber(sdk_version:match("%-uwvm%-ros%.(%d+)"))
+    local native_arch = string.lower(tostring(get_config("arch") or os.arch() or ""))
+    local native_plat = get_config("plat") or ""
+    if owner_revision and owner_revision >= 10 and get_config("use-llvm-compiler") and
+       ((native_plat == "macosx" and (native_arch == "arm64" or native_arch == "aarch64" or get_config("macos-x64-native-step"))) or
+        (native_plat == "mingw" and (native_arch == "x86_64" or native_arch == "x64" or native_arch == "amd64"))) then
+        _append_unique(result, seen, "defines", "UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2=1")
+    end
+
 
     local normalized_includedir = _normalize_dir(includedir)
     if not _is_default_system_include_dir(normalized_includedir) then

@@ -55,7 +55,7 @@ def own_seek(session: step_cli.Session, predicate, description: str, count: int 
             if predicate(position):
                 return position
         result = session.send(f'step wasm {session.thread}')
-        require(b'guest exited:' not in result, 'fixture exited before actual required origin', description)
+        require(b'Program exited' not in result, 'fixture exited before actual required origin', description)
     raise AssertionError(('bounded real origin search exhausted', description))
 
 
@@ -271,7 +271,7 @@ def qualify(prefix: list[str], wasm: Path, source: Path, sequences: list[list[di
             require(b'selected=0' in lower, 'down did not restore actual current frame', lower)
             scalar(session, before, 'leaf_cookie', 16)
             rejected = query(session, f'frame {session.thread} {before["stop_id"]} 18446744073709551615')
-            require(b'outside the current authenticated frame list; selection unchanged' in rejected, 'large ordinal not rejected before access', rejected)
+            require(b'Selection unchanged' in rejected, 'large ordinal not rejected before access', rejected)
             _, still_selected = frame_list(session, before)
             require(still_selected == 0, 'failed selection mutated selected frame')
             row['selected_caller_values_qualified'] = True

@@ -41,7 +41,7 @@ def main():
             reply = console.send(command).decode(errors='replace')
             record['actions'].append({'command': command, 'reply': reply})
             return reply
-        if 'breakpoint ' not in ask('break 0 0 2'):
+        if 'breakpoint ' not in ask('breakwasm 0 0 2'):
             raise AssertionError('real child instruction safe point missing')
         for kind in ('call_indirect', 'call_ref'):
             ask('continue')
@@ -49,7 +49,7 @@ def main():
                 stopped = ask('wait')
                 if 'stopped: breakpoint' in stopped:
                     break
-                if 'guest exited:' in stopped:
+                if 'Program exited' in stopped:
                     raise AssertionError('guest exited before both dynamic calls')
             else:
                 raise AssertionError('actual dynamic child stop missing')

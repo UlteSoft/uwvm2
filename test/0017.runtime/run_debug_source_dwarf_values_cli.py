@@ -34,7 +34,7 @@ def qualify(prefix: list[str], wasm: Path, export: str, expected_value: int, log
             reply = console.send(f'replace 0 {target} 1 {replacement}')
             if b'function replaced; generation 2' not in reply:
                 raise AssertionError(reply)
-        if b'breakpoint' not in console.send(f'break 0 {target} 0'):
+        if b'breakpoint' not in console.send(f'breakwasm 0 {target} 0'):
             raise AssertionError('actual emitted entry safe point missing')
         console.send('continue')
         stopped = b''
@@ -77,7 +77,7 @@ def qualify(prefix: list[str], wasm: Path, export: str, expected_value: int, log
                     raise AssertionError(('native trap reused old cooperative values', values))
                 break
             stepped = console.send(f'step wasm {participant}')
-            if b'guest exited:' in stepped:
+            if b'Program exited' in stepped:
                 break
         if unavailable is None and not seen_value:
             raise AssertionError(('no actual direct formal parameter value observed; fixture may use an unsupported location', wasm,

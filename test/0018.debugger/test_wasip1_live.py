@@ -73,7 +73,7 @@ if True:
    c=Console(policy,['--wasip1-global-mount-dir','/sandbox',TD/'guestdir','--wasip1-global-trace','file',TD/('trace-'+policy+'.log')])
    checked(c,'help','help',lambda x:'info wasip1 args|env|fds|preopens' in x)
    checked(c,'prepared-refusal','info wasip1 args 0',lambda x:not ok(x))
-   checked(c,'nop-break','break 0 4 7',lambda x:'breakpoint' in x and 'error:' not in x)
+   checked(c,'nop-break','breakwasm 0 4 7',lambda x:'breakpoint' in x and 'error:' not in x)
    c.send('continue');stopped=c.until('stopped: breakpoint')
    record(c.name+'-actual-stop',True,reply=stopped)
    checked(c,'args','info wasip1 args 0',lambda x:ok(x) and '"before"' in x and '"argv0"' in x)
@@ -342,7 +342,7 @@ for policy in ['instruction','unwind']:
  c=None
  try:
   c=Console(policy,name='reserved',fixture='reserved.wasm')
-  c.send('break 0 1 7');c.send('continue');c.until('stopped: breakpoint')
+  c.send('breakwasm 0 1 7');c.send('continue');c.until('stopped: breakpoint')
   checked(c,'save','set wasip1 checkpoint 0 0',lambda x:ok(x) and 'retained-external=2' in x)
   checked(c,'construct','set wasip1 file 0 -',lambda x:ok(x) and 'affected=3' in x)
   checked(c,'restore','set wasip1 restore 0 0 bindings',ok)
@@ -369,7 +369,7 @@ group_extra=['--wasm-preload-library',TD/'group-provider.wasm','wasi-group-provi
 def group_start(send,wait):
  accepted=[]
  for mid in (0,1):
-  response=send(f'break {mid} 4 7')
+  response=send(f'breakwasm {mid} 4 7')
   if 'error:' not in response:accepted.append(mid)
  assert len(accepted)==1,accepted
  send('continue');wait('stopped: breakpoint')

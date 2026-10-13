@@ -2160,7 +2160,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                                     lazy_module_storage_t& storage,
                                                                     ::std::size_t entry_local_function_index,
                                                                     ::uwvm2::utils::container::vector<::std::size_t>& out,
-                                                                    parser_feature_parameter_t const* validator_feature_parameter) noexcept
+                                                                    [[maybe_unused]] parser_feature_parameter_t const* validator_feature_parameter) noexcept
         {
             out.clear();
             auto const local_count{curr_module.local_defined_function_vec_storage.size()};
@@ -2383,7 +2383,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                           lazy_module_storage_t& storage,
                                                           lazy_compile_options& options,
                                                           ::std::size_t local_function_index,
-                                                          ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+                                                          [[maybe_unused]] ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
             if(options.compile_options.emit_debug_safe_points) [[unlikely]] { ::fast_io::fast_terminate(); }
             if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { ::fast_io::fast_terminate(); }

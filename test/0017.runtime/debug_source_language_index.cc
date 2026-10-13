@@ -173,7 +173,7 @@ int main(int argc,char** argv)
             {
                 dwarf::variable_selection a{},b{};
                 if(dwarf::query_named_variable(parsed->scopes(),parsed->types(),parsed->variables(),scope.ranges[0].begin,"a",a)==dwarf::inline_query_error::none &&
-                   dwarf::query_named_variable(parsed->scopes(),parsed->types(),parsed->variables(),scope.ranges[0].begin,"b",b)==dwarf::inline_query_error::none)
+                   dwarf::query_named_variable(parsed->scopes(),parsed->types(),parsed->variables(),scope.ranges[0].begin,"bw",b)==dwarf::inline_query_error::none)
                 {
                     check(a.type<parsed->types().size() && b.type<parsed->types().size(),"real variable type indices");
                     auto const& x{parsed->types()[a.type]};auto const& y{parsed->types()[b.type]};
@@ -196,7 +196,7 @@ int main(int argc,char** argv)
             {
                 dwarf::variable_selection left{},right{};
                 check(dwarf::query_named_variable(parsed->scopes(),parsed->types(),parsed->variables(),scope.ranges[0].begin,"a",left)==dwarf::inline_query_error::none &&
-                    dwarf::query_named_variable(parsed->scopes(),parsed->types(),parsed->variables(),scope.ranges[0].begin,"b",right)==dwarf::inline_query_error::none &&
+                    dwarf::query_named_variable(parsed->scopes(),parsed->types(),parsed->variables(),scope.ranges[0].begin,"bw",right)==dwarf::inline_query_error::none &&
                     left.type<parsed->types().size() && right.type<parsed->types().size(),"real primitive producer variables");
                 auto const& t{parsed->types()[left.type]};auto const& other{parsed->types()[right.type]};
                 auto kind{scope.name=="bridge_char" ? scalar::narrow_builtin::plain_char : scope.name=="bridge_schar" ? scalar::narrow_builtin::signed_char :
@@ -227,7 +227,7 @@ int main(int argc,char** argv)
             {
                 using K=scalar::wide_builtin;dwarf::variable_selection left{},right{};
                 check(dwarf::query_named_variable(parsed->scopes(),parsed->types(),parsed->variables(),scope.ranges[0].begin,"a",left)==dwarf::inline_query_error::none &&
-                    dwarf::query_named_variable(parsed->scopes(),parsed->types(),parsed->variables(),scope.ranges[0].begin,"b",right)==dwarf::inline_query_error::none,"real standard wide declarations");
+                    dwarf::query_named_variable(parsed->scopes(),parsed->types(),parsed->variables(),scope.ranges[0].begin,"bw",right)==dwarf::inline_query_error::none,"real standard wide declarations");
                 auto const& t{parsed->types()[left.type]};auto const& other{parsed->types()[right.type]};
                 auto k{scope.name=="rank_int"?K::signed_int:scope.name=="rank_uint"?K::unsigned_int:scope.name=="rank_ulong"?K::unsigned_long:
                     scope.name=="rank_ll"?K::signed_long_long:scope.name=="rank_ull"?K::unsigned_long_long:K::signed_long};

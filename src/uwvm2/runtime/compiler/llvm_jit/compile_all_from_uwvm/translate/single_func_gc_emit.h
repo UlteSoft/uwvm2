@@ -864,6 +864,29 @@ inline void llvm_jit_gc_input_free_bridge(::std::uintptr_t address) noexcept
 // The validator/type registry has proved that this field's unpacked
 // result is i32 or f32. Integer status/payload transport is independent of the
 // Wasm reference carrier's native byte order, including 32-bit native targets.
+// Only the trusted observer profile may select this exact checked scalar
+// read as an internal leaf. Its ordinary store operation cannot call guest or
+// host callbacks or a GC poll; mutable locks and foreign-owner leases remain.
+// A managed-page boundary, resumable profile or unbound emit keeps the original
+// host island. Do not infer this property from noexcept or scalar ABI alone.
+template<bool Signed>
+[[nodiscard]] inline ::llvm::Value* get_llvm_jit_gc_struct_get32_bridge_symbol_value(
+    runtime_local_func_llvm_jit_emit_state_t const& state, ::llvm::IRBuilder<>& builder,
+    ::llvm::FunctionType* type, ::uwvm2::utils::container::u8string_view discriminator) noexcept
+{
+#if !defined(UWVM_EXPERIMENTAL_MANAGED_NUMERIC_PAGE)
+    auto const plan{state.checkpoint_plan};
+    if(plan != nullptr && plan->profile && plan->profile->purpose() ==
+       ::uwvm2::runtime::checkpoint::compilation_purpose::observe_values)
+    {
+        return get_llvm_runtime_bridge_function_symbol_value_unwrapped<llvm_jit_gc_struct_get32_bridge<Signed>>(
+            builder, type, discriminator);
+    }
+#endif
+    return get_llvm_runtime_bridge_function_symbol_value<llvm_jit_gc_struct_get32_bridge<Signed>>(
+        builder, type, discriminator);
+}
+
 [[nodiscard]] inline bool try_emit_runtime_local_func_llvm_jit_gc_struct_get32(
     runtime_local_func_llvm_jit_emit_state_t&,
     ::uwvm2::validation::standard::wasm3::gc_instruction_immediate const&,
@@ -1047,8 +1070,8 @@ inline void llvm_jit_gc_input_free_bridge(::std::uintptr_t address) noexcept
     {
         auto const discriminator{Signed ? ::uwvm2::utils::container::u8string_view{u8"gc_struct_get32_signed"} :
             ::uwvm2::utils::container::u8string_view{u8"gc_struct_get32_unsigned"}};
-        auto const callee{get_llvm_runtime_bridge_function_symbol_value<llvm_jit_gc_struct_get32_bridge<Signed>>(
-            builder, bridge_type, discriminator)};
+        auto const callee{get_llvm_jit_gc_struct_get32_bridge_symbol_value<Signed>(
+            state, builder, bridge_type, discriminator)};
         if(callee == nullptr) { return nullptr; }
         // [live native declaration][four exact integer ABI arguments]
         // [safe                                                     ] only
@@ -1074,7 +1097,17 @@ inline void llvm_jit_gc_input_free_bridge(::std::uintptr_t address) noexcept
     return true;
 }
 
+#if defined(UWVM_EXPERIMENTAL_SCALAR_ARRAY_LENGTH) && UWVM_EXPERIMENTAL_SCALAR_ARRAY_LENGTH == 1
+#include "single_func_gc_array_length32.h"
+#endif
+
 #if defined(UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS) && UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS == 1
+#if defined(UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD) && UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD == 1 && defined(__x86_64__) && defined(__linux__) && defined(__clang__) && defined(__SIZEOF_INT128__)
+#include "single_func_gc_typed_array_load.h"
+#if defined(UWVM_EXPERIMENTAL_TYPED_ARRAY_STORE) && UWVM_EXPERIMENTAL_TYPED_ARRAY_STORE == 1
+#include "single_func_gc_typed_array_store.h"
+#endif
+#endif
 #include "single_func_gc_array_get32.h"
 #endif
 
@@ -1141,8 +1174,56 @@ inline void llvm_jit_gc_input_free_bridge(::std::uintptr_t address) noexcept
     if(((op >= 2u && op <= 6u) || (op >= 8u && op <= 14u) || op == 16u || op == 18u || op == 19u) &&
        field == nullptr)
     { return false; }
+#if defined(UWVM_EXPERIMENTAL_PRIVATE_NUMERIC_ARRAY_LOCK) && UWVM_EXPERIMENTAL_PRIVATE_NUMERIC_ARRAY_LOCK == 1
+    if(state.private_numeric_function_slot != nullptr)
+    {
+        // This entry consumes the already checked GC immediate in BOTH retained
+        // translator routes; there is no new raw bytecode decoder or scan.
+        state.private_numeric_gc_opcode_observed = true;
+        bool safe{op == 15u};
+        if(op == 6u || op == 7u || op == 8u || (op >= 11u && op <= 14u))
+        {
+            auto const* declaration{module->gc_store->field_at(decoded.first, 0uz)};
+            safe = declaration != nullptr &&
+                (declaration->storage.packed != gc_type::packed_kind::none ||
+                 declaration->storage.value.kind != gc_type::value_kind::reference);
+        }
+        // Numeric struct construction/access and numeric bulk fills do not
+        // publish a GC reference. Every reference-valued field still denies.
+        if(op == 0u || op == 1u)
+        {
+            ::std::size_t count{};
+            safe = module->gc_store->field_count(decoded.first, count) && count <= 1024uz;
+            for(::std::size_t i{}; safe && i != count; ++i)
+            {
+                auto const* declaration{module->gc_store->field_at(decoded.first, i)};
+                safe = declaration != nullptr &&
+                    (declaration->storage.packed != gc_type::packed_kind::none ||
+                     declaration->storage.value.kind != gc_type::value_kind::reference);
+            }
+        }
+        else if((op >= 2u && op <= 5u) || op == 9u || op == 16u || op == 18u)
+        { safe = field != nullptr && (field->storage.packed != gc_type::packed_kind::none ||
+            field->storage.value.kind != gc_type::value_kind::reference); }
+        // Reference array copies/initializers, casts/extern bridges, calls,
+        // publication and EH remain conservative fallbacks for the WHOLE body.
+        if(!safe) { state.private_numeric_function_safe = false; }
+    }
+#endif
     if(stack.size() < input_count || input_count > (::std::numeric_limits<::std::size_t>::max)() / sizeof(storage::gc_object_value))
     { return false; }
+#if defined(UWVM_EXPERIMENTAL_SCALAR_ARRAY_LENGTH) && UWVM_EXPERIMENTAL_SCALAR_ARRAY_LENGTH == 1
+    if(op == 15u)
+    {
+        auto const& native_layout{state.llvm_module->getDataLayout()};
+        // Choose the scalar ABI only when it exactly matches this native target.
+        // Unsupported native layouts keep the original aggregate bridge below.
+        if(!state.llvm_module->getDataLayoutStr().empty() &&
+           native_layout.getPointerSize() == sizeof(::std::uintptr_t) &&
+           native_layout.isLittleEndian() == (::std::endian::native == ::std::endian::little))
+        { return try_emit_runtime_local_func_llvm_jit_gc_array_length32(state); }
+    }
+#endif
     if(op >= 2u && op <= 4u)
     {
         auto const result_kind{field->storage.packed == gc_type::packed_kind::none ?
@@ -1195,7 +1276,8 @@ inline void llvm_jit_gc_input_free_bridge(::std::uintptr_t address) noexcept
         }
     }
 #endif
-#if defined(UWVM_EXPERIMENTAL_NUMERIC_ARRAY_SET32) && UWVM_EXPERIMENTAL_NUMERIC_ARRAY_SET32 == 1
+#if (defined(UWVM_EXPERIMENTAL_NUMERIC_ARRAY_SET32) && UWVM_EXPERIMENTAL_NUMERIC_ARRAY_SET32 == 1) || \
+    (defined(UWVM_EXPERIMENTAL_TYPED_ARRAY_STORE) && UWVM_EXPERIMENTAL_TYPED_ARRAY_STORE == 1)
     if(op == 14u)
     {
         auto const value_kind{field->storage.packed == gc_type::packed_kind::none ?
@@ -1213,12 +1295,30 @@ inline void llvm_jit_gc_input_free_bridge(::std::uintptr_t address) noexcept
            native_layout.getPointerSize() == sizeof(::std::uintptr_t) &&
            native_layout.isLittleEndian() == (::std::endian::native == ::std::endian::little))
         {
+#if defined(UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS) && UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS == 1 && defined(UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD) && UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD == 1 && defined(UWVM_EXPERIMENTAL_TYPED_ARRAY_STORE) && UWVM_EXPERIMENTAL_TYPED_ARRAY_STORE == 1 && defined(__x86_64__) && defined(__linux__) && defined(__clang__) && defined(__SIZEOF_INT128__)
+            if(llvm_jit_typed_array_load_eligible(state))
+            {
+                return try_emit_runtime_local_func_llvm_jit_gc_typed_array_store(state, decoded,
+                    value_kind == gc_type::value_kind::i32 ? wasm_type::i32 : wasm_type::f32);
+            }
+#endif
+#if defined(UWVM_EXPERIMENTAL_NUMERIC_ARRAY_SET32) && UWVM_EXPERIMENTAL_NUMERIC_ARRAY_SET32 == 1
             return try_emit_runtime_local_func_llvm_jit_gc_array_set32(state, decoded,
                 value_kind == gc_type::value_kind::i32 ? wasm_type::i32 : wasm_type::f32);
+#endif
         }
     }
 #endif
     auto const input_base{stack.size() - input_count};
+#if defined(UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES) && UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES == 1
+    ::llvm::Value* constructed_array_length{};
+    if(state.array_length_values_enabled)
+    {
+        if(op == 6u || op == 9u || op == 10u) { constructed_array_length = stack[input_base + 1uz].value; }
+        else if(op == 7u) { constructed_array_length = stack[input_base].value; }
+        else if(op == 8u) { constructed_array_length = builder.getInt32(decoded.second); }
+    }
+#endif
     // Resolve the original cold trap before root snapshot/input allocation or
     // the native aggregate call. A declined plan cannot repeat these effects.
     llvm_jit_gc_status_dispatch_plan status_dispatch{};
@@ -1536,6 +1636,11 @@ inline void llvm_jit_gc_input_free_bridge(::std::uintptr_t address) noexcept
         auto const loaded{builder.CreateLoad(llvm_result_type, output, get_llvm_string_ref(u8"gc.result"))};
         loaded->setAlignment(::llvm::Align{1u});
         stack.push_back({.type = result_type, .value = loaded});
+#if defined(UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES) && UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES == 1
+        // Original checked allocation/status success dominates this logical scalar.
+        if(constructed_array_length != nullptr)
+        { llvm_jit_remember_array_length_value(state, loaded, constructed_array_length, builder.getTrue()); }
+#endif
     }
     return true;
 }

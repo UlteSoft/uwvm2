@@ -219,8 +219,8 @@ template<typename Source>
 }
 template<typename Source>
 	requires details::posix_timestamps_nothrow_abi::wide_kernel_source_available<Source>
-[[nodiscard]] inline posix_operation_result linux_utimensat_time64_nothrow(posix_at_entry directory,
-	char const* validated_path, Source const (&times)[2], int raw_flags) noexcept
+[[nodiscard]] inline posix_operation_result linux_utimensat_time64_nothrow([[maybe_unused]] posix_at_entry directory,
+	[[maybe_unused]] char const* validated_path, [[maybe_unused]] Source const (&times)[2], [[maybe_unused]] int raw_flags) noexcept
 {
 #if defined(FAST_IO_POSIX_TIMESTAMP_HAS_KERNEL_TYPES) && defined(__NR_utimensat_time64)
 	struct ::__kernel_timespec owned[2]{};

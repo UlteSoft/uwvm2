@@ -1081,10 +1081,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             );
         // wasm feature
         version_u8print_wasm_feature_from_tuple(u8log_output_ul, ::uwvm2::uwvm::wasm::feature::all_features);
+        // all_features registers binary-format parser/storage hooks, not every supported specification.
+        // These extensions share its binfmt-v1 hooks. Dates follow the covers of the repository-linked manuals.
+        ::fast_io::io::perr(u8log_output_ul,
+                            u8"      - WebAssembly Release 2.0 (Draft 2025-01-30)\n"
+                            u8"      - WebAssembly Release 3.0 (Draft 2024-09-21)\n"
+                            u8"      - WebAssembly Release 2.0 + Threads (Draft 2023-10-10)\n");
 
         // other features
         ::fast_io::io::perr(u8log_output_ul,
-        // version_u8print_wasm_feature_from_tuple already print '\n'
+        // The specification list already ends with '\n'.
 #ifdef UWVM_SUPPORT_PRELOAD_DL
                             // Support Preload Dynamic Linking Module (--wasm-register-dl)
                             u8"  * Support Preload Dynamic Linking Module\n"

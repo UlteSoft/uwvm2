@@ -10,14 +10,19 @@ module;
 #include <string_view>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <chrono>
 #include <utility>
+#include <vector>
 #include <fast_io.h>
 #include <fast_io_unit/string.h>
 
 #endif
 export module uwvm2.uwvm.debugger:console;
 import fast_io;
+import :console_help;
+import :console_messages;
+import :console_module_help;
 import uwvm2.utils.control;
 import uwvm2.utils.thread;
 import uwvm2.runtime;

@@ -67,10 +67,13 @@ inline constexpr bool llvm_jit_debug_control_bridge{
     // frame; wrapping them as a foreign island would invalidate their issuer.
     llvm_jit_same_debug_bridge<Function, ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_materialize_abi_bridge> ||
     llvm_jit_same_debug_bridge<Function, ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_materialize_dynamic_abi_bridge> ||
+    llvm_jit_same_debug_bridge<Function, ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_observer_small_enter_abi_bridge> ||
     llvm_jit_same_debug_bridge<Function, ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_observer_workspace_abi_bridge> ||
     llvm_jit_same_debug_bridge<Function, ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_observer_workspace_leave_abi_bridge> ||
     llvm_jit_same_debug_bridge<Function, ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_activation_enter_abi_bridge> ||
     llvm_jit_same_debug_bridge<Function, ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_activation_leave_abi_bridge> ||
+    llvm_jit_same_debug_bridge<Function, ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_observer_activation_leave_abi_bridge> ||
+    llvm_jit_same_debug_bridge<Function, ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_observer_return_abi_bridge> ||
     llvm_jit_same_debug_bridge<Function, ::uwvm2::runtime::lib::llvm_jit_push_call_stack_frame> ||
     llvm_jit_same_debug_bridge<Function, ::uwvm2::runtime::lib::llvm_jit_pop_call_stack_frame> ||
     // Strict native-frame TLS leaves never park or call guest/host callbacks.

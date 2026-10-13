@@ -130,6 +130,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_step
         position initial{};
         policy requested{policy::into};
         bool ready{}; // Only indicates bounded metadata setup, NOT authority.
+        bool seeking_source{}; // Began at a genuine activation without a source row.
         destination_policy destination{};
         ::std::string destination_file{};
         ::std::uint64_t destination_line{};
@@ -208,6 +209,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_step
         catch(...) { out = {}; return error::allocation_failure; }
 #endif
     }
+    // Starting in compiler-generated startup/epilogue code must still let
+    // step/next seek the next real statement. A complete actual activation is
+    // mandatory; this policy does not invent source rows or frame identities.
+    [[nodiscard]] inline error prepare_unmapped(position const& initial, policy requested, origin& out, limits const& cap = {}) noexcept
+    {
+        out={};
+        if(requested!=policy::into && requested!=policy::over && requested!=policy::out) { return error::unsupported_policy; }
+        auto const checked{details::inspect(initial,cap,false)};
+        if(checked!=error::none) { return checked; }
+        if(initial.status!=position_status::unmapped) { return error::malformed_position; }
+        if(initial.trace!=trace_status::complete) { return error::missing_trace; }
+        if(initial.activation!=activation_relation::same) { return error::unknown_activation; }
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+        try {
+#endif
+            out.initial=initial;out.requested=requested;out.ready=true;out.seeking_source=true;return error::none;
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+        } catch(...) { out={};return error::allocation_failure; }
+#endif
+    }
     // Controller first resolves this exact statement against the current
     // publication's emitted Wasm safe points; labels here remain policy DATA.
     [[nodiscard]] inline error prepare_destination(position const& initial, destination_policy requested,
@@ -240,10 +261,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_step
         { return decline(error::unsupported_policy); }
         if(saved.requested != policy::into && saved.initial.trace != trace_status::complete) { return decline(error::missing_trace); }
         if(saved.requested != policy::into && saved.initial.activation != activation_relation::same) { return decline(error::unknown_activation); }
-        auto const original_checked{details::inspect(saved.initial, cap, true)};
+        auto const original_checked{details::inspect(saved.initial, cap, !saved.seeking_source)};
         if(original_checked != error::none) { return decline(original_checked); }
         auto const checked{details::inspect(current, cap, false)};
         if(checked != error::none) { return decline(checked); }
+        if(saved.seeking_source)
+        {
+            auto const& anchor{saved.returned_anchor_ready ? saved.returned_anchor : saved.initial};
+            if(saved.destination!=destination_policy::none || saved.initial.status!=position_status::unmapped)
+            { return decline(error::malformed_position); }
+            if(current.trace!=trace_status::complete) { return decline(error::missing_trace); }
+            if(current.runtime_epoch!=anchor.runtime_epoch) { return decline(error::stale_generation); }
+            bool const same{current.module==anchor.module && current.function==anchor.function};
+            if((same && current.function_generation!=anchor.function_generation) ||
+               (current.module==anchor.module && anchor.source_owner && !details::same_owner(current.source_owner,anchor.source_owner)))
+            { return decline(error::stale_generation); }
+            bool const related{current.activation==activation_relation::same ? same && current.physical_depth==anchor.physical_depth :
+                current.activation==activation_relation::deeper ? current.physical_depth>anchor.physical_depth :
+                current.activation==activation_relation::returned ? current.physical_depth<anchor.physical_depth :
+                current.activation==activation_relation::tail_successor && current.physical_depth==anchor.physical_depth};
+            if(!related) { return decline(error::inconsistent_activation); }
+            bool const leaving{saved.requested==policy::out};
+            bool const eligible{!leaving || current.activation==activation_relation::returned ||
+                (saved.returned_anchor_ready && current.activation==activation_relation::same)};
+            if(!eligible || current.status!=position_status::mapped || !current.is_statement)
+            { return {action::keep_running,error::none,{}}; }
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+            try {
+#endif
+                return {action::stop,error::none,current.scope_path};
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+            } catch(...) { return decline(error::allocation_failure); }
+#endif
+        }
         auto const& initial{saved.initial};
         if(current.runtime_epoch != initial.runtime_epoch) { return decline(error::stale_generation); }
         bool const same_function{current.module == initial.module && current.function == initial.function};
@@ -434,7 +484,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_step
         if(!saved.ready || saved.requested == policy::into) { return error::unsupported_policy; }
         auto const depth{saved.returned_anchor_ready ? saved.returned_anchor.physical_depth : saved.initial.physical_depth};
         if(current.activation != activation_relation::returned || current.physical_depth >= depth ||
-           !current.source_owner || !current.metadata_ready) { return error::inconsistent_activation; }
+           (!saved.seeking_source && (!current.source_owner || !current.metadata_ready))) { return error::inconsistent_activation; }
         auto const result{decide(saved,current,cap)};
         if(result.reason != error::none) { return result.reason; }
         if(result.result != action::keep_running) { return error::inconsistent_activation; }

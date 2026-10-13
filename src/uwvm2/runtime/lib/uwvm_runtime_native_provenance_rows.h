@@ -28,6 +28,7 @@
 # include <llvm/Object/ELFObjectFile.h>
 # include "uwvm_runtime_ppc64_elfv1_loaded_function_range.h"
 # include <llvm/Support/Error.h>
+# include "uwvm_runtime_native_macho_dwarf.h"
 
 namespace uwvm2::runtime::lib::details::native_loaded_provenance
 {
@@ -397,8 +398,16 @@ namespace uwvm2::runtime::lib::details::native_loaded_provenance
             {
                 malformed = true; ::llvm::consumeError(::std::move(failure));
             }};
-            auto context{::llvm::DWARFContext::create(object,
-                ::llvm::DWARFContext::ProcessDebugRelocations::Process, ::std::addressof(loaded), "", error, error)};
+            ::llvm::StringMap<::std::unique_ptr<::llvm::MemoryBuffer>> macho_sections{};
+            ::std::unique_ptr<::llvm::DWARFContext> context{};
+            if(auto const* macho{::llvm::dyn_cast<::llvm::object::MachOObjectFile>(::std::addressof(object))})
+            {
+                if(!copy_macho_dwarf(*macho, loaded, macho_sections)) { return false; }
+                context = ::llvm::DWARFContext::create(macho_sections, object.getBytesInAddress(), object.isLittleEndian(), error, error);
+            }
+            else
+            { context = ::llvm::DWARFContext::create(object,
+                ::llvm::DWARFContext::ProcessDebugRelocations::Process, ::std::addressof(loaded), "", error, error); }
             if(context == nullptr || malformed) { return false; }
             ::std::size_t unit_count{};
             for(auto const& unit_owner: context->compile_units())

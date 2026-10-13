@@ -33,7 +33,7 @@ def stage(directory: Path, names: tuple[str, ...], source_id: str,
 
 def main() -> None:
     source_id = 'sha256:' + 'a' * 64
-    llvm_sha = 'b' * 64
+    llvm_sha = 'bw' * 64
     with tempfile.TemporaryDirectory(prefix='uwvm-windows-anchor-') as temporary:
         root = Path(temporary)
         build = root / 'build'

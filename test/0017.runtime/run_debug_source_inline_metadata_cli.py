@@ -128,6 +128,7 @@ def variant(path: Path, out: Path, kind: str) -> None:
 class Console:
     def __init__(self, command: list[str], log: Path):
         self.command, self.logpath = command, log
+        self.normal_quit_completed = False
         self.child = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         self.pending, self.transcript = bytearray(), bytearray()
         try:
@@ -170,6 +171,9 @@ class Console:
             self.child.stdin.flush()
             if self.child.wait(timeout=15) != 0:
                 raise AssertionError('console quit failed')
+            # A successful ordinary quit returns only after managed retirement;
+            # no output marker is needed and forced cleanup never sets this.
+            self.normal_quit_completed = True
         finally:
             if self.child.poll() is None:
                 self.child.kill()
@@ -192,7 +196,7 @@ def qualify(prefix: list[str], wasm: Path, export: str, log: Path,
             reply = console.send(f'replace 0 {target} 1 {replacement}')
             if b'function replaced; generation 2' not in reply:
                 raise AssertionError(reply)
-        if b'breakpoint' not in console.send(f'break 0 {target} 0'):
+        if b'breakpoint' not in console.send(f'breakwasm 0 {target} 0'):
             raise AssertionError('target emitted entry safe point missing')
         console.send('continue')
         stopped = b''
@@ -228,7 +232,7 @@ def qualify(prefix: list[str], wasm: Path, export: str, log: Path,
                     raise AssertionError(('native trap reused stale source/inline metadata', after))
                 break
             stepped = console.send(f'step wasm {participant}')
-            if b'guest exited:' in stepped:
+            if b'Program exited' in stepped:
                 break
         if expected_reason is None and not seen_inline:
             raise AssertionError(('no actual inline chain observed', wasm, bytes(console.transcript)[-4000:]))

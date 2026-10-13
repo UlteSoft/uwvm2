@@ -34,6 +34,8 @@ inline static llvm_jit_checkpoint_native_retirement_result completed_native_reti
 }
 [[nodiscard]] static bool check_actual_candidate_source_bindings(
     ::std::shared_ptr<runtime_checkpoint_world_transaction> const&) noexcept;
+[[nodiscard]] static bool cancel_actual_candidate_workers(
+    ::std::shared_ptr<runtime_checkpoint_world_transaction> const&) noexcept;
 static void finish_native_retirement_until(native_retirement_state& actual,
     ::uwvm2::utils::thread::execution_domain::maintenance_transition const& maintenance) noexcept
 {
@@ -70,6 +72,7 @@ static void finish_native_retirement_until(native_retirement_state& actual,
         actual.result.source_initializer_bindings_rechecked_after_physical_join=true;
         actual.result.full_publication_records_rechecked_after_physical_join=true;
         actual.result.full_code_owners_rechecked_after_physical_join=true;
+        actual.result.private_closed_workers_rechecked_after_physical_join=true;
         actual.result.candidate_world_retained=true;
         actual.result.status=outcome::prepared_world_ready_closed;
         return;
@@ -234,6 +237,12 @@ public:
         if(!maintenance) { out=actual->result;out.status=outcome::busy;return out; }
         finish_native_retirement_until(*actual,maintenance);
         if(actual->result.status!=outcome::prepared_world_ready_closed) { return actual->result; }
+        // Outside execution admission/publication: release and actually join
+        // every precreated candidate worker before reopening old admission.
+        // Their finite private bodies contain no guest/provider callbacks.
+        if(!cancel_actual_candidate_workers(actual->candidate))
+        { actual->result.status=outcome::failed_closed;return actual->result; }
+        actual->result.private_closed_workers_cancelled_and_joined=true;
         // Keep candidate alive until release_completed unlocks this registry.
         // Suppress only its closed-ready branch; actual drain/join/host/source
         // proof is independently reacquired by the ordinary finite reset path.

@@ -137,6 +137,15 @@ int main()
         }) || !valid_register_owner || first_registers.size() != 34u || first_registers.pc() != pc + 4u ||
         first_registers.values[0u] != 1u || first_registers.sp() == 0u || register_callbacks != 1u)
     { return 31; }
+    auto const revision{step.trap_revision};
+    if(ns::relocate_owned_pc(step,pc+4u,pc+12u) || ns::relocate_owned_pc(step,pc,pc+4u) ||
+       ns::relocate_owned_pc(step,pc+4u,pc+1u) || step.next_pc!=pc+4u || step.trap_revision!=revision)
+    { return 34; }
+    if(!ns::relocate_owned_pc(step,pc+4u,pc) || step.next_pc!=pc || step.register_snapshot.pc()!=pc ||
+       step.trap_revision!=revision+1u || !ns::continue_from_trap(step) ||
+       !await_phase(step,ns::phase::trapped) || step.next_pc!=pc+4u || step.register_snapshot.values[0u]!=1u)
+    { return 35; }
+    ::std::puts("MACOS_ARM64_RELOCATION_PASS");
     ::std::printf("FIRST_PC=%p AFTER_ONE_PC=%p\n",
         reinterpret_cast<void*>(step.first_pc), reinterpret_cast<void*>(step.next_pc));
     if(!ns::continue_from_trap(step) || !await_phase(step, ns::phase::trapped) ||

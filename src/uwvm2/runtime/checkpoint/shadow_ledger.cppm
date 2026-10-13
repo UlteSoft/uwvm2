@@ -12,6 +12,7 @@ module;
 #include <memory>
 #include <span>
 #include <utility>
+#include <type_traits>
 #include <vector>
 export module uwvm2.runtime.checkpoint.shadow_ledger;
 import uwvm2.runtime.checkpoint.materialization;

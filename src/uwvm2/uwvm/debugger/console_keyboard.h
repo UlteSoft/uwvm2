@@ -31,6 +31,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_keyboard
 {
     inline constexpr int interrupted{-3};
+    inline constexpr int idle{-5}; // manager tick; never an input byte or EOF
     // State is process-local HOST management infrastructure, never a Wasm
     // import, signal-to-capability conversion or native-memory read credential.
     namespace details
@@ -274,7 +275,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_keyboard
         ::std::uint_least32_t input_type_{};
         ::HANDLE output_{}; ::std::uint_least32_t output_mode_{};
         bool output_mode_changed_{};
-        char8_t queued_[4]{};
+        char8_t queued_[32]{};
+        bool mouse_mode_{}, mouse_left_{};
         unsigned queued_size_{}, queued_at_{}, repeat_count_{};
         int repeat_key_{};
         char16_t high_surrogate_{};
@@ -466,7 +468,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_keyboard
                 // IXON consumes Ctrl+S as STOP before the owned editor can
                 // read it. The saved complete termios is restored by RAII.
                 raw.c_iflag &= static_cast<::tcflag_t>(~IXON);
-                raw.c_lflag &= static_cast<::tcflag_t>(~(ICANON | ECHO | ECHONL | NOFLSH));
+                raw.c_lflag &= static_cast<::tcflag_t>(~(ICANON | ECHO | ECHONL | NOFLSH | IEXTEN));
+                // The editor owns Ctrl+V/Ctrl+O; IEXTEN would consume them as
+                // terminal quoting/discard controls even in noncanonical mode.
                 raw.c_lflag |= ISIG;
                 // VMIN=0,VTIME=1 bounds a read to 100ms if SIGINT flushes the
                 // byte BETWEEN poll readiness and read_some. No O_NONBLOCK
@@ -586,6 +590,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_keyboard
 #endif
             return result;
         }
+        [[nodiscard]] bool input_ready() const noexcept
+        {
+            if(!ready()) { return false; }
+#if defined(__unix__) || defined(__APPLE__)
+            ::pollfd descriptor{input_,POLLIN,0};
+            return details::poll_noexcept(::std::addressof(descriptor),1u,0)>0 && (descriptor.revents&POLLIN)!=0;
+#elif defined(_WIN32) && !defined(__CYGWIN__)
+            return queued_at_<queued_size_ || repeat_count_!=0u ||
+                (interactive_ && ::fast_io::win32::WaitForSingleObject(input_,0u)==WAIT_OBJECT_0);
+#else
+            return false;
+#endif
+        }
         [[nodiscard]] int read_byte() noexcept
         {
             if(!ready()) { return -2; }
@@ -597,7 +614,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_keyboard
                 ::pollfd descriptor{input_, POLLIN, 0};
                 auto const result{details::poll_noexcept(::std::addressof(descriptor), 1u, 100)};
                 if(result < 0) { if(errno == EINTR) { continue; } return -2; }
-                if(result == 0) { continue; }
+                if(result == 0) { if(interactive_display_) { return idle; } continue; }
                 if((descriptor.revents & (POLLERR | POLLNVAL)) != 0) { return -2; }
                 if((descriptor.revents & (POLLIN | POLLHUP)) == 0) { continue; }
 # if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
@@ -627,8 +644,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_keyboard
                 }
                 if(interactive_)
                 {
+                    if(mouse_mode_ != console_editing::mouse_reporting)
+                    {
+                        auto mode{(terminal_mode_ | ENABLE_PROCESSED_INPUT) & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT)};
+                        if(console_editing::mouse_reporting) { mode=(mode | ENABLE_MOUSE_INPUT | ENABLE_EXTENDED_FLAGS) & ~ENABLE_QUICK_EDIT_MODE; }
+                        if(details::set_console_mode_noexcept(input_,mode)==0) { return -2; }
+                        mouse_mode_=console_editing::mouse_reporting; mouse_left_=false;
+                    }
                     auto const wait{::fast_io::win32::WaitForSingleObject(input_, 100u)};
-                    if(wait == WAIT_TIMEOUT) { continue; }
+                    if(wait == WAIT_TIMEOUT) { return idle; }
                     if(wait != WAIT_OBJECT_0) { return -2; }
                     ::INPUT_RECORD record{}; ::DWORD count{};
                     // [one complete owned INPUT_RECORD] end; count<=1.
@@ -639,6 +663,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_keyboard
                         ::std::addressof(count), details::console_read_nowait) == 0 || count > 1u) { return -2; }
                     if(consume_interrupt()) { return interrupted; }
                     if(count == 0u) { continue; }
+                    if(record.EventType==WINDOW_BUFFER_SIZE_EVENT) { return idle; }
+                    if(record.EventType == MOUSE_EVENT && mouse_mode_)
+                    {
+                        auto const& event{record.Event.MouseEvent}; auto position{event.dwMousePosition};
+                        ::fast_io::win32::console_screen_buffer_info info{};
+                        if(::fast_io::win32::GetConsoleScreenBufferInfo(output_,::std::addressof(info))==0) { continue; }
+                        int const x{position.X-info.Window.Left+1}, y{position.Y-info.Window.Top+1};
+                        if(x<1 || y<1 || x>65535 || y>65535) { continue; }
+                        bool const left{(event.dwButtonState & FROM_LEFT_1ST_BUTTON_PRESSED)!=0u};
+                        unsigned button{}; char8_t final{u'M'};
+                        if(event.dwEventFlags==MOUSE_WHEELED) { button=static_cast<short>(event.dwButtonState>>16u)>0 ? 64u : 65u; }
+                        else if(event.dwEventFlags==MOUSE_MOVED) { button=left ? 32u : 35u; }
+                        else if((event.dwEventFlags==0u || event.dwEventFlags==DOUBLE_CLICK) && left) { button=0u; }
+                        else if(event.dwEventFlags==0u && mouse_left_ && !left) { button=0u; final=u'm'; }
+                        else { mouse_left_=left; continue; }
+                        mouse_left_=left;
+                        ::fast_io::basic_obuffer_view<char8_t> encoded{queued_,queued_+sizeof(queued_)};
+                        ::fast_io::io::print(encoded,u8"\x1b[<",button,u8";",x,u8";",y,::fast_io::mnp::chvw(final));
+                        queued_size_=static_cast<unsigned>(encoded.curr_ptr-queued_); queued_at_=1u; repeat_count_=0u;
+                        return static_cast<unsigned char>(queued_[0]);
+                    }
                     if(record.EventType != KEY_EVENT || !record.Event.KeyEvent.bKeyDown) { continue; }
                     queued_size_ = queued_at_ = repeat_count_ = 0u;
                     auto const ch{static_cast<char16_t>(record.Event.KeyEvent.uChar.UnicodeChar)};

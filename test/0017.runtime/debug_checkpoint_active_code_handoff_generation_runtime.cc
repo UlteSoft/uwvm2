@@ -210,13 +210,17 @@ int main(int argc, char** argv)
             prepared.modules==1u && prepared.engines==1u && prepared.functions!=0u &&
             prepared.prepared_threads==1u && prepared.prepared_frames==2u,
             "fresh resources, engines and both relocated frames use actual committed generation2 bodies and roll back");
+        require(prepared.runtime_full_root_identities_prepared_privately &&
+            prepared.prepared_full_root_code_identities==prepared.modules &&
+            prepared.prepared_full_root_code_identity_functions==prepared.functions,
+            "generation2 root identity is immutable private compiler DATA, never a LIVE seal");
         require(prepared.runtime_full_code_owners_transferred_privately &&
             prepared.runtime_full_code_targets_allocation_preserved &&
             prepared.prepared_full_code_owner_modules==prepared.modules &&
             prepared.prepared_full_code_owner_functions==prepared.functions &&
             prepared.prepared_full_code_effective_bodies==1u,
             "real active generation2 parser body and finalized code owners moved privately");
-        ::fast_io::print(::fast_io::out(),"ACTIVE_GENERATION2 private_effective_body_owners=1 active_native_frames=2\n");
+        ::fast_io::print(::fast_io::out(),"ACTIVE_GENERATION2 private_effective_body_owners=1 active_native_frames=2\nROOT_IDENTITY private_generation2=1 live_seal=0 PASS\n");
         require(prepared.validated_private_root_scopes==1u && prepared.installed_private_root_frames==5u &&
             prepared.private_root_chain_restored && gc::current_root_frames()==inherited,
             "actual candidate root prefix installed and removed without touching inherited TLS");

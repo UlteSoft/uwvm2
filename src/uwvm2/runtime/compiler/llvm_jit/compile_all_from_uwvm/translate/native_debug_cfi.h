@@ -59,7 +59,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::details
             switch(group)
             {
                 case 0u: // LDRD/LDREXD may define the implicit second register r11 from r10.
-                    return rd == 11u || ((rd == 10u || rn == 11u) && (word & 0x90u) == 0x90u);
+                    return rd == 11u || (rn == 11u && (word & 0x80u) != 0u) ||
+                        (rd == 10u && (word & 0x90u) == 0x90u);
                 case 1u: return rd == 11u;
                 case 2u: return (load && rd == 11u) || memory_writeback();
                 case 3u: // Media/multiply fields differ from ordinary register-offset memory.
@@ -156,6 +157,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::details
                     if(name->size() < 2uz || (*name)[0u] != '$' ||
                         ((*name)[1u] != 'a' && (*name)[1u] != 't' && (*name)[1u] != 'd') ||
                         (name->size() != 2uz && (*name)[2u] != '.')) { continue; }
+                    // ELF mapping symbols are local STT_NOTYPE with zero
+                    // size (both ABI tag values are zero). A named function
+                    // or global symbol cannot certify an instruction state.
+                    auto const elf_symbol{::llvm::object::ELFSymbolRef{symbol}};
+                    if(elf_symbol.getBinding() != 0u || elf_symbol.getELFType() != 0u || elf_symbol.getSize() != 0u)
+                    { retire(); return; }
                     auto section{symbol.getSection()}; auto address{symbol.getAddress()};
                     if(!section || !address)
                     {

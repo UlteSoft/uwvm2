@@ -107,5 +107,70 @@ int main()
     ::uwvm2::object::global::wasm_global_ref_t parser{}; parser.kind = ::uwvm2::object::global::wasm_ref_kind::wasm_func;
     ::std::memcpy(::std::span<::std::byte>{slots}.subspan(2u * cp::native_slot_bytes, cp::native_slot_bytes).data(), ::std::addressof(parser), sizeof(parser));
     require(parser_reference.materialize(root, 1u, slots) == cp::status::invalid_reference, "parser ref.func index is not a published runtime reference");
+    cp::shadow_ledger reused{profile};
+    ::std::array<::std::uint8_t,2u> flags{1u,0u};
+    auto valid{deep_slots}; cp::native_value const* previous_storage{};
+    for(::std::uint64_t n{1u};n!=129u;++n)
+    {
+        cp::activation_identity current{n,0u,n,9u};
+        require(reused.enter(current,plan)==cp::status::ok && !reused.has_complete_materialized_frames() &&
+            reused.frames_while_actually_stopped()[0u].values.empty(),"storage reuse never retains a plan's initialized/materialized values");
+        auto stale{current};++stale.runtime_epoch;
+        require(reused.compiler_top_plan(stale)==nullptr,"recycled address cannot substitute for actual activation epoch");
+        ::std::memcpy(valid.data(),::std::addressof(n),sizeof(n));
+        require(reused.materialize_compiler_native_data(current,plan,1u,valid,flags)==cp::status::ok,"fresh complete packet after retired storage reuse");
+        auto const& frame{reused.frames_while_actually_stopped()[0u]};
+        require(!frame.values[1u].declaration.initialized &&
+            ::std::memcmp(frame.values[0u].bits.data(),::std::addressof(n),sizeof(n))==0,"every new value/flag refreshes");
+        if(previous_storage) { require(frame.values.data()==previous_storage,"bounded repeated calls reuse empty storage"); }
+        previous_storage=frame.values.data();
+        require(reused.materialize(current,2u,valid)==cp::status::ok &&
+            reused.frames_while_actually_stopped()[0u].values.data()==previous_storage,"fixed before-call packet uses the same owned allocation");
+        auto invalid{valid};invalid[cp::native_slot_bytes]=::std::byte{1u};
+        if(n==128u)
+        {
+            require(reused.materialize(current,1u,invalid)==cp::status::invalid_layout &&
+                reused.frames_while_actually_stopped()[0u].site==2u &&
+                reused.frames_while_actually_stopped()[0u].values[1u].bits[0u]==::std::byte{},
+                "rejected reused fixed packet leaves every prior frame value/site unchanged");
+        }
+        else require(reused.leave(current,false)==cp::status::ok && reused.size()==0u,"actual generated return retires only the current frame");
+    }
+    // A retired physical slot never retains an owner or participates in a
+    // stopped view/reference census. A new activation may reuse its address.
+    cp::shadow_ledger retired{profile};
+    auto ephemeral{cp::sealed_function_plan::seal_compiler_metadata(source_plan(profile))};
+    ::std::weak_ptr<cp::sealed_function_plan const> released{ephemeral};
+    cp::activation_identity old_identity{901u,0u,901u,9u};
+    require(retired.enter(old_identity,::std::move(ephemeral))==cp::status::ok &&
+        retired.materialize(old_identity,1u,deep_slots)==cp::status::ok,"temporary plan admitted and owned by active frame");
+    require(retired.leave(old_identity,false)==cp::status::ok && released.expired() &&
+        retired.size()==0u && retired.frames_while_actually_stopped().empty() &&
+        retired.compiler_top_plan(old_identity)==nullptr,"retirement drops controlblock and hides inactive storage");
+    ::std::size_t retired_refs{};
+    require(retired.visit_recorded_native_references([&](cp::native_reference){++retired_refs;return true;})==cp::status::ok &&
+        retired_refs==0u,"retired carriers never appear in reference census");
+    auto different_source{source_plan(profile)};
+    for(auto& site:different_source.sites) { site.slots[0u].type.kind=cp::types::value_kind::f64; }
+    auto const different{cp::sealed_function_plan::seal_compiler_metadata(::std::move(different_source))};
+    for(::std::uint64_t round{1u};round!=129u;++round)
+    {
+        cp::activation_identity parent{1000u+2u*round,0u,1000u+2u*round,9u};
+        cp::activation_identity child{parent.incarnation+1u,parent.incarnation,parent.continuation+1u,9u};
+        require(retired.enter(parent,plan)==cp::status::ok && !retired.has_complete_materialized_frames() &&
+            retired.frames_while_actually_stopped().size()==1u && retired.frames_while_actually_stopped()[0u].values.empty(),
+            "reused slot begins with no values or availability");
+        require(retired.materialize(parent,2u,deep_slots)==cp::status::ok && retired.enter(child,different)==cp::status::ok &&
+            retired.materialize(child,1u,deep_slots)==cp::status::ok && retired.frames_while_actually_stopped()[1u].values[0u].declaration.type.kind==
+                cp::types::value_kind::f64,"different child declaration replaces prior slot state");
+        require(retired.leave(child,false)==cp::status::ok && retired.size()==1u &&
+            retired.frames_while_actually_stopped().size()==1u && retired.compiler_top_plan(child)==nullptr,
+            "inactive child excluded from exact active range");
+        ::std::size_t live_refs{};
+        require(retired.visit_recorded_native_references([&](cp::native_reference){++live_refs;return true;})==cp::status::ok &&
+            live_refs==1u,"only live parent reference remains after child retirement");
+        require(retired.leave(parent,false)==cp::status::ok && retired.frames_while_actually_stopped().empty(),
+            "repeated two-level return fully retires active range");
+    }
     ::fast_io::io::print("checkpoint immutable typed-plan/shadow-ledger components PASS; actual LLVM continuation/restore acceptance=false\n");
 }

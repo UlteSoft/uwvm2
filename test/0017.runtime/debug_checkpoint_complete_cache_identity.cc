@@ -73,10 +73,15 @@ int main()
     require(bool(observer) && observer->purpose() == cp::compilation_purpose::observe_values &&
         profile->purpose() == cp::compilation_purpose::resumable, "immutable distinct profile purposes");
     auto const observed_tuple{observer->cache_identity()};
-    require(observed_tuple[1u] == 13u, "activation-owned heap observer policy invalidates old native packet cache");
+    require(observed_tuple[1u] == 64u, "compiler-selected ordinary-return ABI invalidates the previous generated code cache");
     require(observed_tuple.size() == tuple.size() && observed_tuple[1u] != tuple[1u],
         "explicit observation/resumable policy versions differ with identical caps");
     auto const observed{context(text(observed_tuple))};
+    auto previous_observed_tuple{observed_tuple}; previous_observed_tuple[1u] = 63u;
+    auto const previous_observed{context(text(previous_observed_tuple))};
+    require(!same(cache::make_context_metadata(observed), cache::make_context_metadata(previous_observed)) &&
+        !same(cache::details::cache_key_hash(observed), cache::details::cache_key_hash(previous_observed)),
+        "previous observation policy cannot reuse current object metadata/path");
     require(!same(base_metadata, cache::make_context_metadata(observed)) &&
         !same(base_path, cache::details::cache_key_hash(observed)), "purposes never share cache metadata/path");
     // Modify each copy of scalar DATA, not a real immutable profile. Include

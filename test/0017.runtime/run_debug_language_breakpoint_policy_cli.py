@@ -26,7 +26,7 @@ def main():
         record.update(argv=argv,actions=s.actions,positions=s.positions)
         leaf=meta.function(a.wasm,'policy_leaf')[0];outer=meta.function(a.wasm,'policy_outer')[0]
         def breakpoint(function):
-            reply=s.send(f'break 0 {function} 0');m=re.search(rb'breakpoint (\d+)',reply);step.require(m is not None,'actual breakpoint required',reply);return int(m[1])
+            reply=s.send(f'breakwasm 0 {function} 0');m=re.search(rb'breakpoint (\d+)',reply);step.require(m is not None,'actual breakpoint required',reply);return int(m[1])
         def policy(command):
             reply=language.query(s,command);step.require(b'breakpoint policy updated' in reply,'actual breakpoint policy rejected',(command,reply));return reply
         def wait_stop(function):
@@ -64,7 +64,7 @@ def main():
         if s is not None:
             try:s.console.finish()
             except BaseException as e:record.update(passed=False,close_error=repr(e));raise
-            finally:record.update(quit_returncode=s.console.child.returncode,managed_shutdown_complete=b'managed shutdown complete' in s.console.transcript)
+            finally:record.update(quit_returncode=s.console.child.returncode,managed_shutdown_complete=s.console.normal_quit_completed)
         record['inputs_after']={str(p):step.sha(p) for p in inputs}
         if before!=record['inputs_after']:record.update(passed=False,inputs_changed=True)
         (a.out/'summary.json').write_text(json.dumps(record,indent=2)+'\n')

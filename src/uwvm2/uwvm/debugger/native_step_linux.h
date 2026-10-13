@@ -38,6 +38,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
         ::std::uint_least64_t target_thread{};
         ::std::uintptr_t owner_begin{}, owner_end{}, expected_pc{}, first_pc{}, next_pc{};
         native_registers::snapshot register_snapshot{};
+        bool retained_entry_stop{}; // Host guard; first real trap remains on its original gate.
         ::std::uint64_t trap_revision{};
         bool trap_delay_slot{}; // Fact of the current accepted trap, never a staged successor.
         int first_signal_code{}, second_signal_code{};
@@ -481,7 +482,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
            pc < begin || pc >= end || !provider.bound_to(&step,thread,begin,end,pc) ||
            !plan.bound_to(&step,thread,begin,end,pc,step.trap_revision,true) || plan.site(0u) != pc) { return false; }
         step.target_thread = thread; step.owner_begin = begin; step.owner_end = end; step.expected_pc = pc;
-        step.first_pc = step.next_pc = 0u; step.register_snapshot = {}; step.trap_delay_slot = false;
+        step.first_pc = step.next_pc = 0u; step.retained_entry_stop = false; step.register_snapshot = {}; step.trap_delay_slot = false;
         step.first_signal_code = step.second_signal_code = 0;
         step.first_gate.store(0u,::std::memory_order_relaxed); step.second_gate.store(0u,::std::memory_order_relaxed);
         step.abort_requested.store(false,::std::memory_order_seq_cst); step.activation_provider = provider; step.plan = plan;
@@ -502,10 +503,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
     [[nodiscard]] inline bool stage_plan(session& step, ::uwvm2::runtime::lib::llvm_jit_debug_native_breakpoint_plan const& plan) noexcept
     {
         details::host_transition_guard lock{};
-        if(details::active.load(::std::memory_order_acquire) != &step || step.state.load(::std::memory_order_seq_cst) != phase::trapped ||
+        if(details::active.load(::std::memory_order_acquire) != &step || (step.state.load(::std::memory_order_seq_cst) != phase::trapped &&
+            !(step.state.load(::std::memory_order_seq_cst) == phase::at_guest_pc && step.retained_entry_stop)) ||
            step.abort_requested.load(::std::memory_order_seq_cst) ||
            !plan.bound_to(&step,step.target_thread,step.owner_begin,step.owner_end,step.next_pc,step.trap_revision,false)) { return false; }
         step.plan = plan; return true;
+    }
+    // Publish a zero-instruction native stop only from the actual backend's
+    // first kernel trap. A supplied PC/session label cannot manufacture it.
+    [[nodiscard]] inline bool retain_initial_trap(session& step) noexcept
+    {
+        details::host_transition_guard lock{};
+        if(details::active.load(::std::memory_order_acquire) != ::std::addressof(step) ||
+           step.state.load(::std::memory_order_acquire) != phase::at_guest_pc ||
+           step.abort_requested.load(::std::memory_order_acquire) || step.retained_entry_stop ||
+           step.target_thread == 0u || step.first_pc != step.expected_pc ||
+           step.first_pc < step.owner_begin || step.first_pc >= step.owner_end ||
+           step.register_snapshot.size() == 0u || step.register_snapshot.pc() != step.first_pc ||
+           step.register_snapshot.sp() == 0u) { return false; }
+        if(step.trap_revision == UINT64_MAX) { return false; }
+        ++step.trap_revision; // Revision of this actual first kernel trap, not a stepped instruction.
+        step.next_pc = step.first_pc;
+        step.retained_entry_stop = true;
+        return true; // No gate wake, TF change, instruction execution or register write.
     }
     [[nodiscard]] inline bool continue_one(session& step) noexcept
     {
@@ -518,11 +538,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
     [[nodiscard]] inline bool continue_from_trap(session& step) noexcept
     {
         details::host_transition_guard lock{};
-        if(details::active.load(::std::memory_order_acquire) != &step || step.state.load(::std::memory_order_seq_cst) != phase::trapped ||
+        if(details::active.load(::std::memory_order_acquire) != &step || (step.state.load(::std::memory_order_seq_cst) != phase::trapped &&
+            !(step.state.load(::std::memory_order_seq_cst) == phase::at_guest_pc && step.retained_entry_stop)) ||
            step.abort_requested.load(::std::memory_order_seq_cst) || step.trap_revision == UINT64_MAX ||
            !step.plan.bound_to(&step,step.target_thread,step.owner_begin,step.owner_end,step.next_pc,step.trap_revision,false) ||
            !details::install_successors(step,false)) { return false; }
-        step.state.store(phase::executing,::std::memory_order_seq_cst); details::wake_gate(step.second_gate); return true;
+        bool const first{step.state.load(::std::memory_order_seq_cst) == phase::at_guest_pc};
+        step.state.store(phase::executing,::std::memory_order_seq_cst);
+        details::wake_gate(first ? step.first_gate : step.second_gate); return true;
     }
     [[nodiscard]] inline bool in_owned_kernel_activation_witness(void const* identity, ::std::uint_least64_t thread,
         ::std::uintptr_t pc, ::std::uintptr_t sp) noexcept
@@ -597,7 +620,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
     [[nodiscard]] inline bool with_owned_registers_and_revision(void const* identity, Inspect inspect) noexcept
     {
         details::host_transition_guard lock{}; auto const* step{details::active.load(::std::memory_order_acquire)};
-        if(!step || identity != step || step->state.load(::std::memory_order_seq_cst) != phase::trapped ||
+        if(!step || identity != step || (step->state.load(::std::memory_order_seq_cst) != phase::trapped &&
+            !(step->state.load(::std::memory_order_seq_cst) == phase::at_guest_pc && step->retained_entry_stop)) ||
            step->abort_requested.load(::std::memory_order_seq_cst) || step->trap_revision == 0u ||
            step->next_pc < step->owner_begin || step->next_pc >= step->owner_end ||
            step->register_snapshot.size() == 0u || step->register_snapshot.pc() != step->next_pc) { return false; }

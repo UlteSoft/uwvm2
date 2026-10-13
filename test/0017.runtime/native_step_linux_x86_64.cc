@@ -85,10 +85,11 @@ extern "C" __attribute__((naked)) void native_step_test_bridge() noexcept
         "1: retq\n\t" ::: "memory");
 }
 
-int main()
+int main(int argc, char**)
 {
-    check(::std::strcmp(::std::getenv("UWVM_TEST_CPUSET") == nullptr ? "" : ::std::getenv("UWVM_TEST_CPUSET"),
-                        "0,2,4,6,16-31") == 0, "cgroup cpuset environment");
+    auto const* cpuset{::std::getenv("UWVM_TEST_CPUSET")};
+    check(cpuset != nullptr && (::std::strcmp(cpuset, "0,2,4,6,16-31") == 0 ||
+                               ::std::strcmp(cpuset, "16-31") == 0), "cgroup cpuset environment");
     struct ::sigaction old_action{};
     struct ::sigaction prior{};
     prior.sa_sigaction = prior_trap;
@@ -145,7 +146,18 @@ int main()
     check(!backend::with_owned_registers(::std::addressof(step),
         [&](auto...) noexcept { ++register_callbacks; }), "first gate is not a completed native register stop");
     check(register_callbacks == 0u, "unauthorized register callback never called");
-    check(backend::continue_one(step), "continue first instruction");
+    if(argc > 1)
+    {
+        check(backend::retain_initial_trap(step), "retain actual zero-instruction trap");
+        check(!backend::retain_initial_trap(step), "entry trap cannot be retained twice");
+        check(counter == 0u && step.state.load() == backend::phase::at_guest_pc, "retention does not execute guest code");
+        check(backend::with_owned_registers(&step, [&](auto thread,auto pc,auto begin,auto end,auto const& r) noexcept
+        { check(thread==tid && pc==first && begin==reinterpret_cast<::std::uintptr_t>(code) &&
+                end==reinterpret_cast<::std::uintptr_t>(code+code_size) && r.pc()==first && r.sp()!=0u,
+                "initial registers belong to actual first trap"); }), "retained first trap is queryable");
+        check(backend::continue_from_trap(step), "resume retained first gate");
+    }
+    else { check(backend::continue_one(step), "continue first instruction"); }
     check(wait_for(step, backend::phase::trapped), "single native instruction trap");
     check(step.next_pc == first + 3u && counter == 1u && step.second_signal_code == TRAP_TRACE,
           "exactly one guest instruction");
@@ -227,6 +239,50 @@ int main()
         check(backend::clear(*cancelled), "cancel ready under arm race");
         cancelled.reset();
         contender.join();
+    }
+    // Exercise worker-side TF batching on actual RX instructions, including
+    // cancellation racing the intermediate signal returns. This component
+    // supplies the backend's test owner; product permission is separately
+    // exercised by run_debug_native_fast_breakpoint.py with published JIT code.
+    check(::mprotect(code, page_size, PROT_READ | PROT_WRITE) == 0, "linear code RW");
+    for(unsigned i{}; i != 256u; ++i)
+    { code[16u+3u*i]=0x48;code[17u+3u*i]=0xff;code[18u+3u*i]=0x03; }
+    code[784u]=0x5b;code[785u]=0xc3;
+    __builtin___clear_cache(reinterpret_cast<char*>(code), reinterpret_cast<char*>(code+786u));
+    check(::mprotect(code,page_size,PROT_READ|PROT_EXEC)==0,"linear code RX");
+    for(unsigned round{};round!=33u;++round)
+    {
+        poll_seen.store(false);may_return.store(false);worker_tid.store(0u);counter=0u;
+        backend::session linear{};
+        ::std::thread linear_worker{[&]
+        {
+            worker_tid.store(static_cast<::std::uint_least64_t>(backend::details::raw_system_call(SYS_gettid)),::std::memory_order_release);
+            reinterpret_cast<void(*)(::std::uint64_t*)>(code)(::std::addressof(counter));
+        }};
+        while(!poll_seen.load(::std::memory_order_acquire)) { ::std::this_thread::yield(); }
+        check(backend::request(linear,worker_tid.load(),reinterpret_cast<::std::uintptr_t>(code),
+            reinterpret_cast<::std::uintptr_t>(code+786u),first),"linear owner request");
+        may_return.store(true,::std::memory_order_release);
+        check(wait_for(linear,backend::phase::at_guest_pc),"linear first gate");
+        check(backend::continue_one(linear) && wait_for(linear,backend::phase::trapped),"linear first step");
+        auto const revision{linear.trap_revision};
+        check(!backend::continue_linear_interval(linear,linear.owner_end),"linear excludes owner end");
+        check(backend::continue_linear_interval(linear,first+3u*255u),"linear launch");
+        if(round==0u)
+        {
+            check(wait_for(linear,backend::phase::trapped),"linear endpoint trap");
+            check(counter==255u && linear.next_pc==first+3u*255u && linear.trap_revision==revision+1u,
+                "254 instructions with one published revision and exact counter");
+            check(backend::release(linear),"linear endpoint release");
+        }
+        else
+        {
+            // The endpoint may win the race; release handles either phase.
+            while(!backend::release(linear)) { ::std::this_thread::yield(); }
+        }
+        linear_worker.join();
+        check(counter==256u && linear.state.load()==backend::phase::released,"linear cancellation retires TF and completes");
+        check(backend::clear(linear),"linear cancellation clears session");
     }
     check(backend::uninstall(), "uninstall");
     check(::sigaction(SIGTRAP, ::std::addressof(old_action), nullptr) == 0, "restore original disposition");

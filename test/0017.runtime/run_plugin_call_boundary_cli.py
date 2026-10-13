@@ -37,7 +37,7 @@ for order in (('permitted','restricted'),('restricted','permitted')):
   cmd+=['--wasip1-single-create','permitted','--wasip1-single-expose-host-api','permitted','--run',str(wasm)]
   r=subprocess.run(cmd,input=b'continue\nwait\nquit\n' if debug else b'',stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=40)
   log=a.out/(label+'.log');log.write_bytes(r.stdout)
-  passed=r.returncode==0 and b'[fatal]' not in r.stdout and (not debug or (b'guest exited: 0' in r.stdout and b'timed out' not in r.stdout))
+  passed=r.returncode==0 and b'[fatal]' not in r.stdout and (not debug or (b'Program exited normally.' in r.stdout and b'timed out' not in r.stdout))
   rows.append(dict(label=label,argv=cmd,returncode=r.returncode,passed=passed,log_sha256=hashlib.sha256(r.stdout).hexdigest()))
   (a.out/'results.json').write_text(json.dumps(rows,indent=2))
   assert passed,(label,r.returncode,r.stdout[-6000:])

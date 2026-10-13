@@ -22,7 +22,7 @@ try:
     row.update(argv=argv,actions=s.actions,positions=s.positions)
     wanted=[i for i,t in enumerate(a.source.read_text().splitlines(),1) if '// PROBE_VALUES' in t];assert len(wanted)==1
     assert b'prepared; no Wasm instruction executed' in s.send('status')
-    command=f'break-source 0 {a.source}:{wanted[0]}'
+    command=f'breaksource 0 {a.source}:{wanted[0]}'
     reply=language.query(s,command);bid=re.search(rb'breakpoint (\d+)',reply);assert bid is not None,(command,reply)
     s.send('continue')
     for _ in range(20):
@@ -48,7 +48,7 @@ finally:
         except BaseException as e:row.update(passed=False,close_error=repr(e));raise
         finally:
             row['quit_returncode']=s.console.child.returncode
-            row['managed_shutdown_complete']=b'managed shutdown complete' in s.console.transcript
+            row['managed_shutdown_complete']=s.console.normal_quit_completed
             if row['quit_returncode']!=0 or not row['managed_shutdown_complete']:row['passed']=False
     row['inputs_after']={str(p):sha(p) for p in paths}
     if row['inputs_after']!=before:row.update(passed=False,inputs_changed=True)

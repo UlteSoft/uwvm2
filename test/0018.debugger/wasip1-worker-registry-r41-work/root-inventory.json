@@ -1,732 +1,924 @@
 {
-  "files": {
-    "uwvm2-checkpoint_actual_generation2_nested_replacement-validate-v5.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "delta.tar.gz": {
-      "size": 46603,
-      "sha256": "3856b9cd3962a2a68ebb76b847a36875b0ac28374573c8bdb1ccff63ffaefb71"
-    },
-    "delta-v6.tar.gz": {
-      "size": 47158,
-      "sha256": "db40b0a18d3f921580f262e2316d56c467be0316be6f18dc854c19037a8c50db"
-    },
-    "uwvm2-ros-macos-registry-frontend-v6.log": {
-      "size": 2688,
-      "sha256": "5dd3d467940bc4a3b6d2d3a4776f46b58eebc2443d5a7e143423f8bba45af2b0"
-    },
-    "uwvm2-debug_wasip1_indirect_prepared_retirement-assemble-v5.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-wasip1-indirect-unwind-v6.log": {
-      "size": 275,
-      "sha256": "4a37bea375e8d7e98b347ee8a1a19bbbf7c0d05f6f588403a9dc91d6a95c5c26"
-    },
-    "uwvm2-macos-registry-frontend-v6.log": {
-      "size": 2656,
-      "sha256": "91d1bd3a215bbd1bf82ee2d0c5316ad8283ee14604a06e1273d1f55f334610e6"
-    },
-    "uwvm2-ros-core-build-v6.log": {
-      "size": 2686,
-      "sha256": "8b3130caac94a6bc56f6dd672beffbdc59ea43bc9a75175d4b73d7167a4c7c64"
-    },
-    "uwvm2-ros-active-build-v6.log": {
-      "size": 2697,
-      "sha256": "53696f61823e122427305212efa0ea7153bd945546359a0931087afe072881db"
-    },
-    "guard_matrix-v4.py": {
-      "size": 8705,
-      "sha256": "96e0929124dc47a04178734333836eaceaa18cb8ede5db3afac89fdb0d7da215"
-    },
-    "uwvm2-debug_checkpoint_worker_registry_reuse-assemble-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "run_matrix-v1.py": {
-      "size": 12186,
-      "sha256": "1ad046ea34d32be53b5a006d02932c10c498a672aaef09f8b925020b3560aad0"
-    },
-    "uwvm2-ros-windows-runtime-frontend-v6.log": {
-      "size": 3228,
-      "sha256": "2f5991fbaefadf7b6a534b675184f8d7a8be47848a95a3088ff7436c98463b55"
-    },
-    "uwvm2-ros-wasip1-indirect-unwind-v6.log": {
-      "size": 275,
-      "sha256": "4a37bea375e8d7e98b347ee8a1a19bbbf7c0d05f6f588403a9dc91d6a95c5c26"
-    },
-    "uwvm2-windows-registry-frontend-v4.log": {
-      "size": 2970,
-      "sha256": "fb96725d7db4012691e9e21a18f7d7b92f5adf9939c565734eeaf8af7371d645"
-    },
-    "uwvm2-linux-runtime-frontend-v4.log": {
-      "size": 4212,
-      "sha256": "e57bb9a0093cb26ceee0132dbb1c1ac7a437dcc497c70e89c84256d0bdb33d30"
-    },
-    "guard_matrix-v6.py": {
-      "size": 8705,
-      "sha256": "46ec0f4f1d8c229d6d26f098ae9c6c3230da61c1f522cc4e8a21dfcfa2b5539e"
-    },
-    "uwvm2-pre-fix-registry-reproduction-v5.log": {
-      "size": 133,
-      "sha256": "b3854578b92e360332b7323ce438c86e6f8a455e1bccd02a5f3e1ce2c7c2b515"
-    },
-    "uwvm2-core-indirect-unwind-v6.log": {
-      "size": 636,
-      "sha256": "680e38fe8e66a6f49e8ae5656b126d88bb98671c566ba22d39a259e706b29040"
-    },
-    "uwvm2-pre-fix-runtime-compile-v5.log": {
-      "size": 4226,
-      "sha256": "77d84b5395d028c668b5a961f57e4064933b59e8640e8ae60207e10d028b3a18"
-    },
-    "uwvm2-ros-debug_wasip1_checkpoint-assemble-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-windows-registry-frontend-v5.log": {
-      "size": 2970,
-      "sha256": "9aeb989e49aa21404033637d66f7ba9f2c4d04153953647f56514b274fc544c7"
-    },
-    "uwvm2-checkpoint_actual_generation2_nested_continuation-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-ros-checkpoint_actual_generation2_nested_continuation-assemble-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "run_matrix-v5.py": {
-      "size": 12413,
-      "sha256": "b2ef177b8d9997db864ea67610cc9dfa4fb82b9171b5909596aeeda2820c268a"
-    },
-    "source-equivalence-v6.json": {
-      "size": 10026,
-      "sha256": "413203bcb1eb8b03062d44d6dec79722377176f46df431f830215b1b4b29bba2"
-    },
-    "uwvm2-ros-macos-registry-frontend-v5.log": {
-      "size": 2688,
-      "sha256": "8549421f8036f14b0aa0cafca65bca3c99a7fa0df438b240af46c52378c4b5e3"
-    },
-    "uwvm2-pre-fix-runtime-compile-v6.log": {
-      "size": 4226,
-      "sha256": "855df90574ceaf636214388f26db4973f7e2c1484aa4042e151c2e3732deea94"
-    },
-    "uwvm2-ros-core-indirect-unwind-v6.log": {
-      "size": 636,
-      "sha256": "680e38fe8e66a6f49e8ae5656b126d88bb98671c566ba22d39a259e706b29040"
-    },
-    "guard-matrix-v2.json": {
-      "size": 1583,
-      "sha256": "a1d250c32e30440018cecb0dcc4b808df6253f59e085a699cb3e4df3d62f41e2"
-    },
-    "native-storage-v6.json": {
-      "size": 169,
-      "sha256": "61043072bbc5d147aa81bff5caca32d81464fea7a8a3f731d29bebb20a045027"
-    },
-    "uwvm2-ros-debug_checkpoint_retirement_cohort-assemble-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-runtime-compile-v6.log": {
-      "size": 4212,
-      "sha256": "ab03179b2c8c7b2a46b3d200396b88155eb40733890c00925d2c8bd7e11bb8b8"
-    },
-    "uwvm2-windows-runtime-frontend-v6.log": {
-      "size": 4526,
-      "sha256": "47105ef3e6b9cd827cf76f96a177a47ed4ff751764fdc5a35e12591c4fced743"
-    },
-    "uwvm2-registry-build-v6.log": {
-      "size": 2656,
-      "sha256": "91d1bd3a215bbd1bf82ee2d0c5316ad8283ee14604a06e1273d1f55f334610e6"
-    },
-    "uwvm2-pre-fix-registry-build-v5.log": {
-      "size": 2656,
-      "sha256": "34f25de906c646f154b211c6b2fdb84192a36ae79571a55682f49e19e518ee0b"
-    },
-    "uwvm2-wasip1-normal-instruction-v6.log": {
-      "size": 280,
-      "sha256": "4dfb2463832990aeab54cefbefaa66584a36ee73fe35126ff56d75aa10511961"
-    },
-    "uwvm2-ros-freebsd-runtime-frontend-v6.log": {
-      "size": 3018,
-      "sha256": "e9ae70c271138f8b63b12e0bc8de0892c3b5d59f9cbdf61cd8f4d83c24daf4f0"
-    },
-    "uwvm2-ros-checkpoint_actual_generation2_nested_continuation-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-checkpoint_actual_generation2_nested_continuation-assemble-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-registry-normal-unwind-v6.log": {
-      "size": 382,
-      "sha256": "b0eec958c1e8773a01eaee9e579a313ed6e161249e28614b94e58d3525b8497a"
-    },
-    "v4-interrupted-projection-cleanup.json": {
-      "size": 191586,
-      "sha256": "b84a9e4fd4ff2e80c784af2fd1e929319f9c70a200fa2f943a8b2082113720ba"
-    },
-    "source-equivalence.json": {
-      "size": 9720,
-      "sha256": "a89261acf69745f04b1942dff1cdebc08c0f57bfe479c34709cf07d1feabb9c4"
-    },
-    "guard_matrix-v1.py": {
-      "size": 8690,
-      "sha256": "52e339f5dc94480547caf093a8015890f090a36ba792f3e2f979d8f9a3c175ee"
-    },
-    "uwvm2-registry-normal-instruction-v5.log": {
-      "size": 72,
-      "sha256": "b7227a749a9efd551d8e50060c688d4357b16bd139a52814eb093f54bf50ae1c"
-    },
-    "initial-new-test-sha256.json": {
-      "size": 101,
-      "sha256": "e9ea67353bd4bdc7697c5c2e8fc2361b3b1e195c4f99b98cd0a6c51498706a3f"
-    },
-    "uwvm2-debug_checkpoint_retirement_cohort-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-freebsd-registry-frontend-v6.log": {
-      "size": 2760,
-      "sha256": "07b5cf82cb4648f8425458ae2671955222f369a3f2e8e00910ad62e74b523149"
-    },
-    "source-manifest-v4.json": {
-      "size": 8425,
-      "sha256": "bfd1134b306786fc7ab28255a97fdfb46d8d90fb040ef989cb90fc95d1e12db1"
-    },
-    "source-manifest.json": {
-      "size": 8425,
-      "sha256": "fdf5759120ff51b9112ad4a471d5e78a768c0a47a97ea7739034ee170d83267e"
-    },
-    "evidence-qualified.json": {
-      "size": 29122,
-      "sha256": "7291e2e5fe61889877df447fe1fa2808c43cc99bda5877794707b15232b9598a"
-    },
-    "uwvm2-checkpoint_actual_generation2_nested_replacement-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-wasip1-build-v6.log": {
-      "size": 2650,
-      "sha256": "3290ccae9c87cbc385e4701bb7af35d0e0545a9312d59ed38605cb0ec4993882"
-    },
-    "wasip1_worker_registry_r41_test_report.md": {
-      "size": 3447,
-      "sha256": "1d5f2760740338b4011d785e84a7c5445ed94f5b05744022a2302b64e32e222d"
-    },
-    "native-storage-v4.json": {
-      "size": 169,
-      "sha256": "9ba503285e6a5207e4b50e189952ba502e0398914b1e62c8df3299a4b72a2840"
-    },
-    "results-v6.json": {
-      "size": 223737,
-      "sha256": "764db261000807f35389baf14f61aa1cc08c1cf26610ac5a905d80beaac5453b"
-    },
-    "uwvm2-ros-linux-registry-frontend-v6.log": {
-      "size": 2688,
-      "sha256": "5dd3d467940bc4a3b6d2d3a4776f46b58eebc2443d5a7e143423f8bba45af2b0"
-    },
-    "run_matrix-v4.py": {
-      "size": 12413,
-      "sha256": "8fe8e1314364cd20a82fa395235e29168346e4753a33cda8b8feea5028ec17ab"
-    },
-    "guard_matrix-v3.py": {
-      "size": 8705,
-      "sha256": "5552224f1d30fb2b715bf5f7aed7ba34fb00ac51805e8094595178a859da9f58"
-    },
-    "uwvm2-ros-debug_checkpoint_indirect_retirement_cohort-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "guard-evidence-v2.json": {
-      "size": 1577,
-      "sha256": "d8b6031416595bc9bcd458b0e90b0bc04fb84964756647f90dba6af9ca42b09c"
-    },
-    "uwvm2-ros-checkpoint_actual_generation2_nested_replacement-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-debug_wasip1_indirect_prepared_retirement-validate-v5.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-linux-registry-frontend-v4.log": {
-      "size": 2656,
-      "sha256": "b2c71c4b21483b4819c41ff955193d0c681987f410fa173a175cdeb76a12237f"
-    },
-    "source-manifest-v6.json": {
-      "size": 8727,
-      "sha256": "c3e7223723f68cc7ac0a93cdfd3797d4d0a54be22e7ad697cc50bce903589a62"
-    },
-    "results-v3.json": {
-      "size": 3094,
-      "sha256": "7d0326ab2efc6ffb0d7743a37d15f7514faf61b22f81aadcaa47d9a4313da261"
-    },
-    "uwvm2-debug_checkpoint_retirement_cohort-validate-v5.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-ros-linux-registry-frontend-v5.log": {
-      "size": 2688,
-      "sha256": "8549421f8036f14b0aa0cafca65bca3c99a7fa0df438b240af46c52378c4b5e3"
-    },
-    "uwvm2-ros-macos-runtime-frontend-v5.log": {
-      "size": 2914,
-      "sha256": "f68daf9d6fe0a74680a39c7bc6eed22051f14801459b22ad9360a09c2bafca03"
-    },
-    "uwvm2-windows-registry-frontend-v6.log": {
-      "size": 2970,
-      "sha256": "c59723f7de559a54b7c1b204a6cbcf32e8db45bd625cb5d5128d15e7c41f2670"
-    },
-    "uwvm2-pre-fix-registry-reproduction-v6.log": {
-      "size": 133,
-      "sha256": "b3854578b92e360332b7323ce438c86e6f8a455e1bccd02a5f3e1ce2c7c2b515"
-    },
-    "uwvm2-debug_wasip1_indirect_prepared_retirement-assemble-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "failed-projection-cleanup.json": {
-      "size": 382721,
-      "sha256": "810efab22a7ca2e827dc6b2d714833f3452532a85c69ccac23f5b3bb8d0879a1"
-    },
-    "delta-v4.tar.gz": {
-      "size": 46596,
-      "sha256": "2cfe71effbb7aa6a1b94da64a4ec3d95e5b75a4afc8909e9f8854e9ab450305c"
-    },
-    "uwvm2-ros-runtime-compile-v6.log": {
-      "size": 2914,
-      "sha256": "b47ddc832aaef947dfdfb0c1e70edebaab503d3eca82326543aa431f6efc5d6a"
-    },
-    "uwvm2-core-normal-instruction-v6.log": {
-      "size": 641,
-      "sha256": "afa71b483c0e260225d67b9d6874a1ab030645cdbf87e5925b60a7531d3fd80c"
-    },
-    "native-storage-v3.json": {
-      "size": 169,
-      "sha256": "52a31160e9976cd32ca2067e5f0c44d45cf916cbfb98b93d155d10965d674f56"
-    },
-    "uwvm2-ros-debug_checkpoint_worker_registry_reuse-assemble-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "run_matrix-v3.py": {
-      "size": 13032,
-      "sha256": "c3e2af0f6a2228ac7a7a9c5079f71e02b7b6adc7f08ac6a593e3c5265f2cee17"
-    },
-    "qualified-v6.json": {
-      "size": 810,
-      "sha256": "aca3211128e8568ec425ae4554e5ee8a5df7cc84d6ec192c80c19162792c8c58"
-    },
-    "write_report_and_evidence-v1.py": {
-      "size": 8449,
-      "sha256": "87fc18f73e6dc63b5f88a32e5f49fd13e75dfabbf31271826b1d22edf16466c8"
-    },
-    "uwvm2-checkpoint_actual_generation2_nested_continuation-assemble-v5.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-debug_checkpoint_worker_registry_reuse-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-debug_wasip1_checkpoint-assemble-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-ros-host-api-compile-v6.log": {
-      "size": 109,
-      "sha256": "0cf731748a3ccc5687b5794d42fa19cb32c7e51dd6efb3d8dc6c1a9385ffe9f0"
-    },
-    "uwvm2-windows-runtime-frontend-v5.log": {
-      "size": 4526,
-      "sha256": "996cc81cbb20585494d3a1574c60b0c3b56ba962f9746737b3908c4a4e064464"
-    },
-    "guard_evidence-v2.py": {
-      "size": 8713,
-      "sha256": "3252fb6b759155e7e7c343c4100bc0e29e8852bbadcc3e3d30333f1a715bca78"
-    },
-    "wasip1_worker_registry_r41_test_report.json": {
-      "size": 341488,
-      "sha256": "792a3b81357803bd5bfafeade06ff124a1d67e891917a7fa14e9bdac0e242594"
-    },
-    "uwvm2-windows-runtime-frontend-v4.log": {
-      "size": 423,
-      "sha256": "da3b17875139c05d573f10a0bec08fd330ee40e3c48e6536902736e548273ea9"
-    },
-    "uwvm2-checkpoint_actual_generation2_nested_replacement-assemble-v5.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "write_report_and_evidence-v2.py": {
-      "size": 8600,
-      "sha256": "16cd75efc2dbe45882f7313a430d1f258af78c41932e0f5cebbdad011f06ea95"
-    },
-    "native-storage-v5.json": {
-      "size": 169,
-      "sha256": "a9c00a9731190bd1e9ef47b5d76b07478061aff2904300ae95e831887b8a8c21"
-    },
-    "guard-matrix-v5.json": {
-      "size": 115834,
-      "sha256": "6c6101eefa1c8052ff0b0b227a9cf3435064a82ede69c8510c1b081e7ca99c39"
-    },
-    "uwvm2-ros-debug_wasip1_indirect_prepared_retirement-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-debug_checkpoint_indirect_retirement_cohort-assemble-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "final-new-test-sha256.json": {
-      "size": 301,
-      "sha256": "505ef2780e4ba617997343c36bd2ad077e1af86a57fb4b3e841111c78f583a4c"
-    },
-    "register_active_environment-v2.py": {
-      "size": 3813,
-      "sha256": "aa207b2b501a48a843161e2363c1f618909f4f4c08637e9db6dd06aa60335f0b"
-    },
-    "source-equivalence-v5.json": {
-      "size": 9720,
-      "sha256": "fb233a2555f3e15272fb24844f80e0a322a670df63d22c6deca7574f2b9d1e38"
-    },
-    "guard_matrix-v2.py": {
-      "size": 8705,
-      "sha256": "986cc3e34777876ffc753c11fbcbb436ea4482943c685c926eadcaf0e1d3fa50"
-    },
-    "source-manifest-v5.json": {
-      "size": 8425,
-      "sha256": "fca4c18b48bd71da76c3d54a54e79e7278d402903d01c2e1df7743cc170cbe8b"
-    },
-    "register_active_environment-v1.py": {
-      "size": 3813,
-      "sha256": "2c9ebfc9e515f252f6780971f1d7d9d6bffe9f8d8f1678662ba2d43ae39b0281"
-    },
-    "uwvm2-checkpoint_actual_generation2_nested_replacement-assemble-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-linux-registry-frontend-v5.log": {
-      "size": 2656,
-      "sha256": "34f25de906c646f154b211c6b2fdb84192a36ae79571a55682f49e19e518ee0b"
-    },
-    "uwvm2-ros-debug_checkpoint_indirect_retirement_cohort-assemble-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-ros-windows-registry-frontend-v5.log": {
-      "size": 3002,
-      "sha256": "64183d03fa769d27e80e7669f67920d8fb9e56e9fcde06aba5d3924f89d2e504"
-    },
-    "uwvm2-ros-wasip1-build-v6.log": {
-      "size": 2682,
-      "sha256": "8cee0e1fa0e369b0e3fbc82dc0a14753e76146861644c1eae9510afb976a6d5d"
-    },
-    "uwvm2-debug_checkpoint_retirement_cohort-assemble-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-active-generation2-instruction-v6.log": {
-      "size": 967,
-      "sha256": "0f92c06a9d5de23754387fb156890bb8045150723883adec130d73705864b597"
-    },
-    "uwvm2-host-api-compile-v5.log": {
-      "size": 109,
-      "sha256": "0cf731748a3ccc5687b5794d42fa19cb32c7e51dd6efb3d8dc6c1a9385ffe9f0"
-    },
-    "uwvm2-linux-runtime-frontend-v6.log": {
-      "size": 4212,
-      "sha256": "ab03179b2c8c7b2a46b3d200396b88155eb40733890c00925d2c8bd7e11bb8b8"
-    },
-    "owned-source-changes-v5.patch": {
-      "size": 49536,
-      "sha256": "088c28ab114b6afeac8839b84f2bd4b19ccefb52bb9c83da366a700b30171fa1"
-    },
-    "uwvm2-freebsd-runtime-frontend-v5.log": {
-      "size": 4316,
-      "sha256": "69c110e1fb41944bfc04f31794b856cdb1c0a5929eaa6f3779e001e799df7235"
-    },
-    "apfs-duplicate-report-clone.json": {
+  "files": [
+    {
+      "name": "active-environment-update.json",
+      "size": 336,
+      "sha256": "23da23a206a05905a1ef28741ee316a9ffdf350792bed2c6026f1d9c3273e00b"
+    },
+    {
+      "name": "apfs-duplicate-report-clone.json",
       "size": 1574,
       "sha256": "e8f1767f5e63db91d3c67e6b2b559506952ff21cc7d51f31aced771fb72c3e28"
     },
-    "uwvm2-pre-fix-registry-build-v6.log": {
-      "size": 2656,
-      "sha256": "91d1bd3a215bbd1bf82ee2d0c5316ad8283ee14604a06e1273d1f55f334610e6"
-    },
-    "uwvm2-ros-core-indirect-instruction-v6.log": {
-      "size": 641,
-      "sha256": "afa71b483c0e260225d67b9d6874a1ab030645cdbf87e5925b60a7531d3fd80c"
-    },
-    "uwvm2-freebsd-runtime-frontend-v6.log": {
-      "size": 4316,
-      "sha256": "0afd1afa8ade1a939581e3a283e42e7e2da5b7f68f022c0a3766e57be0597f4f"
-    },
-    "uwvm2-debug_wasip1_checkpoint-assemble-v5.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "source-equivalence-v4.json": {
-      "size": 9720,
-      "sha256": "5540753c84ccc5ea8fb3619df6cff7780ddf4ca70dbaa272a7ba4c2f9123002f"
-    },
-    "guard-matrix-v3.json": {
-      "size": 2041,
-      "sha256": "73e9c3f9ecaad9b4511afd111f3755cd947ec5ecb4b2fee120983a82f84b18f0"
-    },
-    "uwvm2-ros-freebsd-registry-frontend-v5.log": {
-      "size": 2792,
-      "sha256": "b4013dd12e87eb26eda9d752c5926350f6fd0fc58fd43b3676ff3a56f13d1c40"
-    },
-    "uwvm2-linux-runtime-frontend-v5.log": {
-      "size": 4212,
-      "sha256": "90da8b5e25bc1d23133dc97846643fde1598233b0aacc478f668ab438c3eaa46"
-    },
-    "guard-matrix-v6.json": {
-      "size": 318414,
-      "sha256": "a75626df9cafc64215845468ef9b5faabded944b5296d162f90cc477cf7c1ecf"
-    },
-    "run_matrix-v2.py": {
-      "size": 12398,
-      "sha256": "e39671ebbb924e4365efe2981a32fe8ae70429e6536193c8af66f57108781199"
-    },
-    "uwvm2-runtime-compile-v5.log": {
-      "size": 4212,
-      "sha256": "90da8b5e25bc1d23133dc97846643fde1598233b0aacc478f668ab438c3eaa46"
-    },
-    "uwvm2-macos-runtime-frontend-v6.log": {
-      "size": 4212,
-      "sha256": "ab03179b2c8c7b2a46b3d200396b88155eb40733890c00925d2c8bd7e11bb8b8"
-    },
-    "guard-matrix-v4.json": {
-      "size": 14593,
-      "sha256": "7bf80d21a6fb2c15eadbcb21df7b487ad09e0164f4ce5d888157c9d93f0e3ed0"
-    },
-    "guard-matrix-v1.json": {
-      "size": 1584,
-      "sha256": "26719a73107999b04130743d24c66a3fdb24fe5834e520532aa3e5d672ceecdb"
-    },
-    "results-v5.json": {
-      "size": 107325,
-      "sha256": "d68c187a37d9ce14da944fb2d98a1af6ab73304553b645b35aed69123373633f"
-    },
-    "uwvm2-debug_checkpoint_indirect_retirement_cohort-validate-v5.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-ros-macos-runtime-frontend-v6.log": {
-      "size": 2914,
-      "sha256": "b47ddc832aaef947dfdfb0c1e70edebaab503d3eca82326543aa431f6efc5d6a"
-    },
-    "uwvm2-core-indirect-instruction-v6.log": {
-      "size": 641,
-      "sha256": "afa71b483c0e260225d67b9d6874a1ab030645cdbf87e5925b60a7531d3fd80c"
-    },
-    "uwvm2-active-build-v6.log": {
-      "size": 2665,
-      "sha256": "c55f57f6c2288273b50500a7d5cf2951f595460186d3456a4f1e1b7f47d8abcb"
-    },
-    "before.json": {
+    {
+      "name": "before.json",
       "size": 977,
       "sha256": "845cbda61323807a0ea21168d77738f537e537517470569bcc696f42816da1a6"
     },
-    "uwvm2-ros-debug_wasip1_indirect_prepared_retirement-assemble-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    {
+      "name": "delta-v4.tar.gz",
+      "size": 46596,
+      "sha256": "2cfe71effbb7aa6a1b94da64a4ec3d95e5b75a4afc8909e9f8854e9ab450305c"
     },
-    "uwvm2-ros-freebsd-registry-frontend-v6.log": {
-      "size": 2792,
-      "sha256": "df0b768e7d597bed87f4aadd87f6161cc6078886cd1e2fc937f455bc233a064c"
-    },
-    "uwvm2-ros-freebsd-runtime-frontend-v5.log": {
-      "size": 3018,
-      "sha256": "d63121b184ae3ab1f23c78393cad7825764691deddd43383ed3080f9a3a0cd65"
-    },
-    "uwvm2-ros-active-generation2-instruction-v6.log": {
-      "size": 967,
-      "sha256": "8cfca811522a7c61886957ae1d838c182acdfecf299141926c39320cfaee36e3"
-    },
-    "v5-interrupted-projection-cleanup.json": {
-      "size": 191594,
-      "sha256": "6aa63ceb0a16e74e8f77539a58db2eaa8a119034a4a3b04af05b9e01768c51d1"
-    },
-    "uwvm2-core-normal-unwind-v6.log": {
-      "size": 636,
-      "sha256": "680e38fe8e66a6f49e8ae5656b126d88bb98671c566ba22d39a259e706b29040"
-    },
-    "uwvm2-linux-registry-frontend-v3.log": {
-      "size": 5444,
-      "sha256": "101922c709be205525fe250928715aa36706d5b9db28abd4194beac84fd7c479"
-    },
-    "run_matrix-v6.py": {
-      "size": 12760,
-      "sha256": "b89d16544bf9b8e7eb6aca27f250ada2024cb30263a74aa1cc32de9cd896aeab"
-    },
-    "uwvm2-ros-wasip1-normal-unwind-v6.log": {
-      "size": 275,
-      "sha256": "43c7af94453ec4603ef661a6ef93e3bd5852f84f795de6ee5b0a75aad960caf5"
-    },
-    "uwvm2-core-build-v6.log": {
-      "size": 2654,
-      "sha256": "2b2b1d586eef1ab4d55d646f3e12d552c68d4fd57fa8f01dcd178de2e8b2341c"
-    },
-    "uwvm2-debug_wasip1_indirect_prepared_retirement-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-checkpoint_actual_generation2_nested_continuation-validate-v5.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-debug_checkpoint_retirement_cohort-assemble-v5.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-ros-debug_checkpoint_worker_registry_reuse-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-macos-registry-frontend-v5.log": {
-      "size": 2656,
-      "sha256": "34f25de906c646f154b211c6b2fdb84192a36ae79571a55682f49e19e518ee0b"
-    },
-    "uwvm2-ros-registry-build-v6.log": {
-      "size": 2688,
-      "sha256": "5dd3d467940bc4a3b6d2d3a4776f46b58eebc2443d5a7e143423f8bba45af2b0"
-    },
-    "uwvm2-ros-active-generation2-unwind-v6.log": {
-      "size": 967,
-      "sha256": "c3b51a904a4b24e211050d2543a618d0aa3c259ff5ffb2cf727e5297872708e6"
-    },
-    "results-v4.json": {
-      "size": 9363,
-      "sha256": "e254f2a10ff6d7527ef353b33252bac2cbc28cce01996241120287916a5d3579"
-    },
-    "delta-v5.tar.gz": {
+    {
+      "name": "delta-v5.tar.gz",
       "size": 46858,
       "sha256": "bf892f21801839616a885d4f76ab56f6e4594e353e0bfaa92ea2acae7e665ed3"
     },
-    "uwvm2-linux-registry-frontend-v6.log": {
-      "size": 2656,
-      "sha256": "91d1bd3a215bbd1bf82ee2d0c5316ad8283ee14604a06e1273d1f55f334610e6"
+    {
+      "name": "delta-v6.tar.gz",
+      "size": 47158,
+      "sha256": "db40b0a18d3f921580f262e2316d56c467be0316be6f18dc854c19037a8c50db"
     },
-    "uwvm2-ros-windows-runtime-frontend-v5.log": {
-      "size": 3228,
-      "sha256": "88d2caa8add9f036db88025e21f23c503f20aba733f3e8e4348872f16818fb4e"
+    {
+      "name": "delta.tar.gz",
+      "size": 46603,
+      "sha256": "3856b9cd3962a2a68ebb76b847a36875b0ac28374573c8bdb1ccff63ffaefb71"
     },
-    "uwvm2-debug_checkpoint_indirect_retirement_cohort-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    {
+      "name": "evidence-qualified.json",
+      "size": 29122,
+      "sha256": "7291e2e5fe61889877df447fe1fa2808c43cc99bda5877794707b15232b9598a"
     },
-    "uwvm2-ros-debug_checkpoint_retirement_cohort-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    {
+      "name": "failed-projection-cleanup.json",
+      "size": 382721,
+      "sha256": "810efab22a7ca2e827dc6b2d714833f3452532a85c69ccac23f5b3bb8d0879a1"
     },
-    "uwvm2-debug_wasip1_checkpoint-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    {
+      "name": "final-new-test-sha256.json",
+      "size": 301,
+      "sha256": "505ef2780e4ba617997343c36bd2ad077e1af86a57fb4b3e841111c78f583a4c"
     },
-    "uwvm2-ros-core-normal-unwind-v6.log": {
-      "size": 636,
-      "sha256": "680e38fe8e66a6f49e8ae5656b126d88bb98671c566ba22d39a259e706b29040"
+    {
+      "name": "guard-evidence-v2.json",
+      "size": 1577,
+      "sha256": "d8b6031416595bc9bcd458b0e90b0bc04fb84964756647f90dba6af9ca42b09c"
     },
-    "uwvm2-ros-registry-normal-unwind-v6.log": {
-      "size": 382,
-      "sha256": "b0eec958c1e8773a01eaee9e579a313ed6e161249e28614b94e58d3525b8497a"
+    {
+      "name": "guard-matrix-v1.json",
+      "size": 1584,
+      "sha256": "26719a73107999b04130743d24c66a3fdb24fe5834e520532aa3e5d672ceecdb"
     },
-    "uwvm2-registry-normal-instruction-v6.log": {
-      "size": 387,
-      "sha256": "98b11bcc5140590bb852514773f144b27784a60f5fb8abf8c9d8bcf1dc1aac52"
+    {
+      "name": "guard-matrix-v2.json",
+      "size": 1583,
+      "sha256": "a1d250c32e30440018cecb0dcc4b808df6253f59e085a699cb3e4df3d62f41e2"
     },
-    "uwvm2-registry-build-v5.log": {
-      "size": 2656,
-      "sha256": "34f25de906c646f154b211c6b2fdb84192a36ae79571a55682f49e19e518ee0b"
+    {
+      "name": "guard-matrix-v3.json",
+      "size": 2041,
+      "sha256": "73e9c3f9ecaad9b4511afd111f3755cd947ec5ecb4b2fee120983a82f84b18f0"
     },
-    "uwvm2-ros-wasip1-indirect-instruction-v6.log": {
-      "size": 280,
-      "sha256": "dd070d83ba9b95814b63700d9749b6f1797040b01e768eef0c6f70bceaee32d1"
+    {
+      "name": "guard-matrix-v4.json",
+      "size": 14593,
+      "sha256": "7bf80d21a6fb2c15eadbcb21df7b487ad09e0164f4ce5d888157c9d93f0e3ed0"
     },
-    "uwvm2-freebsd-registry-frontend-v5.log": {
-      "size": 2760,
-      "sha256": "b57a51d8a70dbd02e9c7efc43dd6431395d4f252ab9f44b3353e5bcfc8970a64"
+    {
+      "name": "guard-matrix-v5.json",
+      "size": 115834,
+      "sha256": "6c6101eefa1c8052ff0b0b227a9cf3435064a82ede69c8510c1b081e7ca99c39"
     },
-    "owned-source-changes-v6.patch": {
-      "size": 50078,
-      "sha256": "9690d18fd09c2b49fe5edfa75cc01b0a5b10fd515487923484fee3ac7a3a1f75"
+    {
+      "name": "guard-matrix-v6.json",
+      "size": 318414,
+      "sha256": "a75626df9cafc64215845468ef9b5faabded944b5296d162f90cc477cf7c1ecf"
     },
-    "uwvm2-host-api-compile-v6.log": {
-      "size": 109,
-      "sha256": "0cf731748a3ccc5687b5794d42fa19cb32c7e51dd6efb3d8dc6c1a9385ffe9f0"
-    },
-    "uwvm2-ros-linux-runtime-frontend-v5.log": {
-      "size": 2914,
-      "sha256": "f68daf9d6fe0a74680a39c7bc6eed22051f14801459b22ad9360a09c2bafca03"
-    },
-    "uwvm2-ros-core-normal-instruction-v6.log": {
-      "size": 641,
-      "sha256": "afa71b483c0e260225d67b9d6874a1ab030645cdbf87e5925b60a7531d3fd80c"
-    },
-    "uwvm2-ros-windows-registry-frontend-v6.log": {
-      "size": 3002,
-      "sha256": "77a49346010d62de456377c165a134a13b07fa709b2af8fafd121bafd1fb6cab"
-    },
-    "uwvm2-ros-wasip1-normal-instruction-v6.log": {
-      "size": 280,
-      "sha256": "4dfb2463832990aeab54cefbefaa66584a36ee73fe35126ff56d75aa10511961"
-    },
-    "uwvm2-ros-linux-runtime-frontend-v6.log": {
-      "size": 2914,
-      "sha256": "b47ddc832aaef947dfdfb0c1e70edebaab503d3eca82326543aa431f6efc5d6a"
-    },
-    "uwvm2-active-generation2-unwind-v6.log": {
-      "size": 967,
-      "sha256": "5862a985151231ed56c0b89e90ba27f3eea053a0da96aa3a98aa3f9eb408a75b"
-    },
-    "uwvm2-ros-debug_wasip1_checkpoint-validate-v6.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "uwvm2-wasip1-indirect-instruction-v6.log": {
-      "size": 280,
-      "sha256": "dd070d83ba9b95814b63700d9749b6f1797040b01e768eef0c6f70bceaee32d1"
-    },
-    "guard_evidence-v1.py": {
+    {
+      "name": "guard_evidence-v1.py",
       "size": 8713,
       "sha256": "7c427a65ef990966e3258c67fb31e9de41b03ac2f14422c1110a10ccd67a4010"
     },
-    "uwvm2-ros-registry-normal-instruction-v6.log": {
-      "size": 387,
-      "sha256": "98b11bcc5140590bb852514773f144b27784a60f5fb8abf8c9d8bcf1dc1aac52"
+    {
+      "name": "guard_evidence-v2.py",
+      "size": 8713,
+      "sha256": "3252fb6b759155e7e7c343c4100bc0e29e8852bbadcc3e3d30333f1a715bca78"
     },
-    "uwvm2-debug_checkpoint_indirect_retirement_cohort-assemble-v5.log": {
-      "size": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    {
+      "name": "guard_matrix-v1.py",
+      "size": 8690,
+      "sha256": "52e339f5dc94480547caf093a8015890f090a36ba792f3e2f979d8f9a3c175ee"
     },
-    "native-storage-v2.json": {
+    {
+      "name": "guard_matrix-v2.py",
+      "size": 8705,
+      "sha256": "986cc3e34777876ffc753c11fbcbb436ea4482943c685c926eadcaf0e1d3fa50"
+    },
+    {
+      "name": "guard_matrix-v3.py",
+      "size": 8705,
+      "sha256": "5552224f1d30fb2b715bf5f7aed7ba34fb00ac51805e8094595178a859da9f58"
+    },
+    {
+      "name": "guard_matrix-v4.py",
+      "size": 8705,
+      "sha256": "96e0929124dc47a04178734333836eaceaa18cb8ede5db3afac89fdb0d7da215"
+    },
+    {
+      "name": "guard_matrix-v5.py",
+      "size": 8705,
+      "sha256": "004adc5a1533a97945c7c6a629c1e0e914723cb12648e60daef5cfa33d115eaa"
+    },
+    {
+      "name": "guard_matrix-v6.py",
+      "size": 8705,
+      "sha256": "46ec0f4f1d8c229d6d26f098ae9c6c3230da61c1f522cc4e8a21dfcfa2b5539e"
+    },
+    {
+      "name": "initial-new-test-sha256.json",
+      "size": 101,
+      "sha256": "e9ea67353bd4bdc7697c5c2e8fc2361b3b1e195c4f99b98cd0a6c51498706a3f"
+    },
+    {
+      "name": "native-storage-v2.json",
       "size": 169,
       "sha256": "ba15269f2f2315ad5893af477eb8bd10416b140762f1c7a9ea10238e1d7d2808"
     },
-    "uwvm2-macos-runtime-frontend-v5.log": {
+    {
+      "name": "native-storage-v3.json",
+      "size": 169,
+      "sha256": "52a31160e9976cd32ca2067e5f0c44d45cf916cbfb98b93d155d10965d674f56"
+    },
+    {
+      "name": "native-storage-v4.json",
+      "size": 169,
+      "sha256": "9ba503285e6a5207e4b50e189952ba502e0398914b1e62c8df3299a4b72a2840"
+    },
+    {
+      "name": "native-storage-v5.json",
+      "size": 169,
+      "sha256": "a9c00a9731190bd1e9ef47b5d76b07478061aff2904300ae95e831887b8a8c21"
+    },
+    {
+      "name": "native-storage-v6.json",
+      "size": 169,
+      "sha256": "61043072bbc5d147aa81bff5caca32d81464fea7a8a3f731d29bebb20a045027"
+    },
+    {
+      "name": "owned-source-changes-v5.patch",
+      "size": 49536,
+      "sha256": "088c28ab114b6afeac8839b84f2bd4b19ccefb52bb9c83da366a700b30171fa1"
+    },
+    {
+      "name": "owned-source-changes-v6.patch",
+      "size": 50078,
+      "sha256": "9690d18fd09c2b49fe5edfa75cc01b0a5b10fd515487923484fee3ac7a3a1f75"
+    },
+    {
+      "name": "qualified-v6.json",
+      "size": 810,
+      "sha256": "aca3211128e8568ec425ae4554e5ee8a5df7cc84d6ec192c80c19162792c8c58"
+    },
+    {
+      "name": "register_active_environment-v1.py",
+      "size": 3813,
+      "sha256": "2c9ebfc9e515f252f6780971f1d7d9d6bffe9f8d8f1678662ba2d43ae39b0281"
+    },
+    {
+      "name": "register_active_environment-v2.py",
+      "size": 3813,
+      "sha256": "aa207b2b501a48a843161e2363c1f618909f4f4c08637e9db6dd06aa60335f0b"
+    },
+    {
+      "name": "register_active_environment-v3.py",
+      "size": 3804,
+      "sha256": "8c0f725003e34bf6f04aca0d771ad7f708495d3e1a70b4db017db0234fd116e3"
+    },
+    {
+      "name": "results-v3.json",
+      "size": 3094,
+      "sha256": "7d0326ab2efc6ffb0d7743a37d15f7514faf61b22f81aadcaa47d9a4313da261"
+    },
+    {
+      "name": "results-v4.json",
+      "size": 9363,
+      "sha256": "e254f2a10ff6d7527ef353b33252bac2cbc28cce01996241120287916a5d3579"
+    },
+    {
+      "name": "results-v5.json",
+      "size": 107325,
+      "sha256": "d68c187a37d9ce14da944fb2d98a1af6ab73304553b645b35aed69123373633f"
+    },
+    {
+      "name": "results-v6.json",
+      "size": 223737,
+      "sha256": "764db261000807f35389baf14f61aa1cc08c1cf26610ac5a905d80beaac5453b"
+    },
+    {
+      "name": "run_matrix-v1.py",
+      "size": 12186,
+      "sha256": "1ad046ea34d32be53b5a006d02932c10c498a672aaef09f8b925020b3560aad0"
+    },
+    {
+      "name": "run_matrix-v2.py",
+      "size": 12398,
+      "sha256": "e39671ebbb924e4365efe2981a32fe8ae70429e6536193c8af66f57108781199"
+    },
+    {
+      "name": "run_matrix-v3.py",
+      "size": 13032,
+      "sha256": "c3e2af0f6a2228ac7a7a9c5079f71e02b7b6adc7f08ac6a593e3c5265f2cee17"
+    },
+    {
+      "name": "run_matrix-v4.py",
+      "size": 12413,
+      "sha256": "8fe8e1314364cd20a82fa395235e29168346e4753a33cda8b8feea5028ec17ab"
+    },
+    {
+      "name": "run_matrix-v5.py",
+      "size": 12413,
+      "sha256": "b2ef177b8d9997db864ea67610cc9dfa4fb82b9171b5909596aeeda2820c268a"
+    },
+    {
+      "name": "run_matrix-v6.py",
+      "size": 12760,
+      "sha256": "b89d16544bf9b8e7eb6aca27f250ada2024cb30263a74aa1cc32de9cd896aeab"
+    },
+    {
+      "name": "source-equivalence-v4.json",
+      "size": 9720,
+      "sha256": "5540753c84ccc5ea8fb3619df6cff7780ddf4ca70dbaa272a7ba4c2f9123002f"
+    },
+    {
+      "name": "source-equivalence-v5.json",
+      "size": 9720,
+      "sha256": "fb233a2555f3e15272fb24844f80e0a322a670df63d22c6deca7574f2b9d1e38"
+    },
+    {
+      "name": "source-equivalence-v6.json",
+      "size": 10026,
+      "sha256": "413203bcb1eb8b03062d44d6dec79722377176f46df431f830215b1b4b29bba2"
+    },
+    {
+      "name": "source-equivalence.json",
+      "size": 9720,
+      "sha256": "a89261acf69745f04b1942dff1cdebc08c0f57bfe479c34709cf07d1feabb9c4"
+    },
+    {
+      "name": "source-manifest-v4.json",
+      "size": 8425,
+      "sha256": "bfd1134b306786fc7ab28255a97fdfb46d8d90fb040ef989cb90fc95d1e12db1"
+    },
+    {
+      "name": "source-manifest-v5.json",
+      "size": 8425,
+      "sha256": "fca4c18b48bd71da76c3d54a54e79e7278d402903d01c2e1df7743cc170cbe8b"
+    },
+    {
+      "name": "source-manifest-v6.json",
+      "size": 8727,
+      "sha256": "c3e7223723f68cc7ac0a93cdfd3797d4d0a54be22e7ad697cc50bce903589a62"
+    },
+    {
+      "name": "source-manifest.json",
+      "size": 8425,
+      "sha256": "fdf5759120ff51b9112ad4a471d5e78a768c0a47a97ea7739034ee170d83267e"
+    },
+    {
+      "name": "uwvm2-active-build-v6.log",
+      "size": 2665,
+      "sha256": "c55f57f6c2288273b50500a7d5cf2951f595460186d3456a4f1e1b7f47d8abcb"
+    },
+    {
+      "name": "uwvm2-active-generation2-instruction-v6.log",
+      "size": 967,
+      "sha256": "0f92c06a9d5de23754387fb156890bb8045150723883adec130d73705864b597"
+    },
+    {
+      "name": "uwvm2-active-generation2-unwind-v6.log",
+      "size": 967,
+      "sha256": "5862a985151231ed56c0b89e90ba27f3eea053a0da96aa3a98aa3f9eb408a75b"
+    },
+    {
+      "name": "uwvm2-checkpoint_actual_generation2_nested_continuation-assemble-v5.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-checkpoint_actual_generation2_nested_continuation-assemble-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-checkpoint_actual_generation2_nested_continuation-validate-v5.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-checkpoint_actual_generation2_nested_continuation-validate-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-checkpoint_actual_generation2_nested_replacement-assemble-v5.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-checkpoint_actual_generation2_nested_replacement-assemble-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-checkpoint_actual_generation2_nested_replacement-validate-v5.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-checkpoint_actual_generation2_nested_replacement-validate-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-core-build-v6.log",
+      "size": 2654,
+      "sha256": "2b2b1d586eef1ab4d55d646f3e12d552c68d4fd57fa8f01dcd178de2e8b2341c"
+    },
+    {
+      "name": "uwvm2-core-indirect-instruction-v6.log",
+      "size": 641,
+      "sha256": "afa71b483c0e260225d67b9d6874a1ab030645cdbf87e5925b60a7531d3fd80c"
+    },
+    {
+      "name": "uwvm2-core-indirect-unwind-v6.log",
+      "size": 636,
+      "sha256": "680e38fe8e66a6f49e8ae5656b126d88bb98671c566ba22d39a259e706b29040"
+    },
+    {
+      "name": "uwvm2-core-normal-instruction-v6.log",
+      "size": 641,
+      "sha256": "afa71b483c0e260225d67b9d6874a1ab030645cdbf87e5925b60a7531d3fd80c"
+    },
+    {
+      "name": "uwvm2-core-normal-unwind-v6.log",
+      "size": 636,
+      "sha256": "680e38fe8e66a6f49e8ae5656b126d88bb98671c566ba22d39a259e706b29040"
+    },
+    {
+      "name": "uwvm2-debug_checkpoint_indirect_retirement_cohort-assemble-v5.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_checkpoint_indirect_retirement_cohort-assemble-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_checkpoint_indirect_retirement_cohort-validate-v5.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_checkpoint_indirect_retirement_cohort-validate-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_checkpoint_retirement_cohort-assemble-v5.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_checkpoint_retirement_cohort-assemble-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_checkpoint_retirement_cohort-validate-v5.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_checkpoint_retirement_cohort-validate-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_checkpoint_worker_registry_reuse-assemble-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_checkpoint_worker_registry_reuse-validate-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_wasip1_checkpoint-assemble-v5.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_wasip1_checkpoint-assemble-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_wasip1_checkpoint-validate-v5.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_wasip1_checkpoint-validate-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_wasip1_indirect_prepared_retirement-assemble-v5.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_wasip1_indirect_prepared_retirement-assemble-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_wasip1_indirect_prepared_retirement-validate-v5.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-debug_wasip1_indirect_prepared_retirement-validate-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-freebsd-registry-frontend-v5.log",
+      "size": 2760,
+      "sha256": "b57a51d8a70dbd02e9c7efc43dd6431395d4f252ab9f44b3353e5bcfc8970a64"
+    },
+    {
+      "name": "uwvm2-freebsd-registry-frontend-v6.log",
+      "size": 2760,
+      "sha256": "07b5cf82cb4648f8425458ae2671955222f369a3f2e8e00910ad62e74b523149"
+    },
+    {
+      "name": "uwvm2-freebsd-runtime-frontend-v5.log",
+      "size": 4316,
+      "sha256": "69c110e1fb41944bfc04f31794b856cdb1c0a5929eaa6f3779e001e799df7235"
+    },
+    {
+      "name": "uwvm2-freebsd-runtime-frontend-v6.log",
+      "size": 4316,
+      "sha256": "0afd1afa8ade1a939581e3a283e42e7e2da5b7f68f022c0a3766e57be0597f4f"
+    },
+    {
+      "name": "uwvm2-host-api-compile-v5.log",
+      "size": 109,
+      "sha256": "0cf731748a3ccc5687b5794d42fa19cb32c7e51dd6efb3d8dc6c1a9385ffe9f0"
+    },
+    {
+      "name": "uwvm2-host-api-compile-v6.log",
+      "size": 109,
+      "sha256": "0cf731748a3ccc5687b5794d42fa19cb32c7e51dd6efb3d8dc6c1a9385ffe9f0"
+    },
+    {
+      "name": "uwvm2-linux-registry-frontend-v3.log",
+      "size": 5444,
+      "sha256": "101922c709be205525fe250928715aa36706d5b9db28abd4194beac84fd7c479"
+    },
+    {
+      "name": "uwvm2-linux-registry-frontend-v4.log",
+      "size": 2656,
+      "sha256": "b2c71c4b21483b4819c41ff955193d0c681987f410fa173a175cdeb76a12237f"
+    },
+    {
+      "name": "uwvm2-linux-registry-frontend-v5.log",
+      "size": 2656,
+      "sha256": "34f25de906c646f154b211c6b2fdb84192a36ae79571a55682f49e19e518ee0b"
+    },
+    {
+      "name": "uwvm2-linux-registry-frontend-v6.log",
+      "size": 2656,
+      "sha256": "91d1bd3a215bbd1bf82ee2d0c5316ad8283ee14604a06e1273d1f55f334610e6"
+    },
+    {
+      "name": "uwvm2-linux-runtime-frontend-v4.log",
+      "size": 4212,
+      "sha256": "e57bb9a0093cb26ceee0132dbb1c1ac7a437dcc497c70e89c84256d0bdb33d30"
+    },
+    {
+      "name": "uwvm2-linux-runtime-frontend-v5.log",
       "size": 4212,
       "sha256": "90da8b5e25bc1d23133dc97846643fde1598233b0aacc478f668ab438c3eaa46"
     },
-    "uwvm2-ros-checkpoint_actual_generation2_nested_replacement-assemble-v6.log": {
+    {
+      "name": "uwvm2-linux-runtime-frontend-v6.log",
+      "size": 4212,
+      "sha256": "ab03179b2c8c7b2a46b3d200396b88155eb40733890c00925d2c8bd7e11bb8b8"
+    },
+    {
+      "name": "uwvm2-macos-registry-frontend-v5.log",
+      "size": 2656,
+      "sha256": "34f25de906c646f154b211c6b2fdb84192a36ae79571a55682f49e19e518ee0b"
+    },
+    {
+      "name": "uwvm2-macos-registry-frontend-v6.log",
+      "size": 2656,
+      "sha256": "91d1bd3a215bbd1bf82ee2d0c5316ad8283ee14604a06e1273d1f55f334610e6"
+    },
+    {
+      "name": "uwvm2-macos-runtime-frontend-v5.log",
+      "size": 4212,
+      "sha256": "90da8b5e25bc1d23133dc97846643fde1598233b0aacc478f668ab438c3eaa46"
+    },
+    {
+      "name": "uwvm2-macos-runtime-frontend-v6.log",
+      "size": 4212,
+      "sha256": "ab03179b2c8c7b2a46b3d200396b88155eb40733890c00925d2c8bd7e11bb8b8"
+    },
+    {
+      "name": "uwvm2-pre-fix-registry-build-v5.log",
+      "size": 2656,
+      "sha256": "34f25de906c646f154b211c6b2fdb84192a36ae79571a55682f49e19e518ee0b"
+    },
+    {
+      "name": "uwvm2-pre-fix-registry-build-v6.log",
+      "size": 2656,
+      "sha256": "91d1bd3a215bbd1bf82ee2d0c5316ad8283ee14604a06e1273d1f55f334610e6"
+    },
+    {
+      "name": "uwvm2-pre-fix-registry-reproduction-v5.log",
+      "size": 133,
+      "sha256": "b3854578b92e360332b7323ce438c86e6f8a455e1bccd02a5f3e1ce2c7c2b515"
+    },
+    {
+      "name": "uwvm2-pre-fix-registry-reproduction-v6.log",
+      "size": 133,
+      "sha256": "b3854578b92e360332b7323ce438c86e6f8a455e1bccd02a5f3e1ce2c7c2b515"
+    },
+    {
+      "name": "uwvm2-pre-fix-runtime-compile-v5.log",
+      "size": 4226,
+      "sha256": "77d84b5395d028c668b5a961f57e4064933b59e8640e8ae60207e10d028b3a18"
+    },
+    {
+      "name": "uwvm2-pre-fix-runtime-compile-v6.log",
+      "size": 4226,
+      "sha256": "855df90574ceaf636214388f26db4973f7e2c1484aa4042e151c2e3732deea94"
+    },
+    {
+      "name": "uwvm2-registry-build-v5.log",
+      "size": 2656,
+      "sha256": "34f25de906c646f154b211c6b2fdb84192a36ae79571a55682f49e19e518ee0b"
+    },
+    {
+      "name": "uwvm2-registry-build-v6.log",
+      "size": 2656,
+      "sha256": "91d1bd3a215bbd1bf82ee2d0c5316ad8283ee14604a06e1273d1f55f334610e6"
+    },
+    {
+      "name": "uwvm2-registry-normal-instruction-v5.log",
+      "size": 72,
+      "sha256": "b7227a749a9efd551d8e50060c688d4357b16bd139a52814eb093f54bf50ae1c"
+    },
+    {
+      "name": "uwvm2-registry-normal-instruction-v6.log",
+      "size": 387,
+      "sha256": "98b11bcc5140590bb852514773f144b27784a60f5fb8abf8c9d8bcf1dc1aac52"
+    },
+    {
+      "name": "uwvm2-registry-normal-unwind-v6.log",
+      "size": 382,
+      "sha256": "b0eec958c1e8773a01eaee9e579a313ed6e161249e28614b94e58d3525b8497a"
+    },
+    {
+      "name": "uwvm2-ros-active-build-v6.log",
+      "size": 2697,
+      "sha256": "53696f61823e122427305212efa0ea7153bd945546359a0931087afe072881db"
+    },
+    {
+      "name": "uwvm2-ros-active-generation2-instruction-v6.log",
+      "size": 967,
+      "sha256": "8cfca811522a7c61886957ae1d838c182acdfecf299141926c39320cfaee36e3"
+    },
+    {
+      "name": "uwvm2-ros-active-generation2-unwind-v6.log",
+      "size": 967,
+      "sha256": "c3b51a904a4b24e211050d2543a618d0aa3c259ff5ffb2cf727e5297872708e6"
+    },
+    {
+      "name": "uwvm2-ros-checkpoint_actual_generation2_nested_continuation-assemble-v6.log",
       "size": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
-    "uwvm2-debug_wasip1_checkpoint-validate-v5.log": {
+    {
+      "name": "uwvm2-ros-checkpoint_actual_generation2_nested_continuation-validate-v6.log",
       "size": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
-    "uwvm2-wasip1-normal-unwind-v6.log": {
+    {
+      "name": "uwvm2-ros-checkpoint_actual_generation2_nested_replacement-assemble-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-ros-checkpoint_actual_generation2_nested_replacement-validate-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-ros-core-build-v6.log",
+      "size": 2686,
+      "sha256": "8b3130caac94a6bc56f6dd672beffbdc59ea43bc9a75175d4b73d7167a4c7c64"
+    },
+    {
+      "name": "uwvm2-ros-core-indirect-instruction-v6.log",
+      "size": 641,
+      "sha256": "afa71b483c0e260225d67b9d6874a1ab030645cdbf87e5925b60a7531d3fd80c"
+    },
+    {
+      "name": "uwvm2-ros-core-indirect-unwind-v6.log",
+      "size": 636,
+      "sha256": "680e38fe8e66a6f49e8ae5656b126d88bb98671c566ba22d39a259e706b29040"
+    },
+    {
+      "name": "uwvm2-ros-core-normal-instruction-v6.log",
+      "size": 641,
+      "sha256": "afa71b483c0e260225d67b9d6874a1ab030645cdbf87e5925b60a7531d3fd80c"
+    },
+    {
+      "name": "uwvm2-ros-core-normal-unwind-v6.log",
+      "size": 636,
+      "sha256": "680e38fe8e66a6f49e8ae5656b126d88bb98671c566ba22d39a259e706b29040"
+    },
+    {
+      "name": "uwvm2-ros-debug_checkpoint_indirect_retirement_cohort-assemble-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-ros-debug_checkpoint_indirect_retirement_cohort-validate-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-ros-debug_checkpoint_retirement_cohort-assemble-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-ros-debug_checkpoint_retirement_cohort-validate-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-ros-debug_checkpoint_worker_registry_reuse-assemble-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-ros-debug_checkpoint_worker_registry_reuse-validate-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-ros-debug_wasip1_checkpoint-assemble-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-ros-debug_wasip1_checkpoint-validate-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-ros-debug_wasip1_indirect_prepared_retirement-assemble-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-ros-debug_wasip1_indirect_prepared_retirement-validate-v6.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "uwvm2-ros-freebsd-registry-frontend-v5.log",
+      "size": 2792,
+      "sha256": "b4013dd12e87eb26eda9d752c5926350f6fd0fc58fd43b3676ff3a56f13d1c40"
+    },
+    {
+      "name": "uwvm2-ros-freebsd-registry-frontend-v6.log",
+      "size": 2792,
+      "sha256": "df0b768e7d597bed87f4aadd87f6161cc6078886cd1e2fc937f455bc233a064c"
+    },
+    {
+      "name": "uwvm2-ros-freebsd-runtime-frontend-v5.log",
+      "size": 3018,
+      "sha256": "d63121b184ae3ab1f23c78393cad7825764691deddd43383ed3080f9a3a0cd65"
+    },
+    {
+      "name": "uwvm2-ros-freebsd-runtime-frontend-v6.log",
+      "size": 3018,
+      "sha256": "e9ae70c271138f8b63b12e0bc8de0892c3b5d59f9cbdf61cd8f4d83c24daf4f0"
+    },
+    {
+      "name": "uwvm2-ros-host-api-compile-v6.log",
+      "size": 109,
+      "sha256": "0cf731748a3ccc5687b5794d42fa19cb32c7e51dd6efb3d8dc6c1a9385ffe9f0"
+    },
+    {
+      "name": "uwvm2-ros-linux-registry-frontend-v5.log",
+      "size": 2688,
+      "sha256": "8549421f8036f14b0aa0cafca65bca3c99a7fa0df438b240af46c52378c4b5e3"
+    },
+    {
+      "name": "uwvm2-ros-linux-registry-frontend-v6.log",
+      "size": 2688,
+      "sha256": "5dd3d467940bc4a3b6d2d3a4776f46b58eebc2443d5a7e143423f8bba45af2b0"
+    },
+    {
+      "name": "uwvm2-ros-linux-runtime-frontend-v5.log",
+      "size": 2914,
+      "sha256": "f68daf9d6fe0a74680a39c7bc6eed22051f14801459b22ad9360a09c2bafca03"
+    },
+    {
+      "name": "uwvm2-ros-linux-runtime-frontend-v6.log",
+      "size": 2914,
+      "sha256": "b47ddc832aaef947dfdfb0c1e70edebaab503d3eca82326543aa431f6efc5d6a"
+    },
+    {
+      "name": "uwvm2-ros-macos-registry-frontend-v5.log",
+      "size": 2688,
+      "sha256": "8549421f8036f14b0aa0cafca65bca3c99a7fa0df438b240af46c52378c4b5e3"
+    },
+    {
+      "name": "uwvm2-ros-macos-registry-frontend-v6.log",
+      "size": 2688,
+      "sha256": "5dd3d467940bc4a3b6d2d3a4776f46b58eebc2443d5a7e143423f8bba45af2b0"
+    },
+    {
+      "name": "uwvm2-ros-macos-runtime-frontend-v5.log",
+      "size": 2914,
+      "sha256": "f68daf9d6fe0a74680a39c7bc6eed22051f14801459b22ad9360a09c2bafca03"
+    },
+    {
+      "name": "uwvm2-ros-macos-runtime-frontend-v6.log",
+      "size": 2914,
+      "sha256": "b47ddc832aaef947dfdfb0c1e70edebaab503d3eca82326543aa431f6efc5d6a"
+    },
+    {
+      "name": "uwvm2-ros-registry-build-v6.log",
+      "size": 2688,
+      "sha256": "5dd3d467940bc4a3b6d2d3a4776f46b58eebc2443d5a7e143423f8bba45af2b0"
+    },
+    {
+      "name": "uwvm2-ros-registry-normal-instruction-v6.log",
+      "size": 387,
+      "sha256": "98b11bcc5140590bb852514773f144b27784a60f5fb8abf8c9d8bcf1dc1aac52"
+    },
+    {
+      "name": "uwvm2-ros-registry-normal-unwind-v6.log",
+      "size": 382,
+      "sha256": "b0eec958c1e8773a01eaee9e579a313ed6e161249e28614b94e58d3525b8497a"
+    },
+    {
+      "name": "uwvm2-ros-runtime-compile-v6.log",
+      "size": 2914,
+      "sha256": "b47ddc832aaef947dfdfb0c1e70edebaab503d3eca82326543aa431f6efc5d6a"
+    },
+    {
+      "name": "uwvm2-ros-wasip1-build-v6.log",
+      "size": 2682,
+      "sha256": "8cee0e1fa0e369b0e3fbc82dc0a14753e76146861644c1eae9510afb976a6d5d"
+    },
+    {
+      "name": "uwvm2-ros-wasip1-indirect-instruction-v6.log",
+      "size": 280,
+      "sha256": "dd070d83ba9b95814b63700d9749b6f1797040b01e768eef0c6f70bceaee32d1"
+    },
+    {
+      "name": "uwvm2-ros-wasip1-indirect-unwind-v6.log",
+      "size": 275,
+      "sha256": "4a37bea375e8d7e98b347ee8a1a19bbbf7c0d05f6f588403a9dc91d6a95c5c26"
+    },
+    {
+      "name": "uwvm2-ros-wasip1-normal-instruction-v6.log",
+      "size": 280,
+      "sha256": "4dfb2463832990aeab54cefbefaa66584a36ee73fe35126ff56d75aa10511961"
+    },
+    {
+      "name": "uwvm2-ros-wasip1-normal-unwind-v6.log",
       "size": 275,
       "sha256": "43c7af94453ec4603ef661a6ef93e3bd5852f84f795de6ee5b0a75aad960caf5"
     },
-    "guard_matrix-v5.py": {
-      "size": 8705,
-      "sha256": "004adc5a1533a97945c7c6a629c1e0e914723cb12648e60daef5cfa33d115eaa"
+    {
+      "name": "uwvm2-ros-windows-registry-frontend-v5.log",
+      "size": 3002,
+      "sha256": "64183d03fa769d27e80e7669f67920d8fb9e56e9fcde06aba5d3924f89d2e504"
+    },
+    {
+      "name": "uwvm2-ros-windows-registry-frontend-v6.log",
+      "size": 3002,
+      "sha256": "77a49346010d62de456377c165a134a13b07fa709b2af8fafd121bafd1fb6cab"
+    },
+    {
+      "name": "uwvm2-ros-windows-runtime-frontend-v5.log",
+      "size": 3228,
+      "sha256": "88d2caa8add9f036db88025e21f23c503f20aba733f3e8e4348872f16818fb4e"
+    },
+    {
+      "name": "uwvm2-ros-windows-runtime-frontend-v6.log",
+      "size": 3228,
+      "sha256": "2f5991fbaefadf7b6a534b675184f8d7a8be47848a95a3088ff7436c98463b55"
+    },
+    {
+      "name": "uwvm2-runtime-compile-v5.log",
+      "size": 4212,
+      "sha256": "90da8b5e25bc1d23133dc97846643fde1598233b0aacc478f668ab438c3eaa46"
+    },
+    {
+      "name": "uwvm2-runtime-compile-v6.log",
+      "size": 4212,
+      "sha256": "ab03179b2c8c7b2a46b3d200396b88155eb40733890c00925d2c8bd7e11bb8b8"
+    },
+    {
+      "name": "uwvm2-wasip1-build-v6.log",
+      "size": 2650,
+      "sha256": "3290ccae9c87cbc385e4701bb7af35d0e0545a9312d59ed38605cb0ec4993882"
+    },
+    {
+      "name": "uwvm2-wasip1-indirect-instruction-v6.log",
+      "size": 280,
+      "sha256": "dd070d83ba9b95814b63700d9749b6f1797040b01e768eef0c6f70bceaee32d1"
+    },
+    {
+      "name": "uwvm2-wasip1-indirect-unwind-v6.log",
+      "size": 275,
+      "sha256": "4a37bea375e8d7e98b347ee8a1a19bbbf7c0d05f6f588403a9dc91d6a95c5c26"
+    },
+    {
+      "name": "uwvm2-wasip1-normal-instruction-v6.log",
+      "size": 280,
+      "sha256": "4dfb2463832990aeab54cefbefaa66584a36ee73fe35126ff56d75aa10511961"
+    },
+    {
+      "name": "uwvm2-wasip1-normal-unwind-v6.log",
+      "size": 275,
+      "sha256": "43c7af94453ec4603ef661a6ef93e3bd5852f84f795de6ee5b0a75aad960caf5"
+    },
+    {
+      "name": "uwvm2-windows-registry-frontend-v4.log",
+      "size": 2970,
+      "sha256": "fb96725d7db4012691e9e21a18f7d7b92f5adf9939c565734eeaf8af7371d645"
+    },
+    {
+      "name": "uwvm2-windows-registry-frontend-v5.log",
+      "size": 2970,
+      "sha256": "9aeb989e49aa21404033637d66f7ba9f2c4d04153953647f56514b274fc544c7"
+    },
+    {
+      "name": "uwvm2-windows-registry-frontend-v6.log",
+      "size": 2970,
+      "sha256": "c59723f7de559a54b7c1b204a6cbcf32e8db45bd625cb5d5128d15e7c41f2670"
+    },
+    {
+      "name": "uwvm2-windows-runtime-frontend-v4.log",
+      "size": 423,
+      "sha256": "da3b17875139c05d573f10a0bec08fd330ee40e3c48e6536902736e548273ea9"
+    },
+    {
+      "name": "uwvm2-windows-runtime-frontend-v5.log",
+      "size": 4526,
+      "sha256": "996cc81cbb20585494d3a1574c60b0c3b56ba962f9746737b3908c4a4e064464"
+    },
+    {
+      "name": "uwvm2-windows-runtime-frontend-v6.log",
+      "size": 4526,
+      "sha256": "47105ef3e6b9cd827cf76f96a177a47ed4ff751764fdc5a35e12591c4fced743"
+    },
+    {
+      "name": "v4-interrupted-projection-cleanup.json",
+      "size": 191586,
+      "sha256": "b84a9e4fd4ff2e80c784af2fd1e929319f9c70a200fa2f943a8b2082113720ba"
+    },
+    {
+      "name": "v5-interrupted-projection-cleanup.json",
+      "size": 191594,
+      "sha256": "6aa63ceb0a16e74e8f77539a58db2eaa8a119034a4a3b04af05b9e01768c51d1"
+    },
+    {
+      "name": "wasip1_worker_registry_r41_test_report.json",
+      "size": 341488,
+      "sha256": "792a3b81357803bd5bfafeade06ff124a1d67e891917a7fa14e9bdac0e242594"
+    },
+    {
+      "name": "wasip1_worker_registry_r41_test_report.md",
+      "size": 3447,
+      "sha256": "1d5f2760740338b4011d785e84a7c5445ed94f5b05744022a2302b64e32e222d"
+    },
+    {
+      "name": "write_report_and_evidence-v1.py",
+      "size": 8449,
+      "sha256": "87fc18f73e6dc63b5f88a32e5f49fd13e75dfabbf31271826b1d22edf16466c8"
+    },
+    {
+      "name": "write_report_and_evidence-v2.py",
+      "size": 8600,
+      "sha256": "16cd75efc2dbe45882f7313a430d1f258af78c41932e0f5cebbdad011f06ea95"
     }
-  }
+  ]
 }

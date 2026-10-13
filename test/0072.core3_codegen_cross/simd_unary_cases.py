@@ -22,7 +22,7 @@ def cases():
                    ieee.infinity | ieee.quiet | 17,
                    (ieee.bias - 1) << ieee.frac | 1,
                    ieee.sign | (((ieee.bias - 1) << ieee.frac) | 1)]
-        for operation in ('abs', 'neg', 'ceil', 'floor', 'trunc'):
+        for operation in ('abs', 'neg', 'ceil', 'floor', 'trunc', 'nearest'):
             checks = []
             for index in range(len(values)):
                 bits = [values[(index + lane) % len(values)] for lane in range(lanes)]

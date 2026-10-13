@@ -50,6 +50,24 @@ int main()
         command.disassembly_resolve_symbols = resolve;
         return dbg::details::format_reply(reply, command);
     };
+    // A generated safepoint bridge is still inside the owned JIT function.
+    // Display permission does not turn that row into a Wasm breakpoint site.
+    struct copied_image
+    {
+        ::std::uintptr_t owner_begin{0x1000u}, owner_end{0x1008u};
+        ::std::size_t size{8u};
+        ::std::array<::std::uint8_t, 8u> bytes{0x90u,0x90u,0x90u,0x90u,0x90u,0x90u,0x90u,0x90u};
+        ::std::array<::std::uint8_t, 8u> guest_code{};
+    } image;
+    auto bridge{decode(image.bytes)};
+    check(!dbg::native_branch_display::project(image,display,semantics,bridge), "default projection requires exact Wasm provenance");
+    check(static_cast<bool>(dbg::native_branch_display::project(image,display,semantics,bridge,true)), "owned generated bridge can be displayed");
+    auto mismatched{bridge};mismatched.bytes[0]=0xccu;
+    check(!dbg::native_branch_display::project(image,display,semantics,mismatched,true), "bridge bytes must match owner copy");
+    mismatched=bridge;mismatched.pc=image.owner_end;
+    check(!dbg::native_branch_display::project(image,display,semantics,mismatched,true), "bridge display excludes owner end");
+    image.bytes={0xe9u,0xffu,0xffu,0x7fu,0u,0x90u,0x90u,0x90u};
+    check(static_cast<bool>(dbg::native_branch_display::project(image,display,semantics,decode(image.bytes),true)), "owned branch bytes display without reading their external target");
     ::std::array<::std::uint8_t, 2u> conditional{0x75u, 0x02u};
     auto instruction{decode(conditional)};
     auto annotation{dbg::native_branch_display::decode(semantics, instruction)};

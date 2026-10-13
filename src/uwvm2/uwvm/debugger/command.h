@@ -17,6 +17,7 @@
 # include "wasm_mutation.h"
 # include "wasm_path.h"
 # include "wasip1_state.h"
+# include "console_help_catalog.h"
 #endif
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
@@ -26,13 +27,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
     inline constexpr ::std::size_t max_command_bytes{512};
     inline constexpr ::std::size_t max_input_command_bytes{wasip1_state::maximum_command_bytes}; // Long input is restricted to WASIp1 text edits; raw memory remains <=1024.
     using command_text_view = ::fast_io::string_view;
-    enum class console_command_kind { protocol, source_step, source_breakpoint, source_locals, assembly_step, replacement_file, help, quit, unsupported, invalid, empty, assembly_disassemble, assembly_disassemble_range, wasm_event, wasm_script, assembly_registers, source_type, source_value, assembly_next, source_frame, wasm_state, wasip1_state, wasm_path, wasm_mutation, wasm_step, breakpoint_control, assembly_finish };
+    enum class console_command_kind { assembly_breakpoint, module_list, protocol, source_step, source_breakpoint, source_locals, assembly_step, replacement_file, help, quit, unsupported, invalid, empty, assembly_disassemble, assembly_disassemble_range, wasm_event, wasm_script, assembly_registers, source_type, source_value, assembly_next, source_frame, wasm_state, wasip1_state, wasm_path, wasm_mutation, wasm_step, breakpoint_control, assembly_finish, execution_relocate };
     enum class unavailable_step_level { none, source, assembly };
     enum class source_step_policy { into, over, out };
     enum class source_run_to_policy { none, until, advance };
     enum class wasm_step_policy { into, over, out };
     enum class source_frame_action { list, show, select, up, down };
     enum class breakpoint_action { enable, disable, ignore, condition };
+    enum class console_launch_action { none, run, start, start_wasm, start_instruction, kill };
+    enum class relocation_level { source, wasm, assembly };
     struct console_command
     {
         console_command_kind kind{console_command_kind::invalid};
@@ -43,9 +46,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         ::fast_io::array<char, max_command_bytes> replacement_path{};
         ::std::size_t replacement_path_size{};
         ::std::uint64_t source_module{}, source_line{};
+        ::std::uint64_t module_help_page{1u}; // Host metadata page, never a runtime operation.
         ::fast_io::array<char, max_command_bytes> source_path{};
         ::std::size_t source_path_size{};
         bool wait_for_event{}; // Host observation using an authenticated status request.
+        bool run_from_entry{}; // Standalone launcher request; never a wire resume/restart capability.
+        console_launch_action launch_action{}; // HOST CLI only; controller/transport cannot execute it.
+        ::fast_io::array<char, console_help::maximum_selector_bytes> help_topic{};
+        ::std::size_t help_topic_size{}; // Owned host documentation selector; no guest authority.
         unavailable_step_level unavailable_step{unavailable_step_level::none};
         source_step_policy source_policy{source_step_policy::into};
         wasm_step_policy wasm_policy{wasm_step_policy::into};
@@ -53,6 +61,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         // source frame; ordinary source out/DAP stepOut targets current execution.
         // This DATA flag grants no capture, read, frame or resume capability.
         bool source_selected_finish{};
+        // Human CLI display preferences only; never capture/read credentials.
+        bool concise_source_locals{}, concise_backtrace{};
         source_run_to_policy source_run_to{}; // bounded host scheduling DATA, not a frame credential.
         ::std::uint64_t requested_step_thread{};
         ::std::uint64_t disassembly_stop_identifier{}, disassembly_count{};
@@ -74,10 +84,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         bool frame_page_explicit{}, wasm_frames{};
         breakpoint_action breakpoint_policy{};
         ::std::uint64_t breakpoint_id{}, breakpoint_ignore{};
+        ::std::uint64_t native_breakpoint_offset{}; // Function-relative DATA, never a host address.
+        bool breakpoint_source_display{}; // Display provenance only; does not affect breakpoint admission.
         bool breakpoint_initial_ignore{}; // Installed under the same lock as a new breakpoint.
         bool breakpoint_initial_condition{};
         ::fast_io::array<char, 256u> breakpoint_condition{};
         ::std::size_t breakpoint_condition_size{};
+        relocation_level relocation{};
+        ::std::uint64_t relocation_target{};
+        bool relocation_absolute{};
         bool source_frame_explicit{}; // per-request ordinal, never activation/read authority.
     };
     [[nodiscard]] inline constexpr ::fast_io::string_view unsupported_step_message(console_command const& command) noexcept
@@ -94,6 +109,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
     }
     namespace details
     {
+        // These offsets refer only to bounded HOST input. Consume separators
+        // between command words; never rewrite an opaque path or expression.
+        [[nodiscard]] constexpr ::std::size_t skip_command_space(::fast_io::string_view text, ::std::size_t cursor) noexcept
+        { while(cursor < text.size() && ::fast_io::char_category::c_space::char_is(text[cursor])) { ++cursor; } return cursor; }
+        [[nodiscard]] constexpr ::std::size_t command_word_end(::fast_io::string_view text, ::std::size_t cursor) noexcept
+        { while(cursor < text.size() && !::fast_io::char_category::c_space::char_is(text[cursor])) { ++cursor; } return cursor; }
+        [[nodiscard]] constexpr ::std::size_t command_prefix_end(::fast_io::string_view text, ::fast_io::string_view prefix) noexcept
+        {
+            ::std::size_t cursor{}, word{};
+            while((word = skip_command_space(prefix, word)) < prefix.size())
+            {
+                cursor = skip_command_space(text, cursor);
+                auto const end{command_word_end(text, cursor)}, expected{command_word_end(prefix, word)};
+                if(text.subview(cursor, end - cursor) != prefix.subview(word, expected - word)) { return ::fast_io::containers::npos; }
+                cursor = end; word = expected;
+            }
+            return skip_command_space(text, cursor);
+        }
+        struct command_keyword { ::std::size_t before{}, after{}; bool found{}; };
+        [[nodiscard]] constexpr command_keyword find_command_keyword(::fast_io::string_view text, ::fast_io::string_view keyword, bool last = false) noexcept
+        {
+            command_keyword result{}; ::std::size_t cursor{};
+            while(cursor < text.size())
+            {
+                auto const before{cursor}; cursor = skip_command_space(text, cursor);
+                auto const end{command_word_end(text, cursor)};
+                if(cursor != before && end < text.size() && text.subview(cursor, end - cursor) == keyword)
+                { result = {before, skip_command_space(text, end), true}; if(!last) { return result; } }
+                cursor = end;
+            }
+            return result;
+        }
         [[nodiscard]] constexpr bool parse_decimal(::fast_io::string_view text, ::std::uint64_t& value) noexcept
         {
             if(text.empty()) { return false; }
@@ -125,15 +172,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
     [[nodiscard]] inline constexpr console_command parse_console_command(::fast_io::string_view line, bool allow_initial_ignore = true, bool allow_initial_condition = true) noexcept
     {
         if(line.size()>max_input_command_bytes) { return {}; }
-        if(allow_initial_condition && line.size() <= max_command_bytes && (line.starts_with("break ") || line.starts_with("break-source ")))
+        line = line.subview(details::skip_command_space(line, 0u));
+        auto const head_end{details::command_word_end(line, 0u)};
+        auto const head{line.subview(0u, head_end)};
+        bool const breakpoint_head{head == "breakwasm" || head == "bw" || head == "breaksource" || head == "bs"};
+        if(allow_initial_condition && line.size() <= max_command_bytes && breakpoint_head)
         {
-            constexpr ::fast_io::string_view marker{" if "};
-            auto const at{line.rfind(marker)};
-            if(at != ::fast_io::containers::npos)
+            auto const marker{details::find_command_keyword(line, "if", true)};
+            if(marker.found)
             {
-                auto const expression{line.subview(at+marker.size())};
+                auto const expression{line.subview(marker.after)};
                 if(expression.empty() || expression.size() > 256u) { return {}; }
-                auto result{parse_console_command(line.subview(0u,at),allow_initial_ignore,false)};
+                auto result{parse_console_command(line.subview(0u,marker.before),allow_initial_ignore,false)};
                 if(result.operation != ::uwvm2::utils::control::operation::breakpoint_set ||
                    (result.kind != console_command_kind::protocol && result.kind != console_command_kind::source_breakpoint)) { return {}; }
                 result.breakpoint_initial_condition = true; result.breakpoint_condition_size = expression.size();
@@ -141,15 +191,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 return result;
             }
         }
-        if(line.starts_with("condition "))
+        if(head == "condition")
         {
-            auto tail{line.subview(10u)};
-            while(!tail.empty() && tail.front() == ' ') { tail = tail.subview(1u); }
-            ::std::size_t split{}; while(split != tail.size() && tail[split] != ' ') { ++split; }
+            auto const tail{line.subview(details::skip_command_space(line, head_end))};
+            auto const split{details::command_word_end(tail, 0u)};
             console_command result{};
             if(!details::parse_decimal(tail.subview(0u,split),result.breakpoint_id) || result.breakpoint_id == 0u) { return {}; }
-            auto expression{tail.subview(split)};
-            while(!expression.empty() && expression.front() == ' ') { expression = expression.subview(1u); }
+            auto const expression{tail.subview(details::skip_command_space(tail, split))};
             if(expression.size() > result.breakpoint_condition.size()) { return {}; }
             result.kind = console_command_kind::breakpoint_control;
             result.operation = ::uwvm2::utils::control::operation::status;
@@ -158,13 +206,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             for(::std::size_t i{}; i != expression.size(); ++i) { result.breakpoint_condition[i] = expression[i]; }
             return result;
         }
-        if(allow_initial_ignore && line.size() <= max_command_bytes && (line.starts_with("break ") || line.starts_with("break-source ")))
+        if(allow_initial_ignore && line.size() <= max_command_bytes && breakpoint_head)
         {
-            constexpr ::fast_io::string_view marker{" ignore "};
-            auto const at{line.rfind(marker)}; ::std::uint64_t count{};
-            if(at != ::fast_io::containers::npos && details::parse_decimal(line.subview(at+marker.size()),count))
+            auto const marker{details::find_command_keyword(line, "ignore", true)}; ::std::uint64_t count{};
+            auto const end{details::command_word_end(line, marker.after)};
+            if(marker.found && details::skip_command_space(line, end) == line.size() &&
+               details::parse_decimal(line.subview(marker.after, end - marker.after),count))
             {
-                auto result{parse_console_command(line.subview(0u,at),false,false)};
+                auto result{parse_console_command(line.subview(0u,marker.before),false,false)};
                 if(result.operation != ::uwvm2::utils::control::operation::breakpoint_set ||
                    (result.kind != console_command_kind::protocol && result.kind != console_command_kind::source_breakpoint)) { return {}; }
                 result.breakpoint_initial_ignore = true; result.breakpoint_ignore = count; return result;
@@ -174,8 +223,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         {
             constexpr ::fast_io::string_view raw_memory_prefix{"set wasm memory "};
             constexpr ::fast_io::string_view wasip1_prefix{"set wasip1 "};
-            bool const wasip1{line.size() >= wasip1_prefix.size() && line.subview(0u, wasip1_prefix.size()) == wasip1_prefix};
-            bool const memory{line.size() <= 1024u && line.size() >= raw_memory_prefix.size() && line.subview(0u, raw_memory_prefix.size()) == raw_memory_prefix};
+            bool const wasip1{details::command_prefix_end(line, wasip1_prefix) != ::fast_io::containers::npos};
+            bool const memory{line.size() <= 1024u && details::command_prefix_end(line, raw_memory_prefix) != ::fast_io::containers::npos};
             if(!wasip1 && !memory) { return {}; }
         }
         // WASIp1 is a separate host-environment debugger level. The parser owns
@@ -184,19 +233,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         // by the runtime before reading or changing any selected environment.
         for(auto prefix : ::fast_io::array<::fast_io::string_view, 4u>{"info wasip1 ", "set wasip1 ", "unset wasip1 ", "trace wasip1 "})
         {
-            if(line.size() >= prefix.size() && line.subview(0u, prefix.size()) == prefix)
+            if(details::command_prefix_end(line, prefix) != ::fast_io::containers::npos)
             {
                 console_command result{console_command_kind::wasip1_state};
                 // Optional stop selector is DATA checked under the controller
                 // lock immediately before the ordinary coherent admission.
                 auto selected{line};
-                constexpr ::fast_io::string_view guard{" if-stop "};
-                auto const marker{line.find(guard)};
-                if(marker != ::fast_io::containers::npos)
+                auto const marker{details::find_command_keyword(line, "if-stop")};
+                if(marker.found)
                 {
-                    if(!details::parse_decimal(line.subview(marker + guard.size()), result.disassembly_stop_identifier) ||
+                    auto const end{details::command_word_end(line, marker.after)};
+                    if(details::skip_command_space(line, end) != line.size() ||
+                       !details::parse_decimal(line.subview(marker.after, end - marker.after), result.disassembly_stop_identifier) ||
                        result.disassembly_stop_identifier == 0u) { return {}; }
-                    selected = line.subview(0u, marker);
+                    selected = line.subview(0u, marker.before);
                 }
                 if(!wasip1_state::parse(selected, result.wasip1_state_request) ||
                    (result.disassembly_stop_identifier != 0u && !wasip1_state::is_mutation(result.wasip1_state_request.operation))) { return {}; }
@@ -205,21 +255,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             }
         }
         constexpr ::fast_io::string_view mutation_prefix{"set wasm "};
-        if(line.size()>=mutation_prefix.size() && line.subview(0u,mutation_prefix.size())==mutation_prefix)
+        if(details::command_prefix_end(line, mutation_prefix) != ::fast_io::containers::npos)
         {
             console_command result{console_command_kind::wasm_mutation};
             if(!wasm_mutation::parse(line,result.wasm_mutation_request)) { return {}; }
             result.operation=::uwvm2::utils::control::operation::status;return result;
         }
         constexpr ::fast_io::string_view path_prefix{"path "};
-        if(line.size()>=path_prefix.size() && line.subview(0u,path_prefix.size())==path_prefix)
+        if(details::command_prefix_end(line, path_prefix) != ::fast_io::containers::npos)
         {
             ::fast_io::array<::fast_io::string_view,25u> tokens{};::std::size_t cursor{},count{};
             while(cursor<line.size())
             {
-                if(::fast_io::char_category::is_c_blank(line[cursor])) { ++cursor;continue; }
+                if(::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor;continue; }
                 auto const begin{cursor};
-                while(cursor<line.size() && !::fast_io::char_category::is_c_blank(line[cursor])) { ++cursor; }
+                while(cursor<line.size() && !::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor; }
                 if(count==tokens.size()) { return {}; }
                 tokens[count++]=line.subview(begin,cursor-begin); // bounded complete source range before subview.
             }
@@ -268,7 +318,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             if(!wasm_path::valid(query)) { return {}; }return result;
         }
         constexpr ::fast_io::string_view members_prefix{"members "};
-        if(line.size() >= members_prefix.size() && line.subview(0u, members_prefix.size()) == members_prefix)
+        if(details::command_prefix_end(line, members_prefix) != ::fast_io::containers::npos)
         {
             // Fixed root locus followed by at most16 ORIGINAL member indices.
             // Dense display object IDs and native tokens have no input syntax.
@@ -276,9 +326,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             ::std::size_t cursor{}, count{};
             while(cursor < line.size())
             {
-                if(::fast_io::char_category::is_c_blank(line[cursor])) { ++cursor; continue; }
+                if(::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor; continue; }
                 auto const begin{cursor};
-                while(cursor < line.size() && !::fast_io::char_category::is_c_blank(line[cursor])) { ++cursor; }
+                while(cursor < line.size() && !::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor; }
                 if(count == tokens.size()) { return {}; }
                 tokens[count++] = line.subview(begin, cursor - begin); // Both bounded integers before view formation.
             }
@@ -309,30 +359,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             return result;
         }
         constexpr ::fast_io::string_view script_prefix{"wasm-script "};
-        if(line.size() > script_prefix.size() && line.subview(0u, script_prefix.size()) == script_prefix)
+        auto const script_begin{details::command_prefix_end(line, script_prefix)};
+        if(script_begin != ::fast_io::containers::npos && script_begin < line.size())
         {
             console_command result{console_command_kind::wasm_script};
             result.operation = ::uwvm2::utils::control::operation::status;
-            result.script_size = line.size() - script_prefix.size();
+            result.script_size = line.size() - script_begin;
             for(::std::size_t index{}; index != result.script_size; ++index)
             {
                 // [bounded host command ... script prefix][script bytes] end
                 // [safe                                              ] unsafe (one-past)
                 //  ^^ source index < line.size(), destination < fixed command capacity.
-                result.script_text[index] = line[script_prefix.size() + index];
+                result.script_text[index] = line[script_begin + index];
             }
             return result;
         }
         // Source paths are opaque DWARF bytes and may contain spaces, non-ASCII
         // bytes, or a Windows drive colon. Parse from the final :LINE without
         // sending a path over UWC1 or opening a source file.
-        constexpr ::fast_io::string_view break_prefix{"break-source "}, until_prefix{"until "}, advance_prefix{"advance "};
-        bool const until{line.starts_with(until_prefix)}, advance{line.starts_with(advance_prefix)};
-        auto const source_prefix{until ? until_prefix : advance ? advance_prefix : break_prefix};
-        if(line.size() >= source_prefix.size() && line.subview(0u, source_prefix.size()) == source_prefix)
+        bool const until{head == "until"}, advance{head == "advance"};
+        if(until || advance || head == "bs" || head == "breaksource")
         {
-            ::std::size_t cursor{source_prefix.size()};
-            while(cursor < line.size() && line[cursor] == ' ')
+            while(!line.empty() && ::fast_io::char_category::c_space::char_is(line.back())) { line = line.subview(0u, line.size() - 1u); }
+            ::std::size_t cursor{head_end};
+            while(cursor < line.size() && ::fast_io::char_category::c_space::char_is(line[cursor]))
             {
                 // [bounded command bytes ...] command_end
                 // [safe                     ] unsafe (one-past)
@@ -340,7 +390,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 ++cursor;
             }
             auto const module_begin{cursor};
-            while(cursor < line.size() && line[cursor] != ' ')
+            while(cursor < line.size() && !::fast_io::char_category::c_space::char_is(line[cursor]))
             {
                 // [bounded command bytes ...] command_end
                 // [safe                     ] unsafe (one-past)
@@ -349,7 +399,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             }
             ::std::uint64_t module{};
             if(module_begin == cursor || !details::parse_decimal(line.subview(module_begin, cursor - module_begin), module)) { return {}; }
-            while(cursor < line.size() && line[cursor] == ' ')
+            while(cursor < line.size() && ::fast_io::char_category::c_space::char_is(line[cursor]))
             {
                 // [bounded command bytes ...] command_end
                 // [safe                     ] unsafe (one-past)
@@ -360,9 +410,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             if(until || advance)
             {
                 auto const stop_begin{cursor};
-                while(cursor < line.size() && line[cursor] != ' ') { ++cursor; }
+                while(cursor < line.size() && !::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor; }
                 if(module == 0u || !details::parse_decimal(line.subview(stop_begin,cursor-stop_begin),stop) || stop == 0u) { return {}; }
-                while(cursor < line.size() && line[cursor] == ' ') { ++cursor; }
+                while(cursor < line.size() && ::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor; }
             }
             auto const path_begin{cursor};
             ::std::size_t colon{line.size()};
@@ -410,7 +460,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         // Keep the complete expression, including whitespace. Optional numeric
         // THREAD STOP [FRAME] selectors remain launch/control metadata only.
         ::std::size_t name_end{};
-        while(name_end < line.size() && !::fast_io::char_category::is_c_space(line[name_end])) { ++name_end; }
+        while(name_end < line.size() && !::fast_io::char_category::c_space::char_is(line[name_end])) { ++name_end; }
         auto const expression_command{line.subview(0u, name_end)};
         if(expression_command == "print" || expression_command == "p" || expression_command == "source-value" ||
            expression_command == "ptype" || expression_command == "source-type" ||
@@ -421,10 +471,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 console_command_kind::source_type : console_command_kind::source_value};
             result.operation = ::uwvm2::utils::control::operation::locals;
             auto cursor{name_end}; auto const skip{[&]() noexcept
-            { while(cursor < line.size() && ::fast_io::char_category::is_c_space(line[cursor])) { ++cursor; } }};
+            { while(cursor < line.size() && ::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor; } }};
             skip(); auto expression_begin{cursor};
             auto const word{[&]() noexcept
-            { auto const begin{cursor}; while(cursor < line.size() && !::fast_io::char_category::is_c_space(line[cursor])) { ++cursor; }
+            { auto const begin{cursor}; while(cursor < line.size() && !::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor; }
               auto const token{line.subview(begin,cursor-begin)}; skip(); return token; }};
             ::std::uint64_t thread{},stop{};
             auto const first{word()}; auto const second{word()};
@@ -459,10 +509,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         ::std::size_t count{}, cursor{};
         while(cursor != line.size())
         {
-            if(::fast_io::char_category::is_c_blank(line[cursor]) || line[cursor] == '\r') { ++cursor; continue; }
+            if(::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor; continue; }
             if(count == words.size()) { return {}; }
             auto const begin{cursor};
-            while(cursor != line.size() && !::fast_io::char_category::is_c_blank(line[cursor]) && line[cursor] != '\r')
+            while(cursor != line.size() && !::fast_io::char_category::c_space::char_is(line[cursor]))
             {
                 auto const c{static_cast<unsigned char>(line[cursor])};
                 if(!::fast_io::char_category::is_c_graph(c)) { return {}; }
@@ -657,7 +707,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             }
             return result;
         }
-        if((name == "help" || name == "h") && count == 1u) { return {console_command_kind::help}; }
+        if(name == "help" || name == "h")
+        {
+            console_command help{console_command_kind::help};
+            for(::std::size_t i{1u}; i < count; ++i)
+            {
+                auto const needed{words[i].size() + (i == 1u ? 0u : 1u)};
+                if(needed > help.help_topic.size() - help.help_topic_size) { return {}; }
+                if(i != 1u) { help.help_topic[help.help_topic_size++] = ' '; }
+                for(char c : words[i]) { help.help_topic[help.help_topic_size++] = c; }
+            }
+            return help;
+        }
         if((name == "quit" || name == "q") && count == 1u) { return {console_command_kind::quit}; }
         if(name == "server") { return {console_command_kind::unsupported}; }
         if(name == "replace" && count == 5u)
@@ -688,13 +749,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             if(name == "ignore" && !details::parse_decimal(words[2u],result.breakpoint_ignore)) { return {}; }
             return result;
         }
-        if((name == "continue" || name == "c") && count == 1u) { result.operation = resume; }
+        if((name == "continue" || name == "c" || name == "run" || name == "r") && count == 1u)
+        { result.operation = resume; result.run_from_entry = name == "run" || name == "r";
+          if(result.run_from_entry) { result.launch_action = console_launch_action::run; } }
+        else if((name == "start" || name == "st" || name == "startw" || name == "stw" ||
+                 name == "starti" || name == "sti" || name == "kill") && count == 1u)
+        { result.operation = resume; result.run_from_entry = true;
+          result.launch_action = name == "start" || name == "st" ? console_launch_action::start :
+              name == "startw" || name == "stw" ? console_launch_action::start_wasm :
+              name == "starti" || name == "sti" ? console_launch_action::start_instruction : console_launch_action::kill; }
         else if(name == "wait" && count == 1u) { result.operation = status; result.wait_for_event = true; }
         else if(name == "pause" && count == 1u) { result.operation = pause; }
         else if((name == "status" && count == 1u) || (name == "info" && count == 2u && words[1] == "threads"))
         { result.operation = status; }
         else if(name == "info" && count == 2u && words[1] == "breakpoints") { result.operation = breakpoint_list; }
-        else if((name == "break" || name == "b") && count == 4u)
+        else if(name == "info" && (count == 2u || count == 3u) && words[1] == "modules")
+        {
+            if(count == 3u && (!details::parse_decimal(words[2], result.module_help_page) || result.module_help_page == 0u)) { return {}; }
+            result.kind = console_command_kind::module_list; return result;
+        }
+        else if((name == "breakwasm" || name == "bw") && count == 4u)
         {
             result.operation = breakpoint_set;
             result.payload_size = 24u;
@@ -704,6 +778,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 if(!details::parse_decimal(words[i + 1u], value)) { return {}; }
                 ::fast_io::io::print(output, ::fast_io::mnp::le_put<64>(value));
             }
+        }
+        else if(name=="jump" && count==3u)
+        {
+            if(words[1]=="src") { result.relocation=relocation_level::source; }
+            else if(words[1]=="wasm") { result.relocation=relocation_level::wasm; }
+            else if(words[1]=="asm") { result.relocation=relocation_level::assembly; }
+            else { return {}; }
+            auto position{words[2]};
+            if(position.starts_with("*"))
+            { if(result.relocation!=relocation_level::assembly) { return {}; }result.relocation_absolute=true;position=position.subview(1u); }
+            unsigned base{10u};if(position.starts_with("0x")) { base=16u;position=position.subview(2u); }
+            if(position.empty()) { return {}; }
+            for(unsigned char c:position)
+            { unsigned digit{c>='0' && c<='9' ? static_cast<unsigned>(c-'0') : c>='a' && c<='f' ? static_cast<unsigned>(c-'a'+10u) : c>='A' && c<='F' ? static_cast<unsigned>(c-'A'+10u) : base};
+              if(digit>=base || result.relocation_target>(UINT64_MAX-digit)/base) { return {}; }
+              result.relocation_target=result.relocation_target*base+digit; }
+            if(result.relocation==relocation_level::source && !result.relocation_target) { return {}; }
+            result.kind=console_command_kind::execution_relocate;result.operation=status;
+        }
+        else if((name == "breakasm" || name == "bi") && count == 2u)
+        {
+            if(!details::parse_decimal(words[1], result.native_breakpoint_offset) ||
+               result.native_breakpoint_offset > 65536u) { return {}; }
+            result.kind = console_command_kind::assembly_breakpoint;
+            result.operation = status; // Existing authenticated host policy admission.
         }
         else if((name == "ni" || name == "nexti") && (count == 1u || count == 2u))
         {
@@ -749,7 +848,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                !details::parse_signed_decimal(words[4], result.disassembly_byte_offset) ||
                result.disassembly_byte_offset < -65536 || result.disassembly_byte_offset > 65536 ||
                !details::parse_signed_decimal(words[5], result.disassembly_instruction_offset) ||
-               result.disassembly_instruction_offset < -8704 || result.disassembly_instruction_offset > 8704 ||
+               result.disassembly_instruction_offset < -(INT64_MAX / 2) || result.disassembly_instruction_offset > INT64_MAX / 2 ||
                !details::parse_decimal(words[6], symbols) || symbols > 1u) { return {}; }
             result.disassembly_resolve_symbols = symbols != 0u;
             result.kind = console_command_kind::assembly_disassemble_range;

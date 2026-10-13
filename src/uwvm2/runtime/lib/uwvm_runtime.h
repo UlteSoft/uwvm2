@@ -151,11 +151,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
         ::std::vector<::std::uint_least8_t> instruction_safe_point_bits{};
         bool instruction_safe_points_complete{};
     };
+    struct llvm_jit_debug_source_symbol
+    {
+        ::std::uint64_t index{};
+        bool global{};
+        ::std::string name{}; // Detached display label, never runtime authority.
+    };
     struct llvm_jit_debug_source_image
     {
         ::std::uint_least64_t code_section_content_size{}, runtime_epoch{};
         ::std::vector<llvm_jit_debug_source_section> sections{};
         ::std::vector<llvm_jit_debug_source_function> functions{};
+        ::std::vector<llvm_jit_debug_source_symbol> symbols{};
     };
     struct llvm_jit_debug_source_position
     {
@@ -201,6 +208,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     extern "C++" bool llvm_jit_debug_query_activation_host_api(
         llvm_jit_debug_activation_capture_owner const& capture,
         llvm_jit_debug_activation_snapshot& out) noexcept;
+    // Live native frame identities only; never a source/value snapshot.
+    extern "C++" bool llvm_jit_debug_query_native_activation_host_api(
+        llvm_jit_debug_activation_capture_owner const&, void const*, llvm_jit_debug_activation_snapshot&) noexcept;
+    extern "C++" bool llvm_jit_debug_native_retirement_call_host_api(
+        llvm_jit_debug_activation_capture_owner const&, void const*) noexcept;
     struct llvm_jit_debug_source_activation_snapshot
     {
         llvm_jit_debug_activation_snapshot activation{};
@@ -587,7 +599,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     enum class llvm_jit_checkpoint_prepare_status : unsigned char
     { prepared_and_discarded, requires_llvm_jit_full, not_selected, invalid_request,
       unavailable_capture, resource_preparation_declined, engine_preparation_declined, allocation_failed,
-      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained, dispatch_binding_preparation_declined, indirect_binding_preparation_declined, source_initializer_binding_preparation_declined, full_publication_record_preparation_declined, full_code_owner_handoff_declined };
+      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained, dispatch_binding_preparation_declined, indirect_binding_preparation_declined, source_initializer_binding_preparation_declined, full_publication_record_preparation_declined, full_code_owner_handoff_declined, closed_worker_preparation_declined };
     struct llvm_jit_checkpoint_prepare_request
     {
         ::std::array<::std::byte,16u> recording_label{};
@@ -613,6 +625,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
         ::std::size_t maximum_private_source_initializer_modules{4096u};
         // Fixed final full-record slots, bounded before any publication allocation.
         ::std::size_t maximum_private_full_publication_functions{65536u};
+        // Real precreated OS workers held with private roots/TLS. No guest entry.
+        ::std::size_t maximum_private_closed_workers{256u};
     };
     struct llvm_jit_checkpoint_prepare_result
     {
@@ -665,7 +679,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
         ::std::size_t prepared_full_publication_modules{}, prepared_full_publication_functions{};
         bool runtime_full_publication_records_prepared{}; // Final private shape; no LIVE publication.
         ::std::size_t prepared_full_code_owner_modules{}, prepared_full_code_owner_functions{}, prepared_full_code_effective_bodies{};
+        ::std::size_t prepared_full_root_code_identities{}, prepared_full_root_code_identity_functions{};
+        bool runtime_full_root_identities_prepared_privately{}; // Immutable compiler DATA; unsealed, no current-world permission.
         bool runtime_full_code_owners_transferred_privately{}, runtime_full_code_targets_allocation_preserved{}; // Same genuine allocations; no LIVE seal.
+        // A separate real OS cohort remains alive behind a private closed gate
+        // BEFORE old retirement. These counts confer no execution authority.
+        ::std::size_t started_private_closed_workers{}, held_private_closed_workers{};
+        bool private_closed_worker_cohort_held{};
     };
     struct llvm_jit_checkpoint_native_retirement_result
     {
@@ -680,6 +700,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
         bool source_initializer_bindings_rechecked_after_physical_join{}; // Actual closed-world preflight only.
         bool full_publication_records_rechecked_after_physical_join{}; // Same actual private record/engine roster.
         bool full_code_owners_rechecked_after_physical_join{}; // Actual final native owners, still private.
+        bool private_closed_workers_rechecked_after_physical_join{};
+        bool private_closed_workers_cancelled_and_joined{}; // Actual join precedes old admission reopening.
     };
     // Cold native management only. Prepare a fresh candidate under the SAME
     // complete stop, then retire/join the actual registered old cohort. Pending
@@ -864,12 +886,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
         ::std::uint_least64_t thread{};
         ::std::uintptr_t origin_pc{}, continuation_pc{}, owner_begin{}, owner_end{};
         ::std::uint_least64_t module{}, function{}, function_generation{}, runtime_epoch{};
+        ::std::size_t return_stack_adjustment{}; // sealed x86 near-RET immediate; not an address
         friend constexpr bool operator==(llvm_jit_debug_native_call_continuation_view const&,
             llvm_jit_debug_native_call_continuation_view const&) noexcept = default;
     };
     extern "C++" llvm_jit_debug_native_call_continuation_owner llvm_jit_debug_mint_native_call_continuation_host_api(
         llvm_jit_debug_activation_capture_owner const&, llvm_jit_debug_native_activation_cursor_owner const&,
         void const* native_session_identity) noexcept;
+    extern "C++" llvm_jit_debug_native_call_continuation_owner llvm_jit_debug_mint_native_call_policy_host_api(
+        llvm_jit_debug_activation_capture_owner const&, llvm_jit_debug_native_activation_cursor_owner const&,
+        void const* native_session_identity, bool require_guest, ::std::size_t linear_limit = 0u) noexcept;
     extern "C++" bool llvm_jit_debug_native_call_continuation_host_api(
         llvm_jit_debug_native_call_continuation_owner const&, void const* native_session_identity,
         llvm_jit_debug_native_call_continuation_view&) noexcept;
@@ -938,6 +964,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     extern "C++" bool llvm_jit_debug_copy_native_function_host_api(
         llvm_jit_debug_activation_capture_owner const& capture, void const* native_session_identity,
         llvm_jit_debug_native_function_image& out) noexcept;
+    enum class llvm_jit_debug_relocation_status : unsigned char
+    { unavailable, moved, current_stop_required, invalid_target, incompatible_frame, restore_state_unavailable };
+    extern "C++" llvm_jit_debug_relocation_status llvm_jit_debug_relocate_native_pc_host_api(
+        llvm_jit_debug_activation_capture_owner const&, void*, ::std::uint64_t, bool,
+        ::std::uintptr_t&, ::std::uintptr_t&) noexcept;
     enum class llvm_jit_debug_native_position_status : unsigned char { unavailable, unknown, exact, ambiguous };
     struct llvm_jit_debug_native_numeric_location { unsigned dwarf_register{}, bits{}; };
     struct llvm_jit_debug_native_position
@@ -994,6 +1025,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
         // matching real tag identity. True requests a terminal read-only park.
         bool (*on_uncaught)(void* context, ::std::uint_least64_t participant,
             ::uwvm2::utils::thread::cooperative_pause_location location) noexcept{};
+        // Explicit host controller opt-in only. Custom observers continue to
+        // receive every opcode unless they implement the hint publication contract.
+        bool selective_instruction_observation{};
     };
     /// Host-only launch opt-in, before any runtime registry is published. The controller owns authorization
     /// and must never expose this native API or its domain through guest imports. The runtime retains the

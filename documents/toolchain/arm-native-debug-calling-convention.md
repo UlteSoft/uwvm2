@@ -49,3 +49,37 @@ one successor only after its exact three-operand predicate shape and the
 actual ARM target analysis agree; a conditional branch still requires both
 taken and fallthrough boundaries. A successor in literal DATA remains refused.
 The same copied mapping is rechecked when the runtime seals a breakpoint plan.
+
+
+## ARM-native component SDK qualification (2026-10-08)
+
+The paired [qualification record](../../test/0017.runtime/native_arm32_real_mcjit.qualification.json)
+now covers a real ARMv7 A32 hard-float Linux LLVM 23.1.1 component library,
+built from pinned original source with the actual TailCC FastISel fallback
+and TARGET2 RuntimeDyld repair. The build used four compile jobs and one
+link job in the original 64 GiB cgroup. Both repositories pass twenty final
+QEMU executable runs, including O0/optimized 64-argument normal TailCC calls,
+SP/r11 preservation, actual recursive EHABI unwinding, musttail, engine
+retirement, O0/O3 registered owned-DATA CFI and export refusal.
+
+Include the actual LLVM ELF object declarations before glibc link.h in the
+ARM EHABI registry's LLVM-selected path. Otherwise link.h's ELF macros break
+LLVM's later enum/template declarations in a genuine ARM build. The paired
+header preserves platform macros and includes the default-selection path;
+the new header-first fixture checks that ordering without claiming complete
+module compilation. No public debugger permission follows from this fix.
+
+Asynchronous unwind tables must cover the native host frames as well as the
+JIT frames; the product's existing native-debug build option already supplies
+that compiler flag. To exercise the missing-export negative, localize
+__gnu_Unwind_Find_exidx in a linker version map and verify the actual dynamic
+symbol table. Omitting --export-dynamic alone can still leave the hook
+exported when a shared library references it.
+
+This SDK is plain LLVM 23.1.1. It does not meet the current ROS .13 product
+version/capability contract, and no pinned version or provider capability
+check is bypassed. Full ARM Wasm/kernel-stop tests and physical caller,
+return-stop, ni/finish integration remain unqualified. The public ARM
+caller/finish gate stays closed; owned-DATA CFI and private native unwinding
+are not substitutes for an authenticated Wasm activation and instruction
+state.

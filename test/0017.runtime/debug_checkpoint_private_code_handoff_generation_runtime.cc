@@ -414,6 +414,9 @@ int main(int argc, char** argv)
         pending.preparation.modules==1u && pending.preparation.engines==1u && pending.preparation.prepared_threads==2u &&
         pending.preparation.started_private_root_workers==2u && pending.preparation.joined_private_root_workers==2u);
     REQUIRE(pending.preparation.runtime_full_code_owners_transferred_privately && pending.preparation.runtime_full_code_targets_allocation_preserved &&
+        pending.preparation.runtime_full_root_identities_prepared_privately &&
+        pending.preparation.prepared_full_root_code_identities==pending.preparation.modules &&
+        pending.preparation.prepared_full_root_code_identity_functions==pending.preparation.functions &&
         pending.preparation.prepared_full_code_effective_bodies==1u &&
         pending.preparation.prepared_full_code_owner_modules==pending.preparation.modules && pending.preparation.prepared_full_code_owner_functions==pending.preparation.functions &&
         !pending.full_code_owners_rechecked_after_physical_join && pending.preparation.runtime_full_publication_records_prepared && pending.preparation.prepared_full_publication_modules==1u &&

@@ -171,9 +171,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasm_mutation
         ::std::array<::fast_io::string_view,64u> tokens{};::std::size_t cursor{},count{};
         while(cursor<line.size())
         {
-            if(::fast_io::char_category::is_c_blank(line[cursor])) { ++cursor;continue; }
+            if(::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor;continue; }
             auto const begin{cursor};
-            while(cursor<line.size() && !::fast_io::char_category::is_c_blank(line[cursor])) { ++cursor; }
+            while(cursor<line.size() && !::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor; }
             if(count==tokens.size()) { return false; }
             tokens[count++]=line.subview(begin,cursor-begin); // bounded begin<=cursor<=size BEFORE view.
         }

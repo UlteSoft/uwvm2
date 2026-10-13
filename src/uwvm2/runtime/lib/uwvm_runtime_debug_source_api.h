@@ -138,9 +138,11 @@
                     if(name_begin < begin || name_begin > end || name.size() > end - name_begin) { valid = false; return; }
                     bool const debug_name{name.size() >= 7u && name[0u] == u8'.' && name[1u] == u8'd' && name[2u] == u8'e' &&
                         name[3u] == u8'b' && name[4u] == u8'u' && name[5u] == u8'g' && name[6u] == u8'_'};
-                    if(!debug_name && name != u8"external_debug_info" && name != u8".gnu_debugaltlink" && name != u8".gnu_debuglink") { continue; }
+                    if(!debug_name && name != u8"name" && name != u8"external_debug_info" && name != u8".gnu_debugaltlink" && name != u8".gnu_debuglink") { continue; }
                     auto const payload_begin{reinterpret_cast<::std::uintptr_t>(entry.custom_begin)};
                     auto const payload_end{reinterpret_cast<::std::uintptr_t>(entry.sec_span.sec_end)};
+                    if(name == u8"name" && (payload_end < payload_begin || payload_end - payload_begin > 1024u * 1024u || candidate->image_.sections.size()==64u ||
+                        payload_end-payload_begin>8u*1024u*1024u-copied)) { continue; }
                     if(name.size() > 64u || candidate->image_.sections.size() == 64u || payload_begin < begin ||
                        payload_end < payload_begin || payload_end > end || payload_end - payload_begin > 1024u * 1024u ||
                        payload_end - payload_begin > 8u * 1024u * 1024u - copied) { valid = false; return; }
@@ -152,6 +154,33 @@
                     saved.payload.assign(reinterpret_cast<::std::byte const*>(payload_begin),
                                          reinterpret_cast<::std::byte const*>(payload_end));
                     copied += saved.payload.size(); candidate->image_.sections.push_back(::std::move(saved));
+                }
+                // Copy import/export fallbacks from the same canonical parsed
+                // module. Per-kind indices never mix function and global spaces.
+                using import_section_t = ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Fs...>;
+                using export_section_t = ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>;
+                auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<import_section_t>(module.sections)};
+                auto const& exportsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<export_section_t>(module.sections)};
+                auto add_symbol{[&](bool global, ::std::uint64_t index, auto name)
+                {
+                    auto const address{reinterpret_cast<::std::uintptr_t>(name.data())};
+                    if(name.empty() || name.size()>4096u || address<begin || address>end || name.size()>end-address ||
+                       candidate->image_.symbols.size()>=65536u || name.size()>8u*1024u*1024u-copied) { return; }
+                    candidate->image_.symbols.push_back({index,global,{reinterpret_cast<char const*>(name.data()),name.size()}});
+                    copied+=name.size();
+                }};
+                ::std::uint64_t imported_function{}, imported_global{};
+                for(auto const& entry : importsec.imports)
+                {
+                    auto kind{static_cast<unsigned>(entry.imports.type)};
+                    if(kind==0u) { add_symbol(false,imported_function++,entry.extern_name); }
+                    else if(kind==3u) { add_symbol(true,imported_global++,entry.extern_name); }
+                }
+                for(auto const& entry : exportsec.exports)
+                {
+                    auto kind{static_cast<unsigned>(entry.exports.type)};
+                    if(kind==0u) { add_symbol(false,entry.exports.storage.func_idx,entry.export_name); }
+                    else if(kind==3u) { add_symbol(true,entry.exports.storage.global_idx,entry.export_name); }
                 }
                 candidate->image_.functions.reserve(functions.size());
                 ::std::size_t expression_bytes_copied{}, instruction_bitmap_bytes_copied{};

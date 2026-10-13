@@ -1,5 +1,6 @@
 #pragma once
 #ifndef UWVM_MODULE
+# include "console_help.h"
 # include "command.h"
 # include "management_wait_interrupt.h"
 # include "wasm_events.h"

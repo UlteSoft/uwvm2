@@ -61,6 +61,7 @@ def main():
         available_profiles = [f'{mode}-O{level}' for mode in matrix['modes'] for level in matrix['levels']]
         tiered_case = ('tiered-memory64-high' if matrix.get('fixture_kind') == 'memory64-high'
                        else 'tiered-simd-sign' if matrix.get('fixture_kind') == 'simd-sign'
+                       else 'tiered-simd-rounding' if matrix.get('fixture_kind') == 'simd-rounding'
                        else 'tiered-numeric')
         available_cases = [tiered_case]
     else:
@@ -82,7 +83,8 @@ def main():
         if tiered:
             assert row['actual_t2_target_entry'] and row['full_module_ready']
             assert row['counters']['tiered_full_ready'] > 0 and row['counters']['tiered_full_failed'] == 0
-            expected_checks = 12 if matrix.get('fixture_kind') == 'simd-sign' else 6
+            expected_checks = (12 if matrix.get('fixture_kind') == 'simd-sign' else
+                               24 if matrix.get('fixture_kind') == 'simd-rounding' else 6)
             assert row['checked_calls'] == 4_000_000 and row['bit_checks_per_call'] == expected_checks
             # Preserve the original summary bytes; names here only select rows.
             row = {**row, 'profile': f"{row['mode']}-O{row['optimization']}", 'fixture': tiered_case}

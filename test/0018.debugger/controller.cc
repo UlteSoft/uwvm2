@@ -536,10 +536,10 @@ int main()
     }
     {
         auto c=dbg::controller::create(config(),1,capture);CHECK(c->arm_initial_pause());
-        for(unsigned i{};i!=256;++i)CHECK(command(*c,"break 1 2 "+std::to_string(i)).status==ctl::error::none);
-        CHECK(command(*c,"break 1 3 0").status==ctl::error::exhausted);
+        for(unsigned i{};i!=256;++i)CHECK(command(*c,"breakwasm 1 2 "+std::to_string(i)).status==ctl::error::none);
+        CHECK(command(*c,"breakwasm 1 3 0").status==ctl::error::exhausted);
         CHECK(command(*c,"delete 1").status==ctl::error::none);
-        CHECK(command(*c,"break 1 2 1").breakpoint_identifier==2); // Duplicate must not consume the earlier hole.
+        CHECK(command(*c,"breakwasm 1 2 1").breakpoint_identifier==2); // Duplicate must not consume the earlier hole.
         CHECK(command(*c,"info breakpoints").breakpoints.size()==255);
         memory_io io{"help\nlocals\nserver\nwat\nstatus\nquit\n", {}, {}};
         CHECK(dbg::run_console(*c,io.adapter())==dbg::console_exit::terminate_process);

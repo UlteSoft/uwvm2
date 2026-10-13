@@ -345,8 +345,21 @@ extern "C++"
             if(ref.kind == reference_kind::wasm_func_imported || ref.kind == reference_kind::wasm_func_defined)
             {
                 ::std::size_t owner{}, index{};
-                if(!find_function(state, ref, owner, index) ||
-                   !state.modules[declared_owner].store->reference_type_matches(ref, type)) { return false; }
+                // Membership in the actual pinned function records precedes
+                // any metadata read. Function-only legacy modules need not
+                // have GC layouts: the linked matcher proves their signature
+                // against the actual declared module, including rich/legacy
+                // interoperability. Retain that type proof for defined heaps.
+                if(!find_function(state, ref, owner, index)) { return false; }
+                if(type.heap.is_defined())
+                {
+                    auto const& store{state.modules[declared_owner].store};
+                    if(static_cast<::std::uint_least64_t>(type.heap.code) >
+                           (::std::numeric_limits<::std::uint_least32_t>::max)() ||
+                       store->function_type_match_ == nullptr ||
+                       !store->function_type_match_(ref, store.get(),
+                           static_cast<::std::uint_least32_t>(type.heap.code))) { return false; }
+                }
                 out.ref.kind = ws::reference_kind::function; out.ref.function_identity_available = true;
                 out.ref.function_module = state.modules[owner].id; out.ref.function_index = index; out.available = true; return true;
             }

@@ -9,6 +9,11 @@ class Tests(unittest.TestCase):
   for expression,_,_ in cases['valid']:
    with self.subTest(expression=expression):
     self.assertEqual(dap.validate_source_evaluation_expression(expression),expression)
+ def test_rust_underflow_syntax_preserves_explicit_suffix(self):
+  for expression in ('5.463000546873376e-46f32','-5.463000546873376e-46f32',
+                     '1e-400f64','-1e-400f64'):
+   with self.subTest(expression=expression):
+    self.assertEqual(dap.validate_source_evaluation_expression(expression),expression)
  def test_no_command_or_identifier_tail(self):
   for expression in ('1u8junk','1u8;continue','1u128','1.0u8','1u8_u16','1f32\\ncontinue','0Xffu8','0b2u8'):
    with self.subTest(expression=expression),self.assertRaises(ValueError):

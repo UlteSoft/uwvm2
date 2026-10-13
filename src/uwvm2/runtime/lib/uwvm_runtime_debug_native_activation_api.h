@@ -24,27 +24,27 @@
         llvm_jit_debug_native_activation_cursor() = default;
         friend class llvm_jit_debug_native_call_continuation;
         friend class llvm_jit_debug_native_return_continuation;
-        friend auto ::uwvm2::runtime::lib::llvm_jit_debug_mint_native_call_continuation_host_api(
+        friend auto ::uwvm2::runtime::lib::llvm_jit_debug_mint_native_call_policy_host_api(
             llvm_jit_debug_activation_capture_owner const&, llvm_jit_debug_native_activation_cursor_owner const&,
-            void const*) noexcept -> llvm_jit_debug_native_call_continuation_owner;
+            void const*, bool, ::std::size_t) noexcept -> llvm_jit_debug_native_call_continuation_owner;
         friend class llvm_jit_debug_activation_capture;
         llvm_jit_debug_activation_capture_owner capture_{};
         // Capture retains the ACTUAL dynamic debug-ledger control block. A
         // retained provider never borrows freed storage, but physical liveness
         // still requires real kernel/leave witnesses. Actual scope exit poisons
         // the ledger after native ACK, so stale providers cannot revive it.
-        details::debug_activation::ledger const* ledger_{};
+        [[maybe_unused]] details::debug_activation::ledger const* ledger_{};
         ::std::unique_ptr<details::debug_activation::frame[]> expected_storage_{};
-        details::debug_activation::frame const* expected_{};
-        ::std::size_t count_{};
+        [[maybe_unused]] details::debug_activation::frame const* expected_{};
+        [[maybe_unused]] ::std::size_t count_{};
         void const* session_{};
         ::std::uint_least64_t thread_{};
         ::std::uintptr_t begin_{}, end_{}, first_{};
         // Only the actual selected worker writes these members. Host inspection
         // holds the real trapped gate after phase::trapped's acquire publication.
-        bool witnessed_{};
-        unsigned retirement_{4u};
-        ::std::uintptr_t witnessed_pc_{}, witnessed_sp_{};
+        [[maybe_unused]] bool witnessed_{};
+        [[maybe_unused]] unsigned retirement_{4u};
+        [[maybe_unused]] ::std::uintptr_t witnessed_pc_{}, witnessed_sp_{};
 #if defined(__linux__) && ((defined(__aarch64__) && defined(__AARCH64EL__) && __SIZEOF_POINTER__ == 8) || (defined(__loongarch64) && __SIZEOF_POINTER__ == 8) || (defined(__mips__) && defined(__mips64) && __SIZEOF_POINTER__ == 8 && defined(__mips_isa_rev) && __mips_isa_rev == 2 && !defined(__mips16) && !defined(__mips_micromips)) || (defined(__i386__) && __SIZEOF_POINTER__ == 4))
         // Manager-only code facts for ONE genuine kernel trap revision. These
         // contain no live register, CFA, saved word or read/resume authority.
@@ -71,7 +71,7 @@
         // Cold-owned original cursor for a sealed parent-return event. No
         // shared_ptr operation occurs in the actual signal/leave callbacks.
         llvm_jit_debug_native_activation_cursor_owner return_origin_{};
-        ::std::uintptr_t return_stack_{};
+        [[maybe_unused]] ::std::uintptr_t return_stack_{};
         // Qualified function friends nominate the real global-module APIs
         // first declared with C++ linkage in runtime.h. This class keeps its
         // runtime module attachment; no new friend overload is introduced.
@@ -245,13 +245,38 @@
                     static_cast<details::debug_activation::exit_kind>(owner->retirement_));
         }
         return false;
+#elif defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && UWVM2_RUNTIME_NATIVE_STEP_PLATFORM
+        // Mach and VEH admit only same-function instructions; they cannot run
+        // a call/return/host bridge under this session. The caller holds the
+        // actual kernel trap gate, domain and publication guard, so the retained
+        // worker ledger is immutable here. Authenticate the entire live chain,
+        // including incarnation, rather than accepting the old function bounds.
+        // Linux additionally supports retired/caller continuations and therefore
+        // requires its separately witnessed cursor above.
+        if(session == nullptr || sp == 0u || get_runtime_state_publication_depth() != 1u ||
+           !native_ledger_owner_ || !native_ledger_owner_->complete() || snapshot_.frames.empty() ||
+           native_ledger_owner_->count() != snapshot_.frames.size() || !native_site_.valid ||
+           native_site_.native_thread != thread || native_site_.owner_begin != begin ||
+           native_site_.owner_end != end || begin == 0u || end <= begin || pc < begin || pc >= end)
+        { return false; }
+        auto const live{native_ledger_owner_->data()};
+        for(::std::size_t index{}; index != snapshot_.frames.size(); ++index)
+        {
+            auto const& actual{live[index]};
+            auto const& expected{snapshot_.frames[index]};
+            if(actual.incarnation != expected.incarnation || actual.parent != expected.parent ||
+               actual.continuation != expected.continuation || actual.module != expected.module ||
+               actual.function != expected.function || actual.function_generation != expected.function_generation ||
+               actual.runtime_epoch != expected.runtime_epoch) { return false; }
+        }
+        return true;
 #else
         (void)session; (void)thread; (void)pc; (void)sp; (void)begin; (void)end; return false;
 #endif
     }
     namespace
     {
-        inline void debug_native_report_actual_activation_leave(details::debug_activation::ledger const* ledger,
+        UWVM_ALWAYS_INLINE inline void debug_native_report_actual_activation_leave(details::debug_activation::ledger const* ledger,
             ::std::uint64_t incarnation, unsigned kind) noexcept
         {
 #if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)
@@ -259,6 +284,12 @@
             // entry depth and applied leave to its real dynamic TLS-owned ledger.
             // A retained provider copy cannot mint this implementation-only seal.
             if(g_debug_native_actual_leave_witness.ledger != nullptr) { ::fast_io::fast_terminate(); }
+            // No native session can consume a leave on this owning worker.
+            // Its TLS session is installed/retired by the actual worker while
+            // parked or in its native protocol, never by another running thread.
+            // A null session grants nothing: the real ledgers already retired
+            // above, and every active-session provider check remains below.
+            if(::uwvm2::uwvm::debugger::native_step::details::current_thread_session == nullptr) { return; }
             g_debug_native_actual_leave_witness = {ledger, incarnation, kind};
             ::uwvm2::uwvm::debugger::native_step::report_activation_leave_on_worker(incarnation, kind);
             g_debug_native_actual_leave_witness = {};

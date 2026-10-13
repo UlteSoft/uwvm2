@@ -21,6 +21,7 @@
  ****************************************/
 
 module;
+#include <uwvm2/uwvm/debugger/console_stdio.h>
 
 // std
 #include <cstddef>
@@ -52,6 +53,7 @@ module;
 
 export module uwvm2.uwvm.imported.wasi.wasip1.init:init_env;
 
+import uwvm2.uwvm.debugger.wasip1_calls;
 import fast_io;
 import uwvm2.uwvm_predefine.utils.ansies;
 import uwvm2.uwvm_predefine.io;

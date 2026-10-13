@@ -43,6 +43,8 @@
         ::std::vector<void const*> code_owners_{}; // comparison-only actual full/retained code-owner borrows
         friend auto ::uwvm2::runtime::lib::llvm_jit_debug_capture_activation_host_api(
             ::uwvm2::utils::thread::cooperative_pause_domain::pause_ticket const&) noexcept -> llvm_jit_debug_activation_capture_owner;
+        friend auto ::uwvm2::runtime::lib::llvm_jit_debug_query_native_activation_host_api(
+            llvm_jit_debug_activation_capture_owner const&, void const*, llvm_jit_debug_activation_snapshot&) noexcept -> bool;
         friend auto ::uwvm2::runtime::lib::llvm_jit_debug_query_activation_host_api(
             llvm_jit_debug_activation_capture_owner const&, llvm_jit_debug_activation_snapshot&) noexcept -> bool;
         friend auto ::uwvm2::runtime::lib::llvm_jit_debug_copy_source_object_host_api(
@@ -55,6 +57,9 @@
             llvm_jit_debug_activation_capture_owner const&, void const*, llvm_jit_debug_native_code_bytes&) noexcept -> bool;
         friend auto ::uwvm2::runtime::lib::llvm_jit_debug_copy_native_function_host_api(
             llvm_jit_debug_activation_capture_owner const&, void const*, llvm_jit_debug_native_function_image&) noexcept -> bool;
+        friend auto ::uwvm2::runtime::lib::llvm_jit_debug_relocate_native_pc_host_api(
+            llvm_jit_debug_activation_capture_owner const&, void*, ::std::uint64_t, bool,
+            ::std::uintptr_t&, ::std::uintptr_t&) noexcept -> llvm_jit_debug_relocation_status;
         // The position query verifies this exact private capture, execution
         // generation and real trap; no caller-supplied PC or field is accepted.
         friend auto ::uwvm2::runtime::lib::llvm_jit_debug_native_position_host_api(

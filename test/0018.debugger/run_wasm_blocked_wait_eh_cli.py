@@ -127,7 +127,7 @@ def main():
                     console = WaitConsole(argv, args.out / f"wait-{address}-{compare}-{policy}.log")
                     console.prompt()
                     assert b"prepared; no Wasm instruction executed" in console.send("status")
-                    assert b"registered" in console.send(f"break 0 0 {before}")
+                    assert b"registered" in console.send(f"breakwasm 0 0 {before}")
                     console.send("continue")
                     thread, entry_stop = stopped(console, before)
                     before_values = [("i64", 1234), ("i64" if address == 64 else "i32", 16),
@@ -159,7 +159,7 @@ def main():
                         assert edited_thread == thread and edited_stop > wait_stop, (edited_thread, edited_stop, wait_stop)
                         wait_stop = edited_stop
                         operands(console, thread, before_values)
-                        assert b"registered" in console.send(f"break 0 0 {after}")
+                        assert b"registered" in console.send(f"breakwasm 0 0 {after}")
                         # The original monotonic deadline elapses during the real
                         # pause. Completion still requires actual manager resume.
                         time.sleep(1.1)

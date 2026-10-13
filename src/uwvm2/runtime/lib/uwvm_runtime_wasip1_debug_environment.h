@@ -178,11 +178,46 @@ extern "C++"
             }
             return true;
         }
+        // Never use path_open's creation name: a retained descriptor survives
+        // renames, unlink, fd_renumber and duplication. Query its live OS owner.
+        static void descriptor_current_path(fd const& actual, ::uwvm2::uwvm::debugger::wasip1_state::descriptor_entry& row) noexcept
+        {
+            namespace ws=::uwvm2::uwvm::debugger::wasip1_state;
+            auto const& storage{actual.wasi_fd.ptr->wasi_fd_storage};
+            auto sample{[&](auto handle)
+            {
+                auto first{ws::current_descriptor_path(handle)};
+                auto second{ws::current_descriptor_path(handle)};
+                if(!first.empty() && first==second) { row.current_path=::std::move(second); row.current_path_available=true; }
+            }};
+            switch(storage.type)
+            {
+                case fd_type::file:
+#if defined(_WIN32) && !defined(__CYGWIN__)
+                    sample(storage.storage.file_fd.file.native_handle());
+#else
+                    sample(storage.storage.file_fd.native_handle());
+#endif
+                    break;
+                case fd_type::file_observer: sample(storage.storage.file_observer.native_handle()); break;
+                case fd_type::dir:
+                {
+                    auto const& stack{storage.storage.dir_stack.dir_stack};
+                    if(stack.empty() || stack.back_unchecked().ptr==nullptr) { break; }
+                    auto const& entry{stack.back_unchecked().ptr->dir_stack};
+                    if(entry.is_observer) { sample(entry.storage.observer.native_handle()); }
+                    else { sample(entry.storage.file.native_handle()); }
+                    break;
+                }
+                default: break;
+            }
+        }
 #include "uwvm_runtime_wasip1_managed_files.h"
         [[nodiscard]] static view descriptor_operation(request const& selected, wasip1_env_type& environment) noexcept
         {
             namespace ws = ::uwvm2::uwvm::debugger::wasip1_state;
             view out{}; out.module = selected.module; out.operation = selected.operation;
+            out.environment_identity=environment.debug_trace_identity;
             auto& storage{environment.fd_storage};
             // Cold management only: the actual gate/cohort proof surrounds this
             // ordinary FD storage -> per-FD lock order. No guest hot path changes.
@@ -245,10 +280,11 @@ extern "C++"
                 if(!descriptor_row(*actual, number, row) || (selected.operation == action::preopens && !row.preopened)) { return; }
                 ++out.total_entries; // Entire scan <=65536, no overflow.
                 if(number < selected.first) { return; }
-                if(page_closed || out.descriptors.size() == selected.count || row.guest_preopen_name.size() > ws::maximum_page_text_bytes - page_bytes)
+                descriptor_current_path(*actual,row);
+                if(page_closed || out.descriptors.size() == selected.count || row.guest_preopen_name.size()+row.current_path.size() > ws::maximum_page_text_bytes - page_bytes)
                 { page_closed = true; out.more = true; return; }
                 out.next = number + 1u; // number<=INT32_MAX, checked BEFORE next advance.
-                page_bytes += row.guest_preopen_name.size(); // Checked BEFORE addition.
+                page_bytes += row.guest_preopen_name.size()+row.current_path.size(); // Checked BEFORE addition.
                 out.descriptors.push_back(::std::move(row));
             }};
             for(auto const number : numbers) { copy_row(find_descriptor(storage, number), number); }
@@ -304,7 +340,7 @@ extern "C++"
                     out = text_operation(selected, *arguments, environment.argv); break;
                 case action::environment: case action::set_environment: case action::remove_environment:
                     out = text_operation(selected, *variables, environment.envs); break;
-                case action::trace_enable: case action::trace_disable: case action::trace_clear: case action::trace_read:
+                case action::descriptor_detail: case action::trace_enable: case action::trace_disable: case action::trace_clear: case action::trace_read:
                     out.result = status::invalid_request; return out; // trace DATA bypasses no environment admission
                 case action::portable_export: case action::portable_import:
                 case action::portable_export_group: case action::portable_import_group:

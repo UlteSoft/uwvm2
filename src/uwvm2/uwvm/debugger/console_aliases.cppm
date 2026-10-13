@@ -1,5 +1,6 @@
 module;
 #include <cstdint>
+#include <memory>
 #include <fast_io_dsal/string.h>
 #include <fast_io.h>
 #include <fast_io_unit/string.h>

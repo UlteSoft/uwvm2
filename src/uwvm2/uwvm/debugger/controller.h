@@ -39,6 +39,7 @@
 # include <uwvm2/utils/thread/cooperative_pause_domain.h>
 # include <uwvm2/runtime/lib/uwvm_runtime.h>
 # include "command.h"
+# include "breakpoint_index.h"
 # include "management_wait_interrupt.h"
 # include "native_step.h"
 # include "native_continuation_linux.h"
@@ -73,17 +74,35 @@
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
+#include "wasm_listing.h"
+#include "wasm_symbols.h"
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
 {
 #if defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
     enum class execution_status { running, stopping, stopped, exited, closed };
-    enum class stop_reason { initial, requested, breakpoint, step, native_step, wasm_catchpoint, wasm_trap, wasm_uncaught };
+    enum class stop_reason { initial, requested, breakpoint, step, native_step, native_breakpoint, wasm_entry, native_entry, wasm_catchpoint, wasm_trap, wasm_uncaught, execution_relocated };
+    enum class module_source_status { available, missing, invalid, no_points, replaced, unchecked };
+    struct module_help_row
+    {
+        ::std::uint64_t identifier{};
+        ::fast_io::string name{}, file{};
+        module_source_status source{module_source_status::missing};
+    };
+    struct module_help_page
+    {
+        ::fast_io::array<module_help_row, 8u> rows{};
+        ::std::size_t size{};
+        ::std::uint64_t page{1u}, pages{}, total{};
+        bool valid{};
+    };
     struct breakpoint
     {
         ::std::uint64_t identifier{}, module{}, function{}, offset{};
         ::std::uint64_t hits{}, ignore_remaining{}; bool enabled{true};
         ::fast_io::array<char, 256u> condition{};
         ::std::size_t condition_size{};
+        bool assembly{}, source_level{};
+        ::std::uint64_t participant{}, function_generation{}, runtime_epoch{};
     };
     struct source_function_span
     {
@@ -153,12 +172,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         ::uwvm2::utils::control::error status{};
         execution_status execution{execution_status::running};
         stop_reason reason{stop_reason::requested};
-        bool timed_out{};
+        bool timed_out{}, source_statement_stop{};
+        ::uwvm2::runtime::lib::llvm_jit_debug_relocation_status relocation_status{};
         ::std::int_least64_t guest_exit_code{};
         ::std::uint64_t breakpoint_identifier{};
+        ::std::uint64_t native_breakpoint_hit{};
         ::std::uint64_t breakpoint_condition_identifier{};
         ::uwvm2::utils::control::error breakpoint_condition_error{};
         ::std::uint64_t source_breakpoint_function{}, source_breakpoint_offset{};
+        bool source_breakpoint_no_points{}; // Copied metadata diagnosis, no new access permission.
         ::std::uint_least64_t replacement_generation{};
         ::std::uintptr_t native_step_from{}, native_step_to{};
         native_next_policy::reason native_next_reason{native_next_policy::reason::none};
@@ -249,6 +271,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         ::std::uint64_t next_stop_identifier_{1u}, stop_identifier_{};
         wasm_path::ledger wasm_paths_{};
         ::fast_io::array<breakpoint, 256> breakpoints_{};
+        breakpoint_index wasm_breakpoint_index_{};
+        void rebuild_wasm_breakpoint_index_locked() noexcept
+        {
+            wasm_breakpoint_index_.clear();
+            for(::std::size_t i{breakpoints_.size()}; i != 0u;)
+            {
+                auto const& point{breakpoints_[--i]};
+                if(point.identifier != 0u && point.enabled && !point.assembly)
+                { wasm_breakpoint_index_.insert(i,point.module,point.function,point.offset); }
+            }
+            refresh_observation_hints_locked();
+        }
+        void refresh_observation_hints_locked(bool resuming=false) noexcept
+        {
+            using hints=::uwvm2::runtime::checkpoint::observation_probe_hints;
+            hints::bitmap wanted{};
+            bool all{(!resuming && static_cast<bool>(pause_)) || first_wasm_instruction_pending_ || step_thread_!=0u ||
+                source_step_active_ || wasm_step_active_ || wasm_trace_enabled_ || active_wasm_catchpoints_!=0u || native_owned_};
+            for(auto const& point:breakpoints_)
+            {
+                if(point.identifier==0u || !point.enabled) { continue; }
+                if(point.assembly) { all=true;continue; }
+                auto const b{hints::bucket(point.module,point.function,point.offset)};
+                wanted[b/64u]|=::std::uint64_t{1u}<<(b%64u);
+            }
+            if(all) { wanted.fill(UINT64_MAX); }
+            static_cast<void>(hints::publish(this,wanted));
+        }
+        struct refresh_observation_hints_on_return
+        {
+            controller& actual;
+            ~refresh_observation_hints_on_return() { actual.refresh_observation_hints_locked(); }
+        };
+        struct native_breakpoint_binding
+        {
+            ::std::uint64_t identifier{};
+            ::uwvm2::runtime::lib::llvm_jit_debug_activation_capture_owner capture{};
+            ::std::uintptr_t begin{}, end{};
+        };
+        ::fast_io::array<native_breakpoint_binding, 256u> native_breakpoint_bindings_{};
+        ::std::uint64_t native_breakpoint_hit_{};
         ::std::uint64_t pending_breakpoint_{}, pending_breakpoint_participant_{}, condition_checked_stop_{};
         control_error condition_error_{};
         ::fast_io::array<wasm_events::catchpoint, 256u> wasm_catchpoints_{};
@@ -260,6 +323,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         ::std::vector<trace_record> traces_;
         struct source_module
         {
+            ::fast_io::string display_name{}, display_file{};
             source_map lines{};
             source_map_error status{source_map_error::missing_debug_line};
             bool line_only{}; // Successful original v3 mapping; no DWARF scope/variable identity.
@@ -268,14 +332,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             // opcode bytes have their own actual committed generation below;
             // a fresh body can be inspected without reviving old source metadata.
             ::std::vector<bool> invalidated{};
+            // Setup-time bounded intersection of source statements with emitted
+            // guest safe points. 0=no point, 1=has a point, 2=not fully checked.
+            ::std::vector<unsigned char> source_points{};
             ::std::vector<::uwvm2::runtime::lib::llvm_jit_debug_source_function> wasm_functions{};
             ::std::uint64_t wasm_runtime_epoch{};
+            wasm_symbols::table symbols{};
 #if defined(UWVM_USE_LLVM_JIT) || defined(UWVM_USE_DEFAULT_JIT)
             ::std::unique_ptr<source_dwarf::index> dwarf{};
             source_dwarf::error dwarf_status{source_dwarf::error::missing_sections};
             ::uwvm2::runtime::lib::llvm_jit_debug_source_binding_owner binding{};
 #endif
         };
+        [[nodiscard]] static module_source_status source_availability(source_module const& source) noexcept
+        {
+            if(source.status == source_map_error::missing_debug_line) { return module_source_status::missing; }
+            if(source.status != source_map_error::none || source.invalidated.size() != source.functions.size() ||
+               source.source_points.size() != source.functions.size()) { return module_source_status::invalid; }
+            bool unchecked{}, replaced{};
+            for(::std::size_t i{}; i < source.functions.size(); ++i)
+            {
+                if(source.invalidated[i]) { replaced = true; continue; }
+                if(source.source_points[i] == 1u) { return module_source_status::available; }
+                if(source.source_points[i] == 2u) { unchecked = true; }
+            }
+            return unchecked ? module_source_status::unchecked : replaced ? module_source_status::replaced : module_source_status::no_points;
+        }
         [[nodiscard]] static bool source_static_local_intact(source_module const& source,
             ::uwvm2::runtime::lib::llvm_jit_debug_source_position const& position,
             source_dwarf::variable_selection const& selected) noexcept
@@ -342,6 +424,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         ::std::uintptr_t native_pc_{};
         bool native_owned_{}, native_external_parked_{};
         stop_reason reason_{stop_reason::requested};
+        bool source_statement_stop_{};
+        bool first_wasm_instruction_pending_{}; // Host launch request, consumed only by a real observer.
         bool exited_{};
         bool source_installation_closed_{};
         ::std::int_least64_t exit_code_{};
@@ -360,12 +444,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         // Exhaustion disables labels; it never wraps and resurrects an old one.
         void advance_stop_identifier_locked() noexcept
         {
+            source_statement_stop_=false;
             source_frame_cursor_ = {}; wasm_paths_.clear(); // retire DATA selections BEFORE minting a new stop label.
             stop_identifier_ = next_stop_identifier_;
             if(next_stop_identifier_ != 0u) { ++next_stop_identifier_; }
         }
         [[nodiscard]] domain_type::pause_ticket request_pause_locked() noexcept
         {
+            // All workers must construct a fresh complete packet before their
+            // real domain park, including workers without a matching breakpoint.
+            ::uwvm2::runtime::checkpoint::observation_probe_hints::require_all(this);
             auto ticket{domain_->request_pause()};
             if(ticket) { advance_stop_identifier_locked(); }
             return ticket;
@@ -577,6 +665,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             : config_{config}, authority_{config}, domain_{::std::make_shared<domain_type>(capacity)}, traces_(capacity),
               capture_trace_{capture}, read_memory_{reader}
         {
+            wasip1_calls::begin_debug_session();
             admission_ = authority_.status();
             if(admission_ == control_error::none) { admission_ = session_.attach_console(authority_.issue_permit()); }
             if(admission_ == control_error::none)
@@ -586,6 +675,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         {
             // Runtime retains observer.context through execution drain. The raw
             // pointer borrows that owner solely for this synchronous callback.
+            wasip1_calls::observe_thread(participant,location.code_unit);
             static_cast<controller*>(context)->on_safe_point(participant, location);
         }
         static void before_park(void* context, ::std::uint_least64_t participant, location_type location,
@@ -600,7 +690,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         {
             auto& self{*static_cast<controller*>(context)};
             ::std::unique_lock lock{self.mutex_, ::std::defer_lock};
-#if defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)
+#if (defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)) || UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
             // An opaque native continuation may need its actual worker ACK
             // while the manager holds mutex_. Apply the safe-point protocol
             // here too; no host PC/registers become a native stop authority.
@@ -667,8 +757,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             { if(!wasm_trace_.append(event)) { wasm_trace_enabled_ = false; } }
             if(!pause_)
             {
+                if(first_wasm_instruction_pending_)
+                {
+                    // Generated instruction observers run before the opcode.
+                    // Preserve user breakpoint counters/conditions at this one-shot
+                    // launch stop; no numeric requested PC is used as authority.
+                    pause_ = request_pause_locked();
+                    if(pause_)
+                    {
+                        first_wasm_instruction_pending_ = false;
+                        reason_ = stop_reason::wasm_entry;
+                        changed_.notify_all();
+                    }
+                    return;
+                }
                 bool hit{step_thread_ != 0u && step_thread_ == participant};
-                auto reason{stop_reason::step};
+                auto reason{stop_reason::step}; bool source_hit{};
                 // Source stepping requests a real stop at this opcode. Policy
                 // runs on the manager AFTER all participants have parked and
                 // both source PC and true event identities can be authenticated.
@@ -691,9 +795,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                             }
                         }
                     }
-                    for(auto& point : breakpoints_)
+                    for(auto candidate{wasm_breakpoint_index_.first(location.code_unit,location.function,location.offset)};
+                        candidate != 0u; candidate = wasm_breakpoint_index_.next(candidate))
                     {
-                        if(point.identifier != 0u && point.enabled && point.module == location.code_unit && point.function == location.function &&
+                        auto& point{breakpoints_[candidate - 1u]};
+                        if(point.identifier != 0u && !point.assembly && point.enabled && point.module == location.code_unit && point.function == location.function &&
                            point.offset == location.offset)
                         {
                             if(point.hits != ::std::numeric_limits<::std::uint64_t>::max()) { ++point.hits; }
@@ -701,7 +807,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                             hit = true;
                             if(reason != stop_reason::wasm_catchpoint)
                             {
-                                reason = stop_reason::breakpoint;
+                                reason = stop_reason::breakpoint; source_hit=point.source_level;
                                 pending_breakpoint_ = point.identifier; pending_breakpoint_participant_ = participant;
                             }
                             break;
@@ -713,7 +819,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     pause_ = request_pause_locked();
                     if(pause_)
                     {
-                        reason_ = reason;
+                        reason_ = reason; source_statement_stop_=source_hit;
                         auto const conditional{::std::find_if(breakpoints_.begin(),breakpoints_.end(),
                             [&](auto const& point) { return point.identifier == pending_breakpoint_ && point.condition_size != 0u; })};
                         if((wasm_step_active_ || source_step_active_) && reason != stop_reason::step &&
@@ -727,6 +833,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         }
         void on_safe_point(::std::uint_least64_t participant, location_type location) noexcept
         {
+            // Mandatory host/GC sites still materialize their complete packet,
+            // but need no controller lock when no observation policy requests
+            // this identity. Full trace/step/pause/native/catchpoint demand is
+            // published before resume. The bridge still polls the actual pause
+            // participant and services native-continuation cancellation below.
+            if(!::uwvm2::runtime::checkpoint::observation_probe_hints::may_observe(
+                location.code_unit,location.function,location.offset)) { return; }
 #if defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)
             // This pointer is the ACTUAL selected worker's private TLS borrower,
             // not a requested participant/PC or a copied debugger label. Its
@@ -759,10 +872,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 }
             }
 #endif
+#if UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
+            ::std::unique_lock lock{mutex_, ::std::defer_lock};
+            while(!lock.try_lock())
+            { static_cast<void>(native_step::skip_pause_for_continuation()); ::std::this_thread::yield(); }
+            on_safe_point_locked(participant, location); return;
+#else
             // Ordinary observers keep their original blocking lock semantics.
             // Ordinary LLVM-full code has no observer or continuation branch.
             ::std::lock_guard lock{mutex_};
             on_safe_point_locked(participant, location);
+#endif
         }
         void capture_before_park(::std::uint_least64_t participant, location_type location,
                                  ::uwvm2::runtime::lib::llvm_jit_debug_local_view locals) noexcept
@@ -1032,6 +1152,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             result.wasip1_state_values.module = query.module;
             if(!wasip1_state::valid(query))
             { result.wasip1_state_values.result = wasip1_state::status::invalid_request; return; }
+            if(query.operation==wasip1_state::action::descriptor_detail)
+            {
+                auto actual{query};actual.operation=wasip1_state::action::descriptors;actual.first=query.descriptor;actual.count=1u;
+                query_wasip1_state_locked(actual,result,expected_stop);
+                if(result.wasip1_state_values.result==wasip1_state::status::ok &&
+                   (result.wasip1_state_values.descriptors.empty() || result.wasip1_state_values.descriptors.front().descriptor!=query.descriptor))
+                { result.wasip1_state_values.descriptors.clear();result.wasip1_state_values.result=wasip1_state::status::bad_descriptor; }
+                result.wasip1_trace_values=wasip1_calls::apply(query,result.wasip1_state_values.environment_identity);return;
+            }
             if(wasip1_calls::is_trace(query.operation))
             { result.wasip1_trace_values = wasip1_calls::apply(query); return; }
             if(!pause_ || exited_ || native_owned_)
@@ -2795,7 +2924,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 if(expected != native_step::phase::released &&
                    (state == native_step::phase::failed || state == native_step::phase::released ||
                     state == native_step::phase::idle
-#if defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)
+#if (defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)) || UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
                     || state == native_step::phase::continuation_cancel_pending
 #endif
                    )) { return false; }
@@ -2812,6 +2941,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             if(!native_owned_) { native_code_capture_ = {}; return true; }
             if(native_external_parked_)
             {
+                ::uwvm2::runtime::checkpoint::observation_probe_hints::require_all(this);
                 if(!domain_->external_unpark(pause_, native_participant_) && !domain_->is_closed()) { return false; }
                 // A closed domain has already retired its external marker. It
                 // grants no read authority, but the REAL backend session must
@@ -2874,6 +3004,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             }
             native_continuation_event_.disable_close();
             native_owned_ = false;
+            // Native targets are bound to this exact physical activation. They
+            // cannot survive release, restart, unwind or a new JIT publication.
+            for(auto& point : breakpoints_) { if(point.assembly) { point = {}; } }
+            for(auto& binding : native_breakpoint_bindings_) { binding = {}; }
+            native_breakpoint_hit_ = 0u;
             native_participant_ = 0u;
             native_pc_ = 0u;
             native_location_ = {}; native_anchor_location_ = {};
@@ -2903,8 +3038,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
 #endif
             return true;
         }
+        void retire_completed_native_event_locked() noexcept
+        {
+#if defined(__linux__) && defined(__x86_64__) && __SIZEOF_POINTER__ == 8 && defined(PERF_ATTR_SIZE_VER7) && !defined(__ILP32__)
+            auto const descriptor{native_step::take_completed_continuation_descriptor(native_session_)};
+            if(descriptor < 0) { return; }
+            auto const close_matching{[&](auto& event) noexcept
+            {
+                if(event.owns_descriptor() && event.file_.native_handle() == descriptor)
+                { event.disable_close(); return true; }
+                return false;
+            }};
+            if(close_matching(native_continuation_event_)) { return; }
+            for(auto& event : native_call_continuation_events_) { if(close_matching(event)) { return; } }
+            for(auto& event : native_return_continuation_events_) { if(close_matching(event)) { return; } }
+            ::fast_io::fast_terminate(); // A worker cannot own an unregistered descriptor.
+#endif
+        }
         void cancel_step_locked() noexcept
         {
+            first_wasm_instruction_pending_ = false;
             if(source_step_active_ || wasm_step_active_) { source_step_error_ = control_error::invalid_state; }
             step_thread_ = 0u; source_step_active_ = false; wasm_step_active_ = false;
             source_step_stop_count_ = 0u;
@@ -2912,7 +3065,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         }
         [[nodiscard]] bool resume_locked() noexcept
         {
-            if(!pause_ || !release_native_locked() || !domain_->resume(pause_)) { return false; }
+            if(!pause_ || !release_native_locked()) { return false; }
+            refresh_observation_hints_locked(true); // publish BEFORE waking any worker
+            if(!domain_->resume(pause_))
+            { ::uwvm2::runtime::checkpoint::observation_probe_hints::require_all(this);return false; }
             pause_ = {};
             stopped_wasm_catchpoint_ = 0u; terminal_wasm_participant_ = 0u;
             pending_breakpoint_ = pending_breakpoint_participant_ = 0u; condition_error_ = control_error::none;
@@ -2926,7 +3082,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         [[nodiscard]] static native_disassembly::instruction public_native_instruction(
             Image const& image, DisplayDecoder& display, SemanticDecoder& semantics,
             native_disassembly::instruction const& instruction) noexcept
-        { return native_branch_display::project(image, display, semantics, instruction); }
+        { return native_branch_display::project(image, display, semantics, instruction, true); }
         struct native_step_outcome
         {
             completion completed{completion::rejected};
@@ -2936,6 +3092,51 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             native_next_policy::reason next_reason{native_next_policy::reason::none};
             bool timed_out{};
         };
+
+        // Cross a guest call/return through genuine cooperative activation
+        // events, then arm a new owned JIT trap. No host instruction, guessed
+        // frame pointer or old Wasm value is exposed as a native stop.
+        [[nodiscard]] native_step_outcome execute_native_guest_boundary(::std::uint_least64_t selected,
+            wasm_step_policy policy, clock_type::duration budget, management_wait_interrupt interrupt, bool retain_native=true)
+        {
+            native_step_outcome result{};result.error=control_error::unsupported_command;
+            result.next_reason=native_next_policy::reason::current_native_trap_required;
+            auto const deadline{clock_type::now()+budget};
+            {
+                ::std::lock_guard lock{mutex_};
+                ::uwvm2::runtime::lib::llvm_jit_debug_activation_snapshot origin{};
+                if(!pause_ || !native_owned_ || !native_external_parked_ || selected!=native_participant_ ||
+                   !::uwvm2::runtime::lib::llvm_jit_debug_query_native_activation_host_api(native_code_capture_,&native_session_,origin) ||
+                   origin.participant!=selected || origin.frames.empty()) { return result; }
+                if(policy==wasm_step_policy::out && origin.frames.size()<2u)
+                { result.next_reason=native_next_policy::reason::caller_unwind_unavailable;return result; }
+                if(interrupt.pending()) { result.error=control_error::none;result.completed=completion::paused;return result; }
+                result.from=native_pc_;
+                step_thread_=selected;source_step_active_=false;wasm_step_active_=true;wasm_step_policy_=policy;
+                source_step_stop_count_=0u;source_step_error_=control_error::none;source_step_origin_activation_=::std::move(origin);
+                if(!release_native_locked(deadline)) { cancel_step_locked();result.error=control_error::invalid_state;return result; }
+                source_statement_stop_=false;reason_=stop_reason::step;
+            }
+            bool const landed{wait_for_stop(deadline,interrupt)};
+            auto current{inspect()};
+            result.next_reason=native_next_policy::reason::none;result.error=current.status;
+            if(!landed || interrupt.pending() || current.execution!=execution_status::stopped)
+            { ::std::lock_guard lock{mutex_};cancel_step_locked();source_step_error_=control_error::none;result.timed_out=!landed;
+              if(!pause_ && !exited_ && !domain_->is_closed()) { pause_=request_pause_locked();reason_=stop_reason::requested; }
+              changed_.notify_all();result.completed=completion::paused;return result; }
+            { ::std::lock_guard lock{mutex_};result.error=source_step_error_; }
+            if(result.error!=control_error::none || current.reason==stop_reason::breakpoint ||
+               current.reason==stop_reason::wasm_catchpoint || current.reason==stop_reason::wasm_trap ||
+               current.reason==stop_reason::wasm_uncaught) { result.completed=completion::paused;return result; }
+            if(!retain_native) { result.completed=completion::stepped;return result; }
+            auto const remaining{deadline-clock_type::now()};
+            if(remaining<=clock_type::duration::zero()) { result.timed_out=true;result.completed=completion::paused;return result; }
+            auto const armed{execute_native_step(selected,current,remaining,false,interrupt,true)};
+            result.error=armed.error;result.next_reason=armed.next_reason;result.to=armed.to;
+            result.completed=armed.completed;result.timed_out=armed.timed_out;
+            if(armed.error==control_error::none && armed.to) { ::std::lock_guard lock{mutex_};reason_=stop_reason::native_step; }
+            return result;
+        }
 
         [[nodiscard]] native_step_outcome execute_native_finish(::std::uint_least64_t selected,
             clock_type::duration wait_budget, management_wait_interrupt interrupt)
@@ -3087,6 +3288,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                             native_location_ = {actual.module,actual.function,0u,actual.runtime_epoch};
                             native_pc_ = actual.stop_pc; result.to = actual.stop_pc;
                             reason_ = stop_reason::native_step; advance_stop_identifier_locked(); clear_traces_locked();
+                            retire_completed_native_event_locked();
                             published = true;
                         }
                     }
@@ -3113,7 +3315,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             return 0u; // Never wrap/reuse an identity retained by kernel work.
         }
         [[nodiscard]] native_step_outcome execute_native_step(::std::uint_least64_t selected,
-            controller_reply const& initial, clock_type::duration wait_budget, bool ordinary_next = false, management_wait_interrupt interrupt = {})
+            controller_reply const& initial, clock_type::duration wait_budget, bool ordinary_next = false, management_wait_interrupt interrupt = {}, bool retain_entry = false, bool breakpoint_continue = false)
         {
             native_step_outcome result{};
             // Cold owned-code copying/MC boundary proof opens no guest gate.
@@ -3165,7 +3367,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 if(native_owned_)
                 {
                     if(!native_external_parked_ || native_participant_ != selected ||
-                       native_session_.state.load(::std::memory_order_acquire) != native_step::phase::trapped ||
+                       (native_session_.state.load(::std::memory_order_acquire) != native_step::phase::trapped &&
+                        native_session_.state.load(::std::memory_order_acquire) != native_step::phase::at_guest_pc) ||
                        native_pc_ < native_session_.owner_begin || native_pc_ >= native_session_.owner_end)
                     { return result; }
                     ::uwvm2::runtime::lib::llvm_jit_debug_native_function_image copied{};
@@ -3204,13 +3407,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     first_successor = permitted.first_successor;
                     second_successor = permitted.second_successor;
                     bool continuation_call{};
+                    [[maybe_unused]] ::uwvm2::runtime::lib::llvm_jit_debug_native_call_continuation_owner linear{};
+#if UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION || (defined(__linux__) && defined(__x86_64__) && __SIZEOF_POINTER__ == 8 && defined(PERF_ATTR_SIZE_VER7) && !defined(__ILP32__))
+                    if(breakpoint_continue && permitted && copied.size > 1u)
+                    {
+                        auto limit{copied.size-1u};
+                        // Never batch past an enabled breakpoint, even another
+                        // one sharing the current function. The runtime derives
+                        // a shorter safe straight-line prefix from real bytes.
+                        for(auto const& point:breakpoints_)
+                        {
+                            if(point.identifier && point.enabled && point.assembly && point.participant==selected &&
+                               point.module==copied.module && point.function==copied.function &&
+                               point.runtime_epoch==copied.runtime_epoch && point.function_generation==copied.function_generation &&
+                               point.offset>copied.stop_pc-copied.owner_begin && point.offset<limit)
+                            { limit=static_cast<::std::size_t>(point.offset); }
+                        }
+                        linear=::uwvm2::runtime::lib::llvm_jit_debug_mint_native_call_policy_host_api(
+                            native_code_capture_,
+#if defined(__linux__)
+                            native_activation_cursor_,
+#else
+                            {},
+#endif
+                            ::std::addressof(native_session_),false,limit);
+                    }
+#else
+                    (void)breakpoint_continue;
+#endif
 #if defined(__linux__) && defined(__x86_64__) && __SIZEOF_POINTER__ == 8 && \
     defined(UWVM2_ENABLE_DEBUG_NATIVE_CONTINUATION_LINUX_PRODUCT) && UWVM2_ENABLE_DEBUG_NATIVE_CONTINUATION_LINUX_PRODUCT == 1 && \
     defined(PERF_ATTR_SIZE_VER7) && !defined(__ILP32__)
-                    if(!permitted && ordinary_next &&
-                       permitted.unavailable_reason == native_next_policy::reason::call_continuation_unavailable)
+                    if(linear || (!permitted &&
+                       permitted.unavailable_reason == native_next_policy::reason::call_continuation_unavailable))
                     {
-                        if(native_call_continuation_count_ >= native_call_continuation_owners_.size())
+                        if(!linear && native_call_continuation_count_ >= native_call_continuation_owners_.size())
                         {
                             result.error = control_error::unsupported_command;
                             result.next_reason = native_next_policy::reason::call_continuation_capacity_exhausted;
@@ -3222,7 +3453,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                         // true-endpoint Wasm caller image and kernel trap. NI may
                         // run an opaque host/VM call with TF off; no callee view,
                         // code, register, stack or memory capability is issued.
-                        auto const call{::uwvm2::runtime::lib::llvm_jit_debug_mint_native_call_continuation_host_api(
+                        auto const call{linear ? linear : ::uwvm2::runtime::lib::llvm_jit_debug_mint_native_call_continuation_host_api(
                             native_code_capture_, native_activation_cursor_, ::std::addressof(native_session_))};
                         if(!call)
                         {
@@ -3241,7 +3472,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                             ::std::uintptr_t continuation{};
                             native_next_policy::reason failed{native_next_policy::reason::call_target_unavailable};
                             bool woke{};
+                            bool linear_run{};
                         } context{*this, copied, call, deadline, wait_budget, native_call_continuation_count_};
+                        context.linear_run=bool(linear);
                         // [complete host-stack context] exact synchronous borrow
                         // [safe] this opaque pointer is from addressof(context),
                         // never from Wasm/wire. It expires only AFTER the runtime
@@ -3263,7 +3496,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                                actual.function_generation != expected.function_generation || actual.runtime_epoch != expected.runtime_epoch ||
                                actual.continuation_pc <= expected.stop_pc || actual.continuation_pc >= expected.owner_end ||
                                context.index != manager.native_call_continuation_count_ ||
-                               context.index >= manager.native_call_continuation_owners_.size()) { return; }
+                               (!context.linear_run && context.index >= manager.native_call_continuation_owners_.size())) { return; }
+                            if(context.linear_run)
+                            {
+                                context.woke=resume.commit([&]() noexcept
+                                { return native_step::continue_linear_interval(manager.native_session_,actual.continuation_pc); });
+                                if(context.woke)
+                                { manager.native_external_parked_=false;context.continuation=actual.continuation_pc; }
+                                return;
+                            }
                             // [fixed stable cap/event arrays0 ... checked index<256) end
                             // [safe] bounds precede BOTH owner selections. Strong
                             // ownership is installed BEFORE precise event enable;
@@ -3289,7 +3530,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                             if(!resume.commit([&]() noexcept
                             {
                                 return native_step::continue_to_continuation(manager.native_session_, actual.continuation_pc,
-                                    cookie, event.file_.native_handle());
+                                    cookie, event.file_.native_handle(), actual.return_stack_adjustment);
                             }))
                             {
                                 // A false backend leaves its existing trap/TLS
@@ -3363,6 +3604,42 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                         first_successor=context.continuation;second_successor=0u;
                         continuation_call=started_continuation=true;
                     }
+#elif UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
+                    if(linear || (!permitted && permitted.unavailable_reason == native_next_policy::reason::call_continuation_unavailable))
+                    {
+                        auto const call{linear ? linear : ::uwvm2::runtime::lib::llvm_jit_debug_mint_native_call_continuation_host_api(
+                            native_code_capture_, {}, ::std::addressof(native_session_))};
+                        if(!call)
+                        { result.error=control_error::unsupported_command; result.next_reason=native_next_policy::reason::call_target_unavailable; return result; }
+                        struct hardware_resume_context
+                        {
+                            controller& manager;
+                            ::uwvm2::runtime::lib::llvm_jit_debug_native_function_image const& expected;
+                            ::std::uintptr_t continuation{};
+                            bool woke{};
+                        } context{*this,copied};
+                        bool const committed{::uwvm2::runtime::lib::llvm_jit_debug_resume_native_call_continuation_host_api(
+                            call, ::std::addressof(native_session_), ::std::addressof(context),
+                            [](void* opaque, ::uwvm2::runtime::lib::llvm_jit_debug_native_call_continuation_view const& actual,
+                               ::uwvm2::utils::thread::cooperative_pause_domain::external_resume_borrow& resume) noexcept
+                        {
+                            auto& context{*static_cast<hardware_resume_context*>(opaque)};
+                            auto& manager{context.manager}; auto const& expected{context.expected};
+                            if(actual.thread != manager.native_session_.target_thread || actual.origin_pc != expected.stop_pc ||
+                               actual.owner_begin != expected.owner_begin || actual.owner_end != expected.owner_end ||
+                               actual.module != expected.module || actual.function != expected.function ||
+                               actual.function_generation != expected.function_generation || actual.runtime_epoch != expected.runtime_epoch ||
+                               actual.continuation_pc <= expected.stop_pc || actual.continuation_pc >= expected.owner_end) { return; }
+                            context.woke = resume.commit([&]() noexcept
+                            { return native_step::continue_to_continuation(manager.native_session_,actual.continuation_pc); });
+                            if(context.woke) { manager.native_external_parked_=false; context.continuation=actual.continuation_pc; }
+                        })};
+                        if(!committed || !context.woke)
+                        { result.error=control_error::unsupported_command; result.next_reason=native_next_policy::reason::call_continuation_event_unavailable; return result; }
+                        deadline=clock_type::now()+wait_budget;
+                        first_successor=context.continuation; second_successor=0u;
+                        continuation_call=started_continuation=true;
+                    }
 #endif
                     if(!permitted && !continuation_call)
                     {
@@ -3380,6 +3657,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                         { result.error = control_error::unsupported_command; return result; }
 #endif
                         deadline = clock_type::now() + wait_budget;
+                        ::uwvm2::runtime::checkpoint::observation_probe_hints::require_all(this);
                         if(!domain_->external_unpark(pause_, selected)) { return result; }
                         native_external_parked_ = false;
                         if(!native_step::continue_from_trap(native_session_))
@@ -3420,12 +3698,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     result.decoded = public_native_instruction(copied, display, semantics, permitted.decoded);
                     first_successor = permitted.first_successor;
                     second_successor = permitted.second_successor;
-                    if(!permitted)
+                    if(!permitted && !retain_entry)
                     {
                         result.error = control_error::unsupported_command;
                         result.next_reason = permitted.unavailable_reason;
                         return result; // Preserve the original cooperative stop.
                     }
+                    if(retain_entry && (permitted.decoded.size == 0u))
+                    { result.error = control_error::unsupported_command; return result; }
 #if defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)
                     auto const cursor{::uwvm2::runtime::lib::llvm_jit_debug_mint_native_activation_host_api(
                         record->activation_capture, ::std::addressof(native_session_))};
@@ -3537,7 +3817,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                    !domain_->external_park(pause_, selected, native_anchor_location_))
                 { static_cast<void>(resume_locked()); return result; }
                 native_external_parked_ = true;
+                if(retain_entry)
+                {
+                    // Remain on the backend's first real kernel gate. Publishing
+                    // the trap does not perform the first instruction or fabricate
+                    // a completed-step phase. Runtime repeats domain/owner/ledger
+                    // and physical-register validation before any public display.
+                    if(!native_step::retain_initial_trap(native_session_))
+                    { static_cast<void>(resume_locked()); return result; }
+#if defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)
+                    if(!::uwvm2::runtime::lib::llvm_jit_debug_native_activation_host_api(
+                           native_activation_cursor_, ::std::addressof(native_session_)))
+                    { static_cast<void>(resume_locked()); return result; }
+#endif
+                    ::uwvm2::runtime::lib::llvm_jit_debug_native_function_image actual{};
+                    if(!::uwvm2::runtime::lib::llvm_jit_debug_copy_native_function_host_api(native_code_capture_,
+                           ::std::addressof(native_session_), actual) || !actual.native_instruction_stop ||
+                       actual.stop_pc != native_session_.first_pc || actual.participant != selected ||
+                       actual.module != native_location_.code_unit || actual.function != native_location_.function ||
+                       actual.runtime_epoch != native_location_.code_generation || actual.function_generation == 0u ||
+                       actual.owner_begin != native_session_.owner_begin || actual.owner_end != native_session_.owner_end)
+                    { static_cast<void>(resume_locked()); return result; }
+                    native_pc_ = actual.stop_pc;
+                    reason_ = stop_reason::native_entry; advance_stop_identifier_locked();
+                    clear_traces_locked(); // A physical native stop never reuses cooperative value credentials.
+                    result.to = native_pc_; result.completed = completion::paused;
+                    result.error = control_error::none; return result;
+                }
                 result.from = native_session_.first_pc;
+                ::uwvm2::runtime::checkpoint::observation_probe_hints::require_all(this);
                 if(!domain_->external_unpark(pause_, selected))
                 { static_cast<void>(resume_locked()); return result; }
                 native_external_parked_ = false;
@@ -3604,8 +3912,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                    actual.owner_end != native_session_.owner_end)
                 { static_cast<void>(resume_locked()); return result; }
                 native_pc_ = native_session_.next_pc;
+                retire_completed_native_event_locked();
                 result.to = native_pc_;
-                reason_ = stop_reason::native_step;
+                reason_ = stop_reason::native_step; native_breakpoint_hit_ = 0u;
                 advance_stop_identifier_locked();
                 // Locals/backtraces were copied at the previous Wasm safe point.
                 // One machine instruction may mutate either; never display a
@@ -3615,6 +3924,121 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             result.completed = completion::stepped;
             result.error = control_error::none;
             return result;
+        }
+        // Only the runtime-private capture and our actual trapped session admit
+        // this image. Numeric offsets/IDs never become native read authority.
+        [[nodiscard]] bool native_breakpoint_image_locked(
+            ::uwvm2::runtime::lib::llvm_jit_debug_native_function_image& image)
+        {
+            return pause_ && native_owned_ && native_external_parked_ && native_code_capture_ &&
+                native_participant_ != 0u && stop_identifier_ != 0u &&
+                native_session_.state.load(::std::memory_order_acquire) == native_step::phase::trapped &&
+                !native_session_.abort_requested.load(::std::memory_order_acquire) &&
+                ::uwvm2::runtime::lib::llvm_jit_debug_copy_native_function_host_api(
+                    native_code_capture_, ::std::addressof(native_session_), image) &&
+                image.native_instruction_stop && image.complete_storage() &&
+                image.participant == native_participant_ && image.stop_pc == native_pc_ &&
+                image.owner_begin == native_session_.owner_begin && image.owner_end == native_session_.owner_end &&
+                image.owner_begin != 0u && image.owner_end > image.owner_begin &&
+                image.owner_end - image.owner_begin == image.size &&
+                image.stop_pc >= image.owner_begin && image.stop_pc < image.owner_end &&
+                image.module == native_location_.code_unit && image.function == native_location_.function &&
+                image.function_generation != 0u && image.runtime_epoch == native_location_.code_generation;
+        }
+        void configure_native_breakpoint_locked(::std::uint64_t offset, controller_reply& reply)
+        {
+            reply.status = control_error::invalid_state;
+            ::uwvm2::runtime::lib::llvm_jit_debug_native_function_image image{};
+            if(!native_breakpoint_image_locked(image)) { return; }
+            reply.status = control_error::breakpoint_not_executable;
+            native_disassembly::decoder display{image.target};
+            auto const candidate{native_disassembly::guest_breakpoint_with(display, image, offset)};
+            native_owned_instruction_semantics::decoder semantics{image.target};
+            if(!candidate || !public_native_instruction(image, display, semantics, candidate)) { return; }
+            // Reuse only a binding to this identical canonical activation and
+            // publication. The capture is kept privately; public rows hold DATA.
+            for(auto const& binding : native_breakpoint_bindings_)
+            {
+                if(binding.identifier == 0u || binding.capture != native_code_capture_ ||
+                   binding.begin != image.owner_begin || binding.end != image.owner_end) { continue; }
+                for(auto const& point : breakpoints_)
+                {
+                    if(point.identifier == binding.identifier && point.assembly && point.offset == offset &&
+                       point.module == image.module && point.function == image.function &&
+                       point.participant == image.participant && point.function_generation == image.function_generation &&
+                       point.runtime_epoch == image.runtime_epoch)
+                    { reply.breakpoint_identifier = point.identifier; reply.status = control_error::none; return; }
+                }
+            }
+            auto const slot{::std::find_if(breakpoints_.begin(), breakpoints_.end(),
+                [](auto const& point) { return point.identifier == 0u; })};
+            auto const binding{::std::find_if(native_breakpoint_bindings_.begin(), native_breakpoint_bindings_.end(),
+                [](auto const& point) { return point.identifier == 0u; })};
+            reply.status = control_error::exhausted;
+            if(slot == breakpoints_.end() || binding == native_breakpoint_bindings_.end() || next_breakpoint_ == 0u) { return; }
+            *slot = {next_breakpoint_++, image.module, image.function, offset};
+            slot->assembly = true; slot->participant = image.participant;
+            slot->function_generation = image.function_generation; slot->runtime_epoch = image.runtime_epoch;
+            *binding = {slot->identifier, native_code_capture_, image.owner_begin, image.owner_end};
+            reply.breakpoint_identifier = slot->identifier; reply.status = control_error::none;
+        }
+        [[nodiscard]] bool native_breakpoints_active_locked() const noexcept
+        {
+            if(!native_owned_ || !native_external_parked_ || !native_code_capture_) { return false; }
+            for(auto const& point : breakpoints_)
+            {
+                if(point.identifier == 0u || !point.assembly || !point.enabled || point.participant != native_participant_) { continue; }
+                for(auto const& binding : native_breakpoint_bindings_)
+                { if(binding.identifier == point.identifier && binding.capture == native_code_capture_) { return true; } }
+            }
+            return false;
+        }
+        [[nodiscard]] native_step_outcome continue_to_native_breakpoint(::std::uint64_t participant,
+            clock_type::duration budget, management_wait_interrupt interrupt)
+        {
+            auto const deadline{clock_type::now() + budget}; native_step_outcome result{};
+            // Proven straight-line intervals batch native manager stops.
+            // Other instructions retain genuine single stepping. Every gate
+            // repeats the existing owner,
+            // successor, activation, stack and register proof. No intermediate
+            // state is printed; an unproved VM/call/return boundary fails closed.
+            // Continue first executes an instruction, so a hit at the current
+            // PC does not immediately re-trigger without making progress.
+            for(::std::size_t count{}; count != 65536u; ++count)
+            {
+                if(clock_type::now() >= deadline)
+                { result.error = control_error::unsupported_command; result.timed_out = true; return result; }
+                auto const initial{inspect()};
+                if(initial.execution != execution_status::stopped) { return result; }
+                result = execute_native_step(participant, initial, deadline - clock_type::now(), false, interrupt, false, true);
+                if(result.error != control_error::none || result.completed != completion::stepped) { return result; }
+                ::std::lock_guard lock{mutex_};
+                ::uwvm2::runtime::lib::llvm_jit_debug_native_function_image image{};
+                if(!native_breakpoint_image_locked(image))
+                { result.error = control_error::invalid_state; return result; }
+                for(auto& point : breakpoints_)
+                {
+                    if(point.identifier == 0u || !point.assembly || !point.enabled ||
+                       point.participant != participant || point.module != image.module || point.function != image.function ||
+                       point.function_generation != image.function_generation || point.runtime_epoch != image.runtime_epoch ||
+                       point.offset >= image.size || image.stop_pc - image.owner_begin != point.offset) { continue; }
+                    auto const binding{::std::find_if(native_breakpoint_bindings_.begin(), native_breakpoint_bindings_.end(),
+                        [&](auto const& value) { return value.identifier == point.identifier &&
+                            value.capture == native_code_capture_ && value.begin == image.owner_begin && value.end == image.owner_end; })};
+                    if(binding == native_breakpoint_bindings_.end()) { continue; }
+                    native_disassembly::decoder display{image.target};
+                    auto const candidate{native_disassembly::guest_breakpoint_with(display, image, point.offset)};
+                    native_owned_instruction_semantics::decoder semantics{image.target};
+                    if(!candidate || !public_native_instruction(image, display, semantics, candidate))
+                    { result.error = control_error::breakpoint_not_executable; return result; }
+                    if(point.hits != UINT64_MAX) { ++point.hits; }
+                    if(point.ignore_remaining != 0u) { --point.ignore_remaining; continue; }
+                    reason_ = stop_reason::native_breakpoint; native_breakpoint_hit_ = point.identifier;
+                    result.error = control_error::none; return result;
+                }
+            }
+            result.error = control_error::unsupported_command; result.timed_out = true;
+            return result; // The last genuine stop remains owned; no synthetic hit.
         }
         // Caller owns mutex_. Numeric stop IDs only reject stale IDE requests;
         // the runtime independently authenticates the privately minted capture,
@@ -3672,16 +4096,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             // One cold semantic MC context for this whole owned display page.
             // A missing context leaves optional target DATA unavailable.
             native_owned_instruction_semantics::decoder semantics_decoder{copied.target};
-            bool public_gap{};
             for(::std::size_t index{}; index != decoded.count; ++index)
             {
                 // [fixed decoded page ... count <= 32] end
                 // [safe                              ] both arrays share this capacity;
                 //  ^^ only owned instruction values survive the copied-image lifetime.
                 auto instruction{decoded.instructions[index]};
-                if(!public_gap) { instruction = public_native_instruction(copied, display_decoder, semantics_decoder, instruction); }
-                else { instruction = {}; }
-                if(!instruction) { public_gap = true; }
+                instruction = public_native_instruction(copied, display_decoder, semantics_decoder, instruction);
+                if(!instruction && decoded.instructions[index]) { instruction.pc = decoded.instructions[index].pc; }
                 result.disassembly[index] = instruction;
                 result.disassembly_destinations[index] = native_branch_display::decode(semantics_decoder, instruction);
             }
@@ -3735,6 +4157,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
 
         void wasm_command_locked(wasm_events::request const& request, controller_reply& result)
         {
+            ::uwvm2::runtime::checkpoint::observation_probe_hints::require_all(this);
+            refresh_observation_hints_on_return refresh{*this};
             using enum wasm_events::command_kind;
             if(!wasm_events::known_category(request.event)) { result.status = control_error::malformed; return; }
             switch(request.command)
@@ -3837,7 +4261,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     if(row.size > UINTPTR_MAX - row.pc) { result.status = control_error::unsupported_command; return; }
                     last = row.pc + row.size;
                 }
-                else { row.pc = last; }
+                else if(row.pc == 0u) { row.pc = last; }
             }
             // Retain authenticated bounds for mandatory target containment;
             // plain output requests no function name or symbolic resolution.
@@ -4045,7 +4469,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     }
                 }
                 if(source_step_error_ != control_error::none || outcome.result != source_step::action::keep_running)
-                { source_step_active_ = false; wasm_step_active_ = false; step_thread_ = 0u; return true; }
+                { source_statement_stop_=source_step_active_ && source_step_error_==control_error::none && outcome.result==source_step::action::stop;
+                  source_step_active_ = false; wasm_step_active_ = false; step_thread_ = 0u; return true; }
                 // Only an authenticated real next stop was used. Retire this
                 // ticket/capture before running to another actual opcode. The
                 // selected participant retains the step request across resumes.
@@ -4058,7 +4483,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         {
             ::std::lock_guard lock{mutex_};
             controller_reply result;
-            result.reason = reason_;
+            result.reason = reason_; result.source_statement_stop=source_statement_stop_;
             result.wasm_catchpoint_identifier = stopped_wasm_catchpoint_;
             result.wasm_terminal_participant = terminal_wasm_participant_;
             result.guest_exit_code = exit_code_;
@@ -4072,6 +4497,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             if(condition_error_ != control_error::none) { cancel_step_locked(); source_step_error_ = control_error::none; }
             result.execution = execution_status::stopped;
             result.stop_identifier = stop_identifier_;
+            result.native_breakpoint_hit = native_breakpoint_hit_;
             result.breakpoint_condition_identifier = pending_breakpoint_;
             result.breakpoint_condition_error = condition_error_;
             for(auto const& member : stopped.participants)
@@ -4080,7 +4506,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 if(native_owned_ && native_external_parked_ && member.id == native_participant_)
                 {
                     saved.location = native_location_;
-                    saved.native_pc = native_pc_; saved.source_inline_reason = source_inline_unavailable_reason::native_stop;
+                    saved.native_pc = native_pc_; result.source_statement_stop = false; saved.source_inline_reason = source_inline_unavailable_reason::native_stop;
                     ::uwvm2::runtime::lib::llvm_jit_debug_native_position mapped{};
                     // The runtime owns ONE actual native-park transaction; the
                     // previous Wasm display location is never its PC authority.
@@ -4092,13 +4518,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                        mapped.owner_end > mapped.owner_begin && mapped.pc >= mapped.owner_begin && mapped.pc < mapped.owner_end)
                     {
                         saved.native_wasm_position = mapped;
+                        if(mapped.function_generation == 1u)
+                        { saved.source = find_source_locked(native_anchor_location_).value; }
                         // This is only display metadata for a qualified native
                         // provenance row. Original guest DWARF is usable solely
                         // for generation one; replacement keeps it retired.
                         // It grants no numeric locals, guest-memory or stepping authority.
                         if(mapped.status == ::uwvm2::runtime::lib::llvm_jit_debug_native_position_status::exact &&
                            mapped.function_generation == 1u)
-                        { saved.source = find_source_locked({mapped.module, mapped.function, mapped.wasm_offset, mapped.runtime_epoch}).value; }
+                        { auto source{find_source_locked({mapped.module, mapped.function, mapped.wasm_offset, mapped.runtime_epoch}).value};
+                          if(source) { saved.source=::std::move(source); } }
                     }
                 }
                 else { saved.source = find_source_locked(member.location).value; }
@@ -4193,6 +4622,42 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             return ::std::shared_ptr<controller>{new controller{config, capacity, capture, reader}};
         }
         [[nodiscard]] control_error status() const noexcept { return admission_; }
+        // HOST CLI only. The target has passed ordinary breakpoint validation.
+        // A user-owned point gets an independent unconditional temporary point;
+        // its condition, enabled state and counters are never changed.
+        // No address, source lookup, native capture or new permission is granted.
+        [[nodiscard]] ::std::uint64_t make_initial_temporary_breakpoint(::std::uint64_t identifier, bool distinct)
+        {
+            ::std::lock_guard lock{mutex_};
+            if(identifier == 0u || admission_ != control_error::none || exited_ ||
+               domain_->is_closed() || !pause_ || reason_ != stop_reason::initial) { return 0u; }
+            auto point{::std::find_if(breakpoints_.begin(), breakpoints_.end(),
+                [&](auto const& value) { return value.identifier == identifier; })};
+            if(point == breakpoints_.end() || point->assembly) { return 0u; }
+            if(distinct)
+            {
+                auto const free{::std::find_if(breakpoints_.begin(), breakpoints_.end(),
+                    [](auto const& value) { return value.identifier == 0u; })};
+                if(free == breakpoints_.end() || next_breakpoint_ == 0u) { return 0u; }
+                *free = {next_breakpoint_++, point->module, point->function, point->offset};
+                point = free;
+            }
+            else if(!point->enabled || point->condition_size != 0u || point->ignore_remaining != 0u) { return 0u; }
+            auto const temporary_id{point->identifier};
+            ::std::rotate(breakpoints_.begin(), point, point + 1);
+            rebuild_wasm_breakpoint_index_locked();
+            return temporary_id;
+        }
+        // Cold host breakpoint settings only. No ticket, trace, native code or
+        // runtime owner survives a restart; every target is validated anew.
+        [[nodiscard]] ::std::vector<breakpoint> copy_restart_breakpoints()
+        {
+            ::std::lock_guard lock{mutex_};
+            ::std::vector<breakpoint> result;
+            for(auto const& point : breakpoints_)
+            { if(point.identifier != 0u && !point.assembly) { result.push_back(point); } }
+            return result;
+        }
         // Read-only HOST UI metadata. Names/indices are DATA, never native
         // addresses or breakpoint permission. Callers still submit a normal
         // breakpoint command to execute(), which authenticates the live target.
@@ -4247,14 +4712,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         // per module so Wasm-level debugging remains available.
         [[nodiscard]] bool install_source_module(::std::uint64_t id,
             source_map_sections sections, ::std::vector<source_function_span> functions,
-            bool invalid_metadata = false)
+            bool invalid_metadata = false, ::fast_io::string_view display_name = {}, ::fast_io::string_view display_file = {})
         {
             ::std::lock_guard lock{mutex_};
             if(source_installation_closed_ || pause_ || exited_ || id > 65536u) { return false; }
             if(id >= source_modules_.size()) { source_modules_.resize(static_cast<::std::size_t>(id + 1u)); }
             auto& target{source_modules_[static_cast<::std::size_t>(id)]};
+            target.display_name = ::fast_io::concat_fast_io(display_name.subview(0u, (::std::min)(display_name.size(), ::std::size_t{4096u})));
+            target.display_file = ::fast_io::concat_fast_io(display_file.subview(0u, (::std::min)(display_file.size(), ::std::size_t{4096u})));
             target.functions = ::std::move(functions);
             target.invalidated.assign(target.functions.size(), false);
+            target.source_points.assign(target.functions.size(), 2u);
             target.status = invalid_metadata ? source_map_error::malformed :
                 source_map::parse(id, sections, target.lines);
             target.line_only = target.status == source_map_error::none &&
@@ -4266,8 +4734,112 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                    ::std::adjacent_find(target.functions.begin(), target.functions.end(),
                     [](auto const& a, auto const& b) { return a.function == b.function; }) != target.functions.end())
                 { target.status = source_map_error::malformed; }
+                if(target.status == source_map_error::none)
+                {
+                    ::std::size_t work{};
+                    for(::std::size_t i{}; i < target.functions.size() && work < 262144u; ++i)
+                    {
+                        auto const& function{target.functions[i]};
+                        auto const sites{::uwvm2::runtime::lib::llvm_jit_debug_safe_points_host_api(id, function.function)};
+                        if(!sites || sites.function_generation != 1u || sites.expression_size != function.expression_size) { ++work; continue; }
+                        bool found{}; ::std::size_t byte{};
+                        for(; byte < sites.byte_count && work < 262144u && !found; ++byte)
+                        {
+                            ++work;
+                            for(unsigned bit{}; bit < 8u && work < 262144u; ++bit)
+                            {
+                                if((sites.bits[byte] & (1u << bit)) == 0u) { continue; }
+                                ++work;
+                                if(byte > ((::std::numeric_limits<::std::uint64_t>::max)() - bit) / 8u) { break; }
+                                auto const offset{static_cast<::std::uint64_t>(byte) * 8u + bit};
+                                if(offset >= function.expression_size || function.expression_begin > (::std::numeric_limits<::std::uint64_t>::max)() - offset) { break; }
+                                auto const mapped{target.lines.lookup(id, function.expression_begin + offset)};
+                                if(mapped && mapped->line != 0u && !mapped->file.empty() && mapped->is_statement && !mapped->epilogue_begin)
+                                { found = true; break; }
+                            }
+                        }
+                        if(found) { target.source_points[i] = 1u; }
+                        else if(byte == sites.byte_count && work < 262144u) { target.source_points[i] = 0u; }
+                    }
+                }
             }
             return true;
+        }
+        // Copied HOST module labels and original source availability only.
+        // No runtime code, registers, stack, memory or file reads occur here.
+        // One current stop selects a privately copied function image. The text
+        // is detached display data and cannot authorize guest/native memory IO.
+        [[nodiscard]] ::fast_io::string wasm_instruction_listing(::std::uint64_t participant, ::std::uint64_t stop)
+        {
+            auto const current{inspect()};
+            ::std::lock_guard lock{mutex_};
+            if(stop==0u || stop!=stop_identifier_ || current.stop_identifier!=stop || current.execution!=execution_status::stopped)
+            { return ::fast_io::concat_fast_io("Wasm listing unavailable: stale or running stop\n"); }
+            auto member{::std::find_if(current.threads.begin(),current.threads.end(),[&](auto const& t) { return t.identifier==participant; })};
+            if(member==current.threads.end()) { return ::fast_io::concat_fast_io("Wasm thread unavailable\n"); }
+            auto location{member->location}; bool intermediate{member->native_pc.has_value()};
+            if(intermediate)
+            {
+                if(!member->native_wasm_position)
+                { return ::fast_io::concat_fast_io("Wasm owner unavailable at this native instruction\n"); }
+                auto const& at{*member->native_wasm_position};
+                if(at.status==::uwvm2::runtime::lib::llvm_jit_debug_native_position_status::exact)
+                { location={at.module,at.function,at.wasm_offset,at.runtime_epoch}; }
+                else if(at.module==native_anchor_location_.code_unit && at.function==native_anchor_location_.function &&
+                        at.runtime_epoch==native_anchor_location_.code_generation && at.function_generation==1u)
+                { location=native_anchor_location_; }
+                else { return ::fast_io::concat_fast_io("Wasm position unavailable: native owner differs from the last confirmed Wasm instruction\n"); }
+            }
+            if(location.code_unit>=source_modules_.size()) { return ::fast_io::concat_fast_io("Wasm module unavailable\n"); }
+            auto const& module{source_modules_[location.code_unit]};
+            auto found{::std::lower_bound(module.wasm_functions.begin(),module.wasm_functions.end(),location.function,
+                [](auto const& f,auto index) { return f.function<index; })};
+            if(module.wasm_runtime_epoch!=location.code_generation || found==module.wasm_functions.end() || found->function!=location.function ||
+               found->function_generation==0u || !found->instruction_safe_points_complete || found->expression_bytes.size()!=found->expression_size ||
+               found->instruction_safe_point_bits.size()!=found->expression_size/8u+(found->expression_size%8u!=0u))
+            { return ::fast_io::concat_fast_io("Wasm instruction boundaries unavailable for this generation\n"); }
+            auto text{::fast_io::concat_fast_io(module.display_file.empty()?module.display_name.subview(0u):module.display_file.subview(0u),
+                " | ",wasm_symbols::lookup(module.symbols,false,location.function)," [",location.function,"]\n")};
+            if(intermediate && member->native_wasm_position->status!=::uwvm2::runtime::lib::llvm_jit_debug_native_position_status::exact)
+            { text.append("N>: intermediate native stop; last confirmed Wasm opcode (display only)\n"); }
+            auto boundary{[&](::std::size_t i) { return (found->instruction_safe_point_bits[i/8u]&(1u<<(i%8u)))!=0u; }};
+            ::std::size_t previous{},start{},rows{};
+            for(::std::size_t i{}; i<found->expression_size && i<location.offset; ++i) { if(boundary(i)) { start=previous; previous=i; } }
+            for(auto i{start}; i<found->expression_size && rows<64u; ++i)
+            {
+                if(!boundary(i)) { continue; }
+                auto end{i+1u}; while(end<found->expression_size && !boundary(end)) { ++end; }
+                auto const bytes{::std::span<::std::byte const>{found->expression_bytes.data()+i,end-i}};
+                auto decoded{wasm_listing::instruction(bytes)};
+                auto const symbol{wasm_symbols::reference(module.symbols,bytes)};
+                if(!symbol.empty()) { decoded.append(::fast_io::concat_fast_io("  <",symbol,">")); }
+                text.append(::fast_io::concat_fast_io(i==location.offset?(intermediate?::fast_io::string_view{"N> "} : ::fast_io::string_view{"=> "}) : ::fast_io::string_view{"   "},i,"  ",decoded,"\n")); ++rows;
+            }
+            return text;
+        }
+        [[nodiscard]] ::fast_io::string wasm_function_label(::std::uint64_t module,::std::uint64_t function)
+        {
+            ::std::lock_guard lock{mutex_};
+            if(module>=source_modules_.size()) { return {}; }
+            return ::fast_io::concat_fast_io(wasm_symbols::lookup(source_modules_[module].symbols,false,function));
+        }
+        [[nodiscard]] module_help_page source_module_page(::std::uint64_t page, ::std::size_t count = 4u)
+        {
+            ::std::lock_guard lock{mutex_};
+            module_help_page result{}; result.page = page; result.total = source_modules_.size();
+            count = ::std::clamp(count, ::std::size_t{1u}, result.rows.size());
+            result.pages = result.total / count + (result.total % count != 0u);
+            if(page == 0u || (result.pages != 0u && page > result.pages) || (result.pages == 0u && page != 1u)) { return result; }
+            result.valid = true;
+            auto const first{(page - 1u) * count};
+            for(auto i{first}; i < result.total && result.size < count; ++i)
+            {
+                auto const& source{source_modules_[static_cast<::std::size_t>(i)]};
+                auto& row{result.rows[result.size++]}; row.identifier = i;
+                row.name = source.display_name; row.file = source.display_file;
+                row.source = source_availability(source);
+            }
+            return result;
         }
 #if defined(UWVM_USE_LLVM_JIT) || defined(UWVM_USE_DEFAULT_JIT)
         // Native serialized setup only, before the first guest starts. The
@@ -4291,7 +4863,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 // [runtime-owned copied image payload] payload_end
                 // [safe                             ] borrowed only during parse,
                 //  ^^ index immediately makes its own immutable buffer copies.
-                sections.push_back({entry.name, entry.payload});
+                if(entry.name!="name") { sections.push_back({entry.name, entry.payload}); }
             }
             ::std::unique_ptr<source_dwarf::index> metadata{};
             source_dwarf::image_input input{sections, image.code_section_content_size, 4u};
@@ -4334,6 +4906,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             target.dwarf_status = status; target.dwarf = ::std::move(metadata); target.binding = ::std::move(binding);
             target.wasm_runtime_epoch = image.runtime_epoch;
             target.wasm_functions = ::std::move(image.functions);
+            if(target.dwarf_status==source_dwarf::error::none && target.dwarf)
+            {
+                for(auto const& scope:target.dwarf->scopes())
+                {
+                    if(scope.kind!=source_dwarf::scope_kind::subprogram || !scope.concrete || scope.name.empty()) { continue; }
+                    for(auto const& range:scope.ranges)
+                    {
+                        auto found{::std::upper_bound(target.functions.begin(),target.functions.end(),range.begin,
+                            [](auto address,auto const& function) { return address<function.expression_begin; })};
+                        if(found==target.functions.begin()) { continue; }--found;
+                        if(range.begin<range.end && range.begin>=found->expression_begin &&
+                           range.end-found->expression_begin<=found->expression_size)
+                        { target.symbols.functions.try_emplace(found->function,wasm_symbols::display(scope.name));break; }
+                    }
+                }
+                for(auto const& variable:target.dwarf->variables())
+                {
+                    if(!variable.global || variable.name.empty() || variable.locations.size()!=1u) { continue; }
+                    auto const& location{variable.locations.front()};auto const& plan{location.plan};
+                    if(!location.range && plan.kind==source_dwarf::plan_kind::wasm_local_value &&
+                       plan.storage==source_dwarf::wasm_location_space::global && plan.integer_transform_count==0u)
+                    { target.symbols.globals.try_emplace(plan.local_index,wasm_symbols::display(
+                        variable.qualified_name.empty()?variable.name:variable.qualified_name)); }
+                }
+            }
+            for(auto const& symbol : image.symbols)
+            { auto& names{symbol.global?target.symbols.globals:target.symbols.functions};
+              if(!symbol.name.empty()) { names.try_emplace(symbol.index,wasm_symbols::display(symbol.name)); } }
+            for(auto const& section : image.sections)
+            { if(section.name=="name") { wasm_symbols::load_name_section(section.payload,target.symbols); } }
             return true; // malformed/unavailable metadata preserves Wasm/native debugging.
 #if defined(__cpp_exceptions) || defined(_CPPUNWIND)
             }
@@ -4371,7 +4973,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             return native_shutdown_retirement::retired;
         }
         [[nodiscard]] ::uwvm2::runtime::lib::llvm_jit_debug_observer observer()
-        { return {shared_from_this(), observe, before_park, retire_on_close, observe_trap, observe_uncaught}; }
+        { return {shared_from_this(), observe, before_park, retire_on_close, observe_trap, observe_uncaught,true}; }
         // Only during serialized host startup, before starting the guest worker.
         [[nodiscard]] bool arm_initial_pause()
         {
@@ -4383,6 +4985,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             if(current.execution != execution_status::stopped) { return false; }
             synchronize_session(current);
             return true;
+        }
+        // Standalone HOST launch only; controller/transport command execution
+        // still rejects all launch shortcuts. The observer supplies the first
+        // actual Wasm location; the kernel supplies the optional native trap.
+        [[nodiscard]] controller_reply launch_first_instruction(bool native,
+            ::std::chrono::milliseconds timeout = ::std::chrono::seconds{2}, management_wait_interrupt interrupt = {})
+        {
+            auto result{inspect()};
+            if(native && (!native_step::platform_available() ||
+               !::uwvm2::runtime::lib::llvm_jit_enable_debug_native_step_host_api()))
+            { result.status = control_error::unsupported_command; return result; }
+            {
+                ::std::lock_guard lock{mutex_};
+                if(!pause_ || reason_ != stop_reason::initial || exited_ || domain_->is_closed() || native_owned_)
+                { result.status = control_error::invalid_state; return result; }
+                first_wasm_instruction_pending_ = true;
+                if(!resume_locked())
+                { first_wasm_instruction_pending_ = false; result.status = control_error::invalid_state; return result; }
+            }
+            bool const stopped{wait_for_stop(clock_type::now() + timeout, interrupt)};
+            result = inspect();
+            if(!stopped || result.execution != execution_status::stopped ||
+               result.reason != stop_reason::wasm_entry || result.threads.size() != 1u)
+            { result.status = control_error::invalid_state; result.timed_out = !stopped; return result; }
+            if(native)
+            {
+                auto const trapped{execute_native_step(result.threads.front().identifier, result,
+                    timeout, false, interrupt, true)};
+                result = inspect(); result.status = trapped.error; result.timed_out = trapped.timed_out;
+                result.native_next_reason = trapped.next_reason;
+            }
+            return result;
         }
         void notify_guest_exit(::std::int_least64_t code) noexcept
         {
@@ -4423,6 +5057,141 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             auto command{input_command};
             auto initial{inspect()};
             if(admission_ != control_error::none) { initial.status = admission_; return initial; }
+            if(command.kind==console_command_kind::execution_relocate)
+            {
+                using result=::uwvm2::runtime::lib::llvm_jit_debug_relocation_status;
+                auto status{result::current_stop_required};::std::uintptr_t from{},to{};
+                {
+                    ::std::lock_guard lock{mutex_};
+                    if(command.operation!=operation::status || command.payload_size || command.wait_for_event ||
+                       command.run_from_entry || command.launch_action!=console_launch_action::none)
+                    { initial.status=control_error::malformed;return initial; }
+                    if(initial.execution==execution_status::stopped && pause_ && stop_identifier_==initial.stop_identifier && !domain_->is_closed())
+                    {
+                        if(command.relocation==relocation_level::assembly && native_owned_ && native_external_parked_)
+                        {
+                            status=::uwvm2::runtime::lib::llvm_jit_debug_relocate_native_pc_host_api(native_code_capture_,
+                                &native_session_,command.relocation_target,command.relocation_absolute,from,to);
+                            if(status==result::moved)
+                            { native_pc_=to;reason_=stop_reason::execution_relocated;native_breakpoint_hit_=0u;advance_stop_identifier_locked();clear_traces_locked(); }
+                        }
+                        else if(!native_owned_ && (command.relocation==relocation_level::wasm ||
+                                (command.relocation==relocation_level::source && initial.source_statement_stop)))
+                        { status=result::restore_state_unavailable; }
+                    }
+                }
+                auto reply{inspect()};reply.relocation_status=status;reply.native_step_from=from;reply.native_step_to=to;
+                reply.status=status==result::moved ? control_error::none : control_error::unsupported_command;return reply;
+            }
+            // Restart requires the actual standalone launcher and real OS
+            // retirement. Direct controller/transport/script callers cannot
+            // turn this console spelling into an ordinary resume operation.
+            if(command.run_from_entry || command.launch_action != console_launch_action::none)
+            { initial.status = control_error::unsupported_command; return initial; }
+#if UWVM2_DEBUG_NATIVE_LEVEL_TRANSITIONS
+            if((command.kind==console_command_kind::assembly_step || command.kind==console_command_kind::assembly_next ||
+                command.kind==console_command_kind::assembly_finish) && initial.execution==execution_status::stopped &&
+                initial.threads.size()==1u && initial.threads.front().native_pc && command.operation==operation::step &&
+                !command.wait_for_event && (command.payload_size==0u || command.payload_size==8u) &&
+                (!command.requested_step_thread || command.requested_step_thread==initial.threads.front().identifier) &&
+                (!command.disassembly_stop_identifier || command.disassembly_stop_identifier==initial.stop_identifier))
+            {
+                // Linux retains its CFI-backed provider after an instruction
+                // trap. A zero-instruction entry is still on the first gate;
+                // finish that actual activation through its guest boundary.
+                bool cross{UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION && command.kind==console_command_kind::assembly_finish};
+                {
+                    ::std::lock_guard lock{mutex_};
+#if defined(__linux__)
+                    if(command.kind==console_command_kind::assembly_finish && native_owned_ && native_external_parked_ &&
+                       native_session_.retained_entry_stop &&
+                       native_session_.state.load(::std::memory_order_acquire)==native_step::phase::at_guest_pc) { cross=true; }
+#endif
+                    if(!cross && native_owned_ && native_external_parked_)
+                    {
+                        ::uwvm2::runtime::lib::llvm_jit_debug_native_function_image image{};
+                        if(::uwvm2::runtime::lib::llvm_jit_debug_copy_native_function_host_api(native_code_capture_,&native_session_,image) &&
+                           image.stop_pc>=image.owner_begin && image.stop_pc<image.owner_end && image.complete_storage())
+                        {
+                            native_owned_instruction_semantics::decoder decoder{image.target};auto const offset{image.stop_pc-image.owner_begin};
+                            auto const instruction{decoder.decode(image.stop_pc,{image.bytes.data()+offset,image.size-offset})};
+                            cross=instruction && instruction.semantics().kind==native_instruction_semantics::flow::return_instruction;
+                            if(!cross && instruction.safe_for_call_continuation())
+                            { cross=::uwvm2::runtime::lib::llvm_jit_debug_native_retirement_call_host_api(native_code_capture_,&native_session_); }
+                            if(!cross && command.kind==console_command_kind::assembly_step && instruction.safe_for_call_continuation())
+                            { cross=static_cast<bool>(::uwvm2::runtime::lib::llvm_jit_debug_mint_native_call_policy_host_api(
+                                native_code_capture_,
+#if defined(__linux__)
+                                native_activation_cursor_,
+#else
+                                {},
+#endif
+                                &native_session_,true)); }
+                        }
+                    }
+                }
+                if(cross)
+                {
+                    auto const outcome{execute_native_guest_boundary(initial.threads.front().identifier,
+                        command.kind==console_command_kind::assembly_finish ? wasm_step_policy::out : wasm_step_policy::into,timeout,interrupt)};
+                    auto reply{inspect()};reply.status=outcome.error;reply.native_next_reason=outcome.next_reason;
+                    reply.native_step_from=outcome.from;reply.native_step_to=outcome.to;reply.timed_out=outcome.timed_out;return reply;
+                }
+            }
+#endif
+            bool const cooperative_step{command.kind == console_command_kind::source_step || command.kind == console_command_kind::wasm_step ||
+                (command.kind == console_command_kind::protocol && command.operation == operation::step)};
+            if(cooperative_step && initial.execution == execution_status::stopped && initial.threads.size() == 1u && initial.threads.front().native_pc)
+            {
+                auto const origin{initial.threads.front()};
+                if(command.requested_step_thread != 0u && command.requested_step_thread != origin.identifier)
+                { initial.status=control_error::invalid_state; return initial; }
+#if UWVM2_DEBUG_NATIVE_LEVEL_TRANSITIONS
+                auto const policy{command.kind==console_command_kind::wasm_step ? command.wasm_policy :
+                    command.kind==console_command_kind::source_step && command.source_policy==source_step_policy::over ? wasm_step_policy::over :
+                    command.kind==console_command_kind::source_step && command.source_policy==source_step_policy::out ? wasm_step_policy::out : wasm_step_policy::into};
+                auto const outcome{execute_native_guest_boundary(origin.identifier,policy,timeout,interrupt,false)};
+                initial=inspect();initial.status=outcome.error;initial.timed_out=outcome.timed_out;
+                if(initial.status!=control_error::none || initial.timed_out || interrupt.pending() ||
+                   initial.execution!=execution_status::stopped || initial.threads.size()!=1u ||
+                   command.kind!=console_command_kind::source_step || policy==wasm_step_policy::out) { return initial; }
+                auto const& next{initial.threads.front()};
+                if(next.source && origin.source && (next.source->file!=origin.source->file || next.source->line!=origin.source->line)) { return initial; }
+#else
+                auto const deadline{clock_type::now()+timeout};
+                {
+                    ::std::lock_guard lock{mutex_};
+                    if(!native_owned_ || !native_external_parked_ || !pause_ || !release_native_locked(deadline))
+                    { initial.status=control_error::invalid_state; return initial; }
+                    source_statement_stop_=false; reason_=stop_reason::requested;
+                }
+                // The existing pause request parks at the next actual guest
+                // opcode and captures fresh activation/locals before returning.
+                bool const landed{wait_for_stop(deadline,interrupt)};
+                initial=inspect();
+                if(!landed || initial.execution!=execution_status::stopped || initial.threads.size()!=1u || interrupt.pending())
+                { initial.timed_out=!landed; return initial; }
+                if(command.kind != console_command_kind::source_step) { return initial; }
+                auto const& next{initial.threads.front()};
+                if(next.source && origin.source && (next.source->file!=origin.source->file || next.source->line!=origin.source->line))
+                { return initial; }
+#endif
+                // Same source statement: continue its real source policy using
+                // the freshly captured stop, never a stale native stop number.
+                command.disassembly_stop_identifier=initial.stop_identifier;
+            }
+            if(command.kind==console_command_kind::assembly_next && initial.execution==execution_status::stopped &&
+               initial.threads.size()==1u && !initial.threads.front().native_pc)
+            {
+                auto const selected{initial.threads.front().identifier};
+                if(command.requested_step_thread!=0u && command.requested_step_thread!=selected)
+                { initial.status=control_error::invalid_state;return initial; }
+                auto const entry{execute_native_step(selected,initial,timeout,false,interrupt,true)};
+                initial=inspect();
+                if(entry.error!=control_error::none || interrupt.pending())
+                { initial.status=entry.error;initial.native_next_reason=entry.next_reason;initial.timed_out=entry.timed_out;return initial; }
+                command.disassembly_stop_identifier=initial.stop_identifier;
+            }
             if(command.kind == console_command_kind::assembly_next || command.kind == console_command_kind::assembly_finish)
             {
                 // Current top native frame only: this command has no frame
@@ -4430,7 +5199,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 ::std::lock_guard lock{mutex_};
                 if(!native_owned_ || !native_external_parked_ || !native_code_capture_ || native_participant_ == 0u ||
                    !pause_ || stop_identifier_ == 0u || domain_->is_closed() ||
-                   native_session_.state.load(::std::memory_order_acquire) != native_step::phase::trapped ||
+                   (native_session_.state.load(::std::memory_order_acquire) != native_step::phase::trapped &&
+                    native_session_.state.load(::std::memory_order_acquire) != native_step::phase::at_guest_pc) ||
                    initial.execution != execution_status::stopped || initial.stop_identifier != stop_identifier_ ||
                    (command.requested_step_thread != 0u && command.requested_step_thread != native_participant_) ||
                    (command.disassembly_stop_identifier != 0u && command.disassembly_stop_identifier != stop_identifier_))
@@ -4504,6 +5274,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 command.kind == console_command_kind::replacement_file || command.kind == console_command_kind::wasm_mutation ||
                 command.source_run_to != source_run_to_policy::none))
             { initial.status = control_error::invalid_state; return initial; }
+            bool const assembly_breakpoint{command.kind == console_command_kind::assembly_breakpoint};
             bool const breakpoint_control{command.kind == console_command_kind::breakpoint_control};
             bool const replacement_file{command.kind == console_command_kind::replacement_file};
             bool const source_step{command.kind == console_command_kind::source_step};
@@ -4536,7 +5307,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             { initial.status = control_error::malformed; return initial; }
             if(((command.breakpoint_initial_ignore || command.breakpoint_initial_condition) && (command.operation != operation::breakpoint_set ||
                    (command.kind != console_command_kind::protocol && !source_breakpoint))) ||
-               (command.kind != console_command_kind::protocol && !replacement_file && !source_step && !wasm_step && !source_breakpoint && !assembly_step && !source_locals && !disassembly && !registers && !wasm_event && !wasm_script && !source_type && !source_frame && !wasm_state_query && !wasip1_state_query && !wasm_path_query && !wasm_mutation_query && !breakpoint_control) ||
+               (command.kind != console_command_kind::protocol && !replacement_file && !source_step && !wasm_step && !source_breakpoint && !assembly_step && !source_locals && !disassembly && !registers && !wasm_event && !wasm_script && !source_type && !source_frame && !wasm_state_query && !wasip1_state_query && !wasm_path_query && !wasm_mutation_query && !breakpoint_control && !assembly_breakpoint) ||
+               (assembly_breakpoint && (command.operation != operation::status || command.payload_size != 0u ||
+                    command.wait_for_event || command.native_breakpoint_offset > 65536u ||
+                    command.breakpoint_initial_condition || command.breakpoint_initial_ignore)) ||
                (breakpoint_control && (command.operation != operation::status || command.payload_size != 0u || command.wait_for_event ||
                     (command.breakpoint_policy != breakpoint_action::enable && command.breakpoint_policy != breakpoint_action::disable &&
                      command.breakpoint_policy != breakpoint_action::ignore && command.breakpoint_policy != breakpoint_action::condition) ||
@@ -4566,7 +5340,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                                 command.disassembly_stop_identifier == 0u || command.disassembly_count == 0u ||
                                 command.disassembly_count > 32u ||
                                 (disassembly_range && (command.disassembly_byte_offset < -65536 || command.disassembly_byte_offset > 65536 ||
-                                  command.disassembly_instruction_offset < -8704 || command.disassembly_instruction_offset > 8704)))) ||
+                                  command.disassembly_instruction_offset < -(INT64_MAX / 2) || command.disassembly_instruction_offset > INT64_MAX / 2)))) ||
                (source_breakpoint && (command.operation != operation::breakpoint_set || command.payload_size != 0u ||
                                       command.source_line == 0u || command.source_path_size == 0u ||
                                       command.source_path_size >= command.source_path.size())) ||
@@ -4615,7 +5389,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             bool const running{initial.execution == execution_status::running || initial.execution == execution_status::stopping};
             if(((command.operation == operation::resume || command.operation == operation::step ||
                  command.operation == operation::backtrace || command.operation == operation::read_memory ||
-                 command.operation == operation::locals || replacement_file || wasm_state_query ||
+                 command.operation == operation::locals || replacement_file || assembly_breakpoint || wasm_state_query ||
                  (wasip1_state_query && !wasip1_calls::is_trace(command.wasip1_state_request.operation)) || wasm_mutation_query ||
                  (wasm_path_query && command.wasm_path_request.action!=wasm_path::operation::clear)) && !stopped) ||
                (command.operation == operation::pause && !running))
@@ -4670,7 +5444,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 {
                     initial.status = source_destination_locked(position,command,prepared_source_step);
                 }
-                else { initial.status = source_step_error(::uwvm2::uwvm::debugger::source_step::prepare(position, policy, prepared_source_step)); }
+                else { initial.status = source_step_error(position.status==::uwvm2::uwvm::debugger::source_step::position_status::unmapped ?
+                    ::uwvm2::uwvm::debugger::source_step::prepare_unmapped(position,policy,prepared_source_step) :
+                    ::uwvm2::uwvm::debugger::source_step::prepare(position,policy,prepared_source_step)); }
                 if(initial.status != control_error::none) { return initial; }
             }
             if(next_request_ == 0u) { initial.status = control_error::exhausted; return initial; }
@@ -4744,6 +5520,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     }
                     if(!matched)
                     {
+                        auto const availability{source_availability(source)};
+                        initial.source_breakpoint_no_points = availability == module_source_status::no_points || availability == module_source_status::replaced;
                         initial.status = saw_invalidated ? control_error::source_debug_info_unavailable :
                                                                control_error::source_location_unmapped;
                         return initial;
@@ -4830,6 +5608,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 result.reason = current.reason; result.stop_identifier = current.stop_identifier;
                 return result;
             }
+            if(assembly_breakpoint)
+            {
+                auto const acknowledged{session_.complete(*received.request, completion::inspected)};
+                auto result{inspect()};
+                if(acknowledged != control_error::none) { result.status = acknowledged; return result; }
+                ::std::lock_guard lock{mutex_};
+                configure_native_breakpoint_locked(command.native_breakpoint_offset, result);
+                return result;
+            }
             if(breakpoint_control)
             {
                 // Existing authenticated status admission permits a bounded
@@ -4846,10 +5633,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     found = true;
                     if(command.breakpoint_policy == breakpoint_action::ignore) { point.ignore_remaining = command.breakpoint_ignore; }
                     else if(command.breakpoint_policy == breakpoint_action::condition)
-                    { point.condition = command.breakpoint_condition; point.condition_size = command.breakpoint_condition_size; }
+                    { if(point.assembly && command.breakpoint_condition_size != 0u)
+                      { result.status = control_error::unsupported_command; return result; }
+                      point.condition = command.breakpoint_condition; point.condition_size = command.breakpoint_condition_size; }
                     else { point.enabled = command.breakpoint_policy == breakpoint_action::enable; }
                 }
                 if(!found && command.breakpoint_id != 0u) { result.status = control_error::invalid_breakpoint_target; }
+                rebuild_wasm_breakpoint_index_locked();
                 return result;
             }
             if(wasm_event)
@@ -4892,10 +5682,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             }
             else if(::std::holds_alternative<resume_command>(validated))
             {
-                ::std::lock_guard lock{mutex_};
-                cancel_step_locked();
-                if(resume_locked()) { completed = completion::resumed; }
-                else { completed = completion::rejected; error = control_error::invalid_state; }
+                bool native_continue{}; ::std::uint64_t participant{};
+                {
+                    ::std::lock_guard lock{mutex_};
+                    native_continue = native_breakpoints_active_locked(); participant = native_participant_;
+                }
+                if(native_continue)
+                {
+                    auto const outcome{continue_to_native_breakpoint(participant, timeout, interrupt)};
+                    // The resume ticket acknowledges execution; inspect() then
+                    // confirms only the independently authenticated actual stop.
+                    completed = outcome.error == control_error::none ? completion::resumed : completion::rejected;
+                    error = outcome.error; timed_out = outcome.timed_out;
+                    native_next_reason = outcome.next_reason;
+                }
+                else
+                {
+                    ::std::lock_guard lock{mutex_}; cancel_step_locked();
+                    if(resume_locked()) { completed = completion::resumed; }
+                    else { completed = completion::rejected; error = control_error::invalid_state; }
+                }
             }
             else if(assembly_step)
             {
@@ -4957,12 +5763,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     error = control_error::exhausted;
                     for(auto& slot : breakpoints_)
                     {
-                        if(slot.identifier != 0u && slot.module == point->module && slot.function == point->function && slot.offset == point->offset)
+                        if(slot.identifier != 0u && !slot.assembly && slot.module == point->module && slot.function == point->function && slot.offset == point->offset)
                         {
                             if(command.breakpoint_initial_ignore)
                             { slot.hits = 0u; slot.ignore_remaining = command.breakpoint_ignore; slot.enabled = true; }
                             if(command.breakpoint_initial_condition)
                             { slot.condition = command.breakpoint_condition; slot.condition_size = command.breakpoint_condition_size; }
+                            slot.source_level|=source_breakpoint || command.breakpoint_source_display;
                             breakpoint_id = slot.identifier; error = control_error::none; completed = completion::configured; break;
                         }
                     }
@@ -4971,6 +5778,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                         if(breakpoint_id != 0u) { break; }
                         if(slot.identifier == 0u && next_breakpoint_ != 0u)
                         { slot = {next_breakpoint_++, point->module, point->function, point->offset};
+                          slot.source_level=source_breakpoint || command.breakpoint_source_display;
                           slot.ignore_remaining = command.breakpoint_initial_ignore ? command.breakpoint_ignore : 0u;
                           if(command.breakpoint_initial_condition)
                           { slot.condition = command.breakpoint_condition; slot.condition_size = command.breakpoint_condition_size; }
@@ -4978,13 +5786,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                           error = control_error::none; completed = completion::configured; break; }
                     }
                 }
+                rebuild_wasm_breakpoint_index_locked();
             }
             else if(auto const* point = ::std::get_if<breakpoint_clear_command>(::std::addressof(validated)))
             {
                 ::std::lock_guard lock{mutex_};
                 completed = completion::rejected; error = control_error::invalid_state;
                 for(auto& slot : breakpoints_) { if(slot.identifier == point->identifier)
-                    { slot = {}; error = control_error::none; completed = completion::configured; break; } }
+                    { for(auto& binding : native_breakpoint_bindings_)
+                      { if(binding.identifier == slot.identifier) { binding = {}; } }
+                      slot = {}; error = control_error::none; completed = completion::configured; break; } }
+                rebuild_wasm_breakpoint_index_locked();
             }
             else if(auto const* request = ::std::get_if<read_memory_command>(::std::addressof(validated)))
             {
@@ -5073,6 +5885,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                               if(slot.identifier != 0u && slot.module == request->module && slot.function == request->function)
                               { slot = {}; }
                           }
+                          rebuild_wasm_breakpoint_index_locked();
                           if(request->module < source_modules_.size())
                           {
                               auto& source{source_modules_[static_cast<::std::size_t>(request->module)]};

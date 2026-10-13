@@ -33,6 +33,18 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#if (defined(__APPLE__) && defined(__aarch64__) && TARGET_OS_OSX) || (defined(_WIN32) && (defined(_M_X64) || defined(__x86_64__)) && defined(UWVM2_ENABLE_DEBUG_NATIVE_STEP_WINDOWS_PRODUCT) && UWVM2_ENABLE_DEBUG_NATIVE_STEP_WINDOWS_PRODUCT == 1)
+# define UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION 1
+#else
+# define UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION 0
+#endif
+
+#if UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION || (defined(__linux__) && defined(__x86_64__) && __SIZEOF_POINTER__ == 8 && !defined(__ILP32__) && defined(UWVM2_ENABLE_DEBUG_NATIVE_CONTINUATION_LINUX_PRODUCT) && UWVM2_ENABLE_DEBUG_NATIVE_CONTINUATION_LINUX_PRODUCT == 1 && defined(PERF_ATTR_SIZE_VER7))
+# define UWVM2_DEBUG_NATIVE_LEVEL_TRANSITIONS 1
+#else
+# define UWVM2_DEBUG_NATIVE_LEVEL_TRANSITIONS 0
+#endif
+
 #if defined(_WIN32) && (defined(_M_X64) || defined(__x86_64__)) && \
     defined(UWVM2_ENABLE_DEBUG_NATIVE_STEP_WINDOWS_PRODUCT) && UWVM2_ENABLE_DEBUG_NATIVE_STEP_WINDOWS_PRODUCT == 1
 # ifndef UWVM_MODULE
@@ -50,12 +62,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
     using ::uwvm2::uwvm::debugger::native_step_windows::uninstall;
     using ::uwvm2::uwvm::debugger::native_step_windows::request;
     using ::uwvm2::uwvm::debugger::native_step_windows::arm_at_return;
+    using ::uwvm2::uwvm::debugger::native_step_windows::retain_initial_trap;
     using ::uwvm2::uwvm::debugger::native_step_windows::continue_one;
     using ::uwvm2::uwvm::debugger::native_step_windows::continue_from_trap;
     using ::uwvm2::uwvm::debugger::native_step_windows::release;
     using ::uwvm2::uwvm::debugger::native_step_windows::clear;
     using ::uwvm2::uwvm::debugger::native_step_windows::with_owned_trap;
     using ::uwvm2::uwvm::debugger::native_step_windows::with_owned_registers;
+    using ::uwvm2::uwvm::debugger::native_step_windows::with_owned_registers_and_revision;
+    using ::uwvm2::uwvm::debugger::native_step_windows::continue_to_continuation;
+    using ::uwvm2::uwvm::debugger::native_step_windows::skip_pause_for_continuation;
+    using ::uwvm2::uwvm::debugger::native_step_windows::cancel_continuation_on_worker;
+    using ::uwvm2::uwvm::debugger::native_step_windows::acknowledge_continuation_execution_exit;
 }
 #elif defined(__APPLE__) && (defined(__aarch64__) || (defined(__x86_64__) && defined(UWVM2_ENABLE_DEBUG_NATIVE_STEP_MACOS_X64_PRODUCT) && UWVM2_ENABLE_DEBUG_NATIVE_STEP_MACOS_X64_PRODUCT == 1)) && TARGET_OS_OSX
 # ifndef UWVM_MODULE
@@ -73,12 +91,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
     using ::uwvm2::uwvm::debugger::native_step_macos::uninstall;
     using ::uwvm2::uwvm::debugger::native_step_macos::request;
     using ::uwvm2::uwvm::debugger::native_step_macos::arm_at_return;
+    using ::uwvm2::uwvm::debugger::native_step_macos::retain_initial_trap;
     using ::uwvm2::uwvm::debugger::native_step_macos::continue_one;
     using ::uwvm2::uwvm::debugger::native_step_macos::continue_from_trap;
     using ::uwvm2::uwvm::debugger::native_step_macos::release;
     using ::uwvm2::uwvm::debugger::native_step_macos::clear;
     using ::uwvm2::uwvm::debugger::native_step_macos::with_owned_trap;
     using ::uwvm2::uwvm::debugger::native_step_macos::with_owned_registers;
+#if UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
+    using ::uwvm2::uwvm::debugger::native_step_macos::with_owned_registers_and_revision;
+    using ::uwvm2::uwvm::debugger::native_step_macos::relocate_owned_pc;
+    using ::uwvm2::uwvm::debugger::native_step_macos::continue_to_continuation;
+    using ::uwvm2::uwvm::debugger::native_step_macos::skip_pause_for_continuation;
+    using ::uwvm2::uwvm::debugger::native_step_macos::cancel_continuation_on_worker;
+    using ::uwvm2::uwvm::debugger::native_step_macos::acknowledge_continuation_execution_exit;
+#endif
 }
 #elif UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE
 # include "native_step_linux.h"
@@ -102,6 +129,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
         ::std::uintptr_t owner_begin{}, owner_end{}, expected_pc{};
         ::std::uintptr_t first_pc{}, next_pc{};
         native_registers::snapshot register_snapshot{};
+        bool retained_entry_stop{}; // Host guard; first real trap remains on its original gate.
 #if defined(__linux__) && defined(__x86_64__)
         // Actual kernel trap episode only: PC/SP may repeat inside a loop.
         // This sequence is NEVER reset by request/continue/clear, and no manager
@@ -114,7 +142,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
         // Host-owned continuation event data. Cookie/PC/SP/FD are written only
         // with the actual trap gate closed, before state release publication.
         ::std::uintptr_t continuation_pc{}, continuation_origin_sp{};
+        ::std::uintptr_t linear_endpoint{}, linear_previous_pc{}, linear_stack{};
+
         ::std::uint64_t continuation_cookie{};
+        ::std::uint64_t completed_continuation_cookie{}; // Worker writes before publishing the actual trap.
         int continuation_descriptor{-1};
         ::std::atomic_bool continuation_event_retired{true};
 #if defined(__linux__) && defined(__x86_64__) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
@@ -374,9 +405,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
                 continuation_failure.store(3u,::std::memory_order_relaxed);
                 return true;
             }
-            // The FD remains owned until this borrower has actually retired.
-            // Host cancellation may disable the same FD concurrently, but may
-            // not close/reuse it before the selected worker's real ACK.
+            // This worker has finished its final descriptor access. Publish
+            // that fact with the real trap below; canceled paths still use the
+            // full worker retirement protocol. Disabled perf FDs retain scarce
+            // hardware slots until close, even though they cannot fire again.
+            step->completed_continuation_cookie = cookie;
+            retired_continuation_cookie = cookie;
             if(step->abort_requested.load(::std::memory_order_seq_cst)) { return true; }
             if(!witness_physical_activation(*step, pc, sp))
             {
@@ -486,6 +520,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
             }
             if(state == phase::executing)
             {
+                if(step->linear_endpoint!=0u)
+                {
+                    auto const sp{static_cast<::std::uintptr_t>(saved->uc_mcontext.gregs[REG_RSP])};
+                    bool const valid{pc>step->linear_previous_pc && pc<=step->linear_endpoint &&
+                        pc>=step->owner_begin && pc<step->owner_end && sp==step->linear_stack};
+                    if(!valid || step->abort_requested.load(::std::memory_order_seq_cst))
+                    {
+                        flags &= ~static_cast<::greg_t>(trap_flag);
+                        if(step->abort_requested.load(::std::memory_order_seq_cst))
+                        { retire_current_thread_session(*step);return; }
+                        step->state.store(phase::failed,::std::memory_order_seq_cst);
+                        wait_for_gate(step->second_gate);retire_current_thread_session(*step);return;
+                    }
+                    step->linear_previous_pc=pc;
+                    if(pc!=step->linear_endpoint) { return; } // TF remains set; no manager wake or allocation.
+                    step->linear_endpoint=0u;
+                }
                 step->next_pc = pc;
                 capture_registers(step->register_snapshot, *saved);
                 step->second_signal_code = info->si_code;
@@ -586,11 +637,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
         step.owner_begin = owner_begin;
         step.owner_end = owner_end;
         step.expected_pc = return_pc;
-        step.first_pc = step.next_pc = 0u;
+        step.first_pc = step.next_pc = 0u; step.retained_entry_stop = false;
         step.register_snapshot = {};
         step.first_signal_code = step.second_signal_code = 0;
         step.continuation_pc = step.continuation_origin_sp = 0u;
+        step.linear_endpoint=step.linear_previous_pc=step.linear_stack=0u;
         step.continuation_cookie = 0u; step.continuation_descriptor = -1;
+        step.completed_continuation_cookie = 0u;
         step.continuation_event_retired.store(true, ::std::memory_order_relaxed);
         step.first_gate.store(0u, ::std::memory_order_relaxed);
         step.second_gate.store(0u, ::std::memory_order_relaxed);
@@ -632,6 +685,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
         details::current_thread_session = step;
         return true;
     }
+    // Publish a zero-instruction native stop only from the actual backend's
+    // first kernel trap. A supplied PC/session label cannot manufacture it.
+    [[nodiscard]] inline bool retain_initial_trap(session& step) noexcept
+    {
+        details::host_transition_guard guard{};
+        if(details::active.load(::std::memory_order_acquire) != ::std::addressof(step) ||
+           step.state.load(::std::memory_order_acquire) != phase::at_guest_pc ||
+           step.abort_requested.load(::std::memory_order_acquire) || step.retained_entry_stop ||
+           step.target_thread == 0u || step.first_pc != step.expected_pc ||
+           step.first_pc < step.owner_begin || step.first_pc >= step.owner_end ||
+           step.register_snapshot.size() == 0u || step.register_snapshot.pc() != step.first_pc ||
+           step.register_snapshot.sp() == 0u) { return false; }
+        if(step.trap_revision == UINT64_MAX) { return false; }
+        ++step.trap_revision; // Revision of this actual first kernel trap, not a stepped instruction.
+        step.next_pc = step.first_pc;
+        step.retained_entry_stop = true;
+        return true; // No gate wake, TF change, instruction execution or register write.
+    }
     [[nodiscard]] inline bool continue_one(session& step) noexcept
     {
         details::host_transition_guard guard{};
@@ -653,22 +724,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
     {
         details::host_transition_guard guard{};
         if(details::active.load(::std::memory_order_acquire) != ::std::addressof(step) ||
-           step.state.load(::std::memory_order_seq_cst) != phase::trapped ||
+           (step.state.load(::std::memory_order_seq_cst) != phase::trapped &&
+            !(step.state.load(::std::memory_order_seq_cst) == phase::at_guest_pc && step.retained_entry_stop)) ||
            step.next_pc < step.owner_begin || step.next_pc >= step.owner_end ||
            step.trap_revision == UINT64_MAX) { return false; }
-        auto expected{phase::trapped};
+        auto expected{step.state.load(::std::memory_order_acquire)};
+        bool const first{expected == phase::at_guest_pc};
+        if(expected != phase::trapped && !(first && step.retained_entry_stop)) { return false; }
         if(!step.state.compare_exchange_strong(expected, phase::executing,
             ::std::memory_order_seq_cst, ::std::memory_order_seq_cst)) { return false; }
         step.first_pc = step.next_pc;
         step.expected_pc = step.next_pc;
-        details::wake_gate(step.second_gate);
+        details::wake_gate(first ? step.first_gate : step.second_gate);
         return true;
+    }
+    // Runtime-sealed ordinary interval: keep short x86 runs on TF without a
+    // perf_event_open/close round trip. Every kernel trap checks forward progress
+    // and the unchanged stack, but only the endpoint wakes the manager. The
+    // runtime proved ALL instructions and stopped before the nearest breakpoint.
+    [[nodiscard]] inline bool continue_linear_interval(session& step,::std::uintptr_t endpoint) noexcept
+    {
+        details::host_transition_guard guard{};
+        if(details::active.load(::std::memory_order_acquire)!=::std::addressof(step) ||
+           step.state.load(::std::memory_order_seq_cst)!=phase::trapped ||
+           step.abort_requested.load(::std::memory_order_seq_cst) || step.trap_revision==UINT64_MAX ||
+           step.next_pc<step.owner_begin || step.next_pc>=step.owner_end ||
+           endpoint<=step.next_pc || endpoint>=step.owner_end ||
+           step.register_snapshot.pc()!=step.next_pc || step.register_snapshot.sp()==0u) { return false; }
+        step.linear_endpoint=endpoint;step.linear_previous_pc=step.next_pc;
+        step.linear_stack=static_cast<::std::uintptr_t>(step.register_snapshot.sp());
+        step.first_pc=step.expected_pc=step.next_pc;
+        step.state.store(phase::executing,::std::memory_order_seq_cst);
+        details::wake_gate(step.second_gate);return true;
     }
     // Called ONLY after the private runtime authenticated the current actual
     // trap, immutable Wasm owner and exact forward MC continuation boundary,
     // and after its actual TID's owned execute event was enabled while parked.
     [[nodiscard]] inline bool continue_to_continuation(session& step, ::std::uintptr_t continuation,
-        ::std::uint64_t cookie, int owned_descriptor) noexcept
+        ::std::uint64_t cookie, int owned_descriptor, ::std::size_t return_stack_adjustment = 0u) noexcept
     {
 # if __SIZEOF_POINTER__ == 8 && defined(PERF_ATTR_SIZE_VER7) && !defined(__ILP32__)
         details::host_transition_guard guard{};
@@ -687,8 +780,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
 #  endif
            )
         { return false; }
+        // The runtime seals the actual typed callee's uniform RET immediate.
+        // Hardware linear intervals and opaque SysV calls retain adjustment 0.
+        if(return_stack_adjustment>65535u || return_stack_adjustment>UINTPTR_MAX-step.register_snapshot.sp()) { return false; }
         step.continuation_pc = continuation;
-        step.continuation_origin_sp = static_cast<::std::uintptr_t>(step.register_snapshot.sp());
+        step.continuation_origin_sp = static_cast<::std::uintptr_t>(step.register_snapshot.sp())+return_stack_adjustment;
         step.continuation_cookie = cookie; step.continuation_descriptor = owned_descriptor;
         step.continuation_event_retired.store(false, ::std::memory_order_relaxed);
         step.abort_requested.store(false, ::std::memory_order_seq_cst);
@@ -697,7 +793,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
         details::wake_gate(step.second_gate);
         return true;
 # else
-        (void)step; (void)continuation; (void)cookie; (void)owned_descriptor; return false;
+        (void)step; (void)continuation; (void)cookie; (void)owned_descriptor; (void)return_stack_adjustment; return false;
 # endif
     }
 
@@ -787,6 +883,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
     inline void acknowledge_continuation_event_retired(session& step) noexcept
     { step.continuation_event_retired.store(true, ::std::memory_order_release); }
 
+    // Only a completed, precise worker trap relinquishes this particular FD.
+    // Keep activation/provider owners alive until the session's full ACK; this
+    // retires the OS resource alone and never manufactures an execution stop.
+    [[nodiscard]] inline int take_completed_continuation_descriptor(session& step) noexcept
+    {
+        details::host_transition_guard guard{};
+        if(details::active.load(::std::memory_order_acquire) != ::std::addressof(step) ||
+           step.state.load(::std::memory_order_seq_cst) != phase::trapped ||
+           step.abort_requested.load(::std::memory_order_seq_cst) ||
+           step.continuation_cookie == 0u || step.completed_continuation_cookie != step.continuation_cookie ||
+           step.continuation_descriptor < 0) { return -1; }
+        auto const descriptor{step.continuation_descriptor};
+        step.continuation_descriptor = -1;
+        step.continuation_event_retired.store(true, ::std::memory_order_release);
+        return descriptor;
+    }
+
     [[nodiscard]] inline bool release(session& step) noexcept
     {
         details::host_transition_guard guard{};
@@ -832,7 +945,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
         // [actual active controller-owned session] host-transition guard
         // [safe                                 ] excludes release/clear;
         //  ^^ identity was compared before any supplied object was read.
-        if(step->state.load(::std::memory_order_seq_cst) != phase::trapped ||
+        if((step->state.load(::std::memory_order_seq_cst) != phase::trapped &&
+            !(step->state.load(::std::memory_order_seq_cst) == phase::at_guest_pc && step->retained_entry_stop)) ||
            step->abort_requested.load(::std::memory_order_seq_cst) || step->target_thread == 0u ||
            step->owner_begin == 0u || step->owner_end <= step->owner_begin ||
            step->next_pc < step->owner_begin || step->next_pc >= step->owner_end) { return false; }
@@ -852,7 +966,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
         // [actual controller-owned active session] host-transition guard
         // [safe                                  ] identity is compared before dereferencing;
         //  ^^ state acquire observes the complete register copy made by the trap handler.
-        if(step->state.load(::std::memory_order_seq_cst) != phase::trapped ||
+        if((step->state.load(::std::memory_order_seq_cst) != phase::trapped &&
+            !(step->state.load(::std::memory_order_seq_cst) == phase::at_guest_pc && step->retained_entry_stop)) ||
            step->abort_requested.load(::std::memory_order_seq_cst) || step->target_thread == 0u ||
            step->owner_begin == 0u || step->owner_end <= step->owner_begin ||
            step->next_pc < step->owner_begin || step->next_pc >= step->owner_end ||
@@ -895,6 +1010,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step
     [[nodiscard]] inline constexpr bool request(session&, ::std::uint_least64_t,
         ::std::uintptr_t, ::std::uintptr_t, ::std::uintptr_t) noexcept { return false; }
     [[nodiscard]] inline constexpr bool arm_at_return(::std::uintptr_t) noexcept { return false; }
+    [[nodiscard]] inline constexpr bool retain_initial_trap(session&) noexcept { return false; }
     [[nodiscard]] inline constexpr bool continue_one(session&) noexcept { return false; }
     [[nodiscard]] inline constexpr bool continue_from_trap(session&) noexcept { return false; }
     [[nodiscard]] inline constexpr bool release(session&) noexcept { return false; }

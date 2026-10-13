@@ -204,6 +204,45 @@ struct emitter
                            : b.CreateAnd(value, number(value->getType(), (1ull << (bits - 1u)) - 1u)));
     }
 
+    [[nodiscard]] ::llvm::Value* round_mips64_scalar(::llvm::Value* raw_bytes, unsigned bits,
+                                                    ::llvm::Intrinsic::ID operation) const noexcept
+    {
+        // N64 has 64-bit FPRs. Explicit rounding opcodes do not depend on FCSR's rounding mode.
+        // Only convert |x| < 2^mantissa: the integer result and its conversion back are exact;
+        // larger finite values are already integral. Sanitize the other lanes before conversion,
+        // then retain their input bits and quiet NaNs without relying on the host NaN encoding.
+        auto raw{lanes(raw_bytes, bits)};
+        auto integer_type{b.getIntNTy(bits)};
+        auto fp_type{bits == 32u ? b.getFloatTy() : b.getDoubleTy()};
+        auto n{[&](::std::uint64_t value) { return ::llvm::ConstantInt::get(integer_type, value); }};
+        unsigned mantissa{bits == 32u ? 23u : 52u}, bias{bits == 32u ? 127u : 1023u};
+        char const* const names[2][4]{
+            {"ceil.w.s $0, $1\n\tcvt.s.w $0, $0", "floor.w.s $0, $1\n\tcvt.s.w $0, $0",
+             "trunc.w.s $0, $1\n\tcvt.s.w $0, $0", "round.w.s $0, $1\n\tcvt.s.w $0, $0"},
+            {"ceil.l.d $0, $1\n\tcvt.d.l $0, $0", "floor.l.d $0, $1\n\tcvt.d.l $0, $0",
+             "trunc.l.d $0, $1\n\tcvt.d.l $0, $0", "round.l.d $0, $1\n\tcvt.d.l $0, $0"}};
+        unsigned index{operation == ::llvm::Intrinsic::ceil ? 0u : operation == ::llvm::Intrinsic::floor ? 1u :
+                       operation == ::llvm::Intrinsic::trunc ? 2u : 3u};
+        auto signature{::llvm::FunctionType::get(fp_type, {fp_type}, false)};
+        auto instruction{::llvm::InlineAsm::get(signature, names[bits == 32u ? 0u : 1u][index], "=f,f", false)};
+        ::llvm::Value* result{::llvm::PoisonValue::get(raw->getType())};
+        for(unsigned lane{}; lane != 128u / bits; ++lane)
+        {
+            auto value{b.CreateExtractElement(raw, b.getInt32(lane))};
+            auto magnitude{b.CreateAnd(value, n((1ull << (bits - 1u)) - 1u))};
+            auto small{b.CreateICmpULT(magnitude, n(static_cast<::std::uint64_t>(bias + mantissa) << mantissa))};
+            auto input{b.CreateBitCast(b.CreateSelect(small, value, n(0u)), fp_type)};
+            auto rounded{b.CreateBitCast(b.CreateCall(signature, instruction, {input}), integer_type)};
+            auto selected{b.CreateSelect(small, rounded, value)};
+            // Conversion of a negative fraction to integer zero loses its sign.
+            selected = b.CreateOr(selected, b.CreateAnd(value, n(1ull << (bits - 1u))));
+            auto nan{b.CreateICmpUGT(magnitude, n(bits == 32u ? 0x7f800000ull : 0x7ff0000000000000ull))};
+            selected = b.CreateOr(selected, b.CreateSelect(nan, n(1ull << (mantissa - 1u)), n(0u)));
+            result = b.CreateInsertElement(result, selected, b.getInt32(lane));
+        }
+        return pack(result);
+    }
+
     // Exact IEEE rounding using integer vectors for targets whose LLVM vector FP-rounding legalization is broken.
     // All shift counts are masked before evaluation: the unselected large/NaN lanes must not introduce poison.
     [[nodiscard]] ::llvm::Value* round_bits(::llvm::Value* raw_bytes, unsigned bits, ::llvm::Intrinsic::ID operation) const noexcept
@@ -497,6 +536,17 @@ struct emitter
     auto const unary_intrinsic{[&](unsigned bits, ::llvm::Intrinsic::ID id, bool fp = false) noexcept -> ::llvm::Value*
     {
         auto value{e.lanes(a, bits, fp)};
+        if(e.target().isMIPS() && e.target().isArch64Bit() && e.target().getEnvironment() == ::llvm::Triple::GNUABI64 &&
+           !e.has_feature("msa") && fp && (id == ::llvm::Intrinsic::ceil || id == ::llvm::Intrinsic::floor ||
+            id == ::llvm::Intrinsic::trunc || id == ::llvm::Intrinsic::roundeven))
+        {
+#if (defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)) && (defined(_SOFT_FLOAT) || defined(__mips_single_float))
+            return e.round_bits(a, bits, id);
+#else
+            if(e.has_feature("soft-float") || e.has_feature("single-float")) { return e.round_bits(a, bits, id); }
+            return e.round_mips64_scalar(a, bits, id);
+#endif
+        }
         if(e.target().isMIPS() && !e.little_endian() && fp && (id == ::llvm::Intrinsic::ceil || id == ::llvm::Intrinsic::floor ||
             id == ::llvm::Intrinsic::trunc || id == ::llvm::Intrinsic::roundeven))
         {

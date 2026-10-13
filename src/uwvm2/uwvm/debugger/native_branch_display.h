@@ -62,10 +62,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_branch_display
     { return copied && begin != 0u && end > begin && copied.destination.display_pc >= begin && copied.destination.display_pc < end; }
 
     // SAME authenticated private image, never a public address/read grant.
-    // A source row alone cannot qualify a destination or a lowered memory operand.
+    // The optional display mode includes generated safepoint bridges in this
+    // authenticated JIT function. It still proves instruction bytes/boundaries,
+    // prints operands from owned bytes without dereferencing them, and grants no stepping
+    // or breakpoint permission. The default requires exact Wasm provenance.
     template<typename Image, typename DisplayDecoder, typename SemanticDecoder>
     [[nodiscard]] inline native_disassembly::instruction project(Image const& image,
-        DisplayDecoder& display, SemanticDecoder& semantics, native_disassembly::instruction const& shown) noexcept
+        DisplayDecoder& display, SemanticDecoder& semantics, native_disassembly::instruction const& shown,
+        bool generated_bridge_display = false) noexcept
     {
         if(!shown || shown.pc == 0u || shown.size > shown.bytes.size() ||
            image.owner_begin == 0u || image.owner_end <= image.owner_begin ||
@@ -77,11 +81,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_branch_display
         if(!instruction_code.empty() && instruction_code.size()!=image.size) { return {}; }
         auto const offset{shown.pc - image.owner_begin};
         for(::std::size_t byte{}; byte != shown.size; ++byte)
-        { if(image.guest_code[offset + byte] != 1u || image.bytes[offset + byte] != shown.bytes[byte] ||
+        { if((!generated_bridge_display && image.guest_code[offset + byte] != 1u) || image.bytes[offset + byte] != shown.bytes[byte] ||
             (!instruction_code.empty() && instruction_code[offset + byte]!=1u)) { return {}; } }
         auto const actual{semantics.decode(shown.pc, {shown.bytes.data(), shown.size})};
-        if(!actual || actual.semantics().size != shown.size || !actual.safe_for_public_display()) { return {}; }
-        if(actual.destination())
+        if(!actual || actual.semantics().size != shown.size || (!generated_bridge_display && !actual.safe_for_public_display())) { return {}; }
+        if(actual.destination() && !generated_bridge_display)
         {
             annotation const copied{actual.destination(), shown.pc, shown.size};
             if(!inside_owner(copied, image.owner_begin, image.owner_end)) { return {}; }
@@ -92,7 +96,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_branch_display
             auto const target_offset{copied.destination.display_pc - image.owner_begin};
             if(target.instructions[0u].size > image.size - target_offset) { return {}; }
             for(::std::size_t byte{}; byte != target.instructions[0u].size; ++byte)
-            { if(image.guest_code[target_offset + byte] != 1u) { return {}; } }
+            { if(!generated_bridge_display && image.guest_code[target_offset + byte] != 1u) { return {}; } }
         }
         ::std::size_t length{};
         while(length != shown.text.size() && shown.text[length] != '\0') { ++length; }
@@ -108,12 +112,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_branch_display
     // Target provenance is enforced in project(), before the public reply.
     template<typename SemanticDecoder>
     [[nodiscard]] inline bool displayable(SemanticDecoder& decoder, native_disassembly::instruction const& shown,
-        annotation const& copied, ::std::uintptr_t begin, ::std::uintptr_t end) noexcept
+        annotation const& copied, ::std::uintptr_t begin, ::std::uintptr_t end, bool owned_display = false) noexcept
     {
         if(!shown) { return !copied; }
         if(shown.pc == 0u || shown.size > shown.bytes.size() || !matches(copied, shown)) { return false; }
         auto const actual{decoder.decode(shown.pc, {shown.bytes.data(), shown.size})};
-        if(!actual || actual.semantics().size != shown.size || !actual.safe_for_public_display()) { return false; }
+        if(!actual || actual.semantics().size != shown.size || (!owned_display && !actual.safe_for_public_display())) { return false; }
+        if(owned_display)
+        {
+            if(begin == 0u || end <= begin || shown.pc < begin || shown.pc >= end || shown.size > end-shown.pc) { return false; }
+            if(!copied) { return !actual.destination(); }
+            return actual.destination() && copied.destination.display_pc == actual.destination().display_pc &&
+                copied.destination.conditional == actual.destination().conditional &&
+                copied.destination.never_taken == actual.destination().never_taken;
+        }
         if(!actual.destination()) { return !copied; }
         return inside_owner(copied, begin, end) && copied.destination.display_pc == actual.destination().display_pc &&
             copied.destination.conditional == actual.destination().conditional &&

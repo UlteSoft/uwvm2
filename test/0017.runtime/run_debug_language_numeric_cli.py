@@ -50,7 +50,7 @@ def main():
         if a.language=='objc':
             target,_=tinygo.named_function(a.wasm,b'_i_LanguageProbe__add_')
             # A real method symbol containing whitespace, not a C export alias.
-            reply=language.query(session,'break 0 -[LanguageProbe add:]')
+            reply=language.query(session,'breakwasm 0 -[LanguageProbe add:]')
             found=re.search(rb'breakpoint (\d+)',reply);step.require(found is not None,'real Objective-C method name breakpoint',reply)
             session.send('continue')
             for _ in range(20):
@@ -131,7 +131,7 @@ def main():
             except BaseException as e:record.update(passed=False,close_error=repr(e));raise
             finally:
                 record['quit_returncode']=session.console.child.returncode
-                record['managed_shutdown_complete']=b'managed shutdown complete' in session.console.transcript
+                record['managed_shutdown_complete']=session.console.normal_quit_completed
         record['inputs_after']={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
         if record['inputs_after']!=before:record.update(passed=False,inputs_changed=True)
         (a.out/'summary.json').write_text(json.dumps(record,indent=2)+'\n')

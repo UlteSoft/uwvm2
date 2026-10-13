@@ -19,13 +19,55 @@
 #include <memory>
 namespace cfi = ::uwvm2::runtime::compiler::llvm_jit::details;
 #define CHECK(x) do { if(!(x)) { ::fast_io::io::perrln("ARM registered CFI failure line=", __LINE__); return 1; } } while(false)
+// Every mutation gets its own real RuntimeDyld object-to-section map. A
+// LoadedObjectInfo from another ObjectFile would supply no addresses and make
+// a negative vacuous. No external resolver, relocation execution or live read
+// is used; the mapped 32-bit labels remain owned metadata DATA.
+struct no_external_symbols final : ::llvm::LegacyJITSymbolResolver
+{
+    ::llvm::JITSymbol findSymbolInLogicalDylib(::std::string const&) override { return nullptr; }
+    ::llvm::JITSymbol findSymbol(::std::string const&) override { return nullptr; }
+};
+struct owned_registration final
+{
+    cfi::runtime_llvm_jit_section_memory_manager manager{};
+    no_external_symbols resolver{};
+    ::llvm::RuntimeDyld dyld{manager,resolver};
+    ::std::unique_ptr<::llvm::RuntimeDyld::LoadedObjectInfo> loaded{};
+    bool observe(::llvm::JITEventListener::ObjectKey key,::llvm::object::ObjectFile const& original,
+        ::llvm::RuntimeDyld::LoadedObjectInfo const& original_loaded,::llvm::object::ObjectFile const& changed)
+    {
+        loaded=dyld.loadObject(changed);
+        if(!loaded || dyld.hasError()) { return false; }
+        for(auto const& section:changed.sections())
+        {
+            auto const local{loaded->getSectionLoadAddress(section)};
+            if(local==0u) { continue; }
+            bool mapped{};
+            for(auto const& old_section:original.sections())
+            {
+                if(old_section.getIndex()!=section.getIndex()) { continue; }
+                auto const target{original_loaded.getSectionLoadAddress(old_section)};
+                if(target==0u || target>UINT32_MAX || section.getSize()!=old_section.getSize() ||
+                    section.getSize()>UINT32_MAX-target) { return false; }
+                dyld.mapSectionAddress(reinterpret_cast<void const*>(local),target);
+                if(loaded->getSectionLoadAddress(section)!=target) { return false; }
+                mapped=true;break;
+            }
+            if(!mapped) { return false; }
+        }
+        manager.notifyObjectLoaded(key,changed,*loaded);
+        return !manager.has_finalization_failure();
+    }
+};
 struct symbols final : ::llvm::JITEventListener
 {
     struct extent { ::std::uintptr_t begin{},end{}; };
     ::std::array<extent,3u> actual{}; ::std::array<::std::uintptr_t,3u> retired{}; bool valid{true},tailcc{};
     ::llvm::ExecutionEngine* engine{};
-    char const* object_path{}; bool saved_object{}; unsigned debug_frame_count{}, rejected_objects{}, guarded_objects{};
+    char const* object_path{}; bool saved_object{}; unsigned debug_frame_count{}, rejected_objects{}, guarded_objects{}, owned_controls{};
     ::std::array<::std::size_t,3u> text_offsets{};
+    extent literal{}; ::std::uintptr_t literal_data{};
     void fail(unsigned line) noexcept
     { ::fast_io::io::perrln("ARM CFI object listener failure line=",line," malformed=",rejected_objects," guarded=",guarded_objects);valid=false; }
     void notifyObjectLoaded(ObjectKey key,::llvm::object::ObjectFile const& object,
@@ -63,6 +105,39 @@ struct symbols final : ::llvm::JITEventListener
         {
             auto name{symbol.getName()};
             if(!name) { ::llvm::consumeError(name.takeError()); fail(__LINE__); return; }
+            if(*name=="uwvm_cfi_literal")
+            {
+                auto section{symbol.getSection()}; auto address{symbol.getAddress()};
+                if(!section || !address)
+                {
+                    if(!section) { ::llvm::consumeError(section.takeError()); }
+                    if(!address) { ::llvm::consumeError(address.takeError()); }
+                    fail(__LINE__);return;
+                }
+                if(*section==object.section_end() || *address<(*section)->getAddress()) { fail(__LINE__);return; }
+                auto const base{loaded.getSectionLoadAddress(**section)}, offset{*address-(*section)->getAddress()};
+                if(base==0u || base>UINT32_MAX || offset>UINT32_MAX-base || size>UINT32_MAX-base-offset)
+                { fail(__LINE__);return; }
+                literal={static_cast<::std::uintptr_t>(base+offset),static_cast<::std::uintptr_t>(base+offset+size)};
+                for(auto const& marker:object.symbols())
+                {
+                    auto marker_name{marker.getName()};
+                    if(!marker_name) { ::llvm::consumeError(marker_name.takeError());fail(__LINE__);return; }
+                    if(*marker_name!="$d" && !marker_name->starts_with("$d.")) { continue; }
+                    auto marker_section{marker.getSection()};auto marker_address{marker.getAddress()};
+                    if(!marker_section || !marker_address)
+                    {
+                        if(!marker_section) { ::llvm::consumeError(marker_section.takeError()); }
+                        if(!marker_address) { ::llvm::consumeError(marker_address.takeError()); }
+                        fail(__LINE__);return;
+                    }
+                    if(*marker_section==object.section_end() || (*marker_section)->getIndex()!=(*section)->getIndex()) { continue; }
+                    if(*marker_address>=*address && *marker_address-*address<size)
+                    { literal_data=static_cast<::std::uintptr_t>(base+*marker_address-(*section)->getAddress());break; }
+                }
+                if(literal_data<=literal.begin || literal_data>=literal.end) { fail(__LINE__);return; }
+                continue;
+            }
             unsigned index{};
             if(*name=="uwvm_cfi_leaf") { index=0u; }
             else if(*name=="uwvm_cfi_caller") { index=1u; }
@@ -129,7 +204,22 @@ struct symbols final : ::llvm::JITEventListener
             else { reloc_offset=offset;reloc_size=contents->size(); }
         }
         if(!frame_offset || frame_size<40u || !reloc_offset || reloc_size<16u) { fail(__LINE__);return; }
-        for(unsigned mutation{};mutation!=8u;++mutation)
+        // Prove the fresh loader and exact frame extent work on a pristine
+        // clone before any negative claims are admitted.
+        {
+            ::std::vector<char> bytes(original.begin(),original.end());
+            auto pristine{::llvm::object::ObjectFile::createObjectFile(::llvm::MemoryBufferRef{
+                ::llvm::StringRef{bytes.data(),bytes.size()},"owned-ARM-positive-control"})};
+            if(!pristine) { ::llvm::consumeError(pristine.takeError());fail(__LINE__);return; }
+            owned_registration control{};
+            if(!control.observe(key,object,loaded,**pristine)) { fail(__LINE__);return; }
+            auto const extent{actual[0u]};cfi::native_debug_cfa_row scalar{};
+            if(!control.manager.copy_debug_native_cfa_row(extent.begin,extent.end,extent.begin+8u,scalar) ||
+                !scalar.usable || scalar.cfa_register!=11u)
+            { fail(__LINE__);return; }
+            ++owned_controls;
+        }
+        for(unsigned mutation{};mutation!=10u;++mutation)
         {
             ::std::vector<char> bytes(original.begin(),original.end());
             auto const write32{[&](::std::size_t offset,::std::uint32_t value)
@@ -151,7 +241,7 @@ struct symbols final : ::llvm::JITEventListener
                 case 4u: write32(frame_offset+text_field+4u,UINT32_MAX);break; // FDE widens beyond original text.
                 case 5u: write32(reloc_offset+8u,static_cast<::std::uint32_t>(frame_size));break; // Out of section.
                 case 6u: write32(frame_offset,UINT32_MAX);break; // Unsupported DWARF64 record.
-                case 7u: // ELF Arch=arm with Thumb mappings must not supply A32 rows.
+                case 7u: case 8u: case 9u: // Thumb/data/missing A32 mappings cannot supply rows.
                 {
                     unsigned changed{};
                     for(auto const& symbol:object.symbols())
@@ -161,7 +251,7 @@ struct symbols final : ::llvm::JITEventListener
                         if(*name!="$a" && !name->starts_with("$a.")) { continue; }
                         if(name->data()<original.data() || name->data()+name->size()>original.data()+original.size())
                         { fail(__LINE__);return; }
-                        bytes[static_cast<::std::size_t>(name->data()-original.data())+1u]='t';++changed;
+                        bytes[static_cast<::std::size_t>(name->data()-original.data())+1u]=mutation==7u ? 't' : mutation==8u ? 'd' : 'x';++changed;
                     }
                     if(changed==0u) { fail(__LINE__);return; }
                     break;
@@ -170,9 +260,9 @@ struct symbols final : ::llvm::JITEventListener
             auto malformed{::llvm::object::ObjectFile::createObjectFile(::llvm::MemoryBufferRef{
                 ::llvm::StringRef{bytes.data(),bytes.size()},"owned-ARM-debug-frame-negative"})};
             if(!malformed) { ::llvm::consumeError(malformed.takeError());fail(__LINE__);return; }
-            cfi::runtime_llvm_jit_section_memory_manager candidate{};
-            candidate.notifyObjectLoaded(key,**malformed,loaded);
-            if(candidate.has_finalization_failure()) { fail(__LINE__);return; } // Private failure cannot break EHABI.
+            owned_registration registration{};
+            if(!registration.observe(key,object,loaded,**malformed)) { fail(__LINE__);return; }
+            auto& candidate{registration.manager}; // Private failure cannot break EHABI.
             for(auto const extent:actual)
             {
                 cfi::native_debug_cfa_row row{};
@@ -185,11 +275,11 @@ struct symbols final : ::llvm::JITEventListener
         // bounded original instruction, retaining the genuine stale CFI. This
         // exercises production refusal, rather than merely mirroring a bitmask.
         // Conditional writes are vetoed even when their condition could be false.
-        constexpr ::std::array<::std::uint32_t,14u> clobbers{
+        constexpr ::std::array<::std::uint32_t,15u> clobbers{
             0xe8bd4800u, 0xe59db004u, 0xe1a0b000u, 0xe280b008u,
             0x01a0b000u, 0xe5bb0004u, 0xe5ab0004u, 0xe00b0190u,
             0xe08b0291u, 0xe8ab0003u, 0xe8bb0003u, 0xe1a0b00du,
-            0xe1c0a0d0u, 0xe1b0af9fu};
+            0xe1c0a0d0u, 0xe1b0af9fu, 0xe16b0180u};
         auto const extent{actual[0u]};
         if(extent.end-extent.begin<16u) { fail(__LINE__);return; }
         for(auto word:clobbers)
@@ -199,8 +289,9 @@ struct symbols final : ::llvm::JITEventListener
             auto changed{::llvm::object::ObjectFile::createObjectFile(::llvm::MemoryBufferRef{
                 ::llvm::StringRef{bytes.data(),bytes.size()},"owned-ARM-stale-frame-register-negative"})};
             if(!changed) { ::llvm::consumeError(changed.takeError());fail(__LINE__);return; }
-            cfi::runtime_llvm_jit_section_memory_manager candidate{};
-            candidate.notifyObjectLoaded(key,**changed,loaded);
+            owned_registration registration{};
+            if(!registration.observe(key,object,loaded,**changed)) { fail(__LINE__);return; }
+            auto& candidate{registration.manager};
             cfi::native_debug_cfa_row scalar{};
             if(candidate.has_finalization_failure() ||
                 !candidate.copy_debug_native_cfa_row(extent.begin,extent.end,extent.begin+8u,scalar))
@@ -233,10 +324,9 @@ int main(int argc,char const* const* argv)
         auto const parsed{::fast_io::parse_by_scan(argv[3],end,::fast_io::mnp::dec_get<true,true>(tailcc))};
         CHECK(parsed.code==::fast_io::parse_code::ok && parsed.iter==end && tailcc<=1u);
     }
-    // This provider has unpatched ARM O0 FastISel. Its SelectionDAG path
-    // supports actual TailCC. Keep that profile separate from standard AAPCS
-    // and do not present either as a qualified native ARM runtime SDK.
-    CHECK(tailcc==0u || optimization==3u);
+    // O0 TailCC needs a genuinely rebuilt ARM FastISel fallback provider.
+    // An unpatched provider will fail code generation; no ABI check is disabled.
+    // These compiler-object/owned-DATA profiles grant no live Wasm permission.
     auto const convention{tailcc ? ::llvm::CallingConv::Tail : ::llvm::CallingConv::C};
     ::LLVMInitializeARMTargetInfo(); ::LLVMInitializeARMTarget();
     ::LLVMInitializeARMTargetMC(); ::LLVMInitializeARMAsmPrinter(); ::LLVMInitializeARMAsmParser();
@@ -286,6 +376,20 @@ int main(int argc,char const* const* argv)
     for(unsigned n{};n!=64u;++n) { args[n]=builder.getInt32(n); }
     auto bridged_call{builder.CreateCall(caller,args)};bridged_call->setCallingConv(convention);
     builder.CreateRet(bridged_call);
+    // Actual assembler-generated $d/$a boundaries inside an uncalled ARM
+    // function. The private observer must refuse the data word itself and all
+    // later lexical code, even after an actual $a marker resumes.
+    auto literal{::llvm::Function::Create(::llvm::FunctionType::get(i32,false),
+        ::llvm::GlobalValue::ExternalLinkage,"uwvm_cfi_literal",*module)};
+    literal->setUWTableKind(::llvm::UWTableKind::Async);
+    literal->addFnAttr(::llvm::Attribute::NoInline);literal->addFnAttr("frame-pointer","all");
+    auto literal_scope{::uwvm2::runtime::compiler::llvm_jit::native_provenance::attach(*literal,"arm-cfi-data-boundary")};
+    CHECK(literal_scope);
+    builder.SetInsertPoint(::llvm::BasicBlock::Create(context,"entry",literal));
+    CHECK(::uwvm2::runtime::compiler::llvm_jit::native_provenance::location(builder,literal_scope,4u,8u));
+    auto literal_asm{::llvm::InlineAsm::get(::llvm::FunctionType::get(builder.getVoidTy(),false),
+        "nop\n\t.word 0x0000b000\n\tnop","",true)};
+    builder.CreateCall(literal_asm);builder.CreateRet(builder.getInt32(0u));
     CHECK(!::llvm::verifyModule(*module));
     auto manager{::std::make_unique<cfi::runtime_llvm_jit_section_memory_manager>()};
     auto observer{manager.get()}; symbols loaded{}; loaded.object_path=argv[2]; loaded.tailcc=tailcc!=0u;
@@ -295,7 +399,7 @@ int main(int argc,char const* const* argv)
         .setMCJITMemoryManager(::std::move(manager)).create()}};
     CHECK(engine); loaded.engine=engine.get(); engine->RegisterJITEventListener(&loaded); engine->finalizeObject();
     CHECK(!observer->has_finalization_failure() && loaded.valid);
-    CHECK(loaded.saved_object && loaded.debug_frame_count==1u && loaded.rejected_objects==8u && loaded.guarded_objects==14u);
+    CHECK(loaded.saved_object && loaded.debug_frame_count==1u && loaded.rejected_objects==10u && loaded.guarded_objects==15u && loaded.owned_controls==1u);
     unsigned full{},cfa_only{},expressions{},retired_instructions{};
     for(unsigned n{};n!=3u;++n)
     {
@@ -349,11 +453,27 @@ int main(int argc,char const* const* argv)
             " end=",::fast_io::mnp::hex(f.end));
     }
     CHECK(full!=0u && cfa_only!=0u && expressions!=0u && retired_instructions==(tailcc ? 6u : 0u));
+    unsigned literal_instructions{};
+    {
+        auto const extent{loaded.literal};auto const data{loaded.literal_data};
+        CHECK(data>extent.begin && data<extent.end && (data & 3u)==0u);
+        cfi::native_debug_cfa_row scalar{};
+        CHECK(observer->copy_debug_native_cfa_row(extent.begin,extent.end,data-4u,scalar));
+        for(auto pc{data};pc<extent.end;pc+=4u)
+        {
+            cfi::native_debug_cfi_row row{};
+            CHECK(!observer->copy_debug_native_cfa_row(extent.begin,extent.end,pc,scalar) && !scalar.usable &&
+                !observer->copy_debug_native_cfi_row(extent.begin,extent.end,pc,row) && !row.usable);
+            ++literal_instructions;
+        }
+        CHECK(literal_instructions>=2u);
+    }
     observer->deregisterEHFrames();
     for(auto const extent:loaded.actual)
     { cfi::native_debug_cfa_row row{};CHECK(!observer->copy_debug_native_cfa_row(extent.begin,extent.end,extent.begin,row)); }
     engine->UnregisterJITEventListener(&loaded);
     ::fast_io::io::println("actual ARM registered debug_frame: PASS optimization=",optimization," TailCC=",tailcc,
-        " full-instructions=",full," CFA-only-instructions=",cfa_only," rejected-objects=",loaded.rejected_objects," stale-r11-objects-refused=",loaded.guarded_objects," retired-frame-instructions-refused=",retired_instructions,
+        " full-instructions=",full," CFA-only-instructions=",cfa_only," rejected-objects=",loaded.rejected_objects," fresh-loader-controls=",loaded.owned_controls," stale-r11-objects-refused=",loaded.guarded_objects," retired-frame-instructions-refused=",retired_instructions,
+        " literal/data-instruction-positions-refused=",literal_instructions,
         " actual-ARM-execution=false live-caller-qualified=false native-finish-qualified=false");
 }

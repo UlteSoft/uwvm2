@@ -41,7 +41,7 @@ def scopes(client, thread):
 def recurring_stop(client, function, offset):
     # Already stopped after the external step: pause is a running-state
     # command. Reinstall the checked recurring breakpoint and continue.
-    reply = client.evaluate(f"break 0 {function} {offset}")
+    reply = client.evaluate(f"breakwasm 0 {function} {offset}")
     match = re.search(rb"breakpoint ([0-9]+)",reply)
     live.require(match is not None,"actual recurring breakpoint registration",reply)
     point = int(match[1]); client.evaluate("continue")

@@ -13,6 +13,7 @@
 # include <cstddef>
 # include <cstdint>
 # include "console_line_editor.h"
+# include "console_aliases.h"
 #endif
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
@@ -20,7 +21,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_completion
 {
     using view = ::fast_io::string_view;
-    enum class kind { none, path, symbol, function };
+    enum class kind { none, path, symbol, function, module, pane };
     struct request
     {
         kind type{};
@@ -36,9 +37,55 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_completion
         if(cursor > line.size()) { return {}; }
         ::std::size_t p{};
         auto word{[&]() noexcept
-        { while(p < line.size() && line[p] == ' ') { ++p; } auto const b{p};
-          while(p < line.size() && line[p] != ' ') { ++p; } return line.subview(b, p - b); }};
+        { while(p < line.size() && ::fast_io::char_category::c_space::char_is(line[p])) { ++p; } auto const b{p};
+          while(p < line.size() && !::fast_io::char_category::c_space::char_is(line[p])) { ++p; } return line.subview(b, p - b); }};
         auto command{word()};
+        // Resolve only the command token. Replacement spans, selectors and
+        // expression bytes must still refer to the original editable line.
+        auto const normalized{console_aliases::normalize(command)};
+        if(normalized.ambiguous) { return {}; }
+        if(normalized.valid && !normalized.view().empty()) { command = normalized.view(); }
+        if(command=="window") { if(word()!="resize") { return {}; } command="focus"; }
+        if(command=="scroll") { command="focus"; }
+        if(command=="info")
+        {
+            auto const saved{p};auto sub{word()};
+            if(command=="info" && sub=="wasip1") { sub=word(); }
+            if(sub=="fd") { command="breakwasm"; }
+            else { p=saved; }
+        }
+        if(command=="io")
+        { if(word()!="save") { return {}; }auto begin{p};while(begin<line.size() && ::fast_io::char_category::c_space::char_is(line[begin])) { ++begin; }
+          if(cursor>=begin && begin<line.size()) { return {kind::path,begin,line.size(),cursor,line.subview(begin,cursor-begin)}; }return {}; }
+        if(command=="layout")
+        {
+            auto saved{p};auto sub{word()};
+            if(sub=="config")
+            { auto action{word()};if(action!="save" && action!="load") { return {}; }
+              auto begin{p};while(begin<line.size() && ::fast_io::char_category::c_space::char_is(line[begin])) { ++begin; }
+              if(cursor>=begin && begin>p) { return {kind::path,begin,line.size(),cursor,line.subview(begin,cursor-begin)}; }return {}; }
+            if(sub=="tree") { return {}; }
+            if(sub=="move" || sub=="add")
+            { auto pane{word()};auto pane_end{p};auto begin{p};while(begin<line.size() && ::fast_io::char_category::c_space::char_is(line[begin])) { ++begin; }
+              auto end{begin};while(end<line.size() && !::fast_io::char_category::c_space::char_is(line[end])) { ++end; }
+              if(!pane.empty() && cursor>pane_end && cursor>=begin && cursor<=end) { return {kind::pane,begin,end,cursor,line.subview(begin,cursor-begin),"direction"}; } }
+            p=saved;
+        }
+        if(command=="inspect")
+        { auto level{word()};if(level=="src") { command="print"; }else { return {}; } }
+        if(command=="layout" || command=="focus")
+        {
+            auto begin{cursor}; while(begin>p && !::fast_io::char_category::c_space::char_is(line[begin-1u])) { --begin; }
+            auto end{cursor}; while(end<line.size() && !::fast_io::char_category::c_space::char_is(line[end])) { ++end; }
+            if(begin>p) { return {kind::pane,begin,end,cursor,line.subview(begin,cursor-begin)}; }
+        }
+        if(command == "breaksource" || command == "breakwasm")
+        {
+            auto begin{p}; while(begin<line.size() && ::fast_io::char_category::c_space::char_is(line[begin])) { ++begin; }
+            auto end{begin}; while(end<line.size() && !::fast_io::char_category::c_space::char_is(line[end])) { ++end; }
+            if(p<line.size() && cursor>=begin && cursor<=end)
+            { return {kind::module,begin,end,cursor,line.subview(begin,cursor-begin)}; }
+        }
         if(command == "condition")
         {
             auto const token{word()};::std::uint64_t id{};
@@ -47,20 +94,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_completion
             if(scanned.code!=::fast_io::parse_code::ok || scanned.iter!=token.cend() || id==0u) { return {}; }
             command="display"; // same actual current-frame expression completion
         }
-        else if(command=="break-source" || command=="break" || command=="b")
+        else if(command=="breaksource" || command=="breakwasm" || command=="bw")
         {
             ::std::size_t condition_begin{};
-            for(auto i{p};i<=cursor && i<line.size();++i)
+            for(auto i{p}; i < cursor;)
             {
-                if(line.size()-i>=4u && line.subview(i,4u)==" if " && cursor>=i+4u)
-                { condition_begin=i+4u; }
+                while(i < line.size() && ::fast_io::char_category::c_space::char_is(line[i])) { ++i; }
+                auto const begin{i};
+                while(i < line.size() && !::fast_io::char_category::c_space::char_is(line[i])) { ++i; }
+                if(line.subview(begin, i - begin) == "if" && i < line.size())
+                { while(i < line.size() && ::fast_io::char_category::c_space::char_is(line[i])) { ++i; }
+                  if(i <= cursor) { condition_begin=i; } }
             }
             if(condition_begin!=0u) { p=condition_begin;command="display"; }
         }
         if(command == "until" || command == "advance" || command == "u" || command == "adv")
         {
             auto path_begin{p};
-            while(path_begin < line.size() && line[path_begin] == ' ') { ++path_begin; }
+            while(path_begin < line.size() && ::fast_io::char_category::c_space::char_is(line[path_begin])) { ++path_begin; }
             auto const thread{word()}; ::std::uint64_t id{};
             if(!thread.empty())
             {
@@ -71,7 +122,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_completion
                     if(stop.empty()) { return {}; }
                     auto const checked{::fast_io::parse_by_scan(stop.cbegin(),stop.cend(),::fast_io::mnp::dec_get<true,true>(stop_id))};
                     if(id == 0u || stop_id == 0u || checked.code != ::fast_io::parse_code::ok || checked.iter != stop.cend()) { return {}; }
-                    path_begin = p; while(path_begin < line.size() && line[path_begin] == ' ') { ++path_begin; }
+                    path_begin = p; while(path_begin < line.size() && ::fast_io::char_category::c_space::char_is(line[path_begin])) { ++path_begin; }
                 }
             }
             auto end{line.size()}; auto const colon{line.rfind_character(':')};
@@ -85,11 +136,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_completion
             if(cursor < path_begin || cursor > end) { return {}; }
             return {kind::path,path_begin,end,cursor,line.subview(path_begin,cursor-path_begin),{},{}};
         }
-        if(command == "frame") { if(word() != "variable") { return {}; } command="print"; }
-        if(command == "replace" || command == "tui" || command == "break-source")
+        if(command == "frame")
         {
-            if(command == "tui") { if(word() != "source") { return {}; } }
-            else if(command == "break-source")
+            auto const sub{word()};
+            if(sub.empty() || !view{"variable"}.starts_with(sub)) { return {}; }
+            command="print";
+        }
+        if(command == "replace" || command == "set" || command == "breaksource")
+        {
+            if(command == "set") { if(word() != "source") { return {}; } }
+            else if(command == "breaksource")
             {
                 auto const token{word()}; ::std::uint64_t id{};
                 if(token.empty()) { return {}; }
@@ -102,10 +158,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_completion
                 { auto const token{word()}; if(token.empty()) { return {}; }
                   for(char c : token) { if(c < '0' || c > '9') { return {}; } } }
             }
-            if(p == line.size() || line[p] != ' ') { return {}; }
-            ++p; if(cursor < p) { return {}; }
+            if(p == line.size() || !::fast_io::char_category::c_space::char_is(line[p])) { return {}; }
+            while(p < line.size() && ::fast_io::char_category::c_space::char_is(line[p])) { ++p; }
+            if(cursor < p) { return {}; }
             auto end{line.size()};
-            if(command == "break-source")
+            if(command == "breaksource")
             {
                 auto const colon{line.rfind_character(':')};
                 if(colon != ::fast_io::containers::npos && colon >= p)
@@ -113,28 +170,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_completion
             }
             return {kind::path, p, end, cursor, line.subview(p, cursor - p), {}, {}};
         }
-        if(command == "break" || command == "b" || command == "break-name")
+        if(command == "breakwasm" || command == "bw")
         {
             auto const module{word()}; ::std::uint64_t id{};
             if(module.empty()) { return {}; }
             auto const parsed{::fast_io::parse_by_scan(module.cbegin(),module.cend(),::fast_io::mnp::dec_get<true,true>(id))};
             if(parsed.code != ::fast_io::parse_code::ok || parsed.iter != module.cend()) { return {}; }
-            if(p >= line.size() || line[p] != ' ') { return {}; }
-            ++p; if(cursor < p) { return {}; }
+            if(p >= line.size() || !::fast_io::char_category::c_space::char_is(line[p])) { return {}; }
+            while(p < line.size() && ::fast_io::char_category::c_space::char_is(line[p])) { ++p; }
+            if(cursor < p) { return {}; }
             return {kind::function,p,line.size(),cursor,line.subview(p,cursor-p),{},{},id};
         }
         bool const display{command == "display"};
         bool const explicit_frame{command == "print-frame" || command == "ptype-frame"};
         if(!display && !explicit_frame && command != "print" && command != "p" && command != "ptype" && command != "source-value" && command != "source-type")
         { return {}; }
-        auto expression{p}; while(expression < cursor && line[expression] == ' ') { ++expression; }
+        auto expression{p}; while(expression < cursor && ::fast_io::char_category::c_space::char_is(line[expression])) { ++expression; }
         // Preserve explicit THREAD STOP [FRAME] selectors in the actual query.
         auto const selector_begin{expression}; unsigned numeric{};
         while(!display && numeric < 3u)
         {
             auto end{expression}; while(end < line.size() && line[end] >= '0' && line[end] <= '9') { ++end; }
-            if(end == expression || end >= line.size() || line[end] != ' ') { break; }
-            ++numeric; expression = end; while(expression < line.size() && line[expression] == ' ') { ++expression; }
+            if(end == expression || end >= line.size() || !::fast_io::char_category::c_space::char_is(line[end])) { break; }
+            ++numeric; expression = end; while(expression < line.size() && ::fast_io::char_category::c_space::char_is(line[expression])) { ++expression; }
         }
         if(numeric == 1u) { expression = selector_begin; numeric = 0u; }
         if(explicit_frame && numeric != 3u) { return {}; }

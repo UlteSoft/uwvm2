@@ -21,8 +21,8 @@ def main():
   target,marker=(tinygo.named_function(a.wasm,b'_i_LanguageProbe__add_')[0],'OBJC_METHOD_READY') if a.language=='objc' else (tinygo.named_function(a.wasm,b'main.probeOuter')[0],'VALUES') if a.language=='tinygo' else (step.metadata_cli.function(a.wasm,'numeric_probe')[0],'NUMERIC_READY')
   matches=[i for i,line in enumerate(a.source.read_text().splitlines(),1) if '/* '+marker+' */' in line or '// '+marker in line];assert len(matches)==1;wanted=matches[0]
   s.begin(target);origin=language.own_seek(s,lambda p:p['function']==target and p['is_statement'] and p['line']<wanted,'mapped source statement before later breakpoint')
-  command=f'break-source 0 {origin["file"]}:{wanted}';reply=language.query(s,command);found=re.search(rb'breakpoint (\d+)',reply);assert found is not None,(command,reply);bid=found[1].decode()
-  prior=language.query(s,'info breakpoints');bad=language.query(s,f'break-source 0 {origin["file"]}.not-a-producer-file:{wanted}');assert b'error:' in bad and prior==language.query(s,'info breakpoints'),bad
+  command=f'breaksource 0 {origin["file"]}:{wanted}';reply=language.query(s,command);found=re.search(rb'breakpoint (\d+)',reply);assert found is not None,(command,reply);bid=found[1].decode()
+  prior=language.query(s,'info breakpoints');bad=language.query(s,f'breaksource 0 {origin["file"]}.not-a-producer-file:{wanted}');assert b'error:' in bad and prior==language.query(s,'info breakpoints'),bad
   s.send('continue')
   for _ in range(20):
    reply=s.send('wait')
@@ -37,7 +37,7 @@ def main():
   if s is not None:
    try:s.console.finish()
    except BaseException as e:d.update(passed=False,close_error=repr(e));raise
-   finally:d.update(quit_returncode=s.console.child.returncode,managed_shutdown_complete=b'managed shutdown complete' in s.console.transcript)
+   finally:d.update(quit_returncode=s.console.child.returncode,managed_shutdown_complete=s.console.normal_quit_completed)
   d['inputs_after']={p:language.sha(Path(p)) for p in pins}
   if d['inputs_after']!=pins:d.update(passed=False,inputs_changed=True)
   (a.out/'summary.json').write_text(json.dumps(d,indent=2)+'\n')

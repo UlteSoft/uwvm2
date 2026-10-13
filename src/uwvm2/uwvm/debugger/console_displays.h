@@ -26,14 +26,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_displays
     struct request { action operation{}; view expression{}; ::std::uint64_t identifier{}; };
     inline view trim(view text) noexcept
     {
-        while(!text.empty() && (text.front() == ' ' || text.front() == '\t')) { text = text.subview(1u); }
-        while(!text.empty() && (text.back() == ' ' || text.back() == '\t')) { text = text.subview(0u,text.size()-1u); }
+        while(!text.empty() && ::fast_io::char_category::c_space::char_is(text.front())) { text = text.subview(1u); }
+        while(!text.empty() && ::fast_io::char_category::c_space::char_is(text.back())) { text = text.subview(0u,text.size()-1u); }
         return text;
     }
     inline request parse(view text) noexcept
     {
         auto const word_end{[](view value) noexcept
-        { ::std::size_t n{}; while(n < value.size() && value[n] != ' ' && value[n] != '\t') { ++n; } return n; }};
+        { ::std::size_t n{}; while(n < value.size() && !::fast_io::char_category::c_space::char_is(value[n])) { ++n; } return n; }};
         text = trim(text); auto const end{word_end(text)};
         auto const name{text.subview(0u,end)};
         auto tail{trim(text.subview(end))};

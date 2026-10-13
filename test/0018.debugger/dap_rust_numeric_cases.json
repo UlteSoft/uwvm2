@@ -534,6 +534,186 @@
       "((1 + 2) as usize) + 0usize",
       "3",
       "unsigned integer"
+    ],
+    [
+      "300f32 as u8",
+      "255",
+      "unsigned integer"
+    ],
+    [
+      "-300f64 as i8",
+      "-128",
+      "signed integer"
+    ],
+    [
+      "-1f32 as u8",
+      "0",
+      "unsigned integer"
+    ],
+    [
+      "(0f32 / 0f32) as i32",
+      "0",
+      "signed integer"
+    ],
+    [
+      "(1f64 / 0f64) as u64",
+      "18446744073709551615",
+      "unsigned integer"
+    ],
+    [
+      "(-1f64 / 0f64) as i64",
+      "-9223372036854775808",
+      "signed integer"
+    ],
+    [
+      "7.5f32 % 2.0f32",
+      "1.5",
+      "float"
+    ],
+    [
+      "(0f32 % 0f32) as u8",
+      "0",
+      "unsigned integer"
+    ],
+    [
+      "-7.5f64 % 2.0f64",
+      "-1.5",
+      "double"
+    ],
+    [
+      "7.5f32 % -2.0f32",
+      "1.5",
+      "float"
+    ],
+    [
+      "-7.5f32 % -2.0f32",
+      "-1.5",
+      "float"
+    ],
+    [
+      "(1f32 % 0f32) as i16",
+      "0",
+      "signed integer"
+    ],
+    [
+      "(0f32 % 0f32) != (0f32 % 0f32)",
+      "true",
+      "bool"
+    ],
+    [
+      "(1f64 / 0f64) as i64",
+      "9223372036854775807",
+      "signed integer"
+    ],
+    [
+      "(-1f64 / 0f64) as u64",
+      "0",
+      "unsigned integer"
+    ],
+    [
+      "18446744073709551616f64 as u64",
+      "18446744073709551615",
+      "unsigned integer"
+    ],
+    [
+      "9223372036854775808f64 as i64",
+      "9223372036854775807",
+      "signed integer"
+    ],
+    [
+      "-9223372036854775808f64 as i64",
+      "-9223372036854775808",
+      "signed integer"
+    ],
+    [
+      "-0.75f32 as u8",
+      "0",
+      "unsigned integer"
+    ],
+    [
+      "127.75f32 as i8",
+      "127",
+      "signed integer"
+    ],
+    [
+      "-128.75f64 as i8",
+      "-128",
+      "signed integer"
+    ],
+    [
+      "(255.0 + 1.0) as u8",
+      "255",
+      "unsigned integer"
+    ],
+    [
+      "(7.5 % 2.0) + 0f32",
+      "1.5",
+      "float"
+    ],
+    [
+      "(-300f64 as i8) + 1i8",
+      "-127",
+      "signed integer"
+    ],
+    [
+      "(300f32 as u8) >> 7u32",
+      "1",
+      "unsigned integer"
+    ],
+    [
+      "(1f32 / 0f32) as usize",
+      "4294967295",
+      "unsigned integer"
+    ],
+    [
+      "(-1f64 / 0f64) as isize",
+      "-2147483648",
+      "signed integer"
+    ],
+    [
+      "leaf_double as u8",
+      "0",
+      "unsigned integer"
+    ],
+    [
+      "leaf_fraction % 0.5f32",
+      "0.25",
+      "float"
+    ],
+    [
+      "(leaf_fraction / 0.0f32) as u8",
+      "255",
+      "unsigned integer"
+    ],
+    [
+      "(leaf_zero / leaf_zero) as u64",
+      "0",
+      "unsigned integer"
+    ],
+    [
+      "true || (((1f32 % 0f32) as u8) == 0u8)",
+      "true",
+      "bool"
+    ],
+    [
+      "(5.463000546873376e-46f32) as i64",
+      "0",
+      "signed integer"
+    ],
+    [
+      "(-5.463000546873376e-46f32) as u64",
+      "0",
+      "unsigned integer"
+    ],
+    [
+      "(1e-400f64) as i32",
+      "0",
+      "signed integer"
+    ],
+    [
+      "(-1e-400f64) as u8",
+      "0",
+      "unsigned integer"
     ]
   ],
   "invalid": [
@@ -615,7 +795,13 @@
     "((1 + 2) as usize) + 0u32",
     "false && ((1usize + 2) == 0u32)",
     "((2147483648 - 1) as u32) + 0u32",
-    "((1 + 2) << (1.0 + 0f32)) + 0i8"
+    "((1 + 2) << (1.0 + 0f32)) + 0i8",
+    "1f32 % 1f64",
+    "1f32 % 1u32",
+    "1u8 % 1f32",
+    "false && ((1f32 % 1u32) == 0f32)",
+    "1f32 as bool",
+    "1f32 as char"
   ],
   "baseline_valid": [
     [
@@ -880,7 +1066,39 @@
     "(1.0 + 2.0) + (3.0 + 4.0)": "f64",
     "((1 + 2) | (4 + 0u8)) & 7u8": "u8",
     "(1 + 2) + (3 + (4 + 0i64))": "i64",
-    "((1 + 2) as usize) + 0usize": "usize"
+    "((1 + 2) as usize) + 0usize": "usize",
+    "300f32 as u8": "u8",
+    "-300f64 as i8": "i8",
+    "-1f32 as u8": "u8",
+    "(0f32 / 0f32) as i32": "i32",
+    "(1f64 / 0f64) as u64": "u64",
+    "(-1f64 / 0f64) as i64": "i64",
+    "7.5f32 % 2.0f32": "f32",
+    "(0f32 % 0f32) as u8": "u8",
+    "-7.5f64 % 2.0f64": "f64",
+    "7.5f32 % -2.0f32": "f32",
+    "-7.5f32 % -2.0f32": "f32",
+    "(1f32 % 0f32) as i16": "i16",
+    "(0f32 % 0f32) != (0f32 % 0f32)": "bool",
+    "(1f64 / 0f64) as i64": "i64",
+    "(-1f64 / 0f64) as u64": "u64",
+    "18446744073709551616f64 as u64": "u64",
+    "9223372036854775808f64 as i64": "i64",
+    "-9223372036854775808f64 as i64": "i64",
+    "-0.75f32 as u8": "u8",
+    "127.75f32 as i8": "i8",
+    "-128.75f64 as i8": "i8",
+    "(255.0 + 1.0) as u8": "u8",
+    "(7.5 % 2.0) + 0f32": "f32",
+    "(-300f64 as i8) + 1i8": "i8",
+    "(300f32 as u8) >> 7u32": "u8",
+    "(1f32 / 0f32) as usize": "usize",
+    "(-1f64 / 0f64) as isize": "isize",
+    "true || (((1f32 % 0f32) as u8) == 0u8)": "bool",
+    "(5.463000546873376e-46f32) as i64": "i64",
+    "(-5.463000546873376e-46f32) as u64": "u64",
+    "(1e-400f64) as i32": "i32",
+    "(-1e-400f64) as u8": "u8"
   },
   "rust_context_r66_20261008": {
     "baseline_valid": [
@@ -948,5 +1166,53 @@
     "valid_added": 29,
     "invalid_added": 20,
     "full_language_parity": false
+  },
+  "rust_float_cast_r67_20261008": {
+    "baseline_valid": [
+      [
+        "300f32 as u8",
+        "255",
+        "unsigned integer"
+      ],
+      [
+        "-300f64 as i8",
+        "-128",
+        "signed integer"
+      ],
+      [
+        "-1f32 as u8",
+        "0",
+        "unsigned integer"
+      ],
+      [
+        "(0f32 / 0f32) as i32",
+        "0",
+        "signed integer"
+      ],
+      [
+        "(1f64 / 0f64) as u64",
+        "18446744073709551615",
+        "unsigned integer"
+      ],
+      [
+        "(-1f64 / 0f64) as i64",
+        "-9223372036854775808",
+        "signed integer"
+      ],
+      [
+        "7.5f32 % 2.0f32",
+        "1.5",
+        "float"
+      ],
+      [
+        "(0f32 % 0f32) as u8",
+        "0",
+        "unsigned integer"
+      ]
+    ],
+    "valid_added": 36,
+    "invalid_added": 6,
+    "full_native_equivalence": false,
+    "underflow_regressions": 4
   }
 }

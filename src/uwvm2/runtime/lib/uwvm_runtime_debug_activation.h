@@ -9,6 +9,7 @@
 # include <limits>
 # include <new>
 #endif
+#include <uwvm2/utils/macro/push_macros.h>
 namespace uwvm2::runtime::lib::details::debug_activation
 {
     inline constexpr ::std::size_t frames_per_block{64u};
@@ -51,9 +52,9 @@ namespace uwvm2::runtime::lib::details::debug_activation
             for(::std::size_t i{}; i != size_; ++i) { delete[] blocks_[i]; }
             delete[] blocks_;
         }
-        [[nodiscard]] failure ensure(::std::size_t index, ::std::size_t& used, ::std::size_t budget) noexcept
+    private:
+        [[nodiscard]] UWVM_NOINLINE failure grow(::std::size_t index, ::std::size_t& used, ::std::size_t budget) noexcept
         {
-            if(index < frames_per_block || index / frames_per_block <= size_) { return failure::none; }
             if(index / frames_per_block != size_ + 1u) { return failure::invalid_identity; }
             auto const max_directory{static_cast<::std::size_t>((::std::numeric_limits<::std::ptrdiff_t>::max)()) / sizeof(T*)};
             auto next_capacity{capacity_};
@@ -77,6 +78,15 @@ namespace uwvm2::runtime::lib::details::debug_activation
             }
             blocks_[size_++] = block; used += block_bytes + directory_bytes;
             return failure::none;
+        }
+    public:
+        [[nodiscard]] UWVM_ALWAYS_INLINE failure ensure(::std::size_t index, ::std::size_t& used, ::std::size_t budget) noexcept
+        {
+            // Existing blocks are stable, already constructed and charged to
+            // the same ledger budget. Preserve the original admission test;
+            // only actual directory/block growth crosses the cold native ABI.
+            if(index < frames_per_block || index / frames_per_block <= size_) { return failure::none; }
+            return grow(index,used,budget);
         }
         [[nodiscard]] T& operator[](::std::size_t index) noexcept
         { return index < frames_per_block ? first_[index] : blocks_[index / frames_per_block - 1u][index % frames_per_block]; }
@@ -231,7 +241,7 @@ namespace uwvm2::runtime::lib::details::debug_activation
             }
             return pending_.continuation == 0u && pending_.parent == 0u && pending_.island == 0u && pending_.count == 0u;
         }
-        [[nodiscard]] ::std::uint64_t enter(::std::uint64_t module, ::std::uint64_t function,
+        [[nodiscard]] UWVM_ALWAYS_INLINE ::std::uint64_t enter(::std::uint64_t module, ::std::uint64_t function,
             ::std::uint64_t generation, ::std::uint64_t epoch) noexcept
         {
             if(poisoned_) { return 0u; }
@@ -250,7 +260,7 @@ namespace uwvm2::runtime::lib::details::debug_activation
             frames_[count_++] = {identity, parent, continuation, module, function, generation, epoch, island_};
             return identity;
         }
-        void leave(::std::uint64_t identity, exit_kind kind) noexcept
+        UWVM_ALWAYS_INLINE void leave(::std::uint64_t identity, exit_kind kind) noexcept
         {
             if(poisoned_) { return; }
             if(identity == 0u || count_ == 0u || pending_.continuation != 0u ||
@@ -284,3 +294,5 @@ namespace uwvm2::runtime::lib::details::debug_activation
         }
     };
 }
+
+#include <uwvm2/utils/macro/pop_macros.h>

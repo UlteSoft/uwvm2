@@ -142,7 +142,7 @@ def main():
             return reply(f'replace 0 {2 if args.call_existing else 1} {generation} {args.out / (payload + ".bin")}')
         if args.replacements:
             target = 2 if args.call_existing else 1
-            assert b'breakpoint 1' in reply(f'break 0 {target} 0')
+            assert b'breakpoint 1' in reply(f'breakwasm 0 {target} 0')
             result = replace(1, 'malformed')
             rows.append({'case': 'malformed_rejected', 'output': result.decode(errors='replace')})
             assert b'replacement body failed WebAssembly validation' in result, result
@@ -153,7 +153,7 @@ def main():
             rows.append({'case': 'generation_2', 'output': result.decode(errors='replace')})
             assert b'function replaced; generation 2' in result, result
             assert b'no breakpoints' in reply('info breakpoints')
-            result = reply(f'break 0 {target} 3')
+            result = reply(f'breakwasm 0 {target} 3')
             rows.append({'case': 'new_generation_breakpoint', 'output': result.decode(errors='replace')})
             assert b'breakpoint 2' in result, result
             if args.replacements == 1:
@@ -166,13 +166,13 @@ def main():
             rows.append({'case': 'generation_3', 'output': result.decode(errors='replace')})
             assert b'function replaced; generation 3' in result, result
             assert b'no breakpoints' in reply('info breakpoints')
-            assert b'no emitted executable debug safe point' in reply(f'break 0 {target} 3')
+            assert b'no emitted executable debug safe point' in reply(f'breakwasm 0 {target} 3')
         result = reply('continue')
         rows.append({'case': 'continue', 'output': result.decode(errors='replace')})
         deadline = time.monotonic() + 20
         while True:
             result = reply('status')
-            if b'guest exited: 0' in result:
+            if b'Program exited normally.' in result:
                 rows.append({'case': 'new_function_exit', 'output': result.decode(errors='replace')})
                 break
             assert time.monotonic() < deadline, result

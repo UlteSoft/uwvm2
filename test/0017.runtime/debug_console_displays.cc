@@ -32,7 +32,7 @@ int main()
     check(completed.type == console_completion::kind::symbol && completed.prefix == "par" && completed.selectors.empty(),"display dynamic symbol completion");
     auto const literal{console_completion::context("display 1 + par",15u)};
     check(literal.prefix == "par" && literal.selectors.empty(),"display numbers never become thread/stop selectors");
-    for(auto text : {"condition 12 par","condition 12 4 + par","break 0 1 2 if par","break-source 0 file.cpp:9 ignore 2 if par"})
+    for(auto text : {"condition 12 par","condition 12 4 + par","breakwasm 0 1 2 if par","breaksource 0 file.cpp:9 ignore 2 if par"})
     {
         ::fast_io::string_view line{::fast_io::mnp::os_c_str(text)};
         auto const part{console_completion::context(line,line.size())};
@@ -45,12 +45,12 @@ int main()
         check(console_completion::context(line,line.size()).type==console_completion::kind::none,
               "invalid condition ID never selects a symbol scope");
     }
-    for(auto text : {"break 0 1 2 ignore 3","break-source 0 source file.cpp:9 ignore 0","break-source 0 a ignore word.cpp:9 ignore 18446744073709551615"})
+    for(auto text : {"breakwasm 0 1 2 ignore 3","breaksource 0 source file.cpp:9 ignore 0","breaksource 0 a ignore word.cpp:9 ignore 18446744073709551615"})
     { auto const parsed{parse_console_command(::fast_io::string_view{::fast_io::mnp::os_c_str(text)})};
       check(parsed.operation == ::uwvm2::utils::control::operation::breakpoint_set && parsed.breakpoint_initial_ignore,"initial ignore is installed as one bounded command"); }
-    auto const path{parse_console_command("break-source 0 a ignore word.cpp:9")};
+    auto const path{parse_console_command("breaksource 0 a ignore word.cpp:9")};
     check(path.kind == console_command_kind::source_breakpoint && !path.breakpoint_initial_ignore,"literal source path is not a policy suffix");
-    for(auto text : {"break 0 1 2 ignore -1","break 0 1 2 ignore 18446744073709551616","break 0 1 2 ignore 1 ignore 2","status ignore 3"})
+    for(auto text : {"breakwasm 0 1 2 ignore -1","breakwasm 0 1 2 ignore 18446744073709551616","breakwasm 0 1 2 ignore 1 ignore 2","status ignore 3"})
     { check(parse_console_command(::fast_io::string_view{::fast_io::mnp::os_c_str(text)}).kind == console_command_kind::invalid,"invalid initial policy never creates a breakpoint"); }
     ::fast_io::io::println("debug_console_displays: PASS (owned HOST syntax DATA; no VM authority)");
 }

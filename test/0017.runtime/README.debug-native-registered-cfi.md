@@ -121,8 +121,12 @@ four-byte owned-DATA evaluator and Linux ARM EABI little-endian private reader.
 Shared row types now live in native_debug_cfi_types.h without LLVM ABI coupling.
 The LLVM observer uses those same definitions. The subsequent ARM integration
 accepts bounded same-object ELF32 .debug_frame metadata and rejects the lexical
-suffix after an actual r11 restore, where LLVM TailCC rows otherwise retain
-the caller's frame pointer. It preserves EHABI registration and grants no live
-read. Exact native SDK, Wasm ownership and instruction-state qualification are
+suffix after a possible r11 replacement, where LLVM TailCC rows otherwise
+retain the caller's frame pointer. Original ELF $a/$d/$t mapping boundaries
+also limit the scanned instruction prefix. Fresh RuntimeDyld object maps and
+pristine controls replace earlier vacuous cross-object negative checks. The
+current record includes independently assembled fifteen-write inputs and
+actual generated AAPCS/TailCC ordinary-call execution under ARMhf Linux QEMU.
+It preserves EHABI registration and grants no live read. Exact native SDK, Wasm ownership and instruction-state qualification are
 still required before physical ARM Wasm callers, native ni or finish can be
 enabled. See the scoped status for the actual compiler-object test limits.

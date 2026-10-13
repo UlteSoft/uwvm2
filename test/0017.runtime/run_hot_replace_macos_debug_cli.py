@@ -33,7 +33,7 @@ def resume_to_breakpoint(console: Console, transitions: list[str]) -> None:
         transitions.append(reply.decode(errors='replace'))
         if b'stopped: breakpoint' in reply:
             return
-        if b'guest exited:' in reply or b'debug domain closed' in reply:
+        if b'Program exited' in reply or b'debug domain closed' in reply:
             break
         if time.monotonic() >= deadline:
             break
@@ -120,8 +120,9 @@ def main() -> int:
             response = console.send(f'replace 0 0 1 {work / "good.bin"}')
             responses['stale'] = response.decode(errors='replace')
             assert b'function generation changed' in response, response
-            assert b'running' in console.send('continue')
-            assert b'guest exited: 0' in console.until(b'guest exited: 0')
+            resumed = console.send('continue')
+            assert b'error:' not in resumed and not re.search(rb'(?m)^running\r?$', resumed), resumed
+            assert b'Program exited normally.' in console.until(b'Program exited normally.')
             peak, log = console.close()
         except BaseException:
             console.abort()
@@ -141,8 +142,9 @@ def main() -> int:
             response = active.send(f'replace 0 0 1 {work / "good.bin"}')
             responses['active_frame'] = response.decode(errors='replace')
             assert b'active on a stopped Wasm stack' in response, response
-            assert b'running' in active.send('continue')
-            assert b'guest exited: 0' in active.until(b'guest exited: 0')
+            resumed = active.send('continue')
+            assert b'error:' not in resumed and not re.search(rb'(?m)^running\r?$', resumed), resumed
+            assert b'Program exited normally.' in active.until(b'Program exited normally.')
             active_peak, active_log = active.close()
         except BaseException:
             if args.out:

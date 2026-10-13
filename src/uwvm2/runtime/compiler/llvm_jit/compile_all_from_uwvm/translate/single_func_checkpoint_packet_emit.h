@@ -27,6 +27,35 @@ struct llvm_jit_checkpoint_native_packet_emit_result
     return runtime_operand_stack_value_type::i32; // known_type must precede use
 }
 
+// The caller has validated the actual typed SSA carrier and the complete owned
+// packet extent before deriving this cell. A whole integer store preserves all
+// live bits and zero padding without clearing a byte array then overwriting it.
+// Selection is compile time only; reference captures and epoch refreshes remain
+// unconditional where the existing producer requires them.
+[[nodiscard]] inline bool emit_runtime_local_func_llvm_jit_canonical_nonlocal_store(
+    runtime_local_func_llvm_jit_emit_state_t const& state, ::llvm::Value* live,
+    ::llvm::Value* slot, runtime_operand_stack_value_type carrier) noexcept
+{
+#if defined(__linux__) && defined(__x86_64__)
+    if(state.llvm_module == nullptr || state.llvm_function == nullptr || state.ir_builder == nullptr ||
+       state.llvm_function->getParent() != state.llvm_module || live == nullptr || slot == nullptr)
+    { return false; }
+    auto const& layout{state.llvm_module->getDataLayout()};
+    auto const& triple{state.llvm_module->getTargetTriple()};
+    auto const width{get_runtime_wasm_value_type_abi_size(carrier)};
+    if(layout.isDefault() || !layout.isLittleEndian() || layout.getPointerSizeInBits() != 64u ||
+       triple.getArch() != ::llvm::Triple::x86_64 || !triple.isOSLinux() || width == 0u || width > 16u ||
+       live->getType() != get_llvm_type_from_wasm_value_type(state.ir_builder->getContext(),carrier))
+    { return false; }
+    auto& builder{*state.ir_builder};
+    auto const bits{builder.getIntNTy(static_cast<unsigned>(width*CHAR_BIT))};
+    auto const whole{builder.CreateZExtOrBitCast(builder.CreateBitCast(live,bits),builder.getInt128Ty())};
+    builder.CreateStore(whole,slot)->setAlignment(::llvm::Align{1u});return true;
+#else
+    (void)state;(void)live;(void)slot;(void)carrier;return false;
+#endif
+}
+
 [[nodiscard]] inline constexpr llvm_jit_checkpoint_native_packet_emit_result
     emit_runtime_local_func_llvm_jit_checkpoint_dynamic_packet(
         runtime_local_func_llvm_jit_emit_state_t& state,
@@ -262,13 +291,46 @@ struct llvm_jit_checkpoint_native_packet_emit_result
     }
     out.slots_address = builder.CreatePtrToInt(packet, integer);
     // Snapshot the original-index local prefix once through this function's
-    // private noinline copier. Values and executed flags are still read at
-    // EVERY actual opcode; the nonlocal SSA packet remains site-specific.
+    // private copier. Canonical scalar cells follow real executed assignments,
+    // with a full refresh whenever debugger policy changes. References/vectors
+    // always refresh; the nonlocal SSA packet remains site-specific.
     // Complete declarations share a body too; their private address table
     // lives in the already budgeted observation heap, not on the native stack.
     static_assert(checkpoint::native_slot_bytes == ::uwvm2::runtime::lib::details::llvm_jit_debug_local_slot_bytes);
-    if(shared_locals && !emit_runtime_local_func_llvm_jit_snapshot_copy(
-        state,site.local_count,packet,captured_flags,state.checkpoint_observer_workspace,false)) { return {}; }
+    ::llvm::Value* current_full_token{};
+    if(shared_locals && !emit_runtime_local_func_llvm_jit_canonical_local_refresh(state,current_full_token,
+        [&](bool retain_scalars) noexcept
+        { return emit_runtime_local_func_llvm_jit_snapshot_copy(
+            state,site.local_count,packet,captured_flags,state.checkpoint_observer_workspace,false,retain_scalars); })) { return {}; }
+#if defined(__linux__) && defined(__x86_64__)
+    if(incremental_nonlocals && !actual_nonlocals.empty())
+    {
+        using hints=checkpoint::observation_probe_hints;
+        if(auto const address{hints::full_token_address()}; address!=nullptr)
+        {
+            if(state.checkpoint_observer_packet_epoch==nullptr)
+            {
+                auto const stamp{create_llvm_jit_entry_block_alloca(builder,builder.getInt64Ty(),nullptr,
+                    "checkpoint.observation.full.epoch")};
+                if(stamp==nullptr || stamp->getFunction()!=state.llvm_function) { return {}; }
+                stamp->setAlignment(::llvm::Align{8u});
+                auto initialize_at{stamp->getIterator()};++initialize_at;
+                ::llvm::IRBuilder<> initialize{stamp->getParent(),initialize_at};
+                initialize.CreateStore(initialize.getInt64(0u),stamp)->setAlignment(::llvm::Align{8u});
+                state.checkpoint_observer_packet_epoch=stamp;
+            }
+            if(current_full_token == nullptr)
+            {
+                auto const pointer{::llvm::ConstantExpr::getIntToPtr(::llvm::ConstantInt::get(integer,
+                    reinterpret_cast<::std::uintptr_t>(address)),::llvm::PointerType::getUnqual(builder.getContext()))};
+                auto const token{builder.CreateLoad(builder.getInt64Ty(),pointer)};
+                token->setAtomic(::llvm::AtomicOrdering::Acquire);token->setAlignment(::llvm::Align{8u});
+                current_full_token=token;
+            }
+        }
+    }
+#endif
+    ::std::vector<::std::size_t> conditional_rewrites{};
     for(::std::size_t index{}; index != site.slots.size(); ++index)
     {
         if(shared_locals && index < site.local_count) { continue; }
@@ -277,7 +339,10 @@ struct llvm_jit_checkpoint_native_packet_emit_result
         bool const numeric{site.slots[index].type.kind != checkpoint::types::value_kind::reference};
         if(incremental_nonlocals && index >= site.local_count && numeric &&
            retained[index-site.local_count] == actual_nonlocals[index-site.local_count])
-        { continue; } // the same actual SSA value already occupies this exact slot
+        {
+            if(current_full_token!=nullptr) { conditional_rewrites.push_back(index); }
+            continue; // unconditional dominance or a checked FULL epoch below
+        }
         // [native packet0 ... index*16 ... N*16] packet_end
         // [safe                                ] index<N, N*16 bounded above
         // and the complete carrier width<=16 BEFORE creating the byte GEP.
@@ -287,21 +352,28 @@ struct llvm_jit_checkpoint_native_packet_emit_result
         {
             // [actual LLVM operand/control-parameter handles ... bounded index]
             // [safe] exact nonlocals count/type was checked before indexing.
+            bool whole_stored{};
             if(incremental_nonlocals)
             {
+                whole_stored = emit_runtime_local_func_llvm_jit_canonical_nonlocal_store(
+                    state,actual_nonlocals[index-site.local_count],slot,carrier);
                 // Overwrite the complete 16-byte cell when its value changes;
                 // narrower scalars/references never inherit old high padding.
                 // References are deliberately refreshed at every opcode, with
                 // their original exact logical type/GC checks left intact.
-                if(get_runtime_wasm_value_type_abi_size(carrier) != checkpoint::native_slot_bytes)
+                if(!whole_stored && get_runtime_wasm_value_type_abi_size(carrier) != checkpoint::native_slot_bytes)
                 {
                     builder.CreateStore(::llvm::ConstantAggregateZero::get(
                         ::llvm::ArrayType::get(builder.getInt8Ty(),checkpoint::native_slot_bytes)),slot)->setAlignment(::llvm::Align{1u});
                 }
                 retained[index-site.local_count] = numeric ? actual_nonlocals[index-site.local_count] : nullptr;
             }
-            auto const store{builder.CreateStore(actual_nonlocals[index - site.local_count], slot)};
-            store->setAlignment(::llvm::Align{1u}); continue;
+            if(!whole_stored)
+            {
+                auto const store{builder.CreateStore(actual_nonlocals[index - site.local_count], slot)};
+                store->setAlignment(::llvm::Align{1u});
+            }
+            continue;
         }
         // [actual N-local byte flag arrays ... index ... N] flags_end
         // [safe                                          ] index<N and same
@@ -340,12 +412,50 @@ struct llvm_jit_checkpoint_native_packet_emit_result
             auto const store{builder.CreateStore(live, slot)}; store->setAlignment(::llvm::Align{1u});
         }
     }
+    if(!conditional_rewrites.empty())
+    {
+        // Lexical equality alone is insufficient after a skipped capture. An
+        // unchanged odd epoch proves FULL collection throughout this straight
+        // private chain. Every publication first invalidates that epoch before
+        // changing any dispatch word; acquire of a skipped word also prevents
+        // a later capture from observing an earlier FULL epoch. Wasm CFG/owner
+        // changes still clear the lexical witnesses. One branch refreshes ALL
+        // unchanged numeric cells on a mismatch; no reference store is elided.
+        auto const previous{builder.CreateLoad(builder.getInt64Ty(),state.checkpoint_observer_packet_epoch)};
+        previous->setAlignment(::llvm::Align{8u});
+        auto const unchanged{builder.CreateAnd(builder.CreateICmpNE(builder.CreateAnd(current_full_token,
+            builder.getInt64(1u)),builder.getInt64(0u)),builder.CreateICmpEQ(current_full_token,previous))};
+        auto const refresh{::llvm::BasicBlock::Create(builder.getContext(),"checkpoint.packet.refresh",state.llvm_function)};
+        auto const next{::llvm::BasicBlock::Create(builder.getContext(),"checkpoint.packet.ready",state.llvm_function)};
+        builder.CreateCondBr(unchanged,next,refresh);builder.SetInsertPoint(refresh);
+        for(auto const index:conditional_rewrites)
+        {
+            auto const carrier{checkpoint_packet_physical_carrier(site.slots[index].type)};
+            auto const slot{builder.CreateInBoundsGEP(packet_type,packet,
+                {builder.getInt32(0u),builder.getInt64(index*checkpoint::native_slot_bytes)})};
+            if(emit_runtime_local_func_llvm_jit_canonical_nonlocal_store(
+                state,actual_nonlocals[index-site.local_count],slot,carrier)) { continue; }
+            if(get_runtime_wasm_value_type_abi_size(carrier)!=checkpoint::native_slot_bytes)
+            {
+                builder.CreateStore(::llvm::ConstantAggregateZero::get(
+                    ::llvm::ArrayType::get(builder.getInt8Ty(),checkpoint::native_slot_bytes)),slot)->setAlignment(::llvm::Align{1u});
+            }
+            builder.CreateStore(actual_nonlocals[index-site.local_count],slot)->setAlignment(::llvm::Align{1u});
+        }
+        builder.CreateBr(next);builder.SetInsertPoint(next);
+    }
+    if(current_full_token!=nullptr && state.checkpoint_observer_packet_epoch!=nullptr)
+    {
+        // Stamp BEFORE the real observer can park or change registers/policy.
+        // Resume republishes a new epoch, forcing the next complete refresh.
+        builder.CreateStore(current_full_token,state.checkpoint_observer_packet_epoch)->setAlignment(::llvm::Align{8u});
+    }
     if(incremental_nonlocals)
     {
-        state.checkpoint_observer_nonlocal_block = actual_block;
+        state.checkpoint_observer_nonlocal_block = builder.GetInsertBlock();
         state.checkpoint_observer_nonlocal_workspace = state.checkpoint_observer_workspace;
         state.checkpoint_observer_nonlocal_locals = site.local_count;
-        state.checkpoint_observer_nonlocal_anchor = actual_block->empty() ? nullptr : ::std::addressof(actual_block->back());
+        state.checkpoint_observer_nonlocal_anchor = ::std::addressof(builder.GetInsertBlock()->back());
     }
     return out;
 }

@@ -174,11 +174,27 @@ int main(int argc,char** argv)
     require(publication_refused.status==outcome::preparation_declined && publication_refused.preparation.status==lib::llvm_jit_checkpoint_prepare_status::full_publication_record_preparation_declined &&
         !publication_refused.operation && !publication_refused.candidate_world_retained && !publication_refused.preparation.runtime_full_publication_records_prepared,"publication quota refuses before WASI retirement");
     require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"publication refusal preserves current stopped WASI world");
+    limited=request;limited.maximum_private_closed_workers=0u;
+    auto closed_refused{lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,limited,deadline())};
+    require(closed_refused.status==outcome::preparation_declined &&
+        closed_refused.preparation.status==lib::llvm_jit_checkpoint_prepare_status::closed_worker_preparation_declined &&
+        !closed_refused.operation && !closed_refused.candidate_world_retained &&
+        closed_refused.preparation.started_private_closed_workers==0u &&
+        !closed_refused.preparation.private_closed_worker_cohort_held,"closed worker quota refuses before old WASI retirement");
+    require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused &&
+        lib::observe_compiler_runtime_generation_host_api()==epoch,"closed cohort refusal preserves the original WASI world");
     auto pending{lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,request,short_deadline())};
+    require(pending.preparation.started_private_closed_workers==1u &&
+        pending.preparation.held_private_closed_workers==1u && pending.preparation.private_closed_worker_cohort_held &&
+        !pending.private_closed_workers_rechecked_after_physical_join && !pending.private_closed_workers_cancelled_and_joined,
+        "genuine new OS worker holds private WASI root/debug scopes before old retirement");
     ::fast_io::print(::fast_io::out(),"WASIP1_PREPARED_RETIREMENT stage=execution status=",::fast_io::mnp::dec(static_cast<unsigned>(pending.status))," prepare=",::fast_io::mnp::dec(static_cast<unsigned>(pending.preparation.status)),"\n");
     require(pending.status==outcome::pending_execution && pending.operation && pending.candidate_world_retained,"candidate survives pending execution drain");
     require(pending.preparation.status==lib::llvm_jit_checkpoint_prepare_status::prepared_and_retained && pending.preparation.data_error==::uwvm2::uwvm::debugger::checkpoint::error::none && pending.preparation.wasip1_installed_privately && pending.preparation.wasip1_prepared_together && pending.preparation.wasip1_environments==1u && pending.preparation.prepared_wasip1_memories==1u && pending.preparation.joined_private_root_workers==1u,"new WASI memory and complete private candidate retained together");
     require(pending.preparation.runtime_full_code_owners_transferred_privately && pending.preparation.runtime_full_code_targets_allocation_preserved &&
+        pending.preparation.runtime_full_root_identities_prepared_privately &&
+        pending.preparation.prepared_full_root_code_identities==pending.preparation.modules &&
+        pending.preparation.prepared_full_root_code_identity_functions==pending.preparation.functions &&
         pending.preparation.prepared_full_code_owner_modules==pending.preparation.modules && pending.preparation.prepared_full_code_owner_functions==pending.preparation.functions &&
         !pending.full_code_owners_rechecked_after_physical_join && pending.preparation.runtime_full_publication_records_prepared && pending.preparation.prepared_full_publication_modules==1u &&
         pending.preparation.prepared_full_publication_functions==pending.preparation.functions && !pending.full_publication_records_rechecked_after_physical_join,"private final publication record shape");
@@ -208,9 +224,14 @@ int main(int argc,char** argv)
     { ::std::lock_guard lock{windows->mutex};windows->release_tls=true;windows->changed.notify_all(); }
     auto ready{lib::llvm_jit_checkpoint_continue_native_retirement_host_api(operation,deadline())};
     require(ready.status==outcome::prepared_world_ready_closed && ready.native_workers_joined && ready.candidate_world_retained && ready.source_initializer_bindings_rechecked_after_physical_join && ready.full_publication_records_rechecked_after_physical_join && ready.full_code_owners_rechecked_after_physical_join,"private candidate ready only after physical join");blocked();
+    require(ready.private_closed_workers_rechecked_after_physical_join &&
+        !ready.private_closed_workers_cancelled_and_joined,"same actual closed WASI worker is still held after old TLS death");
     require(lib::observe_compiler_runtime_generation_host_api()==epoch && launch->output==0xa5a5a5a5u,"no candidate publication or original return output");
     auto discarded{lib::llvm_jit_checkpoint_discard_prepared_instance_host_api(operation,deadline())};
     require(discarded.status==outcome::retired_and_joined && !discarded.candidate_world_retained && discarded.all_frames_signalled,"explicit discard releases private candidate and reopens same instance");
+    require(discarded.private_closed_workers_cancelled_and_joined &&
+        discarded.private_closed_workers_rechecked_after_physical_join,"actual private WASI cohort joined before old admission opens");
+    ::fast_io::io::println("CLOSED_COHORT workers=1 held_before_old_retirement=1 rechecked_after_old_join=1 cancel_actual_os_tls_join_before_open=1 guest_execution=0 PASS");
     auto joined{lib::runtime_join_llvm_jit_debug_guest_worker_until_host_api(worker.worker,deadline())};require(joined.actual.status==::fast_io::thread_join_status::joined,"actual OS owner reaped");
     lib::reset_runtime_state_host_api();::uwvm2::uwvm::cmdline::wasm_file_ppos=nullptr;
     ::fast_io::print(::fast_io::out(),"CHECKPOINT_WASIP1_PREPARED_RETIREMENT policy=",policy," checks=",::fast_io::mnp::dec(checks.load())," missing_wasi_refused=1 strict_refused=1 execution_pending=1 tls_pending=1 physical_join=1 closed_after_join=1 explicit_discard=1 whole_restore=0 PASS\n");

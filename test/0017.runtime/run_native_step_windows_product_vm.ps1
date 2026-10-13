@@ -753,7 +753,7 @@ try {
             $expectedIndex = if ($operation -eq 'into') { -1 } else { $entry }
             $sourceCommands = Join-Path $work "$sourceStem-$operation-commands.txt"
             $sourceLog = Join-Path $work "$sourceStem-$operation-product.log"
-            $lines = @("break 0 $breakIndex 0", 'continue') +
+            $lines = @("breakwasm 0 $breakIndex 0", 'continue') +
                      (@('wait') * 8) +
                      @("step source 1 $operation", 'status', 'quit')
             [System.IO.File]::WriteAllText($sourceCommands, (($lines -join "`n") + "`n"), $utf8NoBom)
@@ -790,7 +790,7 @@ try {
         Require (-not [string]::IsNullOrEmpty($sourceSpec)) "$sourceStem has no source breakpoint target"
         $breakSourceCommands = Join-Path $work "$sourceStem-break-source-commands.txt"
         $breakSourceLog = Join-Path $work "$sourceStem-break-source-product.log"
-        $breakSourceLines = @("break-source 0 $sourceSpec", 'continue') +
+        $breakSourceLines = @("breaksource 0 $sourceSpec", 'continue') +
                             (@('wait') * 8) + @('status', 'quit')
         [System.IO.File]::WriteAllText($breakSourceCommands, (($breakSourceLines -join "`n") + "`n"), $utf8NoBom)
         $LASTEXITCODE = Invoke-OwnedCase $launcher @($uwvm, $sourceWasm, $breakSourceLog, 'unwind', $breakSourceCommands) $breakSourceLog
@@ -854,7 +854,7 @@ try {
         # body was published through the rejected request.
         $activeCommands = Join-Path $work "$policy-active-frame-commands.txt"
         $activeLog = Join-Path $work "$policy-active-frame-product.log"
-        $activeLines = @('break 0 1 0', 'continue') + (@('wait') * 8) +
+        $activeLines = @('breakwasm 0 1 0', 'continue') + (@('wait') * 8) +
             @("replace 0 1 1 $($bodies['good4'])", 'status', 'continue', 'wait', 'quit')
         [System.IO.File]::WriteAllText($activeCommands, (($activeLines -join "`n") + "`n"), $utf8NoBom)
         $LASTEXITCODE = Invoke-OwnedCase $launcher @($uwvm, $replacementWasm, $activeLog, $policy, $activeCommands) $activeLog

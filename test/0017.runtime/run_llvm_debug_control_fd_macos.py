@@ -128,7 +128,7 @@ def run_live(binary: Path, tools: Path, work: Path, ros: bool, rows: list[dict])
     try:
         output.extend(wait_marker(process, MARKER))
         assert b'running' in exchange(host, 'status')
-        source_rejection = exchange(host, 'break-source 0 missing.c:1')
+        source_rejection = exchange(host, 'breaksource 0 missing.c:1')
         assert b'error: source stepping unavailable' in source_rejection, source_rejection
         assert b'stopped' in exchange(host, 'pause')
         assert b'thread 1' in exchange(host, 'info threads')

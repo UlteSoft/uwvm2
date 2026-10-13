@@ -43,7 +43,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_macos
     enum class phase : ::std::uint32_t
     {
         idle, ready, arming, at_guest_pc, executing, trapped,
-        releasing, released, failed
+        releasing, released, failed, continuation_running, continuation_escape, continuation_cancel_pending
     };
     struct session
     {
@@ -53,6 +53,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_macos
         ::std::uintptr_t owner_begin{}, owner_end{}, expected_pc{};
         ::std::uintptr_t first_pc{}, next_pc{};
         native_registers::snapshot register_snapshot{};
+        ::std::uint64_t trap_revision{};
+        ::std::uintptr_t continuation_pc{}, continuation_origin_sp{};
+        bool retained_entry_stop{}; // Host guard; first real trap remains on its original gate.
         int first_exception_code{}, second_exception_code{};
 #if defined(__APPLE__) && (defined(__aarch64__) || (defined(__x86_64__) && defined(UWVM2_ENABLE_DEBUG_NATIVE_STEP_MACOS_X64_PRODUCT) && UWVM2_ENABLE_DEBUG_NATIVE_STEP_MACOS_X64_PRODUCT == 1)) && TARGET_OS_OSX
         ::thread_act_t target_port{MACH_PORT_NULL};
@@ -377,6 +380,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_macos
                    old_debug.__bvr[0] != pc ||
                    (old_debug.__bcr[0] & 1u) == 0u) { fail_closed(); }
                 step->first_pc = pc;
+                capture_registers(step->register_snapshot, gpr);
+                if(++step->trap_revision == 0u) { fail_closed(); }
                 step->first_exception_code = static_cast<int>(code[0]);
                 if(step->abort_requested.load(::std::memory_order_acquire))
                 { publish_released(*step); }
@@ -387,16 +392,50 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_macos
                     if(step->state.load(::std::memory_order_acquire) == phase::executing &&
                        !step->abort_requested.load(::std::memory_order_acquire))
                     { reply.__mdscr_el1 |= single_step_bit; }
+                    else if(step->state.load(::std::memory_order_acquire) == phase::continuation_running &&
+                            !step->abort_requested.load(::std::memory_order_acquire))
+                    { reply.__bvr[0] = step->continuation_pc; reply.__bcr[0] = breakpoint_control; }
                     else { publish_released(*step); }
                 }
             }
-            else if(current == phase::executing)
+            else if(current == phase::executing || current == phase::continuation_running || current == phase::continuation_escape ||
+                    current == phase::continuation_cancel_pending)
             {
+                bool const continuation{current != phase::executing};
+                bool const escape{current == phase::continuation_escape};
+                if(continuation && !escape)
+                {
+                    if(pc != step->continuation_pc || static_cast<::std::uintptr_t>(code[1]) != pc ||
+                       old_debug.__bvr[0] != pc || (old_debug.__bcr[0] & 1u) == 0u ||
+                       pc < step->owner_begin || pc >= step->owner_end) { fail_closed(); }
+                    auto const sp{static_cast<::std::uintptr_t>(__darwin_arm_thread_state64_get_sp(gpr))};
+                    if(!step->abort_requested.load(::std::memory_order_acquire) && sp != step->continuation_origin_sp)
+                    {
+                        // A recursive invocation can reach the same instruction. Its
+                        // proved ordinary instruction is stepped privately; no descendant
+                        // or host state is published as the selected caller's stop.
+                        if(sp >= step->continuation_origin_sp) { fail_closed(); }
+                        step->state.store(phase::continuation_escape, ::std::memory_order_release);
+                        reply.__mdscr_el1 |= single_step_bit;
+                        ::fast_io::freestanding::my_memcpy(new_state, ::std::addressof(reply), sizeof(reply));
+                        *new_count = ARM_DEBUG_STATE64_COUNT; return KERN_SUCCESS;
+                    }
+                }
+                else if(code[1] != 0 || (old_debug.__mdscr_el1 & single_step_bit) != 0u) { fail_closed(); }
+                if(escape && !step->abort_requested.load(::std::memory_order_acquire))
+                {
+                    if(pc < step->owner_begin || pc >= step->owner_end) { fail_closed(); }
+                    step->state.store(phase::continuation_running, ::std::memory_order_release);
+                    reply.__bvr[0] = step->continuation_pc; reply.__bcr[0] = breakpoint_control;
+                    ::fast_io::freestanding::my_memcpy(new_state, ::std::addressof(reply), sizeof(reply));
+                    *new_count = ARM_DEBUG_STATE64_COUNT; return KERN_SUCCESS;
+                }
                 capture_registers(step->register_snapshot, gpr);
+                if(++step->trap_revision == 0u) { fail_closed(); }
                 // XNU clears MDSCR.SS before sending a software-step
                 // exception. code[1] is zero for this event; the read-only
                 // GPR query above supplies its exact after-instruction PC.
-                if(code[1] != 0 || (old_debug.__mdscr_el1 & single_step_bit) != 0u)
+                if(!continuation && (code[1] != 0 || (old_debug.__mdscr_el1 & single_step_bit) != 0u))
                 { fail_closed(); }
                 step->next_pc = pc;
                 step->second_exception_code = static_cast<int>(code[0]);
@@ -409,6 +448,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_macos
                     if(step->state.load(::std::memory_order_acquire) == phase::executing &&
                        !step->abort_requested.load(::std::memory_order_acquire))
                     { reply.__mdscr_el1 |= single_step_bit; }
+                    else if(step->state.load(::std::memory_order_acquire) == phase::continuation_running &&
+                            !step->abort_requested.load(::std::memory_order_acquire))
+                    { reply.__bvr[0] = step->continuation_pc; reply.__bcr[0] = breakpoint_control; }
                     else { publish_released(*step); }
                 }
             }
@@ -449,6 +491,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_macos
                 if(pc != step->expected_pc || pc < step->owner_begin || pc >= step->owner_end)
                 { fail_closed(); }
                 step->first_pc = pc;
+                capture_registers(step->register_snapshot, gpr);
+                if(++step->trap_revision == 0u) { fail_closed(); }
                 step->first_exception_code = static_cast<int>(code[0]);
                 if(step->abort_requested.load(::std::memory_order_acquire)) { publish_released(*step); }
                 else
@@ -606,7 +650,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_macos
         step.owner_begin = owner_begin;
         step.owner_end = owner_end;
         step.expected_pc = return_pc;
-        step.first_pc = step.next_pc = 0u;
+        step.first_pc = step.next_pc = 0u; step.retained_entry_stop = false;
         step.register_snapshot = {};
         step.first_exception_code = step.second_exception_code = 0;
         step.original_debug = original;
@@ -655,6 +699,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_macos
 # endif
         return true;
     }
+    // Publish a zero-instruction native stop only from the actual backend's
+    // first kernel trap. A supplied PC/session label cannot manufacture it.
+    [[nodiscard]] inline bool retain_initial_trap(session& step) noexcept
+    {
+        details::host_transition_guard guard{};
+        if(details::active.load(::std::memory_order_acquire) != ::std::addressof(step) ||
+           step.state.load(::std::memory_order_acquire) != phase::at_guest_pc ||
+           step.abort_requested.load(::std::memory_order_acquire) || step.retained_entry_stop ||
+           step.target_thread == 0u || step.first_pc != step.expected_pc ||
+           step.first_pc < step.owner_begin || step.first_pc >= step.owner_end ||
+           step.register_snapshot.size() == 0u || step.register_snapshot.pc() != step.first_pc ||
+           step.register_snapshot.sp() == 0u) { return false; }
+        step.next_pc = step.first_pc;
+        step.retained_entry_stop = true;
+        return true; // No gate wake, TF change, instruction execution or register write.
+    }
     [[nodiscard]] inline bool continue_one(session& step) noexcept
     {
         details::host_transition_guard guard{};
@@ -671,21 +731,104 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_macos
         details::host_transition_guard guard{};
         if(details::active.load(::std::memory_order_acquire) != ::std::addressof(step) ||
            step.next_pc < step.owner_begin || step.next_pc >= step.owner_end) { return false; }
-        auto expected{phase::trapped};
+        auto expected{step.state.load(::std::memory_order_acquire)};
+        bool const first{expected == phase::at_guest_pc};
+        if(expected != phase::trapped && !(first && step.retained_entry_stop)) { return false; }
         if(!step.state.compare_exchange_strong(expected, phase::executing,
             ::std::memory_order_acq_rel, ::std::memory_order_acquire)) { return false; }
         step.first_pc = step.next_pc;
         step.expected_pc = step.next_pc;
-        details::signal_gate(step.second_gate);
+        details::signal_gate(first ? step.first_gate : step.second_gate);
         return true;
     }
+#if defined(__aarch64__)
+    // Management thread only, with the selected guest still blocked in our
+    // Mach exception gate. The caller separately proves the owned instruction
+    // boundary and compatible frame. Neither an exception callback nor a
+    // requested address alone may call this operation.
+    [[nodiscard]] inline bool relocate_owned_pc(session& step, ::std::uintptr_t origin,
+        ::std::uintptr_t target) noexcept
+    {
+        details::host_transition_guard guard{};
+        auto const state{step.state.load(::std::memory_order_acquire)};
+        if(details::active.load(::std::memory_order_acquire)!=&step ||
+           (state!=phase::trapped && !(state==phase::at_guest_pc && step.retained_entry_stop)) ||
+           step.abort_requested.load(::std::memory_order_acquire) || step.next_pc!=origin ||
+           step.register_snapshot.pc()!=origin || step.trap_revision==UINT64_MAX ||
+           target<step.owner_begin || target>=step.owner_end || target%4u ||
+           !details::enhanced_mach_restrictions_absent()) { return false; }
+        ::arm_thread_state64_t before{};::mach_msg_type_number_t count{ARM_THREAD_STATE64_COUNT};
+        if(abi::thread_get_state_noexcept(step.target_port,ARM_THREAD_STATE64,
+            reinterpret_cast<::thread_state_t>(&before),&count)!=KERN_SUCCESS || count!=ARM_THREAD_STATE64_COUNT)
+        { return false; }
+        native_registers::snapshot actual{};details::capture_registers(actual,before);
+        if(actual.values!=step.register_snapshot.values) { return false; }
+        if(target==origin) { return true; }
+        auto after{before};__darwin_arm_thread_state64_set_pc_fptr(after,reinterpret_cast<void*>(target));
+        if(abi::thread_set_state_noexcept(step.target_port,ARM_THREAD_STATE64,
+            reinterpret_cast<::thread_state_t>(&after),ARM_THREAD_STATE64_COUNT)!=KERN_SUCCESS) { return false; }
+        // Kernel acceptance is read back before publishing a new stop. No guest
+        // instruction runs and the architectural FP/vector state is untouched.
+        count=ARM_THREAD_STATE64_COUNT;
+        if(abi::thread_get_state_noexcept(step.target_port,ARM_THREAD_STATE64,
+            reinterpret_cast<::thread_state_t>(&after),&count)!=KERN_SUCCESS || count!=ARM_THREAD_STATE64_COUNT)
+        { details::fail_closed(); }
+        details::capture_registers(actual,after);
+        auto expected{step.register_snapshot};expected.values[32u]=target;
+        if(actual.values!=expected.values) { details::fail_closed(); }
+        step.register_snapshot=actual;step.next_pc=step.expected_pc=target;++step.trap_revision;
+        return true;
+    }
+    // Called only inside the runtime's authenticated domain/publication resume
+    // transaction. The target is the decoded caller fallthrough, never user input.
+    [[nodiscard]] inline bool continue_to_continuation(session& step, ::std::uintptr_t pc) noexcept
+    {
+        details::host_transition_guard guard{};
+        auto const state{step.state.load(::std::memory_order_acquire)};
+        bool const first{state == phase::at_guest_pc && step.retained_entry_stop};
+        if(details::active.load(::std::memory_order_acquire) != &step ||
+           (state != phase::trapped && !first) || step.abort_requested.load(::std::memory_order_acquire) ||
+           pc <= step.next_pc || pc >= step.owner_end || pc % 4u != 0u || step.register_snapshot.sp() == 0u) { return false; }
+        step.continuation_pc = pc; step.continuation_origin_sp = step.register_snapshot.sp();
+        step.first_pc = step.next_pc;
+        step.state.store(phase::continuation_running, ::std::memory_order_release);
+        details::signal_gate(first ? step.first_gate : step.second_gate); return true;
+    }
+    [[nodiscard]] inline bool skip_pause_for_continuation() noexcept
+    {
+        details::host_transition_guard guard{};
+        auto* const step{details::active.load(::std::memory_order_acquire)};
+        if(step == nullptr || step->target_port != ::uwvm2::uwvm::debugger::posix_abi::pthread_mach_thread_np_noexcept(
+            ::uwvm2::uwvm::debugger::posix_abi::pthread_self_noexcept())) { return false; }
+        auto const state{step->state.load(::std::memory_order_acquire)};
+        if(state == phase::continuation_running && !step->abort_requested.load(::std::memory_order_acquire)) { return true; }
+        if(state != phase::continuation_cancel_pending && !(state == phase::continuation_running && step->abort_requested.load(::std::memory_order_acquire))) { return false; }
+        // This is the actual worker in a VM safe point, never the exception
+        // callback. Remove the owned hardware event before acknowledging retirement.
+        if(!details::write_debug_state(step->target_port, step->original_debug)) { details::fail_closed(); }
+        details::publish_released(*step); return false;
+    }
+    inline void cancel_continuation_on_worker() noexcept
+    {
+        details::host_transition_guard guard{};
+        auto* const step{details::active.load(::std::memory_order_acquire)};
+        if(step != nullptr && step->target_port == ::uwvm2::uwvm::debugger::posix_abi::pthread_mach_thread_np_noexcept(
+            ::uwvm2::uwvm::debugger::posix_abi::pthread_self_noexcept()) &&
+           step->state.load(::std::memory_order_acquire) == phase::continuation_running)
+        { step->abort_requested.store(true, ::std::memory_order_release); step->state.store(phase::continuation_cancel_pending, ::std::memory_order_release); }
+    }
+    inline void acknowledge_continuation_execution_exit() noexcept
+    { cancel_continuation_on_worker(); static_cast<void>(skip_pause_for_continuation()); }
+#endif
     [[nodiscard]] inline bool release(session& step) noexcept
     {
         details::host_transition_guard guard{};
         if(details::active.load(::std::memory_order_acquire) != ::std::addressof(step))
         { return false; }
         auto const current{step.state.load(::std::memory_order_acquire)};
-        if(current == phase::arming || current == phase::executing)
+        if(current == phase::continuation_running || current == phase::continuation_cancel_pending)
+        { step.abort_requested.store(true, ::std::memory_order_release); step.state.store(phase::continuation_cancel_pending, ::std::memory_order_release); return true; }
+        if(current == phase::arming || current == phase::executing || current == phase::continuation_escape)
         {
             step.abort_requested.store(true, ::std::memory_order_release);
             return true;
@@ -717,7 +860,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_macos
         // [actual active controller-owned session] host-transition guard
         // [safe                                 ] excludes release/clear;
         //  ^^ identity was compared before any supplied object was read.
-        if(step->state.load(::std::memory_order_acquire) != phase::trapped || step->target_thread == 0u ||
+        if((step->state.load(::std::memory_order_acquire) != phase::trapped &&
+            !(step->state.load(::std::memory_order_acquire) == phase::at_guest_pc && step->retained_entry_stop)) || step->target_thread == 0u ||
            step->owner_begin == 0u || step->owner_end <= step->owner_begin ||
            step->next_pc < step->owner_begin || step->next_pc >= step->owner_end) { return false; }
         inspect(step->target_thread, step->next_pc, step->owner_begin, step->owner_end);
@@ -736,7 +880,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_macos
         // [actual controller-owned active session] host-transition guard
         // [safe                                  ] identity is compared before dereferencing;
         //  ^^ state acquire observes the complete register copy made by the trap handler.
-        if(step->state.load(::std::memory_order_acquire) != phase::trapped || step->target_thread == 0u ||
+        if((step->state.load(::std::memory_order_acquire) != phase::trapped &&
+            !(step->state.load(::std::memory_order_acquire) == phase::at_guest_pc && step->retained_entry_stop)) || step->target_thread == 0u ||
            step->owner_begin == 0u || step->owner_end <= step->owner_begin ||
            step->next_pc < step->owner_begin || step->next_pc >= step->owner_end ||
            step->register_snapshot.size() == 0u || step->register_snapshot.pc() != step->next_pc)
@@ -745,6 +890,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_macos
         auto const copied{step->register_snapshot};
         inspect(step->target_thread, step->next_pc, step->owner_begin, step->owner_end, copied);
         return true;
+    }
+    template<typename Inspect>
+    [[nodiscard]] inline bool with_owned_registers_and_revision(void const* identity, Inspect inspect) noexcept
+    {
+        return with_owned_registers(identity, [&](auto thread, auto pc, auto begin, auto end, auto const& registers) noexcept
+        {
+            // The enclosing borrow owns the same transition guard and has
+            // already authenticated identity before this revision read.
+            auto const* step{details::active.load(::std::memory_order_acquire)};
+            inspect(thread, pc, begin, end, registers, step->trap_revision);
+        });
     }
     [[nodiscard]] inline bool clear(session& step) noexcept
     {
@@ -766,6 +922,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_macos
     [[nodiscard]] inline constexpr bool request(session&, ::std::uint_least64_t,
         ::std::uintptr_t, ::std::uintptr_t, ::std::uintptr_t) noexcept { return false; }
     [[nodiscard]] inline constexpr bool arm_at_return(::std::uintptr_t) noexcept { return false; }
+    [[nodiscard]] inline constexpr bool retain_initial_trap(session&) noexcept { return false; }
     [[nodiscard]] inline constexpr bool continue_one(session&) noexcept { return false; }
     [[nodiscard]] inline constexpr bool continue_from_trap(session&) noexcept { return false; }
     [[nodiscard]] inline constexpr bool release(session&) noexcept { return false; }

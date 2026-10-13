@@ -31,6 +31,9 @@
        state.local_func_storage_ptr == nullptr || state.control_stack.empty() ||
        state.current_wasm_op_offset == SIZE_MAX || decoded.error != v3::gc_immediate_error::ok ||
        decoded.opcode < 28u || decoded.opcode > 30u) { return false; }
+#if defined(UWVM_EXPERIMENTAL_PRIVATE_NUMERIC_ARRAY_LOCK) && UWVM_EXPERIMENTAL_PRIVATE_NUMERIC_ARRAY_LOCK == 1
+    state.private_numeric_gc_opcode_observed = true;
+#endif
     if(!state.control_stack.back().is_reachable || state.unreachable_control_depth != 0uz) { return true; }
     auto llvm_module{state.llvm_module};
     auto& ir_builder{*state.ir_builder};

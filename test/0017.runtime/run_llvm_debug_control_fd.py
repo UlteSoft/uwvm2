@@ -165,7 +165,7 @@ try:
     assert b'stopped' in stopped, stopped
     # The inherited capability uses the same source command parser as the
     # console, and a guest without DWARF must fail closed before resuming.
-    assert b'error: source stepping unavailable' in guest.send('break-source 0 missing.c:1')
+    assert b'error: source stepping unavailable' in guest.send('breaksource 0 missing.c:1')
     assert b'thread 1' in guest.send('info threads')
     trace = guest.send('bt 1')
     # Three WASI imports occupy function indices 0..2.

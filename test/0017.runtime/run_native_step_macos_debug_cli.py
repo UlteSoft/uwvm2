@@ -140,7 +140,7 @@ def verify_steps(console: Console) -> dict:
     # The provider has dummy function 0 and source function 1. The importer
     # also has _start at function 1 after its imported function 0.
     for module in (0, 1):
-        assert b'breakpoint' in console.send(f'break {module} 1 0')
+        assert b'breakpoint' in console.send(f'breakwasm {module} 1 0')
     console.send('continue')
     stopped = console.until(b'stopped: breakpoint')
     for _ in range(64):
@@ -212,14 +212,14 @@ def main() -> int:
         results = []
         dead = Console(watchdog, binary, None, dead_wasm, 'instruction')
         try:
-            rejected = dead.send('break 0 0 4')
+            rejected = dead.send('breakwasm 0 0 4')
             assert b'error: Wasm byte offset has no emitted executable debug safe point' in rejected, rejected
-            assert b'breakpoint 1' in dead.send('break 0 0 0')
+            assert b'breakpoint 1' in dead.send('breakwasm 0 0 0')
             dead.send('continue')
             dead.until(b'stopped: breakpoint')
             assert b'breakpoint deleted' in dead.send('delete 1')
             dead.send('continue')
-            dead.until(b'guest exited: 0')
+            dead.until(b'Program exited normally.')
             dead_peak, dead_log = dead.close()
         except BaseException:
             dead.abort()

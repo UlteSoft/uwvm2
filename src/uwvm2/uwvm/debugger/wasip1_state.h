@@ -31,7 +31,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasip1_state
     using text = ::fast_io::u8string;
     using text_view = ::fast_io::u8string_view;
     enum class action : unsigned char
-    { arguments, environment, descriptors, preopens, replace_argument, set_environment, remove_environment, reduce_rights, insert_argument, remove_argument, trace_enable, trace_disable, trace_clear, trace_read, create_file, duplicate_descriptor, close_descriptor, checkpoint_save, checkpoint_restore, checkpoint_drop, portable_export, portable_import, portable_export_group, portable_import_group };
+    { arguments, environment, descriptors, preopens, replace_argument, set_environment, remove_environment, reduce_rights, insert_argument, remove_argument, trace_enable, trace_disable, trace_clear, trace_read, create_file, duplicate_descriptor, close_descriptor, checkpoint_save, checkpoint_restore, checkpoint_drop, portable_export, portable_import, portable_export_group, portable_import_group, descriptor_detail };
     enum class status : unsigned char
     {
         ok, invalid_request, requires_llvm_jit_full, requires_current_cooperative_stop,
@@ -57,14 +57,43 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasip1_state
         descriptor_kind kind{};
         bool preopened{};
         text guest_preopen_name{};
+        text current_path{}; // Sampled from the retained native handle at this observation.
+        bool current_path_available{};
         ::std::uint64_t managed_resource{};
         // Storage kind is not an OS file type: no fstat/native handle is exposed.
     };
+    template<typename NativeHandle>
+    [[nodiscard]] inline text current_descriptor_path(NativeHandle handle)
+    {
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+        try
+        {
+#if defined(_WIN32) && !defined(__CYGWIN__)
+            ::fast_io::array<char16_t,4097u> buffer{};
+            auto const n{::fast_io::win32::GetFinalPathNameByHandleW(handle,buffer.data(),buffer.size(),0u)};
+            if(n==0u || n>=buffer.size()) { return {}; }
+            auto value{::fast_io::u8concat_fast_io(::fast_io::mnp::code_cvt(::fast_io::u16string_view{buffer.data(),n}))};
+            if(value.size()>maximum_text_bytes) { return {}; } return value;
+#elif defined(__linux__) || (defined(__APPLE__) && defined(__MACH__))
+            ::fast_io::array<char,4097u> buffer{};
+            ::fast_io::details::portable_fd_path(handle,buffer.data(),buffer.size());
+            ::std::size_t n{}; while(n<buffer.size() && buffer[n]!='\0') { ++n; }
+            if(n==0u || n>maximum_text_bytes) { return {}; }
+            text value{}; for(::std::size_t i{}; i<n; ++i) { value.push_back(static_cast<char8_t>(buffer[i])); } return value;
+#else
+            static_cast<void>(handle); return {};
+#endif
+        }
+        catch(...) { return {}; }
+#else
+        static_cast<void>(handle); return {};
+#endif
+    }
     struct view
     {
         status result{status::requires_current_cooperative_stop};
         action operation{};
-        ::std::uint64_t module{}, total_entries{}, next{}, observed_runtime_epoch{};
+        ::std::uint64_t module{}, total_entries{}, next{}, observed_runtime_epoch{}, environment_identity{};
         bool more{}, mutation_applied{}, shared_environment{};
         ::std::uint64_t affected_descriptor{}, checkpoint_slot{}, managed_resources{}, retained_external_resources{};
         bool checkpoint_operation{}, portable_operation{}, portable_group_operation{};
@@ -200,6 +229,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasip1_state
                 return true;
             case action::trace_disable: case action::trace_clear: case action::trace_read:
                 return requested.name.empty() && requested.value.empty();
+            case action::descriptor_detail:
+                return requested.descriptor<maximum_fd_scan && requested.name.empty() && requested.value.empty();
             case action::arguments: case action::environment: case action::descriptors: case action::preopens:
                 return requested.name.empty() && requested.value.empty();
             case action::replace_argument: case action::insert_argument:
@@ -299,10 +330,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasip1_state
         ::std::size_t count{}, cursor{};
         while(cursor < line.size())
         {
-            if(::fast_io::char_category::is_c_blank(line[cursor]) || line[cursor] == '\r') { ++cursor; continue; }
+            if(::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor; continue; }
             if(count == words.size()) { return false; }
             auto const begin{cursor};
-            while(cursor < line.size() && !::fast_io::char_category::is_c_blank(line[cursor]) && line[cursor] != '\r')
+            while(cursor < line.size() && !::fast_io::char_category::c_space::char_is(line[cursor]))
             {
                 if(!::fast_io::char_category::is_c_graph(static_cast<unsigned char>(line[cursor]))) { return false; }
                 ++cursor; // cursor<=size after the bounded read; never an unchecked pointer jump.
@@ -325,6 +356,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasip1_state
                 if((count >= 4u && !details::decimal(words[3], candidate.first)) || (count == 5u && !details::decimal(words[4], candidate.count))) { return false; }
             }
             else { return false; }
+        }
+        else if(count>=5u && count<=7u && words[0]=="info" && words[1]=="wasip1" && words[2]=="fd")
+        {
+            candidate.operation=action::descriptor_detail;
+            if(!details::decimal(words[3],candidate.module) || !details::decimal(words[4],candidate.descriptor) ||
+               (count>=6u && !details::decimal(words[5],candidate.first)) || (count==7u && !details::decimal(words[6],candidate.count))) { return false; }
         }
         else if(count >= 4u && count <= 6u && words[0] == "info" && words[1] == "wasip1")
         {
@@ -450,6 +487,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasip1_state
             if(descriptor.guest_preopen_name.size() > maximum_text_bytes || descriptor.guest_preopen_name.size() > maximum_page_text_bytes - page_bytes)
             { ::fast_io::io::print(output, "error: WASIp1 reply resource limit\n"); return; }
             page_bytes += descriptor.guest_preopen_name.size();
+            if(descriptor.current_path.size()>maximum_text_bytes || descriptor.current_path.size()>maximum_page_text_bytes-page_bytes)
+            { ::fast_io::io::print(output,"error: WASIp1 reply resource limit\n"); return; }
+            page_bytes+=descriptor.current_path.size();
         }
         ::fast_io::io::print(output, "wasip1 module=", ::fast_io::mnp::dec(copied.module), " status=", status_text(copied.result),
             " epoch=", ::fast_io::mnp::dec(copied.observed_runtime_epoch), " applied=", copied.mutation_applied,
@@ -485,7 +525,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasip1_state
                 " rights-base=", ::fast_io::mnp::hex0x(fd.base_rights), " rights-inheriting=", ::fast_io::mnp::hex0x(fd.inheriting_rights),
                 " preopened=", fd.preopened);
             if(fd.preopened) { ::fast_io::io::print(output, " guest-name=\""); print_escaped(output, text_view{fd.guest_preopen_name.data(), fd.guest_preopen_name.size()}); ::fast_io::io::print(output, "\""); }
-            ::fast_io::io::print(output, " managed-resource=", fd.managed_resource, "\n");
+            ::fast_io::io::print(output, " managed-resource=", fd.managed_resource, "\n    current-path=");
+            if(fd.current_path_available)
+            { ::fast_io::io::print(output,"\""); print_escaped(output,text_view{fd.current_path.data(),fd.current_path.size()}); ::fast_io::io::print(output,"\" (live native handle)\n"); }
+            else { ::fast_io::io::print(output,"unavailable (no cached pathname used)\n"); }
         }
         if(copied.more) { ::fast_io::io::print(output, "  more next=", ::fast_io::mnp::dec(copied.next), "\n"); }
     }

@@ -65,6 +65,9 @@ def main():
     elif config.get('fixture_kind') == 'simd-sign':
         from tiered_simd_sign import fixture as sign_fixture
         wat.write_text(sign_fixture() + '\n')
+    elif config.get('fixture_kind') == 'simd-rounding':
+        from tiered_simd_rounding import fixture as rounding_fixture
+        wat.write_text(rounding_fixture() + '\n')
     else:
         wat.write_text(fixture() + '\n')
     for stage, argv in [
@@ -96,7 +99,7 @@ def main():
                     '-Rllvm-cache-path', 'disable', '-Rllvm-call-stack', 'instruction',
                     '-Rclog', 'file', str(compiler_log),
                     *(['-WFE-memory64', '-WFE-simd', '-WFE-threads'] if high_memory else
-                      ['-WFE-simd'] if config.get('fixture_kind') == 'simd-sign' else []),
+                      ['-WFE-simd'] if config.get('fixture_kind') in ('simd-sign', 'simd-rounding') else []),
                     '--run', str(wasm)]
             row = execute(argv, work / 'run.log', work, config.get('timeout', 300))
             assert row['exit'] == 0, row
@@ -111,7 +114,8 @@ def main():
                        full_module_ready=ready, counters=counters,
                        physical_compiler_log=str(compiler_log),
                        compiler_log_sha256=digest(compiler_log), checked_calls=4_000_000,
-                       bit_checks_per_call=12 if config.get('fixture_kind') == 'simd-sign' else 6,
+                       bit_checks_per_call=12 if config.get('fixture_kind') == 'simd-sign' else
+                       24 if config.get('fixture_kind') == 'simd-rounding' else 6,
                        wasm_sha256=digest(wasm))
             rows.append(row)
             passed = entered and ready and counters['tiered_full_ready'] > 0 and counters['tiered_full_failed'] == 0

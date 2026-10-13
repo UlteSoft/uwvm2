@@ -20,26 +20,26 @@ try:
  def number(reply):
   assert 'error:' not in reply and 'unavailable' not in reply,reply
   values=re.findall(r'(?m)^(?!source-value\b)[^\r\n]*\b(?:value=|[ui](?:8|16|32|64)=)(-?\d+)\b',reply);assert len(values)==1,reply;return int(values[0])
- line=next(i for i,t in enumerate(a.source.read_text().splitlines(),1) if 'BUILTIN_NAMES_READY' in t);br=ask(f'break-source 0 {a.source}:{line}');bid=int(re.search(r'breakpoint (\d+)',br)[1]);ask('continue')
+ line=next(i for i,t in enumerate(a.source.read_text().splitlines(),1) if 'BUILTIN_NAMES_READY' in t);br=ask(f'breaksource 0 {a.source}:{line}');bid=int(re.search(r'breakpoint (\d+)',br)[1]);ask('continue')
  for _ in range(64):
   stop=ask('wait')
   if 'stopped: breakpoint' in stop:break
-  assert 'guest exited:' not in stop,stop
+  assert 'Program exited' not in stop,stop
  else:raise AssertionError('actual source stop missing')
  thread=int(re.search(r'thread (\d+) module=0 function=',stop)[1]);sid=int(re.search(r'(?m)^stop-id (\d+)',ask(f'bt {thread}'))[1]);oracle={k:number(ask(f'print {thread} {sid} {k}')) for k in ['len','cap']};assert oracle==dict(len=7,cap=11)
  for expression,expected in [('len',7),('len ',7),('cap',11),('cap ',11),('len - 1',6),('cap - 1',10),('(len) - 1',6),('(cap)-1',10)]:
   assert number(ask(f'print {thread} {sid} {expression}'))==expected;assert number(ask(f'print-frame {thread} {sid} 0 {expression}'))==expected;record['values'].append({'expression':expression,'expected':expected,'passed':True})
- assert 'error:' in ask(f'print {thread} {sid+1000000} len ');ask(f'delete {bid}');assert 'guest exited:' not in ask(f'step wasm {thread}');assert 'error:' in ask(f'print {thread} {sid} cap ');ask('continue')
+ assert 'error:' in ask(f'print {thread} {sid+1000000} len ');ask(f'delete {bid}');assert 'Program exited' not in ask(f'step wasm {thread}');assert 'error:' in ask(f'print {thread} {sid} cap ');ask('continue')
  for _ in range(64):
   exited=ask('wait')
-  if 'guest exited:' in exited:assert 'guest exited: 0' in exited;break
+  if 'Program exited' in exited:assert 'Program exited normally.' in exited;break
  else:raise AssertionError('guest did not exit')
  record.update(passed=True,compiler_oracles=oracle,guest_completed_without_trap=True)
 except BaseException as e:record.update(passed=False,error=repr(e));save();raise
 finally:
  if console:
   try:
-   console.finish();record.update(quit_returncode=console.child.returncode,managed_shutdown_complete=b'managed shutdown complete' in console.transcript);assert record['quit_returncode']==0 and record['managed_shutdown_complete']
+   console.finish();record.update(quit_returncode=console.child.returncode,managed_shutdown_complete=console.normal_quit_completed);assert record['quit_returncode']==0 and record['managed_shutdown_complete']
   except BaseException as e:record.update(passed=False,shutdown_error=repr(e));save();raise
  for p,h in pins.items():
   if sha(p)!=h:record.update(passed=False,changed_input=p)

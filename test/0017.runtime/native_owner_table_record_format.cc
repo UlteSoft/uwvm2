@@ -11,24 +11,24 @@ constexpr ::std::array<unsigned char,48u> little32{
  'U','W','V','M','N','E','2',0, 2,4,1,1,1,0,0,0,
  3,0,0,0, 3,0,0,0, 0,0,0,0, 48,0,0,0,
  0x78,0x56,0x34,0x12, 0xF0,0xDE,0xBC,0x9A,
- 'a','b','c','d','e','f',0,0};
+ 'a','bw','c','d','e','f',0,0};
 constexpr ::std::array<unsigned char,48u> big32{
  'U','W','V','M','N','E','2',0, 2,4,2,1,2,0,0,0,
  0,0,0,3, 0,0,0,3, 0,0,0,0, 0,0,0,48,
  0x12,0x34,0x56,0x78, 0x9A,0xBC,0xDE,0xF0,
- 'a','b','c','d','e','f',0,0};
+ 'a','bw','c','d','e','f',0,0};
 constexpr ::std::array<unsigned char,56u> little64{
  'U','W','V','M','N','E','2',0, 2,8,1,1,3,0,0,0,
  3,0,0,0, 3,0,0,0, 0,0,0,0, 56,0,0,0,
  0xEF,0xCD,0xAB,0x89,0x67,0x45,0x23,0x01,
  0x10,0x32,0x54,0x76,0x98,0xBA,0xDC,0xFE,
- 'a','b','c','d','e','f',0,0};
+ 'a','bw','c','d','e','f',0,0};
 constexpr ::std::array<unsigned char,56u> big64{
  'U','W','V','M','N','E','2',0, 2,8,2,1,0,0,0,0,
  0,0,0,3, 0,0,0,3, 0,0,0,0, 0,0,0,56,
  0x01,0x23,0x45,0x67,0x89,0xAB,0xCD,0xEF,
  0xFE,0xDC,0xBA,0x98,0x76,0x54,0x32,0x10,
- 'a','b','c','d','e','f',0,0};
+ 'a','bw','c','d','e','f',0,0};
 template<::std::size_t N>
 static int exercise(::std::array<unsigned char,N> const& input, unsigned pointer, bool little,
     unsigned role, ::std::uint64_t first, ::std::uint64_t last)
@@ -71,7 +71,7 @@ int main()
     constexpr ::std::array<unsigned char,52u> local_entry{
      'U','W','V','M','N','E','2',0, 2,4,1,1,1,0,0,0,
      3,0,0,0, 3,0,0,0, 3,0,0,0, 52,0,0,0,
-     0,0,0,0, 8,0,0,0, 'a','b','c','d','e','f','l','o','c',0,0,0};
+     0,0,0,0, 8,0,0,0, 'a','bw','c','d','e','f','l','o','c',0,0,0};
     wire::record row{};
     CHECK(wire::decode(local_entry,4u,true,row) && row.original_ir_name=="abc" &&
           row.entry_object_name=="def" && row.local_entry_object_name=="loc" && row.bytes==52u);

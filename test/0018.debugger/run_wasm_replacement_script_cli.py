@@ -28,7 +28,7 @@ for policy in ('instruction','unwind'):
   c.prompt();reply=send('wasm-script set wasm memory 0 0 1 0 bytes 7f;trace wasm on')
   assert b'wasm-script command 1' in reply and b'wasm-script command 2' not in reply,reply
   assert b'enabled=0' in send('trace wasm read')
-  c.send('break 0 1 0');c.send('continue')
+  c.send('breakwasm 0 1 0');c.send('continue')
   deadline=time.monotonic()+20
   while b'stopped:' not in c.send('status'):assert time.monotonic()<deadline;time.sleep(.01)
   thread,func,offset=c.location();assert (func,offset)==(1,0)
@@ -45,7 +45,7 @@ for policy in ('instruction','unwind'):
   reply=c.send(f'wasm-script replace 0 0 1 {a.out/"valid.bin"};operands {thread}')
   assert b'function replaced; generation 2' in reply and b'wasm-script command 2' in reply,reply
   reply=send(f'replace 0 0 1 {a.out/"valid.bin"}');assert b'function generation changed' in reply,reply
-  c.send('break 0 0 0');reply=c.send(f'step wasm {thread} over');assert b'breakpoint' in reply
+  c.send('breakwasm 0 0 0');reply=c.send(f'step wasm {thread} over');assert b'breakpoint' in reply
   reply=send(f'replace 0 0 2 {a.out/"valid.bin"}');assert b'target is active' in reply,reply
   c.send('delete 2');c.send(f'step wasm {thread} out');assert c.location()[1:]==(1,2)
   assert b'i32 = 9' in c.send(f'operands {thread}')

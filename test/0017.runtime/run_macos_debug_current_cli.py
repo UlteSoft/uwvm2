@@ -118,7 +118,7 @@ def actual_stop(console: Console, participant: int) -> dict:
 
 def begin(console: Console, target: int, offset: int = 0) -> int:
     require(b'prepared; no Wasm instruction executed' in console.send('status'), 'real prepared debug-full console required')
-    reply = console.send(f'break 0 {target} {offset}')
+    reply = console.send(f'breakwasm 0 {target} {offset}')
     point = re.search(rb'breakpoint (\d+)', reply)
     require(point is not None, 'actual emitted breakpoint missing', reply)
     console.send('continue')
@@ -138,8 +138,8 @@ def exit_guest(console: Console) -> None:
     console.send('continue')
     for _ in range(20):
         reply = console.send('wait')
-        if b'guest exited:' in reply:
-            require(b'guest exited: 0' in reply, 'real fixture computation trapped/failed', reply)
+        if b'Program exited' in reply:
+            require(b'Program exited normally.' in reply, 'real fixture computation trapped/failed', reply)
             return
     raise AssertionError('actual guest exit not observed')
 

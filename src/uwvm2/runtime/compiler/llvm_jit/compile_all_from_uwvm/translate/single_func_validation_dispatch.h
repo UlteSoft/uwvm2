@@ -172,7 +172,16 @@ for(;;)
     // instruction observations before validation consumes immediates/operands;
     // invalid Wasm never publishes this module. Structural target points are
     // deferred until their loop/else/end emitters have selected the proper block.
-    if(emit_llvm_jit_active && curr_opbase != wasm1_code::loop && curr_opbase != wasm1_code::else_ && curr_opbase != wasm1_code::end &&
+    bool defer_observer_call{};
+#if defined(__linux__) && defined(__x86_64__)
+    // The direct-call case emits this SAME pre-pop point after its one original
+    // decoder validates the target/signature. It can then select a local full
+    // typed-call demand gate without decoding an immediate twice or trusting
+    // a public function label. Other opcodes/profiles/platforms stay unchanged.
+    defer_observer_call = (curr_opbase == wasm1_code::call || curr_opbase == static_cast<wasm1_code>(0x14u)) &&
+        llvm_jit_emit_state.checkpoint_observer_controls != nullptr;
+#endif
+    if(emit_llvm_jit_active && !defer_observer_call && curr_opbase != wasm1_code::loop && curr_opbase != wasm1_code::else_ && curr_opbase != wasm1_code::end &&
        !emit_runtime_local_func_llvm_jit_instruction_debug_safe_point(llvm_jit_emit_state)) [[unlikely]]
     {
         disable_inline_llvm_jit_emission();
@@ -225,6 +234,11 @@ for(;;)
             disable_inline_llvm_jit_emission();
         }
     }
+#if defined(UWVM_EXPERIMENTAL_PRIVATE_NUMERIC_ARRAY_LOCK) && UWVM_EXPERIMENTAL_PRIVATE_NUMERIC_ARRAY_LOCK == 1
+    if(emit_llvm_jit_active)
+    { llvm_jit_private_numeric_observe_original_opcode(llvm_jit_emit_state,
+        static_cast<::std::uint_least8_t>(curr_opbase)); }
+#endif
     if(emit_llvm_jit_active && !emit_runtime_local_func_llvm_jit_native_numeric_values(llvm_jit_emit_state))
     { disable_inline_llvm_jit_emission(); }
     if(emit_llvm_jit_active && !checkpoint_opcode_transaction.commit_after_fused_opcode_validation())

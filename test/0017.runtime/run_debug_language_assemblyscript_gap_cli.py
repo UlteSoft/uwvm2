@@ -34,7 +34,7 @@ try:
     row['argv']=argv;c=metadata.Console(argv,a.out/'console.log')
     target,_=metadata.function(a.wasm,'probe_outer')
     assert b'prepared; no Wasm instruction executed' in send('status')
-    reply=send(f'break 0 {target} 0');bid=re.search(rb'breakpoint (\d+)',reply);assert bid is not None
+    reply=send(f'breakwasm 0 {target} 0');bid=re.search(rb'breakpoint (\d+)',reply);assert bid is not None
     send('continue')
     for _ in range(20):
         stopped=send('wait')
@@ -45,7 +45,7 @@ try:
     thread=int(match[1]);send('delete '+bid[1].decode())
     bt=send(f'bt {thread}');assert b'probe_outer' in bt and b'\n  source ' not in bt,bt
     stop=re.search(rb'^stop-id (\d+)\r?$',bt,re.M);assert stop is not None
-    commands=[f'break-source 0 {a.source}:18',f'step source {thread} into',f'print {thread} {stop[1].decode()} shadow',f'ptype {thread} {stop[1].decode()} packet']
+    commands=[f'breaksource 0 {a.source}:18',f'step source {thread} into',f'print {thread} {stop[1].decode()} shadow',f'ptype {thread} {stop[1].decode()} packet']
     row['unavailable_language_features']=[]
     table=send('info breakpoints')
     for command in commands:
@@ -59,8 +59,8 @@ try:
     send('continue')
     for _ in range(20):
         result=send('wait')
-        if b'guest exited:' in result:
-            assert b'guest exited: 0' in result,result
+        if b'Program exited' in result:
+            assert b'Program exited normally.' in result,result
             break
     else:raise AssertionError('AssemblyScript genuine workload exit missing')
     row['passed']=True
@@ -73,7 +73,7 @@ finally:
         except BaseException as e:row.update(passed=False,close_error=repr(e));raise
         finally:
             row['quit_returncode']=c.child.returncode
-            row['managed_shutdown_complete']=b'managed shutdown complete' in c.transcript
+            row['managed_shutdown_complete']=c.normal_quit_completed
             if row['quit_returncode']!=0 or not row['managed_shutdown_complete']:row['passed']=False
     row['inputs_after']={str(p):sha(p) for p in paths}
     if row['inputs_after']!=before:row.update(passed=False,inputs_changed=True)
