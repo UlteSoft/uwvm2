@@ -1,0 +1,646 @@
+{
+  "schema": 1,
+  "scope": "Actual frozen RISC-V64 Linux product executions in the original cgroup for both repositories; source cut qualification is distinct from the shared-cgroup resource receipt.",
+  "stage": "asm-linux-riscv64-current-product-1791174132184",
+  "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope\n",
+  "source_manifest_sha256": "ab0b7ff6ce192043cf4e8520fc308bdecce783db0912740f02055c9fabb4a17d",
+  "remote_source_manifest_sha256": "ab0b7ff6ce192043cf4e8520fc308bdecce783db0912740f02055c9fabb4a17d",
+  "runtime_inputs": {
+    "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-native-fix-20261004-1791108764948/work/uwvm2-native.wasm": "7d2900c865d2b04efb76b19958ccec6430108213f520947c50c6626e0a15ee63",
+    "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-native-fix-20261004-1791108764948/work/uwvm2-all-numeric.wasm": "7cdc70e85d2525f0e45d32b15362aea0b4b0f22a2db8d02e8c9edfff3f61618f",
+    "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-native-fix-20261004-1791108764948/work/uwvm2-ros-native.wasm": "7d2900c865d2b04efb76b19958ccec6430108213f520947c50c6626e0a15ee63",
+    "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/asm-native-fix-20261004-1791108764948/work/uwvm2-ros-all-numeric.wasm": "7cdc70e85d2525f0e45d32b15362aea0b4b0f22a2db8d02e8c9edfff3f61618f",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMCore.a": "380fb55affab37675e7874010cb973e37795a618332e5ddc0853de1e56b71f27",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMSupport.a": "f3626416e04a309edc2147121e735782b2fae8798e38b39dff91e9b22c2f0577",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMAnalysis.a": "1619ca859c3b83d5a7c4c9c9e6b7e3685628404e0dd9b3ef28500af3a1460f28",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMTarget.a": "71316796ab832c004246829b84b01378f5ec8a476278a0a11b1a570112be4cee",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMLinker.a": "f02ef91d731c1f71e295072e19eb649d857306517cefe83eea78cd985fc9616b",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMExecutionEngine.a": "9a6f08dc5dcc068feb0dc80c400c14f17124ed7bf09fd3a412f29e1182aca278",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMMCJIT.a": "7da51d4dbfc6b07a9927ab5eefbec67d1e2fe758b6c4abd3e1fe142e91e5c954",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMRuntimeDyld.a": "fc90f90c48797e211f073f4baf506627487239541ec0a8e5449b5cbd7bc7f671",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMPasses.a": "60ef4a2cb624f39667847019d16df7c806c72dbbf1c6c17dfe72d3254ab9ccf5",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMScalarOpts.a": "7718107a25584d33c76e0c638451490d16fd7194b3420144dab69886b894eed9",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMTransformUtils.a": "a3aae4f2195403077be0e7649be80b79e1263b64b54a9dd49f4cf9585e7703f6",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMInstCombine.a": "e6de9b31acac597a10adcd1ab6ee0bffe980279d6108b9b3060232e0ce27c008",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMBitReader.a": "ba58af490b9a2e1520efb03713a97b0dabfac7f0b1a002d030990ddf9fa1158b",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMBitWriter.a": "f2950c0137b2ae656c808d58d5a2ff77fdc5069f1707af03f058368bc902b9a1",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMObject.a": "2108548bfe5964e51e3b231bd18f28988f6a15adc55749dd565739765173c4a9",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMDebugInfoDWARF.a": "0a399e0422191c507cdbb1133f01b3c947465fb9a487142eb89edf78330f906b",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMTargetParser.a": "d51e02bb43952d3aee9065dae1df91d86f51d6fdbf8109a4d8dca4eb3e6396e0",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMRISCVCodeGen.a": "dd5478856be3233cdaa80e8ffea907cf5b2f332bf804cb51528e23f0d015d922",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMRISCVDesc.a": "431e11960871c47f3cff00008fc48a867aa552d6649bfbd0e405d81f22753134",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMRISCVInfo.a": "c561a98f8027f6e8b9c08323d95148354d3fc4bef8d93e9f4d9dc193e36a35bf",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMRISCVAsmParser.a": "3de1f7f40657534d8240fa7cf873eb722c86e0b727b9dbe0de3ac6b4b4e15e2e",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMRISCVDisassembler.a": "3e14796614a1fd277d626b355facaf03ea235e93dee96b42072bc72b24fabd1e",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMOrcTargetProcess.a": "aa53b0f16ccf5cff4a095e1e041daa3b97001f3500814d63c714b85e92314206",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMOrcShared.a": "eede74fe5bab12707303a53476d04ae56c0a27c097735f2c24c29da242e4e77b",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMCFGuard.a": "3fbf8cc0e4baa82b6db2d85d7ace0a9555f3e6124fa9b87c25e93abbee523ec2",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMCoroutines.a": "5d9fff4a1138ff790c4e1c6881547e6047d64830872be0e0ee2609a599d5e76c",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMHipStdPar.a": "89134539715cbfd6d4ee5bcd6396ce0b6c52ede26aaa91b67bd241b24f371048",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMIRPrinter.a": "6af6ca4a2db121cae02323f11c816b29a6afee64351433c1fac002b71d03891b",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMGlobalISel.a": "20cf5036c1e8963d81078bf8cbca322c07699883a788ebac800acc46d2efdf03",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMipo.a": "52582ef4fbd4ee38b7298c3baa5a2d36c550363a3a1d190a5c336ef7108dfec1",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMInstrumentation.a": "8dd231cba030e0985765fe3d94ad230ee4c86def056b5a894d24c29e7690d3e8",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMFrontendOpenMP.a": "882e0ec75511ee5232186a543934bceb3057dcd0b78e3b7f8790fe7b1be1d634",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMFrontendOffloading.a": "f15ec285cfcddec6471e7e04e7eac03a95cfc4bdb238b4cc9b0a0d1605a856b8",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMObjectYAML.a": "26116f5d7a14f12a5ca3d4dfb80e828d4901b9dbfaebc07642e8d49e330d913c",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMFrontendAtomic.a": "a10dd079a8849fd23b39cffc3e18b88eff90894a17aade03655739e5a2ae8d17",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMFrontendDirective.a": "86ee6f41602a19b907531030eb9d1c0943eabdeed9e4f4409b736782e3f7d766",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMVectorize.a": "9b44a8d8b664eb8b4bb7f26e0c1c674fb6c0c7efca69faeecb0fa6570da07066",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMSandboxIR.a": "c8e24a17cda181524656c44fffe609c6e98bdce58ddc9fed6674802e69408b1e",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMAsmPrinter.a": "613525c5ed901a71126bb95cd2c43d45f91626491b98e868d96502f0f82e5c49",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMSelectionDAG.a": "f09396c2234bfe8083948ae64137a51c70e85b17b7989507f6be0b401351d5e3",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMCodeGen.a": "63d00765cd081d2a81623a3f71ae086dea28f5926e364911f7e9f4554d6f3331",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMAggressiveInstCombine.a": "484ed9661c41c5ccedc692ad3b37ea46a6c365d3eeb4006a071241588841a430",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMObjCARCOpts.a": "b9cd0fe83ac48dfb3747de16cc40992141466acfa15c7a4b7d2fc7d59ac8ccc9",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMCGData.a": "6b525910f3e8c261f50f29d21a011711f7d232857773c057ce140b8d6e4e63a9",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMFrontendHLSL.a": "d53dbfc0c03a6f8aee73921873ca15b6979cda5268b4d711d68c6eeb21d3d0d2",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMProfileData.a": "3b0a9886d4af8e59f183f271fc2b2e84189a0231b2aac5d38eaa9ed12d6db327",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMSymbolize.a": "caf59fcab0f8589fc473110d01f93a3ea626628c260c2a5217b864bc0a6183e4",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMDebugInfoGSYM.a": "38faaa624ec38d91f377b29817a3ab3f7fe62fc03c74805408ec3b82804db9e4",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMDebugInfoPDB.a": "bb2e80cc10a22d4a5df1a4f0aeb145f06a315084dd8a879768c889df10cbcfb4",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMDebugInfoCodeView.a": "8d6ba4fda9a4eaa316d042e2da8828a744e9865b91229123ab56ced3685a1375",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMDebugInfoMSF.a": "1e9c4e1b85d42ecbc765aeb78add51c9bf8dbf5e350b50d1987ff202aacc5e15",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMDebugInfoBTF.a": "77d4f57f0684019ea43e5540436c69e03bc6d63754fedd23cd241b1582a93d9b",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMIRReader.a": "f07f426a0d2d1698f43fedaa9b8a15ef72d6ecf05f84f990ee5cd6b5a09c71c2",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMAsmParser.a": "5fc026d4dadddb80dbeee0bc900520089b5f02a3ef716a19d25c41e2f28bb72b",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMRemarks.a": "7096a3e80efa48c802fb2c9e5377d14eda0eb57355cb556deefe1b91afbbbf81",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMBitstreamReader.a": "793e449b9aa0d255d938c93b6e3de99c6a69b27a633a789c8e90ef3cda188345",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMTextAPI.a": "cbdbab9416709a725616d3364705e93aa4cb8b23d3d1d951c3688402c4dffea6",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMCodeGenTypes.a": "05db325aec3fa87df63b223b7169b6b66c4b01e93bf4ef1bda3cde62f0d88c88",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMMCParser.a": "bcc9f2e5a1938ab852430c6264fdb67dce98c2d0236c6a779180fbe93f3f6f53",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMMCDisassembler.a": "6c6367705d8804351b9e3ee138f9fd3bbe441c8c5ceb22c0bb918ae0a330c332",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMMC.a": "929a17db8b7646ae986bd8397fb3390a91bb898f584160836d6b21acf02b2812",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMDebugInfoDWARFLowLevel.a": "575adfade7ef14ab11bf4e7c4219b265021e6782386e586d4bf4766b594109d1",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMBinaryFormat.a": "d9a44bb8463512439c1b5aba68c7ee4b2bc76bbbc8e94d626c4e575d3b5f81be",
+    "/dev/shm/asm-linux-riscv64-sdk-1791167923280/work/llvm11-riscv64/lib/libLLVMDemangle.a": "b48ab36223e97cbf80968ac536bb527b6dd048adfdc004c1296ee23586ec2259",
+    "/dev/shm/asm-linux-riscv64-sdk-resume-1791170293272/build-meta/work/llvm11-riscv64/qualification.json": "6b30ff74737f1af30275a0cc443cd0fd295607f39b224dd547edea207c5ff69d",
+    "/dev/shm/asm-linux-riscv64-sdk-resume-1791170293272/build-meta/work/llvm11-riscv64/consumer-link.rsp": "31eb193f887660a84adc6717a3ffeaf8d2d4577d66f87661a2f07b6766950e08",
+    "/dev/shm/asm-linux-riscv64-sdk-resume-1791170293272/build-meta/work/llvm11-riscv64/include/llvm/Config/llvm-config.h": "5cb5b8e663defb2a89b4d5d295805a7f614bb90c2bdad1eafc9bf828ef0bb387"
+  },
+  "substantive_driver_returncode": 0,
+  "strict_supervisor_passed": false,
+  "strict_resource_receipt_note": "Shared cgroup memory.events.max advanced from 770840 to 774378. OOM=63 and OOM-kill=15 unchanged; no supervisor error. This failed strict receipt is preserved, not relabeled.",
+  "all_owned_pidfds_retired": true,
+  "matrix": [
+    {
+      "arch": "riscv64",
+      "repository": "uwvm2",
+      "native_product_passed": true,
+      "native_mcjit_elf_loader": 0,
+      "native_mcjit_musttail": 0,
+      "instruction": 0,
+      "instruction-object": {
+        "path": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-instruction-actual-object.o",
+        "sha256": "b73412cea41d3dd71947749db4161bf4674b9081af710b5cb535d18a08a6d31f"
+      },
+      "unwind": 0,
+      "unwind-object": {
+        "path": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-unwind-actual-object.o",
+        "sha256": "12943590fcb739472f31cdd7ab0d244e64140e55b3500c47bebb59aaebd6d891"
+      },
+      "all-numeric-instruction": 0,
+      "all-numeric-instruction-object": {
+        "path": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-all-numeric-instruction-actual-object.o",
+        "sha256": "1d6ad90c6721b8a456bb93270732602f7f3b44cdd9182c948483dfa71a1d6810"
+      },
+      "all-numeric-unwind": 0,
+      "all-numeric-unwind-object": {
+        "path": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-all-numeric-unwind-actual-object.o",
+        "sha256": "3fdb66a964d7f7d435dd9f1a0825ff4596371a19854492d13f11373a2c2db9d0"
+      },
+      "mapping-probe": 0,
+      "shutdown": {
+        "instruction-none-parked-loop": 0,
+        "instruction-none-host-block": 0,
+        "instruction-observe-parked-loop": 0,
+        "instruction-observe-host-block": 0,
+        "instruction-resumable-parked-loop": 0,
+        "instruction-resumable-host-block": 0,
+        "unwind-none-parked-loop": 0,
+        "unwind-none-host-block": 0,
+        "unwind-observe-parked-loop": 0,
+        "unwind-observe-host-block": 0,
+        "unwind-resumable-parked-loop": 0,
+        "unwind-resumable-host-block": 0
+      },
+      "cli-link": 0,
+      "cli-native": 0,
+      "mandatory_c_tail_component_passed": true
+    },
+    {
+      "arch": "riscv64",
+      "repository": "uwvm2-ros",
+      "native_product_passed": true,
+      "native_mcjit_elf_loader": 0,
+      "native_mcjit_musttail": 0,
+      "instruction": 0,
+      "instruction-object": {
+        "path": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-instruction-actual-object.o",
+        "sha256": "5cadf09db5a3397ec7c5d8a4f988aaeadac60e7cdae8c3a90594c05dd52e2718"
+      },
+      "unwind": 0,
+      "unwind-object": {
+        "path": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-unwind-actual-object.o",
+        "sha256": "4bc2055083456e28b7bca86c4e2427bdaf903ba24fc97b4c5fd7f3158ceb3bee"
+      },
+      "all-numeric-instruction": 0,
+      "all-numeric-instruction-object": {
+        "path": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-all-numeric-instruction-actual-object.o",
+        "sha256": "6373d7444e1f80046ae3971cb55e2a0c30aa230b1ea511cc724a242b33139345"
+      },
+      "all-numeric-unwind": 0,
+      "all-numeric-unwind-object": {
+        "path": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-all-numeric-unwind-actual-object.o",
+        "sha256": "64631320186c40bcc7087a15d40fb24a7c89e7d8b3673795a4edbec8897988f1"
+      },
+      "mapping-probe": 0,
+      "shutdown": {
+        "instruction-none-parked-loop": 0,
+        "instruction-none-host-block": 0,
+        "instruction-observe-parked-loop": 0,
+        "instruction-observe-host-block": 0,
+        "instruction-resumable-parked-loop": 0,
+        "instruction-resumable-host-block": 0,
+        "unwind-none-parked-loop": 0,
+        "unwind-none-host-block": 0,
+        "unwind-observe-parked-loop": 0,
+        "unwind-observe-host-block": 0,
+        "unwind-resumable-parked-loop": 0,
+        "unwind-resumable-host-block": 0
+      },
+      "cli-link": 0,
+      "cli-native": 0,
+      "mandatory_c_tail_component_passed": true
+    }
+  ],
+  "commands": [
+    {
+      "label": "riscv64-uwvm2-cgroup",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-cgroup.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-native_mcjit_elf_loader-link",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-native_mcjit_elf_loader-link.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-native_mcjit_elf_loader-native",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-native_mcjit_elf_loader-native.log",
+      "log_sha256": "797ae353278a2dc5c44fcfeb7d04b01f77269c96d7d509458faa1bcf31e52f4e"
+    },
+    {
+      "label": "riscv64-uwvm2-native_mcjit_musttail-link",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-native_mcjit_musttail-link.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-native_mcjit_musttail-native",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-native_mcjit_musttail-native.log",
+      "log_sha256": "716f36b167fad7839d93f7eb77cfbdc8be125e50f33a5d07e5c1b20581120348"
+    },
+    {
+      "label": "riscv64-uwvm2-frontend-check",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-frontend-check.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-runtime-compile",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-runtime-compile.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-host-compile",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-host-compile.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-test-link",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-test-link.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-live-instruction",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-live-instruction.log",
+      "log_sha256": "e9b1d6426b860db2b130ab0458f5b7871cf11cb6b36a3e86860ed2aca77ab87e"
+    },
+    {
+      "label": "riscv64-uwvm2-live-unwind",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-live-unwind.log",
+      "log_sha256": "7a88f817fe0f08f6e488c4b3b2728c53a42d4d908ce316904b785b11465109c2"
+    },
+    {
+      "label": "riscv64-uwvm2-all-numeric-instruction",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-all-numeric-instruction.log",
+      "log_sha256": "15934ec90cb03cba10c8c7d2403af558075a4b43e4234540f8b0a5f62ef0a4fe"
+    },
+    {
+      "label": "riscv64-uwvm2-all-numeric-unwind",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-all-numeric-unwind.log",
+      "log_sha256": "6d99feb2553e5ce6636051892869d964dca65134d5ffe60a78fd9ce96e370315"
+    },
+    {
+      "label": "riscv64-uwvm2-mapping-probe-link",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-mapping-probe-link.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-mapping-probe",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-mapping-probe.log",
+      "log_sha256": "81f36096c1907b2ee125a4410c44774cac430ace54856030e0f1d73d95b4b8d7"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-fixture",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-fixture.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-link",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-link.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-instruction-none-parked-loop",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-instruction-none-parked-loop.log",
+      "log_sha256": "178c2c295ab6302ce333ba4a11e9c0a9ad4cd5805e194e392e2d81dd5dad93c8"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-instruction-none-host-block",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-instruction-none-host-block.log",
+      "log_sha256": "178c2c295ab6302ce333ba4a11e9c0a9ad4cd5805e194e392e2d81dd5dad93c8"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-instruction-observe-parked-loop",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-instruction-observe-parked-loop.log",
+      "log_sha256": "178c2c295ab6302ce333ba4a11e9c0a9ad4cd5805e194e392e2d81dd5dad93c8"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-instruction-observe-host-block",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-instruction-observe-host-block.log",
+      "log_sha256": "178c2c295ab6302ce333ba4a11e9c0a9ad4cd5805e194e392e2d81dd5dad93c8"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-instruction-resumable-parked-loop",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-instruction-resumable-parked-loop.log",
+      "log_sha256": "178c2c295ab6302ce333ba4a11e9c0a9ad4cd5805e194e392e2d81dd5dad93c8"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-instruction-resumable-host-block",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-instruction-resumable-host-block.log",
+      "log_sha256": "178c2c295ab6302ce333ba4a11e9c0a9ad4cd5805e194e392e2d81dd5dad93c8"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-unwind-none-parked-loop",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-unwind-none-parked-loop.log",
+      "log_sha256": "6dc212ed6a928c82742180c112c893e0803f5d9947315b0b00ac32a3e0866e59"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-unwind-none-host-block",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-unwind-none-host-block.log",
+      "log_sha256": "6dc212ed6a928c82742180c112c893e0803f5d9947315b0b00ac32a3e0866e59"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-unwind-observe-parked-loop",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-unwind-observe-parked-loop.log",
+      "log_sha256": "6dc212ed6a928c82742180c112c893e0803f5d9947315b0b00ac32a3e0866e59"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-unwind-observe-host-block",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-unwind-observe-host-block.log",
+      "log_sha256": "6dc212ed6a928c82742180c112c893e0803f5d9947315b0b00ac32a3e0866e59"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-unwind-resumable-parked-loop",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-unwind-resumable-parked-loop.log",
+      "log_sha256": "6dc212ed6a928c82742180c112c893e0803f5d9947315b0b00ac32a3e0866e59"
+    },
+    {
+      "label": "riscv64-uwvm2-shutdown-unwind-resumable-host-block",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-shutdown-unwind-resumable-host-block.log",
+      "log_sha256": "6dc212ed6a928c82742180c112c893e0803f5d9947315b0b00ac32a3e0866e59"
+    },
+    {
+      "label": "riscv64-uwvm2-cli-link",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-cli-link.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-cli-native",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-cli-native.log",
+      "log_sha256": "1b4255a01ee2e32ec452ecb8a5e79572555f43a396a29037cf2721bb46ffc933"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-cgroup",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-cgroup.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-native_mcjit_elf_loader-link",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-native_mcjit_elf_loader-link.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-native_mcjit_elf_loader-native",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-native_mcjit_elf_loader-native.log",
+      "log_sha256": "797ae353278a2dc5c44fcfeb7d04b01f77269c96d7d509458faa1bcf31e52f4e"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-native_mcjit_musttail-link",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-native_mcjit_musttail-link.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-native_mcjit_musttail-native",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-native_mcjit_musttail-native.log",
+      "log_sha256": "716f36b167fad7839d93f7eb77cfbdc8be125e50f33a5d07e5c1b20581120348"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-frontend-check",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-frontend-check.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-runtime-compile",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-runtime-compile.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-host-compile",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-host-compile.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-test-link",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-test-link.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-live-instruction",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-live-instruction.log",
+      "log_sha256": "16172557491d3133b961000c8cb343d59371058c8d94b1a2ddadd99738bff719"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-live-unwind",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-live-unwind.log",
+      "log_sha256": "4e27bf782a92f502f0551e6f1004257ef06bb40579b64038b8f0b0dd63276daf"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-all-numeric-instruction",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-all-numeric-instruction.log",
+      "log_sha256": "33ba32d76ce91f6d2052d0399bbe14e6d9c35027d018b6c944121cbb77a9e943"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-all-numeric-unwind",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-all-numeric-unwind.log",
+      "log_sha256": "c6f9c6cdd324bd570cd36bbb68a358c5f2433a4fab8e4870828a4c1789f507d1"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-mapping-probe-link",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-mapping-probe-link.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-mapping-probe",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-mapping-probe.log",
+      "log_sha256": "390192d1edac042c0df3ea731dd934c19ddf102719c1a865363434070ca6d42b"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-fixture",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-fixture.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-link",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-link.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-instruction-none-parked-loop",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-instruction-none-parked-loop.log",
+      "log_sha256": "178c2c295ab6302ce333ba4a11e9c0a9ad4cd5805e194e392e2d81dd5dad93c8"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-instruction-none-host-block",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-instruction-none-host-block.log",
+      "log_sha256": "178c2c295ab6302ce333ba4a11e9c0a9ad4cd5805e194e392e2d81dd5dad93c8"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-instruction-observe-parked-loop",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-instruction-observe-parked-loop.log",
+      "log_sha256": "178c2c295ab6302ce333ba4a11e9c0a9ad4cd5805e194e392e2d81dd5dad93c8"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-instruction-observe-host-block",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-instruction-observe-host-block.log",
+      "log_sha256": "178c2c295ab6302ce333ba4a11e9c0a9ad4cd5805e194e392e2d81dd5dad93c8"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-instruction-resumable-parked-loop",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-instruction-resumable-parked-loop.log",
+      "log_sha256": "178c2c295ab6302ce333ba4a11e9c0a9ad4cd5805e194e392e2d81dd5dad93c8"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-instruction-resumable-host-block",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-instruction-resumable-host-block.log",
+      "log_sha256": "178c2c295ab6302ce333ba4a11e9c0a9ad4cd5805e194e392e2d81dd5dad93c8"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-unwind-none-parked-loop",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-unwind-none-parked-loop.log",
+      "log_sha256": "6dc212ed6a928c82742180c112c893e0803f5d9947315b0b00ac32a3e0866e59"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-unwind-none-host-block",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-unwind-none-host-block.log",
+      "log_sha256": "6dc212ed6a928c82742180c112c893e0803f5d9947315b0b00ac32a3e0866e59"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-unwind-observe-parked-loop",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-unwind-observe-parked-loop.log",
+      "log_sha256": "6dc212ed6a928c82742180c112c893e0803f5d9947315b0b00ac32a3e0866e59"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-unwind-observe-host-block",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-unwind-observe-host-block.log",
+      "log_sha256": "6dc212ed6a928c82742180c112c893e0803f5d9947315b0b00ac32a3e0866e59"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-unwind-resumable-parked-loop",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-unwind-resumable-parked-loop.log",
+      "log_sha256": "6dc212ed6a928c82742180c112c893e0803f5d9947315b0b00ac32a3e0866e59"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-shutdown-unwind-resumable-host-block",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-shutdown-unwind-resumable-host-block.log",
+      "log_sha256": "6dc212ed6a928c82742180c112c893e0803f5d9947315b0b00ac32a3e0866e59"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-cli-link",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-cli-link.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "riscv64-uwvm2-ros-cli-native",
+      "returncode": 0,
+      "log": "/dev/shm/asm-linux-riscv64-current-product-1791174132184/build-meta/work/riscv64-uwvm2-ros-cli-native.log",
+      "log_sha256": "1b4255a01ee2e32ec452ecb8a5e79572555f43a396a29037cf2721bb46ffc933"
+    }
+  ],
+  "frozen_native_source_sha256": {
+    "uwvm2/src/uwvm2/runtime/compiler/llvm_jit/native_provenance.h": "59c731fc72e7914056d1a10cd4cba2bb8304e40c7259f569c56a15f6bc2257c7",
+    "uwvm2/src/uwvm2/runtime/lib/uwvm_runtime.default.cpp": "3527196f0a4fb21a6058ad3099286e89653298daab492b4f451da44ba5a954c9",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_branch_destination.cppm": "974ec22691cba9dba058d0d8b1e3f498dbc3e6bf9de9a24cc971319b0406a49f",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_branch_destination.h": "f9b88674c0995789107f438de50eeffa237c0a89013140e2bd595e23af9e2ab3",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_branch_destination.md": "fec233957e548c5cd22b71d3a9e1d1c119a48ef138753f9c0986dc99cdff842c",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_branch_display.cppm": "561b0339a173f71b764450f6524db0be6394e3d5a6ef6beeb74f1f3f69b6b022",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_branch_display.h": "08c09645658b6d51929949b03d8880dabf3718a16bf2dd468b76ff33f3384d49",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_branch_display.md": "fffa167ee19b77b9b0c4b9afc6f85139828469d09f8356ebde0986779349cc90",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_continuation_linux.cppm": "d87783fbb20648a7ad16d587d719d2709fd865b6b420ebf829c0da6014835492",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_continuation_linux.h": "366876009eb169a3538d6fc48fc026d0944217165eded0720184472ce9491106",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_disassembly.cppm": "e733369807c980697fd5eac4a5bddde155247b82540764025c2773c175a9192d",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_disassembly.h": "44c1b7e69a233c1daf13c85ea5e8c2bbab7a0f2bdb8db274696387cad77b5eac",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_disassembly_abi.h": "9a831c09a4862db9e815e796064a250e3ad2d6b9ab162ff4c9fcd7f4fbf5182b",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_disassembly_window.cppm": "da04de36d56d3810c765055bb1834398ef7293ac905aeaf42991b377a04ef6ab",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_disassembly_window.h": "9d7fb9b7ce2d3925d6517dd9ef5ecdf908731d1354877056f685cb0508f3cd89",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_execution_plan.md": "59a2e1ae058d7e63097ad28f341c2d40ea6511153511d281499665af2f42ffd1",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_instruction_semantics.cppm": "1284eeb209df398501656ea14b1106174b776c02556483961649a38ac3530aa4",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_instruction_semantics.h": "e28e0e32532e874b1b903ec6b40433e45afe0c31b571965ca1c59900866bd497",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_linux_context.h": "5f865d0c1da4445ebe726300135ffd929346d04717025be42ccba7431d1f4266",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_linux_platform.h": "2b1748b5849f5b16a9a8258472eeb88ebf12169cb017899e472707b8bd00bdd5",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_next_policy.cppm": "74f5b1c7502247acbc1baf98bb7e26b1b9f52e6d20061c12f17131ae2e40e76a",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_next_policy.h": "90bce5d1cc9eb37e1901bc9ec9b157a0958708e0795cb0075aa0b2370618ec37",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_owned_instruction_semantics.cppm": "47a2763e3454d8afc650d5125ab01d5fe49cd81cfb3f71ed27b1d4d2d307be22",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_owned_instruction_semantics.h": "d1314adf73ddca94722caf13e22cc4d7599ff6fba1a82839475ee2d6592238cb",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_registers.cppm": "986d393580b3c2b136a2b0817c3e3bb27cb36f4748d9ff5a356d36ba5ebf79e9",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_registers.h": "5499dcd3c31f95ba8948dc7cce48fd84c91841e101cd07b280e3fb166ce5f251",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_step.cppm": "e65a4f38706ebc7071e639ab7e7a5c60b4e1ed4750f5941fd9eeb58ae35cbc43",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_step.h": "27594d7a305f39d3dcce32cbc398112cf742c851907b64d35e72170fb5d8f08c",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_step.md": "51fc2c0aa27f2bebf1c1c17e470a26d334367d29ea07ba163c25b498b1e2301b",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_step_linux.h": "fc6a07c7e908ece86aa32c0e20cc43197fab160b34bf29f404aa6b9cda0fd894",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_step_macos.cppm": "f34f7f3e004e249bbb5258b86a2c8f7b786647bf5ce1cd2c845292a01a133705",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_step_macos.h": "3767a465aac1df474498d2ee348ff997a2331254136a82346bb100dfe07d4bd9",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_step_macos.md": "75498bbe614118c851539e2264429c04e50be8716c595ec8bd73798adf297bc6",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_step_next_finish.md": "7f1cfb844bb84db18179d3e3899ebd3ca24a852a5b8b25c6e81ef1afd424b786",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_step_windows.cppm": "51c5b19b0d0d23d7025b5042778ded8a4b03c449d483392694ca0fda503daf6d",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_step_windows.h": "c620b7158b32a6bdbdcdf8e62f57dd16d6e775af64c14bc15e1b29647d3ed423",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_step_windows.md": "ae235c06d6022e936af28d865b5a83bd9bc8f43db0dc1b0975f80a8464a23e48",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_target_metadata.cppm": "44db71f667ada8a9064a6de2af9150037df3e1cf1fdb149ee72452f65460f4ba",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_target_metadata.h": "29e6a3028c4f77a5b053692ac0ad0a3e8060a702b6996428ea07177d782b0feb",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_wasm_call_continuation.cppm": "da2e9786721044a84c94197d8e565abc9e0ac3a27ac59b3262cf967ec4b1f05b",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_wasm_call_continuation.h": "ee23119c312819fc36c8ffed0b0d78a71cd98eed7281392a9512382d1142a60a",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_wasm_step_boundary.cppm": "7875e57e0dfe919ba98757db59a63e57017c30609d703984b61f3fde5121ed93",
+    "uwvm2/src/uwvm2/uwvm/debugger/native_wasm_step_boundary.h": "5a6913c97efc1b88ed38b12ff8ec2b0ce608dd5318274831745c902131dd6897",
+    "uwvm2/src/uwvm2/uwvm/host_api.default.cpp": "389d72d23f959567c4f89aea8ec71b8d91e91ee2b3ab8d18f19dfb8156986dc5",
+    "uwvm2/test/0017.runtime/debug_native_linux_runtime.cc": "64352a4d394b49e83ae8f711484d083dd4811eb957cdb0f7625520c79878ce71",
+    "uwvm2-ros/src/uwvm2/runtime/compiler/llvm_jit/native_provenance.h": "59c731fc72e7914056d1a10cd4cba2bb8304e40c7259f569c56a15f6bc2257c7",
+    "uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime.default.cpp": "f9efdafa5a6b04bbbe73620b202bfe62a5000eca5e13754da3cf437e45428bfc",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_branch_destination.cppm": "974ec22691cba9dba058d0d8b1e3f498dbc3e6bf9de9a24cc971319b0406a49f",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_branch_destination.h": "f9b88674c0995789107f438de50eeffa237c0a89013140e2bd595e23af9e2ab3",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_branch_destination.md": "fec233957e548c5cd22b71d3a9e1d1c119a48ef138753f9c0986dc99cdff842c",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_branch_display.cppm": "561b0339a173f71b764450f6524db0be6394e3d5a6ef6beeb74f1f3f69b6b022",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_branch_display.h": "08c09645658b6d51929949b03d8880dabf3718a16bf2dd468b76ff33f3384d49",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_branch_display.md": "fffa167ee19b77b9b0c4b9afc6f85139828469d09f8356ebde0986779349cc90",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_continuation_linux.cppm": "d87783fbb20648a7ad16d587d719d2709fd865b6b420ebf829c0da6014835492",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_continuation_linux.h": "366876009eb169a3538d6fc48fc026d0944217165eded0720184472ce9491106",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_disassembly.cppm": "e733369807c980697fd5eac4a5bddde155247b82540764025c2773c175a9192d",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_disassembly.h": "44c1b7e69a233c1daf13c85ea5e8c2bbab7a0f2bdb8db274696387cad77b5eac",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_disassembly_abi.h": "9a831c09a4862db9e815e796064a250e3ad2d6b9ab162ff4c9fcd7f4fbf5182b",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_disassembly_window.cppm": "da04de36d56d3810c765055bb1834398ef7293ac905aeaf42991b377a04ef6ab",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_disassembly_window.h": "9d7fb9b7ce2d3925d6517dd9ef5ecdf908731d1354877056f685cb0508f3cd89",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_execution_plan.md": "59a2e1ae058d7e63097ad28f341c2d40ea6511153511d281499665af2f42ffd1",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_instruction_semantics.cppm": "1284eeb209df398501656ea14b1106174b776c02556483961649a38ac3530aa4",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_instruction_semantics.h": "e28e0e32532e874b1b903ec6b40433e45afe0c31b571965ca1c59900866bd497",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_linux_context.h": "5f865d0c1da4445ebe726300135ffd929346d04717025be42ccba7431d1f4266",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_linux_platform.h": "2b1748b5849f5b16a9a8258472eeb88ebf12169cb017899e472707b8bd00bdd5",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_next_policy.cppm": "74f5b1c7502247acbc1baf98bb7e26b1b9f52e6d20061c12f17131ae2e40e76a",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_next_policy.h": "90bce5d1cc9eb37e1901bc9ec9b157a0958708e0795cb0075aa0b2370618ec37",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_owned_instruction_semantics.cppm": "47a2763e3454d8afc650d5125ab01d5fe49cd81cfb3f71ed27b1d4d2d307be22",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_owned_instruction_semantics.h": "d1314adf73ddca94722caf13e22cc4d7599ff6fba1a82839475ee2d6592238cb",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_registers.cppm": "986d393580b3c2b136a2b0817c3e3bb27cb36f4748d9ff5a356d36ba5ebf79e9",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_registers.h": "5499dcd3c31f95ba8948dc7cce48fd84c91841e101cd07b280e3fb166ce5f251",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_step.cppm": "e65a4f38706ebc7071e639ab7e7a5c60b4e1ed4750f5941fd9eeb58ae35cbc43",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_step.h": "27594d7a305f39d3dcce32cbc398112cf742c851907b64d35e72170fb5d8f08c",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_step.md": "51fc2c0aa27f2bebf1c1c17e470a26d334367d29ea07ba163c25b498b1e2301b",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_step_linux.h": "fc6a07c7e908ece86aa32c0e20cc43197fab160b34bf29f404aa6b9cda0fd894",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_step_macos.cppm": "f34f7f3e004e249bbb5258b86a2c8f7b786647bf5ce1cd2c845292a01a133705",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_step_macos.h": "3767a465aac1df474498d2ee348ff997a2331254136a82346bb100dfe07d4bd9",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_step_macos.md": "3557d4cd4eae22b2f5f598a486222cc3cc750a4fcbd1083f144fdf29db225082",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_step_next_finish.md": "7f1cfb844bb84db18179d3e3899ebd3ca24a852a5b8b25c6e81ef1afd424b786",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_step_windows.cppm": "51c5b19b0d0d23d7025b5042778ded8a4b03c449d483392694ca0fda503daf6d",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_step_windows.h": "c620b7158b32a6bdbdcdf8e62f57dd16d6e775af64c14bc15e1b29647d3ed423",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_step_windows.md": "ae235c06d6022e936af28d865b5a83bd9bc8f43db0dc1b0975f80a8464a23e48",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_target_metadata.cppm": "44db71f667ada8a9064a6de2af9150037df3e1cf1fdb149ee72452f65460f4ba",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_target_metadata.h": "29e6a3028c4f77a5b053692ac0ad0a3e8060a702b6996428ea07177d782b0feb",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_wasm_call_continuation.cppm": "da2e9786721044a84c94197d8e565abc9e0ac3a27ac59b3262cf967ec4b1f05b",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_wasm_call_continuation.h": "ee23119c312819fc36c8ffed0b0d78a71cd98eed7281392a9512382d1142a60a",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_wasm_step_boundary.cppm": "7875e57e0dfe919ba98757db59a63e57017c30609d703984b61f3fde5121ed93",
+    "uwvm2-ros/src/uwvm2/uwvm/debugger/native_wasm_step_boundary.h": "5a6913c97efc1b88ed38b12ff8ec2b0ce608dd5318274831745c902131dd6897",
+    "uwvm2-ros/src/uwvm2/uwvm/host_api.default.cpp": "389d72d23f959567c4f89aea8ec71b8d91e91ee2b3ab8d18f19dfb8156986dc5",
+    "uwvm2-ros/test/0017.runtime/debug_native_linux_runtime.cc": "64352a4d394b49e83ae8f711484d083dd4811eb957cdb0f7625520c79878ce71",
+    "uwvm2/test/0017.runtime/run_debug_native_cross_linux_cli.py": "4ec77154115a94f0fed0b3f5c02e7759b0dd0c24c2df3e5281e24d4eec19659b",
+    "uwvm2-ros/test/0017.runtime/run_debug_native_cross_linux_cli.py": "4ec77154115a94f0fed0b3f5c02e7759b0dd0c24c2df3e5281e24d4eec19659b"
+  },
+  "qualification_does_not_cover": "Subsequent source edits, other architectures, hardware classes absent from this RISC-V ISA, named-module/Xmake product build."
+}

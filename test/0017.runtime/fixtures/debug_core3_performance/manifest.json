@@ -1,0 +1,334 @@
+[
+  {
+    "name": "memory64",
+    "feature": "64-bit address space",
+    "required_features": [
+      "memory64",
+      "multi-memory"
+    ],
+    "opcode_witness": "i64.load",
+    "oracle": "sum17",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 50165000,
+    "notes": "",
+    "wat_sha256": "452ddc70299a4c2ae610163e0c9390395fe73ff1c0f468b18be9cdfad9bb208c",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "table64",
+    "feature": "64-bit address space",
+    "required_features": [
+      "table64",
+      "reference-types"
+    ],
+    "opcode_witness": "call_indirect",
+    "oracle": "table",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 150010000,
+    "notes": "",
+    "wat_sha256": "1c9f9924de0dc0bc46da0d9d83560039df1c8f1bf7d2939937a96c3cdb33acd6",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "multi_memory",
+    "feature": "Multiple memories",
+    "required_features": [
+      "multi-memory"
+    ],
+    "opcode_witness": "memory.copy",
+    "oracle": "sum17",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 50165000,
+    "notes": "",
+    "wat_sha256": "df2a92856ddb7aa86cd662f884dc26e19e02cecaab43ff4dc5ccdc0ec017514a",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "extended_const",
+    "feature": "Extended constant expressions",
+    "required_features": [
+      "extended-const"
+    ],
+    "opcode_witness": "global.get",
+    "oracle": "sum26",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 50255000,
+    "notes": "constant initialization precedes the kernel clock; kernel measures reads of initialized globals, process time also includes initialization",
+    "wat_sha256": "b64cabf989e17bea4b3c77f5c04a8f26943e9a58ce7ce16881189f3563190af6",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "typed_call_ref",
+    "feature": "Typed references",
+    "required_features": [
+      "function-references",
+      "reference-types"
+    ],
+    "opcode_witness": "call_ref",
+    "oracle": "typed",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 149995000,
+    "notes": "",
+    "wat_sha256": "c24b2dd5b7f637db5c7cbff9dc6791c7a112229544e36eb0917023af98853604",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "nondefaultable_local",
+    "feature": "Typed references",
+    "required_features": [
+      "function-references",
+      "reference-types"
+    ],
+    "opcode_witness": "call_ref",
+    "oracle": "typed",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 149995000,
+    "notes": "",
+    "wat_sha256": "b237b2a826d63bb11dc90b8ae1fee9a519f6c361f6a31cd80059df036b321746",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "tail_direct",
+    "feature": "Tail calls",
+    "required_features": [
+      "tail-call"
+    ],
+    "opcode_witness": "return_call",
+    "oracle": "tail",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 30007,
+    "notes": "",
+    "wat_sha256": "ff802715663e41adb686aeeec9fd853e29096a09d08de9da983ebffe8c1819de",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "tail_indirect",
+    "feature": "Tail calls",
+    "required_features": [
+      "tail-call",
+      "reference-types"
+    ],
+    "opcode_witness": "return_call_indirect",
+    "oracle": "tail_indirect",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 40005,
+    "notes": "",
+    "wat_sha256": "fd395aa99169b7ea70bfb0cc081cab57d01c68f4d2fdb9b198ec8030084d6d89",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "tail_ref",
+    "feature": "Tail calls",
+    "required_features": [
+      "tail-call",
+      "function-references"
+    ],
+    "opcode_witness": "return_call_ref",
+    "oracle": "tail",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 30007,
+    "notes": "",
+    "wat_sha256": "814646656012b57cb5e262a3bf7d76a82d329d3f007a644f227bc48ab06d20a9",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "exception_payload",
+    "feature": "Exception handling",
+    "required_features": [
+      "exceptions"
+    ],
+    "opcode_witness": "try_table",
+    "oracle": "sum17",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 50165000,
+    "notes": "",
+    "wat_sha256": "fe63a3bf78f0582998eef2727876cf57ebbbbee4e9f57ef2734d9e5aa3344293",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "exception_rethrow_ref",
+    "feature": "Exception handling",
+    "required_features": [
+      "exceptions"
+    ],
+    "opcode_witness": "throw_ref",
+    "oracle": "sum17",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 50165000,
+    "notes": "",
+    "wat_sha256": "b559956bba8640094d6b7659752f7ceda288f54161152f7217034f96749c75a9",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "gc_struct",
+    "feature": "Garbage collection",
+    "required_features": [
+      "gc",
+      "function-references"
+    ],
+    "opcode_witness": "struct.new",
+    "oracle": "sum272",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 52715000,
+    "notes": "",
+    "wat_sha256": "a4da5120a93724a7cc8052bf0c1ad3431cbd7ae6da3bbb07eab6a597910ad0b4",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "gc_allocation",
+    "feature": "Garbage collection",
+    "required_features": [
+      "gc",
+      "function-references"
+    ],
+    "opcode_witness": "struct.new",
+    "oracle": "sum272",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 52715000,
+    "notes": "",
+    "wat_sha256": "c79f6ba58f8a348e23374c57948f94dd44af230ea86c55dadf44a2266fea7ab6",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "gc_array",
+    "feature": "Garbage collection",
+    "required_features": [
+      "gc",
+      "function-references"
+    ],
+    "opcode_witness": "array.set",
+    "oracle": "array",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 50165256,
+    "notes": "",
+    "wat_sha256": "8ead08e94acd9f9d9723f7e3c382444ccfc2e0599ec923cfeae902d4695c6dcc",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "gc_i31",
+    "feature": "Garbage collection",
+    "required_features": [
+      "gc",
+      "function-references"
+    ],
+    "opcode_witness": "ref.i31",
+    "oracle": "sum0",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 49995000,
+    "notes": "",
+    "wat_sha256": "0969d56f0aaf1f5d6273f43729711ea626448b0e50829e033484818c0754c072",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "gc_recursive",
+    "feature": "Garbage collection",
+    "required_features": [
+      "gc",
+      "function-references"
+    ],
+    "opcode_witness": "struct.new",
+    "oracle": "recursive",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 50154991,
+    "notes": "",
+    "wat_sha256": "d1a6d6e78ef1118ea8f695d6c67adf36c13307c0b291e56c422cd0c6482796dd",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "relaxed_swizzle",
+    "feature": "Relaxed vector instructions",
+    "required_features": [
+      "simd",
+      "relaxed-simd"
+    ],
+    "opcode_witness": "i8x16.relaxed_swizzle",
+    "oracle": "swizzle",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 75000,
+    "notes": "",
+    "wat_sha256": "5a38a5bcc9e48e723baeb0359a108f749dbe23b9caab6ddb7a095cb7f2eb11a0",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "relaxed_madd",
+    "feature": "Relaxed vector instructions",
+    "required_features": [
+      "simd",
+      "relaxed-simd"
+    ],
+    "opcode_witness": "f32x4.relaxed_madd",
+    "oracle": "count",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 10000,
+    "notes": "",
+    "wat_sha256": "a7e195aa2ed22daef1e7647d124d17edfb9463918a123e229162cc86d8f95d14",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "deterministic_profile",
+    "feature": "Profiles",
+    "required_features": [
+      "simd",
+      "relaxed-simd"
+    ],
+    "opcode_witness": "f32.div",
+    "oracle": "nan",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 10000,
+    "notes": "requires NaN canonicalization and deterministic relaxed SIMD; ordinary NaN legality is insufficient",
+    "wat_sha256": "d2e56ecb96a6ad01ac99bc3ae113fb3bdb02c495c90942b04b7bbe2e17876758",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  },
+  {
+    "name": "annotations",
+    "feature": "Custom annotations",
+    "required_features": [],
+    "opcode_witness": "i32.add",
+    "oracle": "sum17",
+    "iterations": 10000,
+    "kernel_repeats": 1,
+    "expected_checksum": 50165000,
+    "notes": "text and custom-section transport, no new executable opcode",
+    "wat_sha256": "a000e632938c16da654c7259f8552dafc8df629ab1395349e1f6e727a590a35c",
+    "validation": "pending",
+    "runtime_validation": "pending"
+  }
+]

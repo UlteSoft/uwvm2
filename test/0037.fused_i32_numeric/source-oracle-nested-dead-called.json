@@ -1,0 +1,20 @@
+{
+  "source_only": true,
+  "files": [
+    {
+      "path": "fixtures/i32_numeric_nested_dead_called_start.wat",
+      "size": 2517,
+      "sha256": "9eb4ef800726d2087df76b2cf0dee209f31d55721580213c81d9b53aedf309df"
+    },
+    {
+      "path": "run_nested_dead_called_start.py",
+      "size": 4637,
+      "sha256": "4993edc25db8c57f639d6c43cdccde9d5ac82fc03e1c92358c76bcf92d6cb624"
+    },
+    {
+      "path": "README.nested-dead-called.md",
+      "size": 2180,
+      "sha256": "2ae53372e420306ede5323dce818dae0a28c338c1b56d4fedb23cf28bee9ac1a"
+    }
+  ]
+}

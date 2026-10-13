@@ -1,0 +1,14 @@
+--- a/third-parties/fast_io/share/fast_io/fast_io.cppm
++++ b/third-parties/fast_io/share/fast_io/fast_io.cppm
+@@ -16,6 +16,11 @@
+ #ifndef FAST_IO_FREESTANDING
+ #define FAST_IO_FREESTANDING
+ #endif
++#endif
++
++#ifndef FAST_IO_FREESTANDING
++#include <string>
++#include <fast_io_unit/string.h>
+ #endif
+ 
+ export module fast_io;

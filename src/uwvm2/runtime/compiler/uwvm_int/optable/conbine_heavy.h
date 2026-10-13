@@ -106,6 +106,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -140,6 +143,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -184,6 +190,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -218,6 +227,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -238,6 +250,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -266,6 +281,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -315,6 +333,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const off_a{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -377,6 +398,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const off_a{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -432,6 +456,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const off_a{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -494,6 +521,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const off_a{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -550,6 +580,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const off_a{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -606,6 +639,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const off_a{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -656,6 +692,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const off_a{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -702,6 +741,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const off_a{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -744,6 +786,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -751,7 +796,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                      CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f32>(type...[1u], type...[2u] + local_off, type...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ type...[0] advances by sizeof(wasm_f32); translation emitted the matching typed slot.
             type...[0] += sizeof(wasm_f32);
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(wasm_f32); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(wasm_f32);
             uwvm_interpreter_opfunc_t<Type...> next;
             ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
@@ -791,6 +842,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -798,7 +852,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                      CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f32>(typeref...[1u], typeref...[2u] + local_off, typeref...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ typeref...[0] advances by sizeof(wasm_f32); translation emitted the matching typed slot.
             typeref...[0] += sizeof(wasm_f32);
+            // result push: operand_base ... [current stack][result bytes] | frame_end
+            // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+            // ^^ typeref...[1u] advances by sizeof(wasm_f32); the frame reserves operand_stack_byte_max from validation.
             typeref...[1u] += sizeof(wasm_f32);
             return;
         }
@@ -850,6 +910,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -884,6 +947,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -909,6 +975,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const src_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -946,6 +1015,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const src_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -974,6 +1046,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -1008,6 +1083,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -1033,6 +1111,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -1067,6 +1148,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -1092,6 +1176,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const src_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -1129,6 +1216,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const src_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -1157,6 +1247,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -1191,6 +1284,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -1217,6 +1313,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -1224,7 +1323,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                      CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f64>(type...[1u], type...[2u] + local_off, type...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ type...[0] advances by sizeof(wasm_f64); translation emitted the matching typed slot.
             type...[0] += sizeof(wasm_f64);
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(wasm_f64); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(wasm_f64);
             uwvm_interpreter_opfunc_t<Type...> next;
             ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
@@ -1264,6 +1369,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -1271,7 +1379,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                      CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f64>(typeref...[1u], typeref...[2u] + local_off, typeref...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ typeref...[0] advances by sizeof(wasm_f64); translation emitted the matching typed slot.
             typeref...[0] += sizeof(wasm_f64);
+            // result push: operand_base ... [current stack][result bytes] | frame_end
+            // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+            // ^^ typeref...[1u] advances by sizeof(wasm_f64); the frame reserves operand_stack_byte_max from validation.
             typeref...[1u] += sizeof(wasm_f64);
             return;
         }
@@ -1336,11 +1450,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         if constexpr(Op == numeric_details::float_binop::copysign &&
                      CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f32>(type...[1u] - sizeof(wasm_f32), type...[1u] - sizeof(wasm_f32), type...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ type...[0] advances by sizeof(wasm_f32); translation emitted the matching typed slot.
             type...[0] += sizeof(wasm_f32);
             uwvm_interpreter_opfunc_t<Type...> next;
             ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
@@ -1364,6 +1484,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f32 const lhs{get_curr_val_from_operand_stack_cache<wasm_f32>(type...)};
             wasm_f32 const out{numeric_details::eval_float_binop<Op, wasm_f32>(lhs, rhs)};
             ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(out); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(out);
         }
 
@@ -1393,11 +1516,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         if constexpr(Op == numeric_details::float_binop::copysign &&
                      CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f32>(typeref...[1u] - sizeof(wasm_f32), typeref...[1u] - sizeof(wasm_f32), typeref...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ typeref...[0] advances by sizeof(wasm_f32); translation emitted the matching typed slot.
             typeref...[0] += sizeof(wasm_f32);
             return;
         }
@@ -1407,6 +1536,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f32 const lhs{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
         wasm_f32 const out{numeric_details::eval_float_binop<Op, wasm_f32>(lhs, rhs)};
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -1431,11 +1563,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         if constexpr(Op == numeric_details::float_binop::copysign &&
                      CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f64>(type...[1u] - sizeof(wasm_f64), type...[1u] - sizeof(wasm_f64), type...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ type...[0] advances by sizeof(wasm_f64); translation emitted the matching typed slot.
             type...[0] += sizeof(wasm_f64);
             uwvm_interpreter_opfunc_t<Type...> next;
             ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
@@ -1459,6 +1597,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f64 const lhs{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
             wasm_f64 const out{numeric_details::eval_float_binop<Op, wasm_f64>(lhs, rhs)};
             ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(out); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(out);
         }
 
@@ -1488,11 +1629,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         if constexpr(Op == numeric_details::float_binop::copysign &&
                      CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f64>(typeref...[1u] - sizeof(wasm_f64), typeref...[1u] - sizeof(wasm_f64), typeref...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ typeref...[0] advances by sizeof(wasm_f64); translation emitted the matching typed slot.
             typeref...[0] += sizeof(wasm_f64);
             return;
         }
@@ -1502,6 +1649,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 const lhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
         wasm_f64 const out{numeric_details::eval_float_binop<Op, wasm_f64>(lhs, rhs)};
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -1535,6 +1685,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const lhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -1543,6 +1696,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                      CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f32>(type...[1u], type...[2u] + lhs_off, type...[2u] + rhs_off);
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(wasm_f32); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(wasm_f32);
             uwvm_interpreter_opfunc_t<Type...> next;
             ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
@@ -1581,6 +1737,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const lhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -1589,6 +1748,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                      CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f32>(typeref...[1u], typeref...[2u] + lhs_off, typeref...[2u] + rhs_off);
+            // result push: operand_base ... [current stack][result bytes] | frame_end
+            // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+            // ^^ typeref...[1u] advances by sizeof(wasm_f32); the frame reserves operand_stack_byte_max from validation.
             typeref...[1u] += sizeof(wasm_f32);
             return;
         }
@@ -1652,6 +1814,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const lhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -1660,6 +1825,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                      CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f64>(type...[1u], type...[2u] + lhs_off, type...[2u] + rhs_off);
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(wasm_f64); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(wasm_f64);
             uwvm_interpreter_opfunc_t<Type...> next;
             ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
@@ -1700,6 +1868,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         local_offset_t const lhs_off{conbine_details::read_imm<local_offset_t>(type...[0])};
@@ -1718,6 +1889,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         SpilledT const spilled{get_curr_val_from_operand_stack_top<CompileOption, SpilledT, insert_pos>(type...)};
         ::std::memcpy(type...[1u], ::std::addressof(spilled), sizeof(spilled));
+        // operand frame: operand_base ... [uncached bytes][cached value spill] | frame_end
+        //                [validated logical stack depth                  ] unsafe past frame_end
+        // ^^ type...[1u] advances by sizeof(spilled); the ring value occupies a reserved stack slot.
         type...[1u] += sizeof(spilled);
 
         wasm_f64 const lhs{conbine_details::load_local<wasm_f64>(type...[2u], lhs_off)};
@@ -1752,6 +1926,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const lhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -1760,6 +1937,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                      CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f64>(typeref...[1u], typeref...[2u] + lhs_off, typeref...[2u] + rhs_off);
+            // result push: operand_base ... [current stack][result bytes] | frame_end
+            // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+            // ^^ typeref...[1u] advances by sizeof(wasm_f64); the frame reserves operand_stack_byte_max from validation.
             typeref...[1u] += sizeof(wasm_f64);
             return;
         }
@@ -1829,6 +2009,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -1836,6 +2019,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                      CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
         {
             numeric_details::float_sign_memory<wasm_f32, Op>(type...[1u], type...[2u] + local_off);
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(wasm_f32); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(wasm_f32);
         }
         else
@@ -1872,12 +2058,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         if constexpr((Op == numeric_details::float_unop::abs || Op == numeric_details::float_unop::neg))
         {
             numeric_details::float_sign_memory<wasm_f32, Op>(typeref...[1u], typeref...[2u] + local_off);
+            // result push: operand_base ... [current stack][result bytes] | frame_end
+            // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+            // ^^ typeref...[1u] advances by sizeof(wasm_f32); the frame reserves operand_stack_byte_max from validation.
             typeref...[1u] += sizeof(wasm_f32);
         }
         else
@@ -1923,6 +2115,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -1930,6 +2125,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                      CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
         {
             numeric_details::float_sign_memory<wasm_f64, Op>(type...[1u], type...[2u] + local_off);
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(wasm_f64); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(wasm_f64);
         }
         else
@@ -1966,12 +2164,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         if constexpr((Op == numeric_details::float_unop::abs || Op == numeric_details::float_unop::neg))
         {
             numeric_details::float_sign_memory<wasm_f64, Op>(typeref...[1u], typeref...[2u] + local_off);
+            // result push: operand_base ... [current stack][result bytes] | frame_end
+            // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+            // ^^ typeref...[1u] advances by sizeof(wasm_f64); the frame reserves operand_stack_byte_max from validation.
             typeref...[1u] += sizeof(wasm_f64);
         }
         else
@@ -2021,6 +2225,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -2055,6 +2262,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -2080,6 +2290,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -2114,6 +2327,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -2139,6 +2355,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -2173,6 +2392,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -2198,6 +2420,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -2232,6 +2457,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -2258,6 +2486,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -2299,6 +2530,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -2326,6 +2560,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -2367,6 +2604,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -2394,6 +2634,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -2435,6 +2678,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -2462,6 +2708,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -2503,6 +2752,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -2533,6 +2785,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -2574,6 +2829,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -2618,6 +2876,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -2659,6 +2920,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -2707,6 +2971,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -2752,6 +3019,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -2806,6 +3076,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -2851,6 +3124,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -2908,6 +3184,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -2951,6 +3230,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -2997,6 +3279,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -3039,6 +3324,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -3072,12 +3360,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         (void)curr_stack_top;
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         if constexpr(Op == numeric_details::float_binop::copysign &&
                      CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f32>(type...[2u] + local_off, type...[2u] + local_off, type...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ type...[0] advances by sizeof(wasm_f32); translation emitted the matching typed slot.
             type...[0] += sizeof(wasm_f32);
             uwvm_interpreter_opfunc_t<Type...> next;
             ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
@@ -3104,14 +3398,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         if constexpr(Op == numeric_details::float_binop::copysign &&
                      CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f32>(type...[2u] + local_off, type...[2u] + local_off, type...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ type...[0] advances by sizeof(wasm_f32); translation emitted the matching typed slot.
             type...[0] += sizeof(wasm_f32);
             ::std::memcpy(type...[1u], type...[2u] + local_off, sizeof(wasm_f32));
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(wasm_f32); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(wasm_f32);
             uwvm_interpreter_opfunc_t<Type...> next;
             ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
@@ -3144,12 +3447,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         if constexpr(Op == numeric_details::float_binop::copysign &&
                      CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f32>(typeref...[2u] + local_off, typeref...[2u] + local_off, typeref...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ typeref...[0] advances by sizeof(wasm_f32); translation emitted the matching typed slot.
             typeref...[0] += sizeof(wasm_f32);
             return;
         }
@@ -3175,14 +3484,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         if constexpr(Op == numeric_details::float_binop::copysign &&
                      CompileOption.f32_stack_top_begin_pos == CompileOption.f32_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f32>(typeref...[2u] + local_off, typeref...[2u] + local_off, typeref...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ typeref...[0] advances by sizeof(wasm_f32); translation emitted the matching typed slot.
             typeref...[0] += sizeof(wasm_f32);
             ::std::memcpy(typeref...[1u], typeref...[2u] + local_off, sizeof(wasm_f32));
+            // result push: operand_base ... [current stack][result bytes] | frame_end
+            // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+            // ^^ typeref...[1u] advances by sizeof(wasm_f32); the frame reserves operand_stack_byte_max from validation.
             typeref...[1u] += sizeof(wasm_f32);
             return;
         }
@@ -3206,12 +3524,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         (void)curr_stack_top;
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         if constexpr(Op == numeric_details::float_binop::copysign &&
                      CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f64>(type...[2u] + local_off, type...[2u] + local_off, type...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ type...[0] advances by sizeof(wasm_f64); translation emitted the matching typed slot.
             type...[0] += sizeof(wasm_f64);
             uwvm_interpreter_opfunc_t<Type...> next;
             ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
@@ -3238,14 +3562,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         if constexpr(Op == numeric_details::float_binop::copysign &&
                      CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f64>(type...[2u] + local_off, type...[2u] + local_off, type...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ type...[0] advances by sizeof(wasm_f64); translation emitted the matching typed slot.
             type...[0] += sizeof(wasm_f64);
             ::std::memcpy(type...[1u], type...[2u] + local_off, sizeof(wasm_f64));
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(wasm_f64); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(wasm_f64);
             uwvm_interpreter_opfunc_t<Type...> next;
             ::std::memcpy(::std::addressof(next), type...[0], sizeof(next));
@@ -3278,12 +3611,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         if constexpr(Op == numeric_details::float_binop::copysign &&
                      CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f64>(typeref...[2u] + local_off, typeref...[2u] + local_off, typeref...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ typeref...[0] advances by sizeof(wasm_f64); translation emitted the matching typed slot.
             typeref...[0] += sizeof(wasm_f64);
             return;
         }
@@ -3309,14 +3648,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         if constexpr(Op == numeric_details::float_binop::copysign &&
                      CompileOption.f64_stack_top_begin_pos == CompileOption.f64_stack_top_end_pos)
         {
             numeric_details::float_copysign_memory<wasm_f64>(typeref...[2u] + local_off, typeref...[2u] + local_off, typeref...[0]);
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ typeref...[0] advances by sizeof(wasm_f64); translation emitted the matching typed slot.
             typeref...[0] += sizeof(wasm_f64);
             ::std::memcpy(typeref...[1u], typeref...[2u] + local_off, sizeof(wasm_f64));
+            // result push: operand_base ... [current stack][result bytes] | frame_end
+            // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+            // ^^ typeref...[1u] advances by sizeof(wasm_f64); the frame reserves operand_stack_byte_max from validation.
             typeref...[1u] += sizeof(wasm_f64);
             return;
         }
@@ -3344,6 +3692,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         (void)curr_stack_top;
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         wasm_f32 const mul{conbine_details::read_imm<wasm_f32>(type...[0])};
@@ -3374,6 +3725,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         wasm_f32 const mul{conbine_details::read_imm<wasm_f32>(typeref...[0])};
@@ -3397,6 +3751,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         (void)curr_stack_top;
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         wasm_f64 const mul{conbine_details::read_imm<wasm_f64>(type...[0])};
@@ -3427,6 +3784,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         wasm_f64 const mul{conbine_details::read_imm<wasm_f64>(typeref...[0])};
@@ -3454,6 +3814,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         (void)curr_stack_top;
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         auto const acc_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -3483,6 +3846,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         auto const acc_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -3505,6 +3871,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         (void)curr_stack_top;
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         auto const acc_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -3534,6 +3903,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         auto const acc_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -3556,6 +3928,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         (void)curr_stack_top;
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         auto const acc_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -3585,6 +3960,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         auto const acc_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -3607,6 +3985,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         (void)curr_stack_top;
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
         auto const acc_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -3636,6 +4017,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
         auto const acc_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -3663,6 +4047,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -3703,6 +4090,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -3735,6 +4125,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -3776,6 +4169,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -3808,6 +4204,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -3848,6 +4247,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -3880,6 +4282,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -3921,6 +4326,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -3960,6 +4368,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const lhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -3999,6 +4410,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const lhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -4030,6 +4444,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const lhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -4069,6 +4486,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const lhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -4105,6 +4525,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -4146,6 +4569,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -4188,6 +4614,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -4228,6 +4657,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -4262,6 +4694,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -4269,6 +4704,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ type...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         type...[0] += sizeof(jmp_ip);
 
         wasm_i32 const a{conbine_details::load_local<wasm_i32>(type...[2u], a_off)};
@@ -4280,6 +4718,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  endif
         if(rem == wasm_i32{})
         {
+            // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+            //               [complete target pointer slot] safe for dispatch
+            // ^^ type...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
             type...[0] = jmp_ip;
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -4312,6 +4753,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const a_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -4319,11 +4763,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), typeref...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ typeref...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         typeref...[0] += sizeof(jmp_ip);
 
         wasm_i32 const a{conbine_details::load_local<wasm_i32>(typeref...[2u], a_off)};
         wasm_i32 const b{conbine_details::load_local<wasm_i32>(typeref...[2u], b_off)};
         wasm_i32 const rem{numeric_details::eval_int_binop<numeric_details::int_binop::rem_u, wasm_i32, numeric_details::wasm_u32>(a, b)};
+        // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+        //               [complete target pointer slot] safe for dispatch
+        // ^^ typeref...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
         if(rem == wasm_i32{}) { typeref...[0] = jmp_ip; }
     }
 
@@ -4346,6 +4796,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const i_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -4354,6 +4807,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ type...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         type...[0] += sizeof(jmp_ip);
 
         wasm_i32 const i{conbine_details::load_local<wasm_i32>(type...[2u], i_off)};
@@ -4366,6 +4822,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  endif
         if(take_branch)
         {
+            // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+            //               [complete target pointer slot] safe for dispatch
+            // ^^ type...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
             type...[0] = jmp_ip;
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -4398,6 +4857,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const i_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -4406,11 +4868,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), typeref...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ typeref...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         typeref...[0] += sizeof(jmp_ip);
 
         wasm_i32 const i{conbine_details::load_local<wasm_i32>(typeref...[2u], i_off)};
         wasm_i32 const next_i{numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, numeric_details::wasm_u32>(i, step)};
         conbine_details::store_local(typeref...[2u], i_off, next_i);
+        // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+        //               [complete target pointer slot] safe for dispatch
+        // ^^ typeref...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
         if(details::eval_int_cmp<details::int_cmp::lt_u, wasm_i32, conbine_details::wasm_u32>(next_i, end)) { typeref...[0] = jmp_ip; }
     }
 
@@ -4430,6 +4898,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const sqrt_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -4438,6 +4909,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ type...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         type...[0] += sizeof(jmp_ip);
 
         wasm_f64 const sqrt_n{conbine_details::load_local<wasm_f64>(type...[2u], sqrt_off)};
@@ -4453,6 +4927,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  endif
         if(!lt)
         {
+            // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+            //               [complete target pointer slot] safe for dispatch
+            // ^^ type...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
             type...[0] = jmp_ip;
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -4486,6 +4963,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const sqrt_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -4494,6 +4974,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), typeref...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ typeref...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         typeref...[0] += sizeof(jmp_ip);
 
         wasm_f64 const sqrt_n{conbine_details::load_local<wasm_f64>(typeref...[2u], sqrt_off)};
@@ -4503,6 +4986,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         wasm_f64 const next_i_d{::uwvm2::runtime::compiler::shared::strict_float::convert<wasm_f64>(static_cast<::std::uint_least32_t>(next_i))};
         bool const lt{details::eval_float_cmp<details::float_cmp::lt, wasm_f64>(sqrt_n, next_i_d)};
+        // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+        //               [complete target pointer slot] safe for dispatch
+        // ^^ typeref...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
         if(!lt) { typeref...[0] = jmp_ip; }
     }
 
@@ -4527,6 +5013,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -4569,6 +5058,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -4602,6 +5094,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -4645,6 +5140,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -4679,6 +5177,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -4722,6 +5223,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -4760,6 +5264,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const y_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -4803,6 +5310,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const y_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -4837,6 +5347,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const y_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -4880,6 +5393,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const y_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -4920,6 +5436,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         if constexpr(!Tee) { (void)curr_i64_stack_top; }
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -4961,6 +5480,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -4995,10 +5517,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ type...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         type...[0] += sizeof(jmp_ip);
 
         bool take_branch{};
@@ -5033,6 +5561,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  endif
         if(take_branch)
         {
+            // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+            //               [complete target pointer slot] safe for dispatch
+            // ^^ type...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
             type...[0] = jmp_ip;
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -5065,14 +5596,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), typeref...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ typeref...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         typeref...[0] += sizeof(jmp_ip);
 
         wasm_f32 const rhs{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
         wasm_f32 const lhs{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
+        // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+        //               [complete target pointer slot] safe for dispatch
+        // ^^ typeref...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
         if(details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs)) { typeref...[0] = jmp_ip; }
     }
 
@@ -5098,6 +5638,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const rhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -5139,6 +5682,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(out); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(out);
         }
 
@@ -5169,6 +5715,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const rhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -5178,6 +5727,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_i32 const out{static_cast<wasm_i32>(details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs))};
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -5203,6 +5755,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const rhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
@@ -5244,6 +5799,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(out); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(out);
         }
 
@@ -5274,6 +5832,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const rhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
@@ -5283,6 +5844,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_i32 const out{static_cast<wasm_i32>(details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs))};
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -5302,12 +5866,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const rhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ type...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         type...[0] += sizeof(jmp_ip);
 
         wasm_f32 const rhs{conbine_details::load_local<wasm_f32>(type...[2u], rhs_off)};
@@ -5332,6 +5902,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  endif
         if(take_branch)
         {
+            // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+            //               [complete target pointer slot] safe for dispatch
+            // ^^ type...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
             type...[0] = jmp_ip;
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -5365,16 +5938,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const rhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), typeref...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ typeref...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         typeref...[0] += sizeof(jmp_ip);
 
         wasm_f32 const rhs{conbine_details::load_local<wasm_f32>(typeref...[2u], rhs_off)};
         wasm_f32 const lhs{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
+        // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+        //               [complete target pointer slot] safe for dispatch
+        // ^^ typeref...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
         if(details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs)) { typeref...[0] = jmp_ip; }
     }
 
@@ -5394,12 +5976,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         auto const rhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ type...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         type...[0] += sizeof(jmp_ip);
 
         wasm_f64 const rhs{conbine_details::load_local<wasm_f64>(type...[2u], rhs_off)};
@@ -5424,6 +6012,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  endif
         if(take_branch)
         {
+            // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+            //               [complete target pointer slot] safe for dispatch
+            // ^^ type...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
             type...[0] = jmp_ip;
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -5457,16 +6048,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const rhs_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), typeref...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ typeref...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         typeref...[0] += sizeof(jmp_ip);
 
         wasm_f64 const rhs{conbine_details::load_local<wasm_f64>(typeref...[2u], rhs_off)};
         wasm_f64 const lhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
+        // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+        //               [complete target pointer slot] safe for dispatch
+        // ^^ typeref...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
         if(details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs)) { typeref...[0] = jmp_ip; }
     }
 
@@ -5521,10 +6121,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ type...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         type...[0] += sizeof(jmp_ip);
 
         bool take_branch{};
@@ -5559,6 +6165,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  endif
         if(take_branch)
         {
+            // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+            //               [complete target pointer slot] safe for dispatch
+            // ^^ type...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
             type...[0] = jmp_ip;
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -5591,14 +6200,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), typeref...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ typeref...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         typeref...[0] += sizeof(jmp_ip);
 
         wasm_f64 const rhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
         wasm_f64 const lhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
+        // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+        //               [complete target pointer slot] safe for dispatch
+        // ^^ typeref...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
         if(details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs)) { typeref...[0] = jmp_ip; }
     }
 
@@ -5620,10 +6238,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ type...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         type...[0] += sizeof(jmp_ip);
 
         bool take_branch{};
@@ -5658,6 +6282,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  endif
         if(take_branch)
         {
+            // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+            //               [complete target pointer slot] safe for dispatch
+            // ^^ type...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
             type...[0] = jmp_ip;
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -5690,14 +6317,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         ::std::byte const* jmp_ip;  // no init
         ::std::memcpy(::std::addressof(jmp_ip), typeref...[0], sizeof(jmp_ip));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ typeref...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
         typeref...[0] += sizeof(jmp_ip);
 
         wasm_f64 const rhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
         wasm_f64 const lhs{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
+        // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+        //               [complete target pointer slot] safe for dispatch
+        // ^^ typeref...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
         if(!details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs)) { typeref...[0] = jmp_ip; }
     }
 
@@ -11540,6 +12176,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const local_off{details::read_imm<local_offset_t>(type...[0])};
@@ -11555,9 +12194,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
                 }
             }
             else
@@ -11597,6 +12239,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const local_off{details::read_imm<local_offset_t>(type...[0])};
@@ -11614,9 +12259,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
                 }
             }
             else
@@ -11662,6 +12310,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const addr_off{details::read_imm<local_offset_t>(type...[0])};
@@ -11671,6 +12322,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             ::std::byte const* jmp_ip;  // no init
             ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ type...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
             type...[0] += sizeof(jmp_ip);
 
             wasm_i32 const addr{load_local<wasm_i32>(type...[2u], addr_off)};
@@ -11684,9 +12338,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
                 }
             }
             else
@@ -11706,6 +12363,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  endif
             if(take_branch)
             {
+                // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+                //               [complete target pointer slot] safe for dispatch
+                // ^^ type...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
                 type...[0] = jmp_ip;
 
                 uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -11745,6 +12405,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const addr_off{details::read_imm<local_offset_t>(type...[0])};
@@ -11755,6 +12418,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             ::std::byte const* jmp_ip;  // no init
             ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ type...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
             type...[0] += sizeof(jmp_ip);
 
             wasm_i32 const base{load_local<wasm_i32>(type...[2u], addr_off)};
@@ -11769,9 +12435,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
                 }
             }
             else
@@ -11791,6 +12460,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  endif
             if(take_branch)
             {
+                // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+                //               [complete target pointer slot] safe for dispatch
+                // ^^ type...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
                 type...[0] = jmp_ip;
 
                 uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -11828,6 +12500,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const addr_off{details::read_imm<local_offset_t>(type...[0])};
@@ -11837,6 +12512,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             ::std::byte const* jmp_ip;  // no init
             ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+            // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+            //                              [complete emitted slot] safe to its end
+            // ^^ type...[0] advances by sizeof(jmp_ip); translation emitted the matching typed slot.
             type...[0] += sizeof(jmp_ip);
 
             wasm_i32 const addr{load_local<wasm_i32>(type...[2u], addr_off)};
@@ -11848,9 +12526,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
                 }
             }
             else
@@ -11869,6 +12550,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  endif
             if(take_branch)
             {
+                // bytecode: ... [resolved target handler][its emitted operands] | stream_end
+                //               [complete target pointer slot] safe for dispatch
+                // ^^ type...[0] takes jmp_ip; final label fixup points into this function's finished bytecode.
                 type...[0] = jmp_ip;
 
                 uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -11901,6 +12585,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const local_off{details::read_imm<local_offset_t>(type...[0])};
@@ -11916,9 +12603,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
                 }
             }
             else
@@ -11958,6 +12648,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const local_off{details::read_imm<local_offset_t>(type...[0])};
@@ -11975,9 +12668,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
                 }
             }
             else
@@ -12016,6 +12712,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
@@ -12034,9 +12733,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
                 }
             }
             else
@@ -12045,7 +12747,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_f32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), v);
+            details::store_f32_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 4uz>(memory, eff), v);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -12072,6 +12774,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
@@ -12092,9 +12797,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
                 }
             }
             else
@@ -12103,7 +12811,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_f32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), v);
+            details::store_f32_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 4uz>(memory, eff), v);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -12130,6 +12838,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
@@ -12147,9 +12858,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
                 }
             }
             else
@@ -12158,7 +12872,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_f32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), imm);
+            details::store_f32_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 4uz>(memory, eff), imm);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -12185,6 +12899,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
@@ -12203,9 +12920,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
                 }
             }
             else
@@ -12214,7 +12934,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_f64_le(details::prepare_memory_store_pointer<8uz>(memory, eff), v);
+            details::store_f64_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 8uz>(memory, eff), v);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -12241,6 +12961,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
@@ -12261,9 +12984,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
                 }
             }
             else
@@ -12272,7 +12998,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_f64_le(details::prepare_memory_store_pointer<8uz>(memory, eff), v);
+            details::store_f64_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 8uz>(memory, eff), v);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -12299,6 +13025,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
@@ -12316,9 +13045,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
                 }
             }
             else
@@ -12327,7 +13059,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_f64_le(details::prepare_memory_store_pointer<8uz>(memory, eff), imm);
+            details::store_f64_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 8uz>(memory, eff), imm);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -12354,6 +13086,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
@@ -12370,9 +13105,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
                 }
             }
             else
@@ -12412,6 +13150,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
@@ -12428,9 +13169,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
                 }
             }
             else
@@ -12470,6 +13214,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
@@ -12486,9 +13233,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
                 }
             }
             else
@@ -12528,6 +13278,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
@@ -12544,9 +13297,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
-                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
+                    details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 8uz);
                 }
             }
             else
@@ -12594,6 +13350,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const dst_local_off{details::read_imm<local_offset_t>(type...[0])};
@@ -12620,16 +13379,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, src_eff65, 2uz) || details::should_trap_oob_unlocked(memory, dst_eff65, 2uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
                     // Prefer reporting the first failing access (src first).
                     if(details::should_trap_oob_unlocked(memory, src_eff65, 2uz))
                     {
-                        details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(src_static_off), src_eff65, memory_length, 2uz);
+                        details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(src_static_off), src_eff65, memory_length, 2uz);
                     }
                     else
                     {
-                        details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(dst_static_off), dst_eff65, memory_length, 2uz);
+                        details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(dst_static_off), dst_eff65, memory_length, 2uz);
                     }
                 }
             }
@@ -12645,7 +13407,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::std::uint_least16_t tmp;  // no init
             ::std::memcpy(::std::addressof(tmp), details::ptr_add_u64(memory.memory_begin, src_eff), sizeof(tmp));
             tmp = ::fast_io::little_endian(tmp);
-            details::store_u16_le(details::prepare_memory_store_pointer<2uz>(memory, dst_eff), tmp);
+            details::store_u16_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 2uz>(memory, dst_eff), tmp);
 
             details::exit_memory_operation_memory_lock(memory);
 
@@ -12673,6 +13435,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const dst_off{details::read_imm<local_offset_t>(type...[0])};
@@ -12694,15 +13459,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, src_eff65, 4uz) || details::should_trap_oob_unlocked(memory, dst_eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
                     if(details::should_trap_oob_unlocked(memory, src_eff65, 4uz))
                     {
-                        details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(src_static_off), src_eff65, memory_length, 4uz);
+                        details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(src_static_off), src_eff65, memory_length, 4uz);
                     }
                     else
                     {
-                        details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(dst_static_off), dst_eff65, memory_length, 4uz);
+                        details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(dst_static_off), dst_eff65, memory_length, 4uz);
                     }
                 }
             }
@@ -12717,7 +13485,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_f32 tmp;
             details::load_f32_le(details::ptr_add_u64(memory.memory_begin, src_eff), tmp);
-            details::store_f32_le(details::prepare_memory_store_pointer<4uz>(memory, dst_eff), tmp);
+            details::store_f32_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 4uz>(memory, dst_eff), tmp);
 
             details::exit_memory_operation_memory_lock(memory);
 
@@ -12745,6 +13513,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             local_offset_t const dst_off{details::read_imm<local_offset_t>(type...[0])};
@@ -12766,15 +13537,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, src_eff65, 8uz) || details::should_trap_oob_unlocked(memory, dst_eff65, 8uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
                     if(details::should_trap_oob_unlocked(memory, src_eff65, 8uz))
                     {
-                        details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(src_static_off), src_eff65, memory_length, 8uz);
+                        details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(src_static_off), src_eff65, memory_length, 8uz);
                     }
                     else
                     {
-                        details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(dst_static_off), dst_eff65, memory_length, 8uz);
+                        details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(dst_static_off), dst_eff65, memory_length, 8uz);
                     }
                 }
             }
@@ -12789,7 +13563,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_f64 tmp;
             details::load_f64_le(details::ptr_add_u64(memory.memory_begin, src_eff), tmp);
-            details::store_f64_le(details::prepare_memory_store_pointer<8uz>(memory, dst_eff), tmp);
+            details::store_f64_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 8uz>(memory, dst_eff), tmp);
 
             details::exit_memory_operation_memory_lock(memory);
 
@@ -12825,6 +13599,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -12842,6 +13619,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f32 out;
         details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff), out);
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -12870,6 +13650,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -12889,6 +13672,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f32 out;
         details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff), out);
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -12917,6 +13703,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -12934,6 +13723,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 out;
         details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff), out);
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -12962,6 +13754,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const local_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -12981,6 +13776,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 out;
         details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff), out);
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -13008,6 +13806,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const p_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -13052,6 +13853,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const p_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -13098,6 +13902,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const p_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -13141,6 +13948,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const p_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -13185,6 +13995,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const p_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -13231,6 +14044,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const p_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -13274,6 +14090,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const p_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -13319,6 +14138,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const p_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -13339,6 +14161,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::memop::store_local(typeref...[2u], dst_off, out);
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -13366,6 +14191,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const p_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -13411,6 +14239,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const p_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -13431,6 +14262,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::memop::store_local(typeref...[2u], dst_off, out);
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -13456,6 +14290,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const dst_local_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -13513,6 +14350,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const dst_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -13564,6 +14404,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         auto const dst_off{details::read_imm<details::memop::local_offset_t>(typeref...[0])};
@@ -13744,6 +14587,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f32_store_localget_off_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
@@ -13754,6 +14598,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f32_store_local_plus_imm_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
@@ -13764,6 +14609,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f32_store_imm_localget_off_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
@@ -13774,6 +14620,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f64_store_localget_off_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
@@ -13784,6 +14631,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f64_store_local_plus_imm_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
@@ -13794,6 +14642,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f64_store_imm_localget_off_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
@@ -13852,6 +14701,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f32_memcpy_localget_localget_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
@@ -13862,6 +14712,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f64_memcpy_localget_localget_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {
@@ -13872,6 +14723,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct u16_copy_scaled_index_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 {

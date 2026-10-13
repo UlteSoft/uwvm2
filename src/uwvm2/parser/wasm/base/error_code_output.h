@@ -623,6 +623,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
 #include "error_code_outputs/eco_invalid_data_kind.h"
                 return;
             }
+            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm3_limit_type_max_lt_min:
+            {
+#include "error_code_outputs/eco_wasm3_limit_type_max_lt_min.h"
+            }
+            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm3_rich_signature_not_integrated:
+            {
+#include "error_code_outputs/eco_wasm3_rich_signature_not_integrated.h"
+                return;
+            }
+            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm3_invalid_tag_type:
+            {
+#include "error_code_outputs/eco_wasm3_invalid_tag_type.h"
+                break;
+            }
+            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm3_invalid_tag_count:
+            {
+#include "error_code_outputs/eco_wasm3_invalid_tag_count.h"
+                break;
+            }
+            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm3_rich_value_not_integrated:
+            {
+#include "error_code_outputs/eco_wasm3_rich_value_not_integrated.h"
+                return;
+            }
+            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm3_memory_limit_out_of_range:
+            {
+#include "error_code_outputs/eco_wasm3_memory_limit_out_of_range.h"
+            }
+            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm3_table_limit_out_of_range:
+            {
+#include "error_code_outputs/eco_wasm3_table_limit_out_of_range.h"
+            }
             case ::uwvm2::parser::wasm::base::wasm_parse_error_code::limit_type_max_lt_min:
             {
 #include "error_code_outputs/eco_limit_type_max_lt_min.h"
@@ -696,6 +728,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
             case ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1p1_feature_required:
             {
 #include "error_code_outputs/eco_wasm1p1_feature_required.h"
+                return;
+            }
+            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm3_extended_const_disabled:
+            {
+#include "error_code_outputs/eco_wasm3_extended_const_disabled.h"
+                return;
+            }
+            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm3_table_initializer_disabled:
+            {
+#include "error_code_outputs/eco_wasm3_table_initializer_disabled.h"
                 return;
             }
             case ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm2_feature_required:

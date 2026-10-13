@@ -1,0 +1,328 @@
+{
+  "scope": "SOURCE16 actual nonempty3-slot split cached i32/i64 combine/delay recipes plus two distinct memory-stack by-reference/tail-min baselines; actual ABI/ASM/native qualification0",
+  "component": "real_integer_width_dual_sink.cc",
+  "module_consumer": "module_capsule.cppm",
+  "builds": [
+    {
+      "id": "cached-ring-tail-combine0-delay0",
+      "defines": [
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine0-delay1",
+      "defines": [
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_SOFT_PUSH_DELAY"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine0-delay2",
+      "defines": [
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_PUSH_DELAY"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine0-delay3",
+      "defines": [
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_SOFT_PUSH_DELAY",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_PUSH_DELAY"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine1-delay0",
+      "defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine1-delay1",
+      "defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_SOFT_PUSH_DELAY"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine1-delay2",
+      "defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_PUSH_DELAY"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine1-delay3",
+      "defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_SOFT_PUSH_DELAY",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_PUSH_DELAY"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine2-delay0",
+      "defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine2-delay1",
+      "defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_SOFT_PUSH_DELAY"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine2-delay2",
+      "defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_PUSH_DELAY"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine2-delay3",
+      "defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_SOFT_PUSH_DELAY",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_PUSH_DELAY"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine3-delay0",
+      "defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine3-delay1",
+      "defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_SOFT_PUSH_DELAY"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine3-delay2",
+      "defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_PUSH_DELAY"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "cached-ring-tail-combine3-delay3",
+      "defines": [
+        "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "UWVM2TEST_DUAL_WIDTH_CACHED_RING",
+        "UWVM_ENABLE_UWVM_INT_SOFT_PUSH_DELAY",
+        "UWVM_ENABLE_UWVM_INT_HEAVY_PUSH_DELAY"
+      ],
+      "actual_i32_slots": [
+        3,
+        6
+      ],
+      "actual_i64_slots": [
+        6,
+        9
+      ],
+      "uses_existing_real_fully_split_factory": true,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "memory-stack-byref-baseline",
+      "defines": [],
+      "actual_i32_slots": null,
+      "actual_i64_slots": null,
+      "actual_native_qualified": false
+    },
+    {
+      "id": "memory-stack-musttail-baseline",
+      "defines": [
+        "UWVM2TEST_DUAL_I32_TAIL"
+      ],
+      "actual_i32_slots": null,
+      "actual_i64_slots": null,
+      "actual_native_qualified": false
+    }
+  ],
+  "must_bind_actual_target_provider_and_exact_NTTP": true,
+  "fresh_actual_runtime_fixture_and_BMI_required": true,
+  "build_recipe_command_not_provided_by_this_metadata": true,
+  "native_builds_done": 0,
+  "actual_OS_ISA_ABI_qualified": false,
+  "musttail_generated_ASM_checked": false,
+  "typed_component": "integer_width_event_component.cc",
+  "actual_cached_ring_cells": 16,
+  "actual_memory_stack_baseline_cells": 2
+}

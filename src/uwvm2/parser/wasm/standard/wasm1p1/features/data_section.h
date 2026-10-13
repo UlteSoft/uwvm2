@@ -38,6 +38,7 @@
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include "def.h"
 # include "feature_def.h"
+# include "types.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -56,8 +57,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                                  ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...>& module_storage,
                                                  ::std::byte const* section_curr,
                                                  ::std::byte const* const section_end,
-                                                 ::uwvm2::parser::wasm::base::error_impl& err) UWVM_THROWS
+                                                 ::uwvm2::parser::wasm::base::error_impl& err,
+                                                 ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
+                                                 ::uwvm2::parser::wasm::base::wasm1p1_error_subject subject =
+                                                     ::uwvm2::parser::wasm::base::wasm1p1_error_subject::data_segment) UWVM_THROWS
         {
+            if(!::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para).disable_extended_const)
+            {
+                // The shared validator bounds every read/move against section_end and requires one i32 result.
+                // [before_expr] opcode ... end ... (section_end)
+                // [safe       ] unsafe (could be the section_end)
+                //               ^^ section_curr; the returned cursor is after a checked terminator.
+                return parse_and_check_global_expr_valid(
+                    ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<global_section_storage_t<Fs...>>{},
+                    ::uwvm2::parser::wasm::standard::wasm1p1::features::global_type{
+                        ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::i32, false},
+                    expr, module_storage, section_curr, section_end, err, fs_para, true, subject);
+            }
             auto const& importsec{
                 ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<import_section_storage_t<Fs...>>(module_storage.sections)};
             constexpr ::std::size_t importdesc_count{importsec.importdesc_count};
@@ -232,7 +248,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                         //                                           ^^ section_curr
                         expr.opcodes.reserve(1uz);
                         expr.opcodes.emplace_back_unchecked(
-                            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.global_idx = global_idx},
+                            ::uwvm2::parser::wasm::standard::wasm1p1::features::wasm1p1_const_expr_opcode_storage_u{.imported_global_idx = global_idx},
                             ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get);
                         break;
                     }
@@ -276,6 +292,108 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             auto const imported_memory_size{
                 static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(importsec.importdesc.index_unchecked(2uz).size())};
             return static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(defined_memory_size + imported_memory_size);
+        }
+
+        // Core 3 active data expressions produce the selected memory's address type.
+        // Table offsets retain their independent i32 parser until table64 is supported.
+        template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        inline constexpr ::std::byte const* parse_and_check_memory_const_expr_valid(
+            final_wasm_const_expr<Fs...>& expr,
+            ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...>& module_storage,
+            ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memory_index,
+            ::std::byte const* section_curr, ::std::byte const* const section_end,
+            ::uwvm2::parser::wasm::base::error_impl& err,
+            ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) UWVM_THROWS
+        {
+            auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<import_section_storage_t<Fs...>>(module_storage.sections)};
+            auto const& memorysec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<memory_section_storage_t<Fs...>>(module_storage.sections)};
+            static_assert(importsec.importdesc_count > 2uz);
+            auto const& imports{importsec.importdesc.index_unchecked(2uz)};
+            bool address64{};
+            auto const select_type{[&](auto const& memory) constexpr noexcept
+            {
+                if constexpr(requires { memory.address64; }) { address64 = memory.address64; }
+            }};
+            if(memory_index < imports.size())
+            {
+                // The bucket and element bounds are proven above; parsed imports own this live declaration.
+                auto const declaration{imports.index_unchecked(memory_index)};
+                if(declaration == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                select_type(declaration->imports.storage.memory);
+            }
+            else
+            {
+                auto const local_index{memory_index - imports.size()};
+                if(local_index >= memorysec.memories.size()) [[unlikely]]
+                {
+                    err.err_curr = section_curr;
+                    err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::data_memory_index_exceeds_maxvul;
+                    err.err_selectable.u32arr[0] = memory_index;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+                select_type(memorysec.memories.index_unchecked(local_index));
+            }
+            // [before_expr] opcode ... end ... (section_end)
+            // [safe       ] unsafe (could be the section_end)
+            //               ^^ section_curr; the callee checks each read/move and the result type.
+            if(!address64) { return parse_and_check_i32_const_expr_valid(expr, module_storage, section_curr, section_end, err, fs_para,
+                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::data_segment); }
+            return parse_and_check_global_expr_valid(
+                ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<global_section_storage_t<Fs...>>{},
+                ::uwvm2::parser::wasm::standard::wasm1p1::features::global_type{
+                    ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::i64, false},
+                expr, module_storage, section_curr, section_end, err, fs_para, true,
+                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::data_segment);
+        }
+
+        template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        inline constexpr ::std::byte const* parse_and_check_table_const_expr_valid(
+            final_wasm_const_expr<Fs...>& expr,
+            ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...>& module_storage,
+            ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 table_index,
+            ::std::byte const* section_curr, ::std::byte const* const section_end,
+            ::uwvm2::parser::wasm::base::error_impl& err,
+            ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) UWVM_THROWS
+        {
+            auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<import_section_storage_t<Fs...>>(module_storage.sections)};
+            auto const& tablesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<table_section_storage_t<Fs...>>(module_storage.sections)};
+            static_assert(importsec.importdesc_count > 1uz);
+            auto const& imports{importsec.importdesc.index_unchecked(1uz)};
+            bool address64{};
+            auto const select_type{[&](auto const& table) constexpr noexcept
+            {
+                if constexpr(requires { table.address64; }) { address64 = table.address64; }
+            }};
+            if(table_index < imports.size())
+            {
+                // The bucket and element bounds are proven above; parsed imports own this live declaration.
+                auto const declaration{imports.index_unchecked(table_index)};
+                if(declaration == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                select_type(declaration->imports.storage.table);
+            }
+            else
+            {
+                auto const local_index{table_index - imports.size()};
+                if(local_index >= tablesec.tables.size()) [[unlikely]]
+                {
+                    err.err_curr = section_curr;
+                    err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::elem_table_index_exceeds_maxvul;
+                    err.err_selectable.elem_table_index_exceeds_maxvul = {table_index, static_cast<::std::uint_least32_t>(imports.size() + tablesec.tables.size())};
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+                select_type(tablesec.tables.index_unchecked(local_index));
+            }
+            // [before_expr] opcode ... end ... (section_end)
+            // [safe       ] unsafe (could be the section_end)
+            //               ^^ section_curr; the callee checks each read/move and the result type.
+            if(!address64) { return parse_and_check_i32_const_expr_valid(expr, module_storage, section_curr, section_end, err, fs_para,
+                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::element_segment); }
+            return parse_and_check_global_expr_valid(
+                ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<global_section_storage_t<Fs...>>{},
+                ::uwvm2::parser::wasm::standard::wasm1p1::features::global_type{
+                    ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::i64, false},
+                expr, module_storage, section_curr, section_end, err, fs_para, true,
+                ::uwvm2::parser::wasm::base::wasm1p1_error_subject::element_segment);
         }
 
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -393,9 +511,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                 }
 
-                // parse_and_check_i32_const_expr_valid checks the whole i32 constant expression against section_end and returns its end pointer.
+                // parse_and_check_memory_const_expr_valid checks the whole typed constant expression against section_end and returns its end pointer.
                 // Pointer move: replace section_curr with the first byte after the checked offset expression.
-                section_curr = wasm1p1_data_details::parse_and_check_i32_const_expr_valid(data_storage.expr, module_storage, section_curr, section_end, err);
+                section_curr = wasm1p1_data_details::parse_and_check_memory_const_expr_valid(
+                    data_storage.expr, module_storage, data_storage.memory_idx, section_curr, section_end, err, fs_para);
 
                 // [before_data_payload ... offset_expr ...] byte_size ... byte_begin ... (section_end)
                 // [                 safe                  ] unsafe (could be the section_end)
@@ -471,9 +590,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 // [                safe                 ] unsafe (could be the section_end)
                 //                                        ^^ section_curr
 
-                // parse_and_check_i32_const_expr_valid checks the whole i32 constant expression against section_end and returns its end pointer.
+                // parse_and_check_memory_const_expr_valid checks the whole typed constant expression against section_end and returns its end pointer.
                 // Pointer move: replace section_curr with the first byte after the checked offset expression.
-                section_curr = wasm1p1_data_details::parse_and_check_i32_const_expr_valid(data_storage.expr, module_storage, section_curr, section_end, err);
+                section_curr = wasm1p1_data_details::parse_and_check_memory_const_expr_valid(
+                    data_storage.expr, module_storage, data_storage.memory_idx, section_curr, section_end, err, fs_para);
 
                 // [before_data_payload ... memoryidx ... offset_expr ...] byte_size ... byte_begin ... (section_end)
                 // [                         safe                       ] unsafe (could be the section_end)

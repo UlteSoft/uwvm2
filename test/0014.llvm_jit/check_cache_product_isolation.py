@@ -16,6 +16,7 @@ parser.add_argument('--full', type=Path, required=True)
 parser.add_argument('--ros', type=Path, required=True)
 parser.add_argument('--out', type=Path, required=True)
 args = parser.parse_args()
+subprocess.run(['bash', str(Path(__file__).resolve().parents[2] / 'tools/ci/require_wasm3_test_cgroup.sh')], check=True)
 args.out.mkdir(parents=True, exist_ok=False)
 binaries = {'uwvm2': args.full.resolve(), 'uwvm2ros': args.ros.resolve()}
 rows = []
@@ -36,7 +37,13 @@ for product, values in defaults.items():
     assert values['product'] == product and values['version'] == '5'
     assert product in values['default']
     abi = bytes.fromhex(values['abi-hex'])
-    assert (product+'-runtime-abi-v12').encode() in abi
+    assert (product+'-runtime-abi-v27').encode() in abi
+    assert b'function-call-type-check' in abi and b'caller-forest-interval-v1' in abi
+    assert b'local-table-layout' in abi and b'typed-u64-limits-initializer-expression-v2' in abi
+    assert b'typed-call-abi' in abi and b'qualified-tailcc-explicit-tuple-buffer-v3' in abi
+    assert b'wasm-memory-addresses' in abi and b'typed-u64-limits-and-memarg-v1' in abi
+    assert b'native-memory-backend' in abi
+    assert b'native-memory-layout' in abi and b'bounded-reservation-aligned64-owner-ordered-size-v4' in abi
     policy = 'unique-temporary-labels-v1' if product == 'uwvm2' else 'symbol-entry-identity-v1'
     assert b'llvm-elf-local-symbols' in abi and policy.encode() in abi
     assert b'llvm-mips-call-relocations' in abi and b'full-width-noabicalls-c-abi-v2' in abi
@@ -50,6 +57,20 @@ for mode in ('signed', 'unsigned'):
     assert own['uwvm2'] != own['uwvm2ros']
     for product, path in own.items():
         assert run(product, 'policy-v1', args.out/mode/product/'policy-v1', mode)['status'] == 'context-mismatch'
+        assert run(product, 'table-layout-v12', args.out/mode/product/'table-layout-v12', mode)['status'] == 'context-mismatch'
+        assert run(product, 'memory-layout-v13', args.out/mode/product/'memory-layout-v13', mode)['status'] == 'context-mismatch'
+        assert run(product, 'memory-layout-v14', args.out/mode/product/'memory-layout-v14', mode)['status'] == 'context-mismatch'
+        assert run(product, 'memory-layout-v15', args.out/mode/product/'memory-layout-v15', mode)['status'] == 'context-mismatch'
+        assert run(product, 'memory-layout-v16', args.out/mode/product/'memory-layout-v16', mode)['status'] == 'context-mismatch'
+        assert run(product, 'memory-layout-v17', args.out/mode/product/'memory-layout-v17', mode)['status'] == 'context-mismatch'
+        assert run(product, 'memory-layout-v18', args.out/mode/product/'memory-layout-v18', mode)['status'] == 'context-mismatch'
+        assert run(product, 'atomic-scalars-v19', args.out/mode/product/'atomic-scalars-v19', mode)['status'] == 'context-mismatch'
+        assert run(product, 'typed-calls-v20', args.out/mode/product/'typed-calls-v20', mode)['status'] == 'context-mismatch'
+        assert run(product, 'typed-calls-v21', args.out/mode/product/'typed-calls-v21', mode)['status'] == 'context-mismatch'
+        assert run(product, 'typed-calls-v22', args.out/mode/product/'typed-calls-v22', mode)['status'] == 'context-mismatch'
+        assert run(product, 'memory64-v23', args.out/mode/product/'memory64-v23', mode)['status'] == 'context-mismatch'
+        assert run(product, 'table64-v24', args.out/mode/product/'table64-v24', mode)['status'] == 'context-mismatch'
+        assert run(product, 'function-calls-v26', args.out/mode/product/'function-calls-v26', mode)['status'] == 'context-mismatch'
         assert path.relative_to(shared).parts[0] == product
         assert path.name.startswith(product+'-') and path.suffix == '.uwvm-ljc'
         assert path.is_file()

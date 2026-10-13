@@ -16,12 +16,12 @@
 #else
 #include "nt.h"
 #endif
+#elif defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+#include "darwin.h"
 #elif defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(BSD) || defined(_SYSTYPE_BSD)
 #include "bsd.h"
 #elif defined(__OpenBSD__)
 #include "openbsd.h"
-#elif defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
-#include "darwin.h"
 #else
 #include "null.h"
 #endif

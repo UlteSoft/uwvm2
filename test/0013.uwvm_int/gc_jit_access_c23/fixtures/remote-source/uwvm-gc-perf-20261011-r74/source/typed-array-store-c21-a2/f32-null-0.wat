@@ -1,0 +1,1 @@
+(module (type $A (sub (array (mut f32)))) (type $B (sub $A (array (mut f32)))) (type $J (struct (field i64))) (tag $E (param i32)) (func (export "_start") (local $a (ref null $A)) (local $b (ref null $A)) (local $n i32) ref.null $A i32.const 0 i32.const 1 f32.reinterpret_i32 array.set $A))

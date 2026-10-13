@@ -1,0 +1,77 @@
+{
+  "cases": [
+    {
+      "name": "i8-write",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i8-write.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i8-write.wasm",
+      "wasm_sha": "c30531014725779b45a89887f0b7116eb53e4e2cb1f6646d980c9fbc5e364f45",
+      "writes": 131072,
+      "reads": 1024,
+      "checksum": null
+    },
+    {
+      "name": "i8-write-read",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i8-write-read.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i8-write-read.wasm",
+      "wasm_sha": "01f93a08f2d0f396536eecfef4d587a1bed67f6d41b8ba7cfc3375201777ca6a",
+      "writes": 131072,
+      "reads": 132096,
+      "checksum": 16711680
+    },
+    {
+      "name": "i16-write",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i16-write.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i16-write.wasm",
+      "wasm_sha": "a8c7da8e20a6dc29e13de43c14172b2319953e2bcafb70a1735148bbacd3ef4b",
+      "writes": 131072,
+      "reads": 1024,
+      "checksum": null
+    },
+    {
+      "name": "i16-write-read",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i16-write-read.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i16-write-read.wasm",
+      "wasm_sha": "664ea811e5c4f21bcae50f4305e217e0c49fb22fd508352d26e6bbcb0f0abd96",
+      "writes": 131072,
+      "reads": 132096,
+      "checksum": 4294901760
+    },
+    {
+      "name": "i32-write",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i32-write.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i32-write.wasm",
+      "wasm_sha": "71c7b69cc0238e3e6151b362f73f82f7691ecf35365b75b4bfa7c4d142f515a0",
+      "writes": 131072,
+      "reads": 1024,
+      "checksum": null
+    },
+    {
+      "name": "i32-write-read",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i32-write-read.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i32-write-read.wasm",
+      "wasm_sha": "37270f4e40d96cadcc86343bfb007915850d47fdb3b62f1d012ba74f23c06a51",
+      "writes": 131072,
+      "reads": 132096,
+      "checksum": 1968111616
+    },
+    {
+      "name": "f32-write",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/f32-write.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/f32-write.wasm",
+      "wasm_sha": "8232404354f724e8a045a141ecefc98b3ffb2bf84224803f6c4695ae522c32bf",
+      "writes": 131072,
+      "reads": 1024,
+      "checksum": null
+    },
+    {
+      "name": "f32-write-read",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/f32-write-read.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/f32-write-read.wasm",
+      "wasm_sha": "8df305cec2b57be18735afdedc41674079555058d63218ac52c3fb54bbe21068",
+      "writes": 131072,
+      "reads": 132096,
+      "checksum": 1968111616
+    }
+  ],
+  "scope": "PostJIT numeric stores, each validates all final1024slots; read variants checksum131072raw bit values includingf32NaNs. No forcedGC/cycle/parallelGC throughput claim."
+}

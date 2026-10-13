@@ -1,0 +1,91 @@
+#pragma once
+// REVIEW CANDIDATE ONLY. Not imported by the product or an authority-bearing
+// controller. No caller locals, frame pointers, guest bytes or native registers
+// are obtained here; actual stop/source/activation proof remains external.
+#include <uwvm2/uwvm/debugger/source_scope_path.h>
+#include <algorithm>
+#include <new>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+namespace uwvm2::uwvm::debugger::language_frame_candidate
+{
+    namespace dwarf = ::uwvm2::uwvm::debugger::source_dwarf;
+    enum class error { none, unavailable, malformed, bounds, limit_exceeded, allocation_failure };
+    struct frame
+    {
+        dwarf::die_key identity{};
+        ::std::size_t scope_index{dwarf::no_record};
+        dwarf::scope_kind kind{};
+        ::std::string name{};
+    };
+    struct limits { dwarf::scope_path_limits path{}; ::std::size_t max_string_bytes{65536u}; };
+    // Frame 0 is innermost concrete inline instance, then enclosing inline
+    // instances, then THIS physical function. Callers are deliberately absent:
+    // an unwind label alone cannot authenticate that activation's local values.
+    [[nodiscard]] inline error current_frames(::std::span<dwarf::scope_record const> scopes, ::std::uint64_t pc,
+        ::std::vector<frame>& out, limits const& cap = {}) noexcept
+    {
+        out.clear();
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+        try
+        {
+#endif
+            dwarf::concrete_scope_path selected{};
+            auto const status{dwarf::query_concrete_scope_path(scopes, pc, selected, cap.path)};
+            switch(status)
+            {
+                case dwarf::scope_path_error::none: break;
+                case dwarf::scope_path_error::unavailable: return error::unavailable;
+                case dwarf::scope_path_error::malformed: return error::malformed;
+                case dwarf::scope_path_error::ambiguous: return error::malformed;
+                case dwarf::scope_path_error::limit_exceeded: return error::limit_exceeded;
+                case dwarf::scope_path_error::allocation_failure: return error::allocation_failure;
+                default: return error::malformed;
+            }
+            if(selected.record_indices.empty() || selected.record_indices.size() != selected.physical_and_inline.size())
+            { return error::malformed; }
+            ::std::vector<frame> pending{}; ::std::size_t strings{};
+            auto remaining{selected.record_indices.size()};
+            while(remaining != 0u)
+            {
+                --remaining; // [safe] positive scalar extent before decrement; no pointer changes.
+                // [owned checked record_indices/keys ... remaining ... end]
+                // [safe                                                  ] both equal extents
+                //  ^^ and remaining < size are proved BEFORE either subscript.
+                auto const index{selected.record_indices[remaining]};
+                if(index >= scopes.size()) { return error::malformed; }
+                // [same immutable scope records ... checked index ... end]
+                // [safe                                                  ] index < size.
+                //  ^^ synchronous metadata borrow; only integers/owned name escape.
+                auto const& scope{scopes[index]};
+                if(scope.identity != selected.physical_and_inline[remaining] ||
+                   (remaining == 0u ? scope.kind != dwarf::scope_kind::subprogram : scope.kind != dwarf::scope_kind::inline_subprogram))
+                { return error::malformed; }
+                if(!dwarf::budget::charge(scope.name.size(), cap.max_string_bytes, strings)) { return error::limit_exceeded; }
+                pending.push_back({scope.identity, index, scope.kind, ::fast_io::concat_std(::std::string_view{scope.name})});
+            }
+            out = ::std::move(pending); return error::none;
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+        }
+        catch(...) { out.clear(); return error::allocation_failure; }
+#endif
+    }
+    // Metadata cursor only. The controller must invalidate its actual selected
+    // frame on resume/replacement/native trap/source retirement before using
+    // this ordinal; these scalar helpers grant no ticket/read permission.
+    [[nodiscard]] inline error move_up(::std::span<frame const> frames, ::std::size_t& selected, ::std::uint64_t count = 1u) noexcept
+    {
+        if(selected >= frames.size()) { return error::bounds; }
+        if(count > frames.size() - 1u - selected) { return error::bounds; }
+        selected += static_cast<::std::size_t>(count); // [safe] upper bound proved by subtraction BEFORE addition.
+        return error::none;
+    }
+    [[nodiscard]] inline error move_down(::std::span<frame const> frames, ::std::size_t& selected, ::std::uint64_t count = 1u) noexcept
+    {
+        if(selected >= frames.size() || count > selected) { return error::bounds; }
+        selected -= static_cast<::std::size_t>(count); // [safe] count <= selected BEFORE subtraction.
+        return error::none;
+    }
+}

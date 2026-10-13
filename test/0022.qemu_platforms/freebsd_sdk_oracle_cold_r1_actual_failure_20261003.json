@@ -1,0 +1,40 @@
+{
+  "ROS_LLVM23_product_qualified": false,
+  "actual_compiler_or_ELF_tool_or_guest_executed": false,
+  "actual_failure": "SDK directory alias usr/lib/include mistakenly scanned as a regular provider",
+  "actual_remaining_roster": [
+    10154
+  ],
+  "actual_stage": "input-before",
+  "actual_stage_returncode": 1,
+  "all_known_original_pidfds_readable": true,
+  "cross_compile_qualified": false,
+  "executed_commands": 1,
+  "kernel_memory_max_bytes": 68719476736,
+  "max_actual_owned_rss_bytes": 42733568,
+  "memory_events_after": {
+    "high": 0,
+    "low": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_group_kill": 0,
+    "oom_kill": 0
+  },
+  "original_root_pidfd": {
+    "actual_reaped_returncode": 1,
+    "pid": 360151,
+    "pidfd_readable": true
+  },
+  "planned_commands": 27,
+  "preserved_failure": true,
+  "raw_archive_sha256": "379ac02bc224314ce958fc9c330dba7bdd304e5d911a813f490aca0604b82efc",
+  "raw_evidence_local": "/tmp/uwvm-qemu-freebsd-sdk-oracle-cold-r1-attempt1-small-evidence",
+  "raw_manifest_sha256": "09c2fa551cab26504f5d6918595e674c3425ec9fc57d273c56f4bb28aac8788a",
+  "schema": "uwvm-qemu-freebsd-sdk-oracle-cold-r1-actual-failure-v1",
+  "source_manifest_sha256": "58b066d3454eed5b972036bc14f081e9d8284408ab9f568e66507a445e42f8b3",
+  "swap_max_bytes": 0,
+  "ticket_id": "e34130ac0f174ed48b550b41c119d1bc",
+  "ticket_state": "retired",
+  "verified_raw_members": 10,
+  "wall_seconds": 1.0748692950000986
+}

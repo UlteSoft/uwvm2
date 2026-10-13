@@ -1,0 +1,2602 @@
+{
+  "cases": [
+    {
+      "name": "bench-eh-cross",
+      "wasm": "cases/c000-bench-eh-cross.wasm",
+      "wasm_sha": "240abb40df3919b594d36dfe454e7ac0132ebda94ad1999a253e4cfccce519f4",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-eh-nested",
+      "wasm": "cases/c001-bench-eh-nested.wasm",
+      "wasm_sha": "35d387b791fdbfc7441acd5a7080e1fc016e4616f738ddc8ac81899f113cab9d",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-eh-nothrow",
+      "wasm": "cases/c002-bench-eh-nothrow.wasm",
+      "wasm_sha": "6d9ad9c474785915d5e1e536c714a7d2baf5a353b70715893d481ed78f1575a7",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-eh-plain",
+      "wasm": "cases/c003-bench-eh-plain.wasm",
+      "wasm_sha": "8203c766418ef939e3abe68c9c31bcef15944c18fa8af730b6d8b1e15542b8f3",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-eh-raw-nan",
+      "wasm": "cases/c004-bench-eh-raw-nan.wasm",
+      "wasm_sha": "9611f9743676597ff8100d36c0eb7eb4cdb20e5baeffdf634382cb1a28a5c596",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-eh-same-tag",
+      "wasm": "cases/c005-bench-eh-same-tag.wasm",
+      "wasm_sha": "9ffa98c5b4dbff79aeb002d19e16142b7186cbda3ae2edd374f65fb63d86a63a",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-eh-v128",
+      "wasm": "cases/c006-bench-eh-v128.wasm",
+      "wasm_sha": "0fdc25c97d05de80a24efece6c7407ff8bbc15ae90fd108aeaf742783d1e7b5c",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-eq-16-r16",
+      "wasm": "cases/c007-bench-eq-16-r16.wasm",
+      "wasm_sha": "49b57f3f0f366e6e9ecd4533aeca4c4ec17ff6ba82f53d1dadb0693be691a4bd",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-eq-16-r256",
+      "wasm": "cases/c008-bench-eq-16-r256.wasm",
+      "wasm_sha": "88317f2ac507c80b5caf2910da0bac3f61ff15714e45f0b8471a71e7dfefc6d1",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-eq-256-r16",
+      "wasm": "cases/c009-bench-eq-256-r16.wasm",
+      "wasm_sha": "d4edb9e8567392a2d1ae631a943b5a034b92c9b89fa557c005079fa0d7803a78",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-eq-256-r256",
+      "wasm": "cases/c010-bench-eq-256-r256.wasm",
+      "wasm_sha": "d77f14da7544915ae375f0874c57a24aee8488d6e4575dee21a069c0241470ab",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-eq-4096-r16",
+      "wasm": "cases/c011-bench-eq-4096-r16.wasm",
+      "wasm_sha": "849be189875f769c0be89c74b3a10c2cd58245f8f17e0887824a84e179e424cc",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-eq-4096-r256",
+      "wasm": "cases/c012-bench-eq-4096-r256.wasm",
+      "wasm_sha": "c5d676ab50878d60333db48d21f1633f43b72bca23d6380b1193feb5f213ec7c",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-i64-16-r16",
+      "wasm": "cases/c013-bench-i64-16-r16.wasm",
+      "wasm_sha": "c700342274a5d416be547157d5c45ff3db7f831ad968e312d0f16fa830972bca",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-i64-16-r256",
+      "wasm": "cases/c014-bench-i64-16-r256.wasm",
+      "wasm_sha": "a5c16988134f6d29f7e1efbce679101ee4293f9ea126c30aaffccc48d554f6a4",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-i64-256-r16",
+      "wasm": "cases/c015-bench-i64-256-r16.wasm",
+      "wasm_sha": "dab2b1cb901a15a19bb8c6a29d24ce04dec21515ef903fc4a9f0b65bafff8cae",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-i64-256-r256",
+      "wasm": "cases/c016-bench-i64-256-r256.wasm",
+      "wasm_sha": "09d37d3d8c23f51f8a1b1b45952e0b83bb551ca891e273f0d3e8e344baa60fbe",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-i64-4096-r16",
+      "wasm": "cases/c017-bench-i64-4096-r16.wasm",
+      "wasm_sha": "631cc255c67b5e2eedc05ac1f1393f4eddae36779760fe6dda4621271e1c36e6",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-i64-4096-r256",
+      "wasm": "cases/c018-bench-i64-4096-r256.wasm",
+      "wasm_sha": "79020644b3d93cc6f4dd6779ee84d2dda498de8d5a4d17ebd75a3ac8316b229a",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-i8-16-r16",
+      "wasm": "cases/c019-bench-i8-16-r16.wasm",
+      "wasm_sha": "54bf2f5cc2d0bf78571334b54d5dcadc77d746a30d646dc9d855e753efd2ef3b",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-i8-16-r256",
+      "wasm": "cases/c020-bench-i8-16-r256.wasm",
+      "wasm_sha": "e0124fa77021ff5cd582eca7abf83c3d48d8d268ad2a95454ccf6449baf6158e",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-i8-256-r16",
+      "wasm": "cases/c021-bench-i8-256-r16.wasm",
+      "wasm_sha": "0600838fe24edadd0bdff9eec3537974d7ad14c2ff11ebf4be6e21562bdca599",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-i8-256-r256",
+      "wasm": "cases/c022-bench-i8-256-r256.wasm",
+      "wasm_sha": "c71d5fbdb12d63e1e3e1bace5510b4279c3e274befb44a9f20ba40d5c22d6be4",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-i8-4096-r16",
+      "wasm": "cases/c023-bench-i8-4096-r16.wasm",
+      "wasm_sha": "c660d2796e9321f02a7f5962e0ca2799775f7b9db4596769a2bf85b2f2e259fe",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-i8-4096-r256",
+      "wasm": "cases/c024-bench-i8-4096-r256.wasm",
+      "wasm_sha": "77a1f1a9e592d5a04220e37fac6e257a86b1bb093592c86d9eead4025190ede2",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-v128-16-r16",
+      "wasm": "cases/c025-bench-v128-16-r16.wasm",
+      "wasm_sha": "f4c36189fc4ef5e0de9e6a5d0ac1ad9b03fb0c0cc7195624b7fd1d4a2d8f26a4",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-v128-16-r256",
+      "wasm": "cases/c026-bench-v128-16-r256.wasm",
+      "wasm_sha": "5218b625ed405d3b6553eb13a9794de04675eec76c2b5f4f4b80844513d017b6",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-v128-256-r16",
+      "wasm": "cases/c027-bench-v128-256-r16.wasm",
+      "wasm_sha": "518732bdf5c8b4c127b19d76105675b867d1c168bb9c8e95bb1bd8267b10a48d",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-v128-256-r256",
+      "wasm": "cases/c028-bench-v128-256-r256.wasm",
+      "wasm_sha": "28131520ae3999c0e935ba8bd6ac330fe50c356905aa896ddb8c989fa052b610",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-v128-4096-r16",
+      "wasm": "cases/c029-bench-v128-4096-r16.wasm",
+      "wasm_sha": "b0577b9b91ab3f1b7010bd6f87a5f3e569502c94690030c5c1b2fba5b7e0183a",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-v128-4096-r256",
+      "wasm": "cases/c030-bench-v128-4096-r256.wasm",
+      "wasm_sha": "8fbec8d3e0f6a27fb4d788b8be314bed1d079b543c051866ed69d814cdd6e8d7",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-vector-global-parameter-result",
+      "wasm": "cases/c031-bench-vector-global-parameter-result.wasm",
+      "wasm_sha": "9a546932a9814413b1db0703265a04d691e25ac5beb1faebe9abe6a1e91304a5",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "bench-vector-owned-memory",
+      "wasm": "cases/c032-bench-vector-owned-memory.wasm",
+      "wasm_sha": "6eddff94b26559a7df13f42b30f85aa28d4149e6ef541f14f9f768cd5a9a4c69",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-dynamic_locals_16",
+      "wasm": "cases/c033-root-dynamic_locals_16.wasm",
+      "wasm_sha": "4ec4259f2df5621de9971539f0e8e7a2cee9a1c031c877d203d53a7989c52b3f",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-dynamic_locals_256",
+      "wasm": "cases/c034-root-dynamic_locals_256.wasm",
+      "wasm_sha": "dcbedc9bffbc8be69b404b334b8e9b2b982f2b3f51b1b14a65625a32039f4477",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-dynamic_locals_32",
+      "wasm": "cases/c035-root-dynamic_locals_32.wasm",
+      "wasm_sha": "c553887d54cf952910575f9face5616d9e73eca4b3672e4b5d2d127920131e88",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-dynamic_locals_64",
+      "wasm": "cases/c036-root-dynamic_locals_64.wasm",
+      "wasm_sha": "cba193bfc40fbd90789e3127ded9e2f89028fa40687437287a90be51c8623b1c",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-mixed_count_and_wide_byte_pressure",
+      "wasm": "cases/c037-root-mixed_count_and_wide_byte_pressure.wasm",
+      "wasm_sha": "8b1d82ff632a19d9b10ff3147c62dcf86300eb56fc40ef2edc78da90f21a46ac",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-nested_tail_exception_roots",
+      "wasm": "cases/c038-root-nested_tail_exception_roots.wasm",
+      "wasm_sha": "f718439788f06bbf66270797a2130f7afcf4af20e0ee7de866fe5d5580848a37",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-operand_prefix_24",
+      "wasm": "cases/c039-root-operand_prefix_24.wasm",
+      "wasm_sha": "87f84dea4fcd3765d4bf60c722a19d80b39c462e3d0d09754ed41a9cf3e85006",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-short_entry_32_allocations",
+      "wasm": "cases/c040-root-short_entry_32_allocations.wasm",
+      "wasm_sha": "a80d7c8ba803d82d8c2b36f765308ab280ea7810a0abda4a9809b7438eaacbd0",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-sole_local_array_4096",
+      "wasm": "cases/c041-root-sole_local_array_4096.wasm",
+      "wasm_sha": "5d04cef3763ea09b673bc24e199f59a43b367efcece5a72b092879266b3568d7",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-sole_local_subtype_4094",
+      "wasm": "cases/c042-root-sole_local_subtype_4094.wasm",
+      "wasm_sha": "11f4e966362b1866161dedf12e2ceb42ae733aaa1c86dfd53a971fbc118f581f",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-sole_local_subtype_4095",
+      "wasm": "cases/c043-root-sole_local_subtype_4095.wasm",
+      "wasm_sha": "9ba21af562d0548fcd3ddeec4c2f060f2720739576221750d05bb80880a6fe11",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-sole_local_subtype_4096",
+      "wasm": "cases/c044-root-sole_local_subtype_4096.wasm",
+      "wasm_sha": "ec6b1d4eceb7fd72a4f36523b617a79aed0f2e1385de5a6f701b0e832e02c831",
+      "wat": null,
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-mvp",
+      "wasm": "cases/c045-feature-mvp.wasm",
+      "wasm_sha": "8194457d30043ad35b41ec237b0cdc3f49153c29a229fd816ae8496c5da56b60",
+      "wat": "cases/c045-feature-mvp.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-mutable-global-export",
+      "wasm": "cases/c046-feature-mutable-global-export.wasm",
+      "wasm_sha": "fa06906b1ed7e64d995d23d8d962b02a00a1637168cef3114960a2460945c593",
+      "wat": "cases/c046-feature-mutable-global-export.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-nontrapping-float-to-int",
+      "wasm": "cases/c047-feature-nontrapping-float-to-int.wasm",
+      "wasm_sha": "63c69a0960d5362f2d2aaa947c0ceaf75786cb148d2af35e353bdcc9829f9e35",
+      "wat": "cases/c047-feature-nontrapping-float-to-int.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-sign-extension",
+      "wasm": "cases/c048-feature-sign-extension.wasm",
+      "wasm_sha": "188f1564048d7d725d78f5afedaa417aa0271bde649ace4201418f378e91ef07",
+      "wat": "cases/c048-feature-sign-extension.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-multi-value",
+      "wasm": "cases/c049-feature-multi-value.wasm",
+      "wasm_sha": "77434386fe0543adc25c0247a5cc803e2538a8f391fcefddea9f7f5d3d21f51b",
+      "wat": "cases/c049-feature-multi-value.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-reference-types",
+      "wasm": "cases/c050-feature-reference-types.wasm",
+      "wasm_sha": "2300e3ec498d13576272aa72532566ea152ebbe15f43c9aefdb8f7161f3c493c",
+      "wat": "cases/c050-feature-reference-types.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-bulk-memory",
+      "wasm": "cases/c051-feature-bulk-memory.wasm",
+      "wasm_sha": "d4ed173d0ec112237983285f5984d734f89f4dff219f5ea0df4f6ceb85ad5dd0",
+      "wat": "cases/c051-feature-bulk-memory.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-fixed-simd",
+      "wasm": "cases/c052-feature-fixed-simd.wasm",
+      "wasm_sha": "c2727727f12aed0a98a17a28fe408324225090a163a60359e8a7dc13db8416d3",
+      "wat": "cases/c052-feature-fixed-simd.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-relaxed-simd",
+      "wasm": "cases/c053-feature-relaxed-simd.wasm",
+      "wasm_sha": "0c2887f779eb33ba9d80d659c3593e15970936fc8c519e1b2c09a8b5685066c7",
+      "wat": "cases/c053-feature-relaxed-simd.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-tail-call",
+      "wasm": "cases/c054-feature-tail-call.wasm",
+      "wasm_sha": "c32ed74177ac13e47083a66a3b6f73b4ded03a1477bf0df15ae13ada47499a0d",
+      "wat": "cases/c054-feature-tail-call.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-typed-function-reference",
+      "wasm": "cases/c055-feature-typed-function-reference.wasm",
+      "wasm_sha": "0146f6a45b7cef03ff8bcfd270f2274c598a9ea9810f68c5a7490b3c00d0eb65",
+      "wat": "cases/c055-feature-typed-function-reference.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-gc-struct-array-i31",
+      "wasm": "cases/c056-feature-gc-struct-array-i31.wasm",
+      "wasm_sha": "46910656bf64f5927e7182566ae98f03320bf993700ea350078c724504e11b15",
+      "wat": "cases/c056-feature-gc-struct-array-i31.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-exceptions-exnref",
+      "wasm": "cases/c057-feature-exceptions-exnref.wasm",
+      "wasm_sha": "0ce471be5f2ecc89762c91ee1ed9195997a3eef727e6aaaf407d6a566789d238",
+      "wat": "cases/c057-feature-exceptions-exnref.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-multi-memory",
+      "wasm": "cases/c058-feature-multi-memory.wasm",
+      "wasm_sha": "d74fe7c687ffcde51859cfc050f2c6abc108f0b56a150cff1f33d0727eae0a72",
+      "wat": "cases/c058-feature-multi-memory.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-memory64",
+      "wasm": "cases/c059-feature-memory64.wasm",
+      "wasm_sha": "c74175a4ae93f2d6102d50ddcb96d95f1f921283e5fd317dafebbbfd8621d33f",
+      "wat": "cases/c059-feature-memory64.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-table64",
+      "wasm": "cases/c060-feature-table64.wasm",
+      "wasm_sha": "6d27810124f888b8c2be844df90c42682dd56ad014776173ca440a2f2d753ce2",
+      "wat": "cases/c060-feature-table64.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-extended-constant-expressions",
+      "wasm": "cases/c061-feature-extended-constant-expressions.wasm",
+      "wasm_sha": "14ecea778751656708085a685ab058a7e00043fd019b88a1c66d6f66808e7ead",
+      "wat": "cases/c061-feature-extended-constant-expressions.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-custom-annotation",
+      "wasm": "cases/c062-feature-custom-annotation.wasm",
+      "wasm_sha": "e4b19d302c5b3c84001e6f95e0a8dcd56aa3c979b78a51062db0727660fa4f9e",
+      "wat": "cases/c062-feature-custom-annotation.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-branch-hint",
+      "wasm": "cases/c063-feature-branch-hint.wasm",
+      "wasm_sha": "4fa25d76afd281757e8e328a43a9cd0508999f76a96c7afd91e96de3d5410b4b",
+      "wat": "cases/c063-feature-branch-hint.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "feature-threads-atomic-semantics",
+      "wasm": "cases/c064-feature-threads-atomic-semantics.wasm",
+      "wasm_sha": "914e872d02ccd7bd3f2100b3e56de18136dc0524e45391447f9f530cf27f69f2",
+      "wat": "cases/c064-feature-threads-atomic-semantics.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-set-1",
+      "wasm": "cases/c065-array-edge-set-1.wasm",
+      "wasm_sha": "791216f30d96ca9d860115d6d1f6708a628c875a9491f07e43b1038312ec40c7",
+      "wat": "cases/c065-array-edge-set-1.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-set-16",
+      "wasm": "cases/c066-array-edge-set-16.wasm",
+      "wasm_sha": "8e650887d0aca90570510a234939ca325d1cbf7fc645ae6467deccee59ab2f60",
+      "wat": "cases/c066-array-edge-set-16.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-set-256",
+      "wasm": "cases/c067-array-edge-set-256.wasm",
+      "wasm_sha": "f15a6948386eab9f34e1c0570a98c2051f4caf74458a22c53397156d5040d09c",
+      "wat": "cases/c067-array-edge-set-256.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-set-4096",
+      "wasm": "cases/c068-array-edge-set-4096.wasm",
+      "wasm_sha": "4bfca84aea7f003c039ffd93daeadf4d97a16cdbc4c2aa1655a240b1aee689ce",
+      "wat": "cases/c068-array-edge-set-4096.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-fill-1",
+      "wasm": "cases/c069-array-edge-fill-1.wasm",
+      "wasm_sha": "09447ccbb06dda4387a3add5b42771c6e713fe6c9870282604316c1926352033",
+      "wat": "cases/c069-array-edge-fill-1.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-fill-16",
+      "wasm": "cases/c070-array-edge-fill-16.wasm",
+      "wasm_sha": "03faa9949b9a2ab2c2d0372658e68f1a5ffbf83e44f20b441b4b4ab3125ae087",
+      "wat": "cases/c070-array-edge-fill-16.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-fill-256",
+      "wasm": "cases/c071-array-edge-fill-256.wasm",
+      "wasm_sha": "6bbbd9b33058773566bf06d9882d1b5733181a92565bcc5f778f5a52e4224363",
+      "wat": "cases/c071-array-edge-fill-256.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-fill-4096",
+      "wasm": "cases/c072-array-edge-fill-4096.wasm",
+      "wasm_sha": "b10e7b9f4cc0f999c970aa20407e7c904e28f8532d443541b6bf54f6e9b174a8",
+      "wat": "cases/c072-array-edge-fill-4096.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-copy-1",
+      "wasm": "cases/c073-array-edge-copy-1.wasm",
+      "wasm_sha": "4981bf692f892cbe4e8649bdc0055ae3069704e12c761b8ce62f82d780eb3b7e",
+      "wat": "cases/c073-array-edge-copy-1.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-copy-16",
+      "wasm": "cases/c074-array-edge-copy-16.wasm",
+      "wasm_sha": "2ee0bbe1c3d55997dd3242d802eb748fd62d5e58c6b51d69eadfe4f1841179ac",
+      "wat": "cases/c074-array-edge-copy-16.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-copy-256",
+      "wasm": "cases/c075-array-edge-copy-256.wasm",
+      "wasm_sha": "ae47ddb7437da049f8ab19f98030d7f7ff2cc5f402bb55b19ba8ad9e82987586",
+      "wat": "cases/c075-array-edge-copy-256.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-copy-4096",
+      "wasm": "cases/c076-array-edge-copy-4096.wasm",
+      "wasm_sha": "a08c44450a483a21662e9f6e2ced6f69a07cdf71408617966117cfd52c03b434",
+      "wat": "cases/c076-array-edge-copy-4096.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-overlap-copy-1",
+      "wasm": "cases/c077-array-edge-overlap-copy-1.wasm",
+      "wasm_sha": "4981bf692f892cbe4e8649bdc0055ae3069704e12c761b8ce62f82d780eb3b7e",
+      "wat": "cases/c077-array-edge-overlap-copy-1.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-overlap-copy-16",
+      "wasm": "cases/c078-array-edge-overlap-copy-16.wasm",
+      "wasm_sha": "1f13e46c1932c3eeabf2aa2b8b35a76c10084c5881746cbb0b1ec213ea7e0880",
+      "wat": "cases/c078-array-edge-overlap-copy-16.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-overlap-copy-256",
+      "wasm": "cases/c079-array-edge-overlap-copy-256.wasm",
+      "wasm_sha": "054b31f255bab07ea046d238e0e92cd563589393231276076bddb6fe7ccd7c94",
+      "wat": "cases/c079-array-edge-overlap-copy-256.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "array-edge-overlap-copy-4096",
+      "wasm": "cases/c080-array-edge-overlap-copy-4096.wasm",
+      "wasm_sha": "57392e797d4b972591278ed926c6ae71c891c1dd3cf0a728343d9b96cc19845d",
+      "wat": "cases/c080-array-edge-overlap-copy-4096.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-scalar-graph-i8",
+      "wasm": "cases/c081-gc-scalar-graph-i8.wasm",
+      "wasm_sha": "038f6ac3281e5ebb91dbf6a2f8793e45f73c557512cb548d3c3aa5108427df4e",
+      "wat": "cases/c081-gc-scalar-graph-i8.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-scalar-graph-i16",
+      "wasm": "cases/c082-gc-scalar-graph-i16.wasm",
+      "wasm_sha": "91ce255d997b6fa782a1480b4773805fe27d660aea154c4b7041eac3b035cc41",
+      "wat": "cases/c082-gc-scalar-graph-i16.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-scalar-graph-i32",
+      "wasm": "cases/c083-gc-scalar-graph-i32.wasm",
+      "wasm_sha": "fd1ddf3f1658de7616ba949a52a78823436b24a779bae3ee55943bedfae9dcbc",
+      "wat": "cases/c083-gc-scalar-graph-i32.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-scalar-graph-i64",
+      "wasm": "cases/c084-gc-scalar-graph-i64.wasm",
+      "wasm_sha": "ca064647bac1655b3d02ccc6df9b12ca7534363084cd3d8b04bdc57cc8380619",
+      "wat": "cases/c084-gc-scalar-graph-i64.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-scalar-graph-f32",
+      "wasm": "cases/c085-gc-scalar-graph-f32.wasm",
+      "wasm_sha": "b91dd75c9573ad64eb42bbd528df951f786c792e7cdb19c5213b11fa2404f59a",
+      "wat": "cases/c085-gc-scalar-graph-f32.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-scalar-graph-f64",
+      "wasm": "cases/c086-gc-scalar-graph-f64.wasm",
+      "wasm_sha": "2656198f4bc1b2c00a88d9a925bfd05f5b1e144b4c41b03a892fd57c14b5cd3e",
+      "wat": "cases/c086-gc-scalar-graph-f64.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-scalar-graph-v128",
+      "wasm": "cases/c087-gc-scalar-graph-v128.wasm",
+      "wasm_sha": "d40758dd3a1437ba9865f2384fd2e433b2df0a1735cea0f013c53c22c90187a0",
+      "wat": "cases/c087-gc-scalar-graph-v128.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-scalar-graph-chain",
+      "wasm": "cases/c088-gc-scalar-graph-chain.wasm",
+      "wasm_sha": "8b2b21905f1ba95202d3d2782f85c158e6f2d52e2cf018760cbfbfcb4c4eae26",
+      "wat": "cases/c088-gc-scalar-graph-chain.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-scalar-graph-self-cycle",
+      "wasm": "cases/c089-gc-scalar-graph-self-cycle.wasm",
+      "wasm_sha": "450aa791a58bd4831c3ed6a67dbf990830fc23774edfa40e8fd46701e8e96553",
+      "wat": "cases/c089-gc-scalar-graph-self-cycle.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-scalar-graph-binary-dag",
+      "wasm": "cases/c090-gc-scalar-graph-binary-dag.wasm",
+      "wasm_sha": "16ccd872d03806fc997fd262ef67b3da065bc1f317bd7f5c399b72d923e7a1d0",
+      "wat": "cases/c090-gc-scalar-graph-binary-dag.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-raw-f32-qnan",
+      "wasm": "cases/c091-gc-raw-f32-qnan.wasm",
+      "wasm_sha": "fc8d6a03dd6924771d67df03f3c2b7b44bc00bc6fa8ac8b6d9916680b5805f5e",
+      "wat": "cases/c091-gc-raw-f32-qnan.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-raw-f32-snan",
+      "wasm": "cases/c092-gc-raw-f32-snan.wasm",
+      "wasm_sha": "5e78a93b4e819551620ec1a34eafe5743c50a9e96a4c3535b4f8beb8eb32fdaa",
+      "wat": "cases/c092-gc-raw-f32-snan.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-raw-f64-qnan",
+      "wasm": "cases/c093-gc-raw-f64-qnan.wasm",
+      "wasm_sha": "ed15095518cb639a068d8c42b9ed552ff89311a13b0bc3a3ae2008e1de6d7a63",
+      "wat": "cases/c093-gc-raw-f64-qnan.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-raw-f64-snan",
+      "wasm": "cases/c094-gc-raw-f64-snan.wasm",
+      "wasm_sha": "3a4c385a1c851e62b511abb5bfb56f13aee70059bc37f135ab5ebcbf59db72b4",
+      "wat": "cases/c094-gc-raw-f64-snan.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-i8",
+      "wasm": "cases/c095-repeat-init-i8.wasm",
+      "wasm_sha": "a578f85efc9b68cff7b6b3e698485474717ee636091fe9df5e28c01272d4eae8",
+      "wat": "cases/c095-repeat-init-i8.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-i16",
+      "wasm": "cases/c096-repeat-init-i16.wasm",
+      "wasm_sha": "58a545498d4bc81063865432b1f002026ad1f132b9944acb9fd4ebd2ec39281e",
+      "wat": "cases/c096-repeat-init-i16.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-i32",
+      "wasm": "cases/c097-repeat-init-i32.wasm",
+      "wasm_sha": "c592e0bdee078c22f8d22b13a36af612e098122aba8a7caa3f3db59e89baaa95",
+      "wat": "cases/c097-repeat-init-i32.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-i64",
+      "wasm": "cases/c098-repeat-init-i64.wasm",
+      "wasm_sha": "39f61d13628f21840f5e42a523fa2bf2f28c702554b9cf1476313b89159146ed",
+      "wat": "cases/c098-repeat-init-i64.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-f32-qnan",
+      "wasm": "cases/c099-repeat-init-f32-qnan.wasm",
+      "wasm_sha": "f5b609297eb560320a60f2397430526e7828a0a2f577ec10003a54ac4c0a273d",
+      "wat": "cases/c099-repeat-init-f32-qnan.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-f32-snan",
+      "wasm": "cases/c100-repeat-init-f32-snan.wasm",
+      "wasm_sha": "1457757e5e6ce85ae76bf40c8a2fd123b30a42c953576b4e8cb3ae0a173c7e43",
+      "wat": "cases/c100-repeat-init-f32-snan.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-f64-qnan",
+      "wasm": "cases/c101-repeat-init-f64-qnan.wasm",
+      "wasm_sha": "1fa84d8907434e151944aa407a994b2b7f9fffbcceba0b413e7ebc35eb806955",
+      "wat": "cases/c101-repeat-init-f64-qnan.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-f64-snan",
+      "wasm": "cases/c102-repeat-init-f64-snan.wasm",
+      "wasm_sha": "f12a10700bea3c8947e56bebda798d627b790960bb3c6bfd1e8f25d1554f4700",
+      "wat": "cases/c102-repeat-init-f64-snan.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-v128",
+      "wasm": "cases/c103-repeat-init-v128.wasm",
+      "wasm_sha": "a636df8c45b4cae7d70f446dbf16f6922dec2936ce263744f04ce0f28e9c1f8c",
+      "wat": "cases/c103-repeat-init-v128.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-null-eq",
+      "wasm": "cases/c104-repeat-init-null-eq.wasm",
+      "wasm_sha": "5e3f01b3aeb7795b829acac5d686d0dad2752e5c16e510cff0a7e22926417d71",
+      "wat": "cases/c104-repeat-init-null-eq.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-null-func",
+      "wasm": "cases/c105-repeat-init-null-func.wasm",
+      "wasm_sha": "3b13f39584559dbabade0a62f4ad01f0265a17119b0dd80250675bbb291c2eb8",
+      "wat": "cases/c105-repeat-init-null-func.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-null-extern",
+      "wasm": "cases/c106-repeat-init-null-extern.wasm",
+      "wasm_sha": "59abb369089f163ce702c4da3b9b07737d4b5bc18bbc877d7eeec64afe4cddd3",
+      "wat": "cases/c106-repeat-init-null-extern.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-null-exn",
+      "wasm": "cases/c107-repeat-init-null-exn.wasm",
+      "wasm_sha": "394ba160366e25c3fb81e0481073796a4012fd9dc7657b94f2b139ff7dbdd1a6",
+      "wat": "cases/c107-repeat-init-null-exn.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-i31",
+      "wasm": "cases/c108-repeat-init-i31.wasm",
+      "wasm_sha": "0e8582bbaac849c60e31702f5ed3d9f244a9a63f09a86abce9ec8dc85f1d5a6a",
+      "wat": "cases/c108-repeat-init-i31.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-object",
+      "wasm": "cases/c109-repeat-init-object.wasm",
+      "wasm_sha": "f1f2835088254ee98585fa6ffcdd6a3b874c929f61be035749090cd686fa0d0f",
+      "wat": "cases/c109-repeat-init-object.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-func",
+      "wasm": "cases/c110-repeat-init-func.wasm",
+      "wasm_sha": "f2cd2ec08b8eac772cdd8f2ec1a1b93963f8cbbeb736d7db0bb215b9353a5ff9",
+      "wat": "cases/c110-repeat-init-func.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "repeat-init-extern-i31",
+      "wasm": "cases/c111-repeat-init-extern-i31.wasm",
+      "wasm_sha": "d357ee6aa01de50a39bf8c37dd549400649d8128210de1c6c3aee361fa7f183b",
+      "wat": "cases/c111-repeat-init-extern-i31.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-mvp",
+      "wasm": "cases/c112-observable-mvp.wasm",
+      "wasm_sha": "5f6c28aa0127db0e3462bb33689d1f9ff03598f31c8717d3ff11e8e87702186c",
+      "wat": "cases/c112-observable-mvp.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-mutable-global-export",
+      "wasm": "cases/c113-observable-mutable-global-export.wasm",
+      "wasm_sha": "56cd7dbdcb178e34b1718125ddfaa361fa7b957d971677f536ca64719a4a66c5",
+      "wat": "cases/c113-observable-mutable-global-export.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-sign-extension",
+      "wasm": "cases/c114-observable-sign-extension.wasm",
+      "wasm_sha": "de88e023991f89cae2ff965c41e4f4a1f9bafc0715f2ad1fd2b5d7ac77d8d605",
+      "wat": "cases/c114-observable-sign-extension.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-nontrapping-float-to-int",
+      "wasm": "cases/c115-observable-nontrapping-float-to-int.wasm",
+      "wasm_sha": "5db53916ce3ccf6bc10f420cde86eed9e6110ce17708e9afb9ad5bd9b04e0343",
+      "wat": "cases/c115-observable-nontrapping-float-to-int.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-multi-value",
+      "wasm": "cases/c116-observable-multi-value.wasm",
+      "wasm_sha": "212fdb42a62b8317c54d18703144ec40377506548facc960648052973298e550",
+      "wat": "cases/c116-observable-multi-value.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-reference-types",
+      "wasm": "cases/c117-observable-reference-types.wasm",
+      "wasm_sha": "d9f6d4d206eeb304631886750d6923a0c4a68931e536ea6c55b58fb77b3f93f2",
+      "wat": "cases/c117-observable-reference-types.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-typed-function-reference",
+      "wasm": "cases/c118-observable-typed-function-reference.wasm",
+      "wasm_sha": "85e0247ab9838059c6f502ead43f0357723be2649af75c6e4a0b1103d0920247",
+      "wat": "cases/c118-observable-typed-function-reference.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-table64",
+      "wasm": "cases/c119-observable-table64.wasm",
+      "wasm_sha": "6132b1a6e982a2ac61fe00a39bcc6ff762d98b0f3492dcad9f2df0b6454ccffd",
+      "wat": "cases/c119-observable-table64.wat",
+      "trap": null,
+      "flags": [
+        "-WFE-table64"
+      ]
+    },
+    {
+      "name": "observable-tail-call",
+      "wasm": "cases/c120-observable-tail-call.wasm",
+      "wasm_sha": "1fc2fba2b2e1660439d88856e7662be566ceb0f06c96df201085649f8b9bcae2",
+      "wat": "cases/c120-observable-tail-call.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-gc-struct-array-i31",
+      "wasm": "cases/c121-observable-gc-struct-array-i31.wasm",
+      "wasm_sha": "d6dfaa51d4e97e8ae01097d5c9cf42bd40af15f70ca844fc13732c56defa83f4",
+      "wat": "cases/c121-observable-gc-struct-array-i31.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-exceptions-exnref",
+      "wasm": "cases/c122-observable-exceptions-exnref.wasm",
+      "wasm_sha": "b4d33c4e56beb08ad62aba1bbed8e80bb4f6a54cb90b7c106b575edec1c1fe99",
+      "wat": "cases/c122-observable-exceptions-exnref.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-memory64",
+      "wasm": "cases/c123-observable-memory64.wasm",
+      "wasm_sha": "2740208c88c5a559558beb31fd55bda89ffde6ebd01ddc10ec30919bb93c79a7",
+      "wat": "cases/c123-observable-memory64.wat",
+      "trap": null,
+      "flags": [
+        "-WFE-memory64"
+      ]
+    },
+    {
+      "name": "observable-multi-memory",
+      "wasm": "cases/c124-observable-multi-memory.wasm",
+      "wasm_sha": "cbf715b2fc942173d6a0080b1d81b0eb8fa9f18218d1e66d97391b96e150bb0b",
+      "wat": "cases/c124-observable-multi-memory.wat",
+      "trap": null,
+      "flags": [
+        "-WFE-multi-memory"
+      ]
+    },
+    {
+      "name": "observable-bulk-memory",
+      "wasm": "cases/c125-observable-bulk-memory.wasm",
+      "wasm_sha": "a7b582b311192a61fa2bb07750ee1607b7734e0cc7e212af6329a100719a2b70",
+      "wat": "cases/c125-observable-bulk-memory.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-threads-atomic-semantics",
+      "wasm": "cases/c126-observable-threads-atomic-semantics.wasm",
+      "wasm_sha": "e6d5c106bacf4cd96b603ec421e72c4a168ee5931ab1048f81c9c94f2815c71f",
+      "wat": "cases/c126-observable-threads-atomic-semantics.wat",
+      "trap": null,
+      "flags": [
+        "-WFE-threads"
+      ]
+    },
+    {
+      "name": "observable-branch-hint",
+      "wasm": "cases/c127-observable-branch-hint.wasm",
+      "wasm_sha": "14f410eead739458dde93c2108286e8b573e1647f2ead5c5ede5214864e1763b",
+      "wat": "cases/c127-observable-branch-hint.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-custom-annotation",
+      "wasm": "cases/c128-observable-custom-annotation.wasm",
+      "wasm_sha": "7e83983b9a093fa26cef8e59df53161fdfb75b735d75559e50c71a716046f70c",
+      "wat": "cases/c128-observable-custom-annotation.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-extended-constant-expressions",
+      "wasm": "cases/c129-observable-extended-constant-expressions.wasm",
+      "wasm_sha": "0ab9c09616710b0eb3c74f04c928da68f9786a4a27c3b20e7bace2b48a6cf582",
+      "wat": "cases/c129-observable-extended-constant-expressions.wat",
+      "trap": null,
+      "flags": [
+        "-WFE-extended-const"
+      ]
+    },
+    {
+      "name": "observable-fixed-simd",
+      "wasm": "cases/c130-observable-fixed-simd.wasm",
+      "wasm_sha": "203848213a94e58ea15da0a122dce769ee8de4db375e352c8b62715a388223b9",
+      "wat": "cases/c130-observable-fixed-simd.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "observable-relaxed-simd",
+      "wasm": "cases/c131-observable-relaxed-simd.wasm",
+      "wasm_sha": "7dbc9fce404eb73c63b32c1bd76cc07148b6cd259f2d982f06638d3c40b09996",
+      "wat": "cases/c131-observable-relaxed-simd.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-phase-i64-256-16-256",
+      "wasm": "cases/c132-gc-phase-i64-256-16-256.wasm",
+      "wasm_sha": "03e81ae70628ac0c6e5dbf7eed365ea4e7ea9c460f53c560379f3a601ca6fdcf",
+      "wat": "cases/c132-gc-phase-i64-256-16-256.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-phase-i64-16-256-16",
+      "wasm": "cases/c133-gc-phase-i64-16-256-16.wasm",
+      "wasm_sha": "88dced577690a030de7754df314f17f5f7d4b9ddc5805c01e56aaf6c80d08cda",
+      "wat": "cases/c133-gc-phase-i64-16-256-16.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-phase-v128-256-16-256",
+      "wasm": "cases/c134-gc-phase-v128-256-16-256.wasm",
+      "wasm_sha": "1f231230183e652b382106eee5200a646e173cc77dd37538f291a5626f79dcfb",
+      "wat": "cases/c134-gc-phase-v128-256-16-256.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-phase-v128-16-256-16",
+      "wasm": "cases/c135-gc-phase-v128-16-256-16.wasm",
+      "wasm_sha": "92d40b824eb22eb30ccac8d53c6643f7f49050290d934bbed5531e6f74447077",
+      "wat": "cases/c135-gc-phase-v128-16-256-16.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-phase-ref-256-16-256",
+      "wasm": "cases/c136-gc-phase-ref-256-16-256.wasm",
+      "wasm_sha": "6bcb1b83977ff3cefcad4a30827679c4d85728898c89708304e86fd4098e491c",
+      "wat": "cases/c136-gc-phase-ref-256-16-256.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "gc-phase-ref-16-256-16",
+      "wasm": "cases/c137-gc-phase-ref-16-256-16.wasm",
+      "wasm_sha": "b2771ca78d84b5016120664cb27c72d4cbe6e2ceb335c6c4ee45a52964cb698b",
+      "wat": "cases/c137-gc-phase-ref-16-256-16.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "uniform-ref-mutate-set-first",
+      "wasm": "cases/c138-uniform-ref-mutate-set-first.wasm",
+      "wasm_sha": "ef1711b477e61d9ab0710500fb4f163bf6decdbdf246b784f0437595843cfa09",
+      "wat": "cases/c138-uniform-ref-mutate-set-first.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "uniform-ref-mutate-set-middle",
+      "wasm": "cases/c139-uniform-ref-mutate-set-middle.wasm",
+      "wasm_sha": "5d6e7cc4ccc9354fa8bad29a9ad62792702d47f993ea5bd4b4f7df86db2d1af6",
+      "wat": "cases/c139-uniform-ref-mutate-set-middle.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "uniform-ref-mutate-set-last",
+      "wasm": "cases/c140-uniform-ref-mutate-set-last.wasm",
+      "wasm_sha": "cc567bb12c296847d1308ce51e83942fb2654e84ec54ee2ff11c4b063926a95e",
+      "wat": "cases/c140-uniform-ref-mutate-set-last.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "uniform-ref-mutate-fill-tail",
+      "wasm": "cases/c141-uniform-ref-mutate-fill-tail.wasm",
+      "wasm_sha": "370aa5b93748acd08c0e0fbea6a8cac0a2c03f3b0e275e78e645fb28dfa5cbb3",
+      "wat": "cases/c141-uniform-ref-mutate-fill-tail.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "uniform-ref-mutate-copy-tail",
+      "wasm": "cases/c142-uniform-ref-mutate-copy-tail.wasm",
+      "wasm_sha": "83c2a687a14121bf9f850eede97fd02e6ad038194603c989680208c2c39da44e",
+      "wat": "cases/c142-uniform-ref-mutate-copy-tail.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "uniform-ref-mutate-overlap",
+      "wasm": "cases/c143-uniform-ref-mutate-overlap.wasm",
+      "wasm_sha": "66da411b63712720676403f92c34f6bbb30763db0888b49226e0a5d054c6e7e8",
+      "wat": "cases/c143-uniform-ref-mutate-overlap.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "uniform-ref-mutate-init-elem",
+      "wasm": "cases/c144-uniform-ref-mutate-init-elem.wasm",
+      "wasm_sha": "0b50a8aaccc2e7e9aa0f44008f4849192c5cfb964ccf7b544b8a5d3b9ec5627e",
+      "wat": "cases/c144-uniform-ref-mutate-init-elem.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "local-catch-ref-raw-nan-v128-rethrow",
+      "wasm": "cases/c145-local-catch-ref-raw-nan-v128-rethrow.wasm",
+      "wasm_sha": "52c0c390374639fcab24ad31c25f25feb5e4d38e11025d6d911b90c8427cb1f2",
+      "wat": "cases/c145-local-catch-ref-raw-nan-v128-rethrow.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "local-catch-all-ref-rethrow",
+      "wasm": "cases/c146-local-catch-all-ref-rethrow.wasm",
+      "wasm_sha": "21f8b8e8a269bc35dc703e89a1c1da9a89d4af2c29e80186f7a2a76a6173b949",
+      "wat": "cases/c146-local-catch-all-ref-rethrow.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "local-catch-ref-empty-payload",
+      "wasm": "cases/c147-local-catch-ref-empty-payload.wasm",
+      "wasm_sha": "c686a20a4689e8be94544ff709864c6390da83124bf5f76818bf48714c9ff3a9",
+      "wat": "cases/c147-local-catch-ref-empty-payload.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "local-catch-ref-distinct-equal-tags",
+      "wasm": "cases/c148-local-catch-ref-distinct-equal-tags.wasm",
+      "wasm_sha": "6969d9b975c49772b62f965bb69c57852d4ade4124048ad47e3b5ba37698c91a",
+      "wat": "cases/c148-local-catch-ref-distinct-equal-tags.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "local-catch-ref-inner-unmatched",
+      "wasm": "cases/c149-local-catch-ref-inner-unmatched.wasm",
+      "wasm_sha": "6a9a9ce6659335e21ee2a8a56274ed533cdf2e9ed1db352f0e94b83eab4b2952",
+      "wat": "cases/c149-local-catch-ref-inner-unmatched.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "local-catch-ref-stack-prefix",
+      "wasm": "cases/c150-local-catch-ref-stack-prefix.wasm",
+      "wasm_sha": "a49452ddfc763ac244fd1c5d8d9d3283888a65095a054a2894f9a3b8c2495236",
+      "wat": "cases/c150-local-catch-ref-stack-prefix.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "local-catch-all-ref-first-clause",
+      "wasm": "cases/c151-local-catch-all-ref-first-clause.wasm",
+      "wasm_sha": "de232c7d5fc7497bf283c33e0e2e5bdfd5765ec9f0424edc21fa1afd58a28674",
+      "wat": "cases/c151-local-catch-all-ref-first-clause.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "local-catch-ref-tail-rethrow",
+      "wasm": "cases/c152-local-catch-ref-tail-rethrow.wasm",
+      "wasm_sha": "6c1c7d47a05df265162975bd8a8a984d5563692a9e5008f0a17b0cb1263e6175",
+      "wat": "cases/c152-local-catch-ref-tail-rethrow.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i8-immutable",
+      "wasm": "cases/c153-i8-immutable.wasm",
+      "wasm_sha": "126e06f58d9cc2b37ea773a2f42d6c03dcf4c6fffa5136249762a04c77be400e",
+      "wat": "cases/c153-i8-immutable.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i8-immutable-fixed",
+      "wasm": "cases/c154-i8-immutable-fixed.wasm",
+      "wasm_sha": "a0fa99f0a99a3160e11a6eb42ed296b86e156903fac410a04dce73e2ff945c93",
+      "wat": "cases/c154-i8-immutable-fixed.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i8-immutable-default",
+      "wasm": "cases/c155-i8-immutable-default.wasm",
+      "wasm_sha": "354fd774364a28cc7779b4162367cf85d2ad14e17ddd9746b228e5052c2547ff",
+      "wat": "cases/c155-i8-immutable-default.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i8-immutable-at-length",
+      "wasm": "cases/c156-i8-immutable-at-length.wasm",
+      "wasm_sha": "9973b3274ff9f6368e178ec34c00021f2c804b3389f0354510039c09f1a8cc18",
+      "wat": "cases/c156-i8-immutable-at-length.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i8-immutable-UINTMAX",
+      "wasm": "cases/c157-i8-immutable-UINTMAX.wasm",
+      "wasm_sha": "3d12cecb46ce9aec4b40c05644c96f9c3510963cede13ab44996d6da08dbaed1",
+      "wat": "cases/c157-i8-immutable-UINTMAX.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i8-immutable-empty",
+      "wasm": "cases/c158-i8-immutable-empty.wasm",
+      "wasm_sha": "7f903e0841b3530f36059847236af9fed194fd587166e1ca04098475e4dab87c",
+      "wat": "cases/c158-i8-immutable-empty.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i8-immutable-null",
+      "wasm": "cases/c159-i8-immutable-null.wasm",
+      "wasm_sha": "454a56085d518e4390c1d680039c469959118630812e333405c29d6821905043",
+      "wat": "cases/c159-i8-immutable-null.wat",
+      "trap": "null",
+      "flags": []
+    },
+    {
+      "name": "i8-immutable-subtype",
+      "wasm": "cases/c160-i8-immutable-subtype.wasm",
+      "wasm_sha": "7157fd1ddee188142dceaee2636d6c54f3bbabb80abbdd5eae231f85943e92eb",
+      "wat": "cases/c160-i8-immutable-subtype.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i16-immutable",
+      "wasm": "cases/c161-i16-immutable.wasm",
+      "wasm_sha": "30f3f847ee8f6bf294b6591f8ea277523311ac080754c10e85e47430c89c2c49",
+      "wat": "cases/c161-i16-immutable.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i16-immutable-fixed",
+      "wasm": "cases/c162-i16-immutable-fixed.wasm",
+      "wasm_sha": "8ac34090ec35018064ea9ad6bcdd57ce342daaf7ee7abc22bf637e6ace05cb75",
+      "wat": "cases/c162-i16-immutable-fixed.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i16-immutable-default",
+      "wasm": "cases/c163-i16-immutable-default.wasm",
+      "wasm_sha": "035b6669b966f79edd40efd4a119cc3ef3237895ab3cacf9d72122100f919b78",
+      "wat": "cases/c163-i16-immutable-default.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i16-immutable-at-length",
+      "wasm": "cases/c164-i16-immutable-at-length.wasm",
+      "wasm_sha": "e8b6982e2d244af59e33b792a39f4e1c58f15ca92526bdcea6b5812f39ab6543",
+      "wat": "cases/c164-i16-immutable-at-length.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i16-immutable-UINTMAX",
+      "wasm": "cases/c165-i16-immutable-UINTMAX.wasm",
+      "wasm_sha": "2882d0fc9a812b376b7638df0501f023a20a695d9e8ddf160c869579584b1b71",
+      "wat": "cases/c165-i16-immutable-UINTMAX.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i16-immutable-empty",
+      "wasm": "cases/c166-i16-immutable-empty.wasm",
+      "wasm_sha": "af19522e6daac2b3f60ecdf5ece9cb3c1866c29e908a6af179ed9671297dd177",
+      "wat": "cases/c166-i16-immutable-empty.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i16-immutable-null",
+      "wasm": "cases/c167-i16-immutable-null.wasm",
+      "wasm_sha": "80d6d435a459e8e52fcf2022a91693efcbf00d0e594c86e183befbf42b43b8c7",
+      "wat": "cases/c167-i16-immutable-null.wat",
+      "trap": "null",
+      "flags": []
+    },
+    {
+      "name": "i16-immutable-subtype",
+      "wasm": "cases/c168-i16-immutable-subtype.wasm",
+      "wasm_sha": "3f46651ee8c4f5771eb9a0094608adb68e85207a5cc909a4ab8864abbdee51ef",
+      "wat": "cases/c168-i16-immutable-subtype.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i32-immutable",
+      "wasm": "cases/c169-i32-immutable.wasm",
+      "wasm_sha": "60894f6b01499cb443d879c562ff1cc9eef084fefd2b09e7fe7bc9f34d324772",
+      "wat": "cases/c169-i32-immutable.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i32-immutable-fixed",
+      "wasm": "cases/c170-i32-immutable-fixed.wasm",
+      "wasm_sha": "f3ead205fad627eac36423557bcb5962f20814f6b1cf64d577589c04f2dbaed0",
+      "wat": "cases/c170-i32-immutable-fixed.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i32-immutable-default",
+      "wasm": "cases/c171-i32-immutable-default.wasm",
+      "wasm_sha": "343a8cb2fc6a963f30ba1c101d3b85c2dee055f3bcad4d2d6e5dcbf42c72de9e",
+      "wat": "cases/c171-i32-immutable-default.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i32-immutable-at-length",
+      "wasm": "cases/c172-i32-immutable-at-length.wasm",
+      "wasm_sha": "1cf9a974b9d1e5bcbf669868a55c280bb9225bec67f92479765c7656380c0224",
+      "wat": "cases/c172-i32-immutable-at-length.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i32-immutable-UINTMAX",
+      "wasm": "cases/c173-i32-immutable-UINTMAX.wasm",
+      "wasm_sha": "71602807753cbb8d605c79f20a4ed36b0f2ffb71c4edae986db8cd56047d6815",
+      "wat": "cases/c173-i32-immutable-UINTMAX.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i32-immutable-empty",
+      "wasm": "cases/c174-i32-immutable-empty.wasm",
+      "wasm_sha": "1a401a05b4ac7b8fc451b4fe4e82cdaad6009db87cb6e64f9bb12a04b2ad65e3",
+      "wat": "cases/c174-i32-immutable-empty.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i32-immutable-null",
+      "wasm": "cases/c175-i32-immutable-null.wasm",
+      "wasm_sha": "6148e7dc5cd018dc5b566d15ed0d315fc4c56189e83b28be6ea516b82e0b8677",
+      "wat": "cases/c175-i32-immutable-null.wat",
+      "trap": "null",
+      "flags": []
+    },
+    {
+      "name": "i32-immutable-subtype",
+      "wasm": "cases/c176-i32-immutable-subtype.wasm",
+      "wasm_sha": "d8f6ac8f5a4a9ff2237bf7d6dec69e534ad89b0382f5b67f667a8936b25a339d",
+      "wat": "cases/c176-i32-immutable-subtype.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "f32-immutable",
+      "wasm": "cases/c177-f32-immutable.wasm",
+      "wasm_sha": "ffd79b97e26122bc43b0b9ff6d46ea9924f202a520c5949757c3525f8d3bbe02",
+      "wat": "cases/c177-f32-immutable.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "f32-immutable-fixed",
+      "wasm": "cases/c178-f32-immutable-fixed.wasm",
+      "wasm_sha": "95950f1dc8269ebdf3a6ee4d31ad30a4579194d8530233463cac9a9a622174f1",
+      "wat": "cases/c178-f32-immutable-fixed.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "f32-immutable-default",
+      "wasm": "cases/c179-f32-immutable-default.wasm",
+      "wasm_sha": "627035193a2e91c1ceff823c3742a64e0455d8007ff2f92b89432ecf159acccd",
+      "wat": "cases/c179-f32-immutable-default.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "f32-immutable-at-length",
+      "wasm": "cases/c180-f32-immutable-at-length.wasm",
+      "wasm_sha": "89bcf21fc188efe08d91bba9c6ba0a45dd82a0f613a16b01fd9bf20d9911949b",
+      "wat": "cases/c180-f32-immutable-at-length.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "f32-immutable-UINTMAX",
+      "wasm": "cases/c181-f32-immutable-UINTMAX.wasm",
+      "wasm_sha": "e77a80dd917efaee1f7cbfe24d7558c0a07878585b58c9e6ae0419c2e214907f",
+      "wat": "cases/c181-f32-immutable-UINTMAX.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "f32-immutable-empty",
+      "wasm": "cases/c182-f32-immutable-empty.wasm",
+      "wasm_sha": "afae3736bc6c49892a2ac20f12b1fe90f59d6f989377fea7def38bbc1bd4b04c",
+      "wat": "cases/c182-f32-immutable-empty.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "f32-immutable-null",
+      "wasm": "cases/c183-f32-immutable-null.wasm",
+      "wasm_sha": "1ea0df718dcfb1f442787bee3762ed3ba03fd12254b31af49a6ebbe8ad667d24",
+      "wat": "cases/c183-f32-immutable-null.wat",
+      "trap": "null",
+      "flags": []
+    },
+    {
+      "name": "f32-immutable-subtype",
+      "wasm": "cases/c184-f32-immutable-subtype.wasm",
+      "wasm_sha": "6fad6d3d611afe177167c19e257be84ee9188641ab8600f42536d6aa0e951bfe",
+      "wat": "cases/c184-f32-immutable-subtype.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i8-mut",
+      "wasm": "cases/c185-i8-mut.wasm",
+      "wasm_sha": "68ad0da7fe020d639b25190d6f535284151f97de8162f835a1634fd67051914f",
+      "wat": "cases/c185-i8-mut.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i8-mut-fixed",
+      "wasm": "cases/c186-i8-mut-fixed.wasm",
+      "wasm_sha": "04010be6b1e9aa2fa34f52ee8d4b61aa44a3e76f7a81bad90008b5cb378db71b",
+      "wat": "cases/c186-i8-mut-fixed.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i8-mut-default",
+      "wasm": "cases/c187-i8-mut-default.wasm",
+      "wasm_sha": "ebd124c210cdf059cbb214f22a2a0844db49ed7fdf1b08058ba9fb7452065f29",
+      "wat": "cases/c187-i8-mut-default.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i8-mut-at-length",
+      "wasm": "cases/c188-i8-mut-at-length.wasm",
+      "wasm_sha": "6135a6a5dfd6fe2e12643f3c1ef4bc4e8df3a7c3dfc03daa08a820c966451296",
+      "wat": "cases/c188-i8-mut-at-length.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i8-mut-UINTMAX",
+      "wasm": "cases/c189-i8-mut-UINTMAX.wasm",
+      "wasm_sha": "cf97f4154cced912ecacc85f37a78a8d5fe319a677b61a20bd244fc5841b87fa",
+      "wat": "cases/c189-i8-mut-UINTMAX.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i8-mut-empty",
+      "wasm": "cases/c190-i8-mut-empty.wasm",
+      "wasm_sha": "44c93d8ba2103e5a3e07c35871ea85be155ad488321ad7145c2ea7469b76c26b",
+      "wat": "cases/c190-i8-mut-empty.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i8-mut-null",
+      "wasm": "cases/c191-i8-mut-null.wasm",
+      "wasm_sha": "b911303a38bc21a0b66075917b9134ecc852f66d1b40a4a99fc643f086f0ad5d",
+      "wat": "cases/c191-i8-mut-null.wat",
+      "trap": "null",
+      "flags": []
+    },
+    {
+      "name": "i8-mut-alias-set-fill-loop",
+      "wasm": "cases/c192-i8-mut-alias-set-fill-loop.wasm",
+      "wasm_sha": "844c4bfc4a649a568dc80f3315ecf0fb34e0ca093dedf330030927db01e57bea",
+      "wat": "cases/c192-i8-mut-alias-set-fill-loop.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i8-mut-copy",
+      "wasm": "cases/c193-i8-mut-copy.wasm",
+      "wasm_sha": "7066768caac1762bf451135507c56152f2791f761d735871a9ef333846f0439d",
+      "wat": "cases/c193-i8-mut-copy.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i8-mut-subtype",
+      "wasm": "cases/c194-i8-mut-subtype.wasm",
+      "wasm_sha": "d23d26f443e8535a531d9b8dbc60764e74e0679b889463832f92676d1958cb8a",
+      "wat": "cases/c194-i8-mut-subtype.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i16-mut",
+      "wasm": "cases/c195-i16-mut.wasm",
+      "wasm_sha": "23827ff57895c1eb2cfbe1d661bcbf7b6e2a99a0a2262376125f029aa4686b38",
+      "wat": "cases/c195-i16-mut.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i16-mut-fixed",
+      "wasm": "cases/c196-i16-mut-fixed.wasm",
+      "wasm_sha": "6649b174cc54a0b98459eefe44e107be5f7dd7b7a13c15e78b39d4b38d33e98f",
+      "wat": "cases/c196-i16-mut-fixed.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i16-mut-default",
+      "wasm": "cases/c197-i16-mut-default.wasm",
+      "wasm_sha": "e90dfcd0d09cc97fb54dba625c02c727f07e46d1c21992ee262522d41a5df5da",
+      "wat": "cases/c197-i16-mut-default.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i16-mut-at-length",
+      "wasm": "cases/c198-i16-mut-at-length.wasm",
+      "wasm_sha": "188912da8f0b2d593424f105d9571b29c6eaffbf93bd85de73c3ee919dcf1629",
+      "wat": "cases/c198-i16-mut-at-length.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i16-mut-UINTMAX",
+      "wasm": "cases/c199-i16-mut-UINTMAX.wasm",
+      "wasm_sha": "bb9d68751acb634f73355743a28704d8aa919b2b284df39aa1f6099b4c8b43cc",
+      "wat": "cases/c199-i16-mut-UINTMAX.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i16-mut-empty",
+      "wasm": "cases/c200-i16-mut-empty.wasm",
+      "wasm_sha": "36eb1c4f337baac4ec774d9cf9a58868315d732006a88b20bf00ce1b9e1f12fb",
+      "wat": "cases/c200-i16-mut-empty.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i16-mut-null",
+      "wasm": "cases/c201-i16-mut-null.wasm",
+      "wasm_sha": "a4881f334bfd9acaa809d598935eb5af12a5d87377c6e24b06cdd41f36d438fc",
+      "wat": "cases/c201-i16-mut-null.wat",
+      "trap": "null",
+      "flags": []
+    },
+    {
+      "name": "i16-mut-alias-set-fill-loop",
+      "wasm": "cases/c202-i16-mut-alias-set-fill-loop.wasm",
+      "wasm_sha": "6e2de5f4e655dfd0a2476b912950803c47bb091a0f3b6553da2645d35744b89f",
+      "wat": "cases/c202-i16-mut-alias-set-fill-loop.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i16-mut-copy",
+      "wasm": "cases/c203-i16-mut-copy.wasm",
+      "wasm_sha": "cc9194909784c301f8eb0009912f9995ea28f82f2875870b00d51ce0579443db",
+      "wat": "cases/c203-i16-mut-copy.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i16-mut-subtype",
+      "wasm": "cases/c204-i16-mut-subtype.wasm",
+      "wasm_sha": "cfd7a432b106a9b9c6b072eeac7e91a9fc7a3d6b2eb93cf995b4ecbe0a3787cc",
+      "wat": "cases/c204-i16-mut-subtype.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i32-mut",
+      "wasm": "cases/c205-i32-mut.wasm",
+      "wasm_sha": "aa2448374e598e2979baa3bd427402d9dc42d69904a6be4e1ed94f239e89b779",
+      "wat": "cases/c205-i32-mut.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i32-mut-fixed",
+      "wasm": "cases/c206-i32-mut-fixed.wasm",
+      "wasm_sha": "ff589537e3032fc6cc8b2e11dc3d9c50c5f3a298ed58fb9d2ce7c0e922ad7097",
+      "wat": "cases/c206-i32-mut-fixed.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i32-mut-default",
+      "wasm": "cases/c207-i32-mut-default.wasm",
+      "wasm_sha": "00b7744e1a53aa49b1f860c0d963f6dee76329f7af2868002c2120c7e0bee686",
+      "wat": "cases/c207-i32-mut-default.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i32-mut-at-length",
+      "wasm": "cases/c208-i32-mut-at-length.wasm",
+      "wasm_sha": "75ef3c36ee7425ddd382391dc5b45e5999f0ac4721eda04431092e0e78e3b90c",
+      "wat": "cases/c208-i32-mut-at-length.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i32-mut-UINTMAX",
+      "wasm": "cases/c209-i32-mut-UINTMAX.wasm",
+      "wasm_sha": "bd161a752130c182f7ce871cca2d4548364eb732fe6f1d6bd0acd2594518052c",
+      "wat": "cases/c209-i32-mut-UINTMAX.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i32-mut-empty",
+      "wasm": "cases/c210-i32-mut-empty.wasm",
+      "wasm_sha": "aa566384957e63b001c1180edaa303e7f5cd589f7d1caa5735c0833dbcd626a3",
+      "wat": "cases/c210-i32-mut-empty.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "i32-mut-null",
+      "wasm": "cases/c211-i32-mut-null.wasm",
+      "wasm_sha": "11b70a46f5900ecc28ec44cd07fe96e7175f9bdc81b08c9104c8be64dafeb477",
+      "wat": "cases/c211-i32-mut-null.wat",
+      "trap": "null",
+      "flags": []
+    },
+    {
+      "name": "i32-mut-alias-set-fill-loop",
+      "wasm": "cases/c212-i32-mut-alias-set-fill-loop.wasm",
+      "wasm_sha": "cfcb5b335af5759f50cf91d010a8d6ea360d9e00440ed511eed79579703ad2fb",
+      "wat": "cases/c212-i32-mut-alias-set-fill-loop.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i32-mut-copy",
+      "wasm": "cases/c213-i32-mut-copy.wasm",
+      "wasm_sha": "3232b924b1a0040f4bce4c02169e2a969acc8daaf2c7676a4522249290341419",
+      "wat": "cases/c213-i32-mut-copy.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "i32-mut-subtype",
+      "wasm": "cases/c214-i32-mut-subtype.wasm",
+      "wasm_sha": "3203f8800d38885f82be145dc66306d0856da2db4c150ac030d668a5f6aae65a",
+      "wat": "cases/c214-i32-mut-subtype.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "f32-mut",
+      "wasm": "cases/c215-f32-mut.wasm",
+      "wasm_sha": "b628305052c4ff4ec15970601188e477e224e3048f3b95b65242cb8012fc6a99",
+      "wat": "cases/c215-f32-mut.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "f32-mut-fixed",
+      "wasm": "cases/c216-f32-mut-fixed.wasm",
+      "wasm_sha": "3076debb7d53cb24975d725fba5cdc7417a5acd1e1192245b57e05aab1cbb374",
+      "wat": "cases/c216-f32-mut-fixed.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "f32-mut-default",
+      "wasm": "cases/c217-f32-mut-default.wasm",
+      "wasm_sha": "e79a5b43ca5977b3d8be9c660b986dc1aaa676049238c87250d3c8be7b139372",
+      "wat": "cases/c217-f32-mut-default.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "f32-mut-at-length",
+      "wasm": "cases/c218-f32-mut-at-length.wasm",
+      "wasm_sha": "19d9dcb05a45730acd2f9f1c3070cdaf12cc9d772f3d50647c77c7958affcdb2",
+      "wat": "cases/c218-f32-mut-at-length.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "f32-mut-UINTMAX",
+      "wasm": "cases/c219-f32-mut-UINTMAX.wasm",
+      "wasm_sha": "536ba873ff5b60bcac569448486133be8609a6bb610b8591c1ebe679be028af7",
+      "wat": "cases/c219-f32-mut-UINTMAX.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "f32-mut-empty",
+      "wasm": "cases/c220-f32-mut-empty.wasm",
+      "wasm_sha": "85845b1fe172d23ae37c0c46df98a3a8847798be71c168724f26a8994d98944c",
+      "wat": "cases/c220-f32-mut-empty.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "f32-mut-null",
+      "wasm": "cases/c221-f32-mut-null.wasm",
+      "wasm_sha": "27419183ad01f2fbb44ac3a2c1b3fbfb0e5b8241afcc6873a587dcc851b95514",
+      "wat": "cases/c221-f32-mut-null.wat",
+      "trap": "null",
+      "flags": []
+    },
+    {
+      "name": "f32-mut-alias-set-fill-loop",
+      "wasm": "cases/c222-f32-mut-alias-set-fill-loop.wasm",
+      "wasm_sha": "a90dc34489acde8db607588354e2900e2e1905b5ee8f4ab337b821fc8ab7dfcd",
+      "wat": "cases/c222-f32-mut-alias-set-fill-loop.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "f32-mut-copy",
+      "wasm": "cases/c223-f32-mut-copy.wasm",
+      "wasm_sha": "af0d63c1bbd02382454f49e43376958cbead445b3ad95bc7daa80014126a4736",
+      "wat": "cases/c223-f32-mut-copy.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "f32-mut-subtype",
+      "wasm": "cases/c224-f32-mut-subtype.wasm",
+      "wasm_sha": "7fe3450ee59c5d3d5c3245f15fdcb48477b72996e4809aa998a130dfc9f8f47a",
+      "wat": "cases/c224-f32-mut-subtype.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "data-i8",
+      "wasm": "cases/c225-data-i8.wasm",
+      "wasm_sha": "c626722e4a54d9edf63c21dbf21aba990cfb4021553898ad03ae1e8ae11953d5",
+      "wat": "cases/c225-data-i8.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "data-i16",
+      "wasm": "cases/c226-data-i16.wasm",
+      "wasm_sha": "b6e43bf3251ec16f0f865ce2a1300a17d198b1416dce46b174d177851bc871f3",
+      "wat": "cases/c226-data-i16.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "data-i32",
+      "wasm": "cases/c227-data-i32.wasm",
+      "wasm_sha": "70bb5751cb68124e115b5114a8191cf736c8ee30d285fd54c95700959aba90d4",
+      "wat": "cases/c227-data-i32.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-live-across-30000-allocations",
+      "wasm": "cases/c228-root-live-across-30000-allocations.wasm",
+      "wasm_sha": "5f4b24405d95972f59456bc3997f80e6455df70a04dbbbf41809d06413dd0415",
+      "wat": "cases/c228-root-live-across-30000-allocations.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "parameter-return-unknown",
+      "wasm": "cases/c229-parameter-return-unknown.wasm",
+      "wasm_sha": "6af6e8ac07f79a56d0dd329dd78a45889e1087ae01020648aeb0c8356638312c",
+      "wat": "cases/c229-parameter-return-unknown.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "exception-between-reads",
+      "wasm": "cases/c230-exception-between-reads.wasm",
+      "wasm_sha": "62560241d4f5d08f6721b26a1105cc390f071ea887a9f8867dc7fd2eff5e30c4",
+      "wat": "cases/c230-exception-between-reads.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "new-i8",
+      "wasm": "cases/c231-new-i8.wasm",
+      "wasm_sha": "0565c75f7e6c6fae07f02010363d5f097e1cdb552167a00d59a258d875f64f9f",
+      "wat": "cases/c231-new-i8.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "default-zero-i8",
+      "wasm": "cases/c232-default-zero-i8.wasm",
+      "wasm_sha": "6f7de750f49da2738ef8728997f2863ed61e22bb0348db60456597c8150d66c3",
+      "wat": "cases/c232-default-zero-i8.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "fixed-three-i8",
+      "wasm": "cases/c233-fixed-three-i8.wasm",
+      "wasm_sha": "871543f2c43535cc88947b116b2df17baab380d3eef39b24f9c8e8f7ff2a3645",
+      "wat": "cases/c233-fixed-three-i8.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "new-i16",
+      "wasm": "cases/c234-new-i16.wasm",
+      "wasm_sha": "db8dfcf54f62cd9fbcceeba5930cf0ae381591a2cd42e5bb04ccaad3c9ebb153",
+      "wat": "cases/c234-new-i16.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "default-zero-i16",
+      "wasm": "cases/c235-default-zero-i16.wasm",
+      "wasm_sha": "a2cd23dee8165ba519e56deea454dc7f8153245f5337ea7bd22e9e520b00e444",
+      "wat": "cases/c235-default-zero-i16.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "fixed-three-i16",
+      "wasm": "cases/c236-fixed-three-i16.wasm",
+      "wasm_sha": "e1b124032b41394b179b86cd5f3ca7e683877ce55ad384543dc3a1e45074a323",
+      "wat": "cases/c236-fixed-three-i16.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "new-i32",
+      "wasm": "cases/c237-new-i32.wasm",
+      "wasm_sha": "0b1a2d2956885c2bf57a8581b29adc08c855fc9667765a75fbf901fba31d7ae3",
+      "wat": "cases/c237-new-i32.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "default-zero-i32",
+      "wasm": "cases/c238-default-zero-i32.wasm",
+      "wasm_sha": "5bc5b40c0a7817d078c7cf36cb44c60e012385f8b3b7eee61e7857badf76acbc",
+      "wat": "cases/c238-default-zero-i32.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "fixed-three-i32",
+      "wasm": "cases/c239-fixed-three-i32.wasm",
+      "wasm_sha": "b4ee6b7b3e27803073aed751dc6b429c8c87951ccfce81a9c37876c7208e3cb3",
+      "wat": "cases/c239-fixed-three-i32.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "new-i64",
+      "wasm": "cases/c240-new-i64.wasm",
+      "wasm_sha": "e56e7d5a12e8800b4d5c69cad4d0bf2c82984f1392ae3a59c9144f138edba7e2",
+      "wat": "cases/c240-new-i64.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "default-zero-i64",
+      "wasm": "cases/c241-default-zero-i64.wasm",
+      "wasm_sha": "12da6c8a31260b11b010871f75d29196543929442e2003b5be99283ef9850951",
+      "wat": "cases/c241-default-zero-i64.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "fixed-three-i64",
+      "wasm": "cases/c242-fixed-three-i64.wasm",
+      "wasm_sha": "bff6f8741463268226ed007384f6685355791bfed8d41cdab28f421ddf831613",
+      "wat": "cases/c242-fixed-three-i64.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "new-f32",
+      "wasm": "cases/c243-new-f32.wasm",
+      "wasm_sha": "f5728139289d58660f8a796734e3e0090837dc118f3377dab126612042227da6",
+      "wat": "cases/c243-new-f32.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "default-zero-f32",
+      "wasm": "cases/c244-default-zero-f32.wasm",
+      "wasm_sha": "4e815718200269ad5f2077d8c1e6ebe700cdf144fa6f40cb87819ed8a7314c84",
+      "wat": "cases/c244-default-zero-f32.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "fixed-three-f32",
+      "wasm": "cases/c245-fixed-three-f32.wasm",
+      "wasm_sha": "35f797ccd922f021b4136a8369821d8f6294b3921be3ad6bef4010d534633ba2",
+      "wat": "cases/c245-fixed-three-f32.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "new-f64",
+      "wasm": "cases/c246-new-f64.wasm",
+      "wasm_sha": "d6b871b0186e0a01ec0b8c58ca55dd93797928461f3bfa891c7b544cb99a866e",
+      "wat": "cases/c246-new-f64.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "default-zero-f64",
+      "wasm": "cases/c247-default-zero-f64.wasm",
+      "wasm_sha": "aa092f97f44878db183c55a1b08ec1743a43c59766dc23a0dbc4901580e39c51",
+      "wat": "cases/c247-default-zero-f64.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "fixed-three-f64",
+      "wasm": "cases/c248-fixed-three-f64.wasm",
+      "wasm_sha": "aed049f654081dfa137f7dee965ff757a3589710aaa7b6f0798f08afa16edca9",
+      "wat": "cases/c248-fixed-three-f64.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "new-v128",
+      "wasm": "cases/c249-new-v128.wasm",
+      "wasm_sha": "ba83fd65d9b0f3b897f829d22a2f7d957615384a4e35e42ebe0d2ae362b9d63a",
+      "wat": "cases/c249-new-v128.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "default-zero-v128",
+      "wasm": "cases/c250-default-zero-v128.wasm",
+      "wasm_sha": "3ccf282260ba7464ad2299bbd5dbf613fd0a9f66a7b30e564211d46710713c4a",
+      "wat": "cases/c250-default-zero-v128.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "fixed-three-v128",
+      "wasm": "cases/c251-fixed-three-v128.wasm",
+      "wasm_sha": "c1e032b9d17f55310b767aeb28a3d8d7a149263c9105bcc517e2765db602353f",
+      "wat": "cases/c251-fixed-three-v128.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "new-i31",
+      "wasm": "cases/c252-new-i31.wasm",
+      "wasm_sha": "a5034a6927b331c6999589d434d7abcd400b170f0dd52dbde6df303aa6a670f9",
+      "wat": "cases/c252-new-i31.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "default-zero-i31",
+      "wasm": "cases/c253-default-zero-i31.wasm",
+      "wasm_sha": "4421344c58a2869fba88b07f761064286f2b575b883731ce6ef885b8aaa74980",
+      "wat": "cases/c253-default-zero-i31.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "fixed-three-i31",
+      "wasm": "cases/c254-fixed-three-i31.wasm",
+      "wasm_sha": "4602e8734d08c1ef91948dfc89d1758ba1f723c3f3a7b3ad37ff9b7237db9de4",
+      "wat": "cases/c254-fixed-three-i31.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "new-struct",
+      "wasm": "cases/c255-new-struct.wasm",
+      "wasm_sha": "41884ce643a38baa71d3afd3ad3e9227968bac00ac579c1815c6e00402862914",
+      "wat": "cases/c255-new-struct.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "default-zero-struct",
+      "wasm": "cases/c256-default-zero-struct.wasm",
+      "wasm_sha": "f231f6d272b9b494134bc02ace89dbace7def82556c8f6821f9d74bb33133d14",
+      "wat": "cases/c256-default-zero-struct.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "fixed-three-struct",
+      "wasm": "cases/c257-fixed-three-struct.wasm",
+      "wasm_sha": "7916e7f6f42b9d6520f80a678b87b9954d6cba0c25b5cd7165f6a6db8be91d1c",
+      "wat": "cases/c257-fixed-three-struct.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "new-func",
+      "wasm": "cases/c258-new-func.wasm",
+      "wasm_sha": "a52b721f04814c0e8440acd9a15ce6310b1f403a4366f119c0b7cbb0a411990c",
+      "wat": "cases/c258-new-func.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "default-zero-func",
+      "wasm": "cases/c259-default-zero-func.wasm",
+      "wasm_sha": "fe54f5418816530c8ff029d8b6196f846865c0edad9c9bc7f9d4f31ce0fc5489",
+      "wat": "cases/c259-default-zero-func.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "fixed-three-func",
+      "wasm": "cases/c260-fixed-three-func.wasm",
+      "wasm_sha": "1c99b25bd93d0bc2d967152011a5238ff994b96500643ffac641b57fbe16f7c4",
+      "wat": "cases/c260-fixed-three-func.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "fixed-empty",
+      "wasm": "cases/c261-fixed-empty.wasm",
+      "wasm_sha": "785b4e2fa33eae3d538841545127fb5119f9b0192fe5c45dddd3d7f945e92ac0",
+      "wat": "cases/c261-fixed-empty.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "immutable-numeric",
+      "wasm": "cases/c262-immutable-numeric.wasm",
+      "wasm_sha": "1efc58f5449a067a753e8631957d694ba9cdefd4225149c5647222d05771df09",
+      "wat": "cases/c262-immutable-numeric.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "data-length-and-empty",
+      "wasm": "cases/c263-data-length-and-empty.wasm",
+      "wasm_sha": "36a8654e09f04e652c9a4d9163aaf2c3d0b0bb9534f9d632a765c3b6a4890e12",
+      "wat": "cases/c263-data-length-and-empty.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "data-real-bounds-trap",
+      "wasm": "cases/c264-data-real-bounds-trap.wasm",
+      "wasm_sha": "9948dde0b5f359e4a6b6d60041c384ee947cb90e3eb661cc7d40dbf808c4bac1",
+      "wat": "cases/c264-data-real-bounds-trap.wat",
+      "trap": "bounds",
+      "flags": []
+    },
+    {
+      "name": "elem-length-and-empty",
+      "wasm": "cases/c265-elem-length-and-empty.wasm",
+      "wasm_sha": "97f728848a0eaee5b7a9f8ecc0dfc7690f7547915aae3bc0640efd9b3d96f1e3",
+      "wat": "cases/c265-elem-length-and-empty.wat",
+      "trap": "invalid",
+      "flags": []
+    },
+    {
+      "name": "elem-typed-length-and-empty",
+      "wasm": "cases/c266-elem-typed-length-and-empty.wasm",
+      "wasm_sha": "8ad500f59a7dfd34433fac46e05ae4b93e52e75c052486d9b3d052a8557e83c5",
+      "wat": "cases/c266-elem-typed-length-and-empty.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "null-array-trap",
+      "wasm": "cases/c267-null-array-trap.wasm",
+      "wasm_sha": "956a16fc9bac9ac2bf65bdf3e9922a7de313054332dda8222691574c249e3a03",
+      "wat": "cases/c267-null-array-trap.wat",
+      "trap": "null",
+      "flags": []
+    },
+    {
+      "name": "subtype-ref-cast-local-select",
+      "wasm": "cases/c268-subtype-ref-cast-local-select.wasm",
+      "wasm_sha": "64b76592aa5bee794903257675923258895d5924cb4f7378c3f38ee66d24e006",
+      "wat": "cases/c268-subtype-ref-cast-local-select.wat",
+      "trap": "select",
+      "flags": []
+    },
+    {
+      "name": "subtype-ref-cast-typed-select",
+      "wasm": "cases/c269-subtype-ref-cast-typed-select.wasm",
+      "wasm_sha": "78b2a2627fe4d9b0916f8e101fc6b5268cfb1bfb5d4c3747279b5b1c77ae80cf",
+      "wat": "cases/c269-subtype-ref-cast-typed-select.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "loop-local-reassignment-branch-tee",
+      "wasm": "cases/c270-loop-local-reassignment-branch-tee.wasm",
+      "wasm_sha": "170768ba13a20b632ff0806e0ebb9eee2cf2b54c66570cbff6ed16d7feab3622",
+      "wat": "cases/c270-loop-local-reassignment-branch-tee.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "root-live-across-collection",
+      "wasm": "cases/c271-root-live-across-collection.wasm",
+      "wasm_sha": "1dfdcb33f1ee6289f1f3e59a8b0066ca99b039e9312a30bb28a6e8f4af38edf5",
+      "wat": "cases/c271-root-live-across-collection.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "parameter-call-return-unknown",
+      "wasm": "cases/c272-parameter-call-return-unknown.wasm",
+      "wasm_sha": "702076b54ead7b11f6dc2748bfb8255caa30849190f7ec32059f1b8c548c173a",
+      "wat": "cases/c272-parameter-call-return-unknown.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "self-tail-swapping-parameters",
+      "wasm": "cases/c273-self-tail-swapping-parameters.wasm",
+      "wasm_sha": "21e8bafaff9a797c413ced2279057be5211ea3535b184a00f79aed17095227ba",
+      "wat": "cases/c273-self-tail-swapping-parameters.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "EH-ref-root-live",
+      "wasm": "cases/c274-EH-ref-root-live.wasm",
+      "wasm_sha": "302f51473c7f95e33ec7b786e47d0d9dd474002ded3d3b508ea9474de7fdaa72",
+      "wat": "cases/c274-EH-ref-root-live.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "known-to-unknown-return-overwrites-shadow",
+      "wasm": "cases/c275-known-to-unknown-return-overwrites-shadow.wasm",
+      "wasm_sha": "6dc51640289ad0cb3ba473c0c724a07c1075711cdb5ec0745dcdfc594b6f09b7",
+      "wat": "cases/c275-known-to-unknown-return-overwrites-shadow.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "known-to-null-return-clears-shadow",
+      "wasm": "cases/c276-known-to-null-return-clears-shadow.wasm",
+      "wasm_sha": "8d60e713bec5c74967eb2fa30441ff5aa2e1f0bb05b9dd3eb6e0785f5c7e2ca8",
+      "wat": "cases/c276-known-to-null-return-clears-shadow.wat",
+      "trap": "null",
+      "flags": []
+    },
+    {
+      "name": "loop-known-unknown-join-runtime-shadow",
+      "wasm": "cases/c277-loop-known-unknown-join-runtime-shadow.wasm",
+      "wasm_sha": "d22a134b51addbcfc82de06003ec9695e9bb604c98099d1572274ada23538fe3",
+      "wat": "cases/c277-loop-known-unknown-join-runtime-shadow.wat",
+      "trap": null,
+      "flags": []
+    },
+    {
+      "name": "self-tail-resets-declared-null-shadow",
+      "wasm": "cases/c278-self-tail-resets-declared-null-shadow.wasm",
+      "wasm_sha": "080803fd7cbdef506c17b0470073933435f333769b002946c03247685432b3a7",
+      "wat": "cases/c278-self-tail-resets-declared-null-shadow.wat",
+      "trap": "null",
+      "flags": []
+    }
+  ],
+  "foreign": [
+    {
+      "provider": "foreign/f32-immutable-bounds-provider.wasm",
+      "provider_sha": "112bbe5fdc2088293798b70667d704a69905358fb912f53492045a030893dcb8",
+      "importer": "foreign/f32-immutable-bounds-importer.wasm",
+      "importer_sha": "b620d2ad7e5f41f69a9ac5b880d9dbc14b5dfef58336e9d58561e058796a0e7f",
+      "name": "f32-immutable-bounds",
+      "trap": "bounds",
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/f32-immutable-null-provider.wasm",
+      "provider_sha": "813ad3f1c7222081ea572660e239f3fa990593785a4f4eda88bd70500e3f82bb",
+      "importer": "foreign/f32-immutable-null-importer.wasm",
+      "importer_sha": "27eb7552313a0ed6d90fc7b3b2174027eff0750251d2c0ddf6aa7e7df6c5c5ef",
+      "name": "f32-immutable-null",
+      "trap": "null",
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/f32-immutable-read-provider.wasm",
+      "provider_sha": "112bbe5fdc2088293798b70667d704a69905358fb912f53492045a030893dcb8",
+      "importer": "foreign/f32-immutable-read-importer.wasm",
+      "importer_sha": "23092f66133da76ab73706d8441cda9b72a41ba4a48799b21a345da3322a7d10",
+      "name": "f32-immutable-read",
+      "trap": null,
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/f32-mut-bounds-provider.wasm",
+      "provider_sha": "3ef9e655f6c6e7f2f9bd36aba4ba32732ca5092c5bce0cb64645d94613f5f0ff",
+      "importer": "foreign/f32-mut-bounds-importer.wasm",
+      "importer_sha": "74cf71df977246d80774538a7d68ce55bfa512721e7e8f72a09537ea6bd0bdd0",
+      "name": "f32-mut-bounds",
+      "trap": "bounds",
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/f32-mut-null-provider.wasm",
+      "provider_sha": "74fc02a63230868f6b832d7e227f87a90b51f739282bd50597534f345b523cdb",
+      "importer": "foreign/f32-mut-null-importer.wasm",
+      "importer_sha": "cd3c40d677640a7a60991ce879a498b0b10aee3c7e3e5457ead64cc8144cbd5b",
+      "name": "f32-mut-null",
+      "trap": "null",
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/f32-mut-read-provider.wasm",
+      "provider_sha": "3ef9e655f6c6e7f2f9bd36aba4ba32732ca5092c5bce0cb64645d94613f5f0ff",
+      "importer": "foreign/f32-mut-read-importer.wasm",
+      "importer_sha": "9f337c38c76e32423c322c5e85d019033c173ac25a0cea9ea3b0c59e42975ff8",
+      "name": "f32-mut-read",
+      "trap": null,
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/i16-immutable-read-provider.wasm",
+      "provider_sha": "858f4300edab28e9567385ae7344747b48dc498a10de93e38c8c271810d90a42",
+      "importer": "foreign/i16-immutable-read-importer.wasm",
+      "importer_sha": "b8bf671229ea8d12c57c7028f33134fa45bcef472986799efebcfc16c30aff7a",
+      "name": "i16-immutable-read",
+      "trap": null,
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/i16-mut-read-provider.wasm",
+      "provider_sha": "50ba7db531174ac04d5a8a3d2a441f1094102fc7c1ab86feec6777288a6a93e2",
+      "importer": "foreign/i16-mut-read-importer.wasm",
+      "importer_sha": "9bed087149005804a63a8329a4dc6e70816aeedd24ff16280915f07f7ce30074",
+      "name": "i16-mut-read",
+      "trap": null,
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/i32-immutable-bounds-provider.wasm",
+      "provider_sha": "72571f0a87d1bee156525ee706683b58cfbfd748b5427587ea923f8efe3fa524",
+      "importer": "foreign/i32-immutable-bounds-importer.wasm",
+      "importer_sha": "ad069b22fccff3455360c94de4c8db17202b3ebe496ee9fe8c60c9f6f2af5a8b",
+      "name": "i32-immutable-bounds",
+      "trap": "bounds",
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/i32-immutable-null-provider.wasm",
+      "provider_sha": "b494096b80ba9ede1cc71d433e55a85c52541ba24d99c47193d512b9f1e6a7ca",
+      "importer": "foreign/i32-immutable-null-importer.wasm",
+      "importer_sha": "7908aacc8e7a2de393028d3c764c1df3eb27d5d525f5bce6aaaf61bfba3dc0c6",
+      "name": "i32-immutable-null",
+      "trap": "null",
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/i32-immutable-read-provider.wasm",
+      "provider_sha": "72571f0a87d1bee156525ee706683b58cfbfd748b5427587ea923f8efe3fa524",
+      "importer": "foreign/i32-immutable-read-importer.wasm",
+      "importer_sha": "22976a77e90f54d96c84122f186270cc31902dc3e1201efbdc8a08a154954609",
+      "name": "i32-immutable-read",
+      "trap": null,
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/i32-mut-bounds-provider.wasm",
+      "provider_sha": "448384a0dbfe4bd8c50e93e88db8ae7ab820885eaa9a1e9d56442c7850449475",
+      "importer": "foreign/i32-mut-bounds-importer.wasm",
+      "importer_sha": "5b17f68dc0836c80a73f7b3659073b2c6fbbe6260a2da99eb8cc1cdcf0c5cd43",
+      "name": "i32-mut-bounds",
+      "trap": "bounds",
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/i32-mut-null-provider.wasm",
+      "provider_sha": "590d517e227173f3916e44e3fb57eddcb17808f8f05a71fa42a218c76b41cee5",
+      "importer": "foreign/i32-mut-null-importer.wasm",
+      "importer_sha": "5c6af19c406d8359dd46dfae3aa4ba690c83c9021db5c8a4790381b6aba5a8b4",
+      "name": "i32-mut-null",
+      "trap": "null",
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/i32-mut-read-provider.wasm",
+      "provider_sha": "448384a0dbfe4bd8c50e93e88db8ae7ab820885eaa9a1e9d56442c7850449475",
+      "importer": "foreign/i32-mut-read-importer.wasm",
+      "importer_sha": "86b7bf4156d55d335ab9324b330dddab4d31826868103dff5b4e6e16172c7c5f",
+      "name": "i32-mut-read",
+      "trap": null,
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/i8-immutable-read-provider.wasm",
+      "provider_sha": "b7b986c840498c8cba9cd23eeb5cc60187f2edc9cd9074a055d10c27cb033ac5",
+      "importer": "foreign/i8-immutable-read-importer.wasm",
+      "importer_sha": "ec54f6cc84c1bf99c3929e1b18762245e2e3440e249dc63edfedc02720619df4",
+      "name": "i8-immutable-read",
+      "trap": null,
+      "provider_module": "provider"
+    },
+    {
+      "provider": "foreign/i8-mut-read-provider.wasm",
+      "provider_sha": "bf4162a564b133ace58f1f1219f52f996c43965bd51b305c2d955d8853e4e71c",
+      "importer": "foreign/i8-mut-read-importer.wasm",
+      "importer_sha": "d9c95e5a057a05223f5a9c103b3be051f876176d8caeae1f735dd626d8f335e8",
+      "name": "i8-mut-read",
+      "trap": null,
+      "provider_module": "provider"
+    }
+  ],
+  "primary_extra_flags": {
+    "feature-memory64": [
+      "-WFE-memory64"
+    ],
+    "feature-table64": [
+      "-WFE-table64"
+    ],
+    "feature-multi-memory": [
+      "-WFE-multi-memory"
+    ],
+    "feature-extended-constant-expressions": [
+      "-WFE-extended-const"
+    ],
+    "feature-threads-atomic-semantics": [
+      "-WFE-threads"
+    ]
+  },
+  "scope": "279 full-module independent assertion/trap cases used for each merged3TU binary;16 foreign provider/consumer pairs. Expected validation failures2. Wasm self-assertions enforce independent numeric/alias/bits/GC/ref/EH results; nonzero exit alone never counts as a trap match.",
+  "features": [
+    {
+      "name": "observable-mvp",
+      "wasm": "features/observable-mvp.wasm",
+      "wasm_sha": "444b124f96095964eda81c33b698f495e6d72bb2d4de8ca8fa922c589ce2490f",
+      "wat": "features/observable-mvp.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-mutable-global-export",
+      "wasm": "features/observable-mutable-global-export.wasm",
+      "wasm_sha": "adf7ed855e2b18aff1af557b76a25e2e7491ced391b9c7c89706f0c61649ab05",
+      "wat": "features/observable-mutable-global-export.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-sign-extension",
+      "wasm": "features/observable-sign-extension.wasm",
+      "wasm_sha": "66e6e74ad52408d127dd296554ada243cac2d8bcde5ac5e76fe959ba430abc3e",
+      "wat": "features/observable-sign-extension.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-nontrapping-float-to-int",
+      "wasm": "features/observable-nontrapping-float-to-int.wasm",
+      "wasm_sha": "0d3179b165a4a05fb89e4ad56dc362321cea222f37e2f82fe897ddda08aa0a09",
+      "wat": "features/observable-nontrapping-float-to-int.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-multi-value",
+      "wasm": "features/observable-multi-value.wasm",
+      "wasm_sha": "5da21b05bd4957d61f97cb87f6302fa22f795b4d67e3f1b8e741c0bf008731ae",
+      "wat": "features/observable-multi-value.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-reference-types",
+      "wasm": "features/observable-reference-types.wasm",
+      "wasm_sha": "1f4314fc6e37e6131169738925679790ebe242e684ce58b4a04531f4245c3f87",
+      "wat": "features/observable-reference-types.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-typed-function-reference",
+      "wasm": "features/observable-typed-function-reference.wasm",
+      "wasm_sha": "331f4a0273a3651200d327fbe31f229adbdf5d67b162571323fcd246b603a90a",
+      "wat": "features/observable-typed-function-reference.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-table64",
+      "wasm": "features/observable-table64.wasm",
+      "wasm_sha": "b73b7e61448d858a9de7e2d12e8b0053aeb341a567e5636e58be52606db8749e",
+      "wat": "features/observable-table64.wat",
+      "flags": [
+        "-WFE-table64"
+      ],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-tail-call",
+      "wasm": "features/observable-tail-call.wasm",
+      "wasm_sha": "1fc2fba2b2e1660439d88856e7662be566ceb0f06c96df201085649f8b9bcae2",
+      "wat": "features/observable-tail-call.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-gc-struct-array-i31",
+      "wasm": "features/observable-gc-struct-array-i31.wasm",
+      "wasm_sha": "a08f94a5ba2997e16e2506aa8a932cde409d3a22a9e8727e3f9ef05999860108",
+      "wat": "features/observable-gc-struct-array-i31.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-exceptions-exnref",
+      "wasm": "features/observable-exceptions-exnref.wasm",
+      "wasm_sha": "b4d33c4e56beb08ad62aba1bbed8e80bb4f6a54cb90b7c106b575edec1c1fe99",
+      "wat": "features/observable-exceptions-exnref.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-memory64",
+      "wasm": "features/observable-memory64.wasm",
+      "wasm_sha": "b496a88e9ca470fa45cb833cf903efcaa1a81ec9d2cb7011478c4fb6bd9229d8",
+      "wat": "features/observable-memory64.wat",
+      "flags": [
+        "-WFE-memory64"
+      ],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-multi-memory",
+      "wasm": "features/observable-multi-memory.wasm",
+      "wasm_sha": "1d642d857770f09a33f2b4208b1c12ffda02ed997dd9e504526f271ee55463c6",
+      "wat": "features/observable-multi-memory.wat",
+      "flags": [
+        "-WFE-multi-memory"
+      ],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-bulk-memory",
+      "wasm": "features/observable-bulk-memory.wasm",
+      "wasm_sha": "b933b4dd78d5f70955d9776a0efdcd9e6a067f940d793f921c5f21a74144b7c0",
+      "wat": "features/observable-bulk-memory.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-threads-atomic-semantics",
+      "wasm": "features/observable-threads-atomic-semantics.wasm",
+      "wasm_sha": "1a09e318b237aa2ab402553d6f46ae55ce279e97eebd3a464a1285ebbf68537b",
+      "wat": "features/observable-threads-atomic-semantics.wat",
+      "flags": [
+        "-WFE-threads"
+      ],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-branch-hint",
+      "wasm": "features/observable-branch-hint.wasm",
+      "wasm_sha": "c5a0c46efd7e42fe8147e3c9b2b61fcc395519292e1fea31273687c87f1c15d7",
+      "wat": "features/observable-branch-hint.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-custom-annotation",
+      "wasm": "features/observable-custom-annotation.wasm",
+      "wasm_sha": "736ed7f33bf3e1e2be90dd61769ce978dc377487a9148fe3d797d02883a880a1",
+      "wat": "features/observable-custom-annotation.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-extended-constant-expressions",
+      "wasm": "features/observable-extended-constant-expressions.wasm",
+      "wasm_sha": "d8fa89ad7c5e15c7b166a8058aa77abde8f3a9b11edd192b53b3b36262a082f6",
+      "wat": "features/observable-extended-constant-expressions.wat",
+      "flags": [
+        "-WFE-extended-const"
+      ],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-fixed-simd",
+      "wasm": "features/observable-fixed-simd.wasm",
+      "wasm_sha": "203848213a94e58ea15da0a122dce769ee8de4db375e352c8b62715a388223b9",
+      "wat": "features/observable-fixed-simd.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    },
+    {
+      "name": "observable-relaxed-simd",
+      "wasm": "features/observable-relaxed-simd.wasm",
+      "wasm_sha": "7dbc9fce404eb73c63b32c1bd76cc07148b6cd259f2d982f06638d3c40b09996",
+      "wat": "features/observable-relaxed-simd.wat",
+      "flags": [],
+      "trap": null,
+      "scope": "primary feature workload with its necessary dependencies; unused exnref removed, no assertions or executed loop body changed; custom annotations/extended const are conformance only; atomics is semantics, not parallel GC"
+    }
+  ]
+}

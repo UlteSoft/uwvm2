@@ -1,0 +1,287 @@
+{
+  "schema": "uwvm-gc-nativetls-ABC-source-contract-v1",
+  "source_only": true,
+  "original_review_packet_sha256": "2cac876783c820fc2ee8508c0928bdb59378d75bc0fbca313719f96e42a05038",
+  "original_derivation_sha256": "3b430f7eac6b6c0a612cd639096c176494f68053565779c779ae5de79ad3a87e",
+  "canonical_source_archive_sha256": "ef3bdb9d8227be8405d1c72c5e14eef1e040ec29eb2654fbb3bcb192886f521e",
+  "canonical_source_archive_bytes": 183098,
+  "root_base_manifest_sha256": "5cad7465e846b03e97b181e85a6149711be6a4a14e57f317a0553e1b29a9f4cd",
+  "approved_precise_key_manifest_sha256": "2ae326cf1b3106661dbbe3cf929a46d88da153e85f49502c05b02c3a99aafca6",
+  "records": {
+    "uwvm2/src/uwvm2/runtime/llvm_jit_cache/environment.h": {
+      "bytes": 43178,
+      "sha256": "a3c7fe4c6bb48354b613da547bc7ca38ef38e3e1ebd1929d3deec9de38483e09"
+    },
+    "uwvm2/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_status_dispatch.inc": {
+      "bytes": 6974,
+      "sha256": "52bcb00db2cb6ad622cb877e9d74bb9b440ba193b8bdf8a701854a6534abc9ae"
+    },
+    "uwvm2/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_struct_set32.inc": {
+      "bytes": 12251,
+      "sha256": "b6f3f43ba557479ec84d3170c8b651b7bf104cc349e5bd7675adc195165c9dc2"
+    },
+    "uwvm2/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_struct_set32_bridge.inc": {
+      "bytes": 3087,
+      "sha256": "8266bff375688586caea42c082b9256643d538e8972df3f81ccf719adfdbddf4"
+    },
+    "uwvm2/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h": {
+      "bytes": 77577,
+      "sha256": "c83a2540769cb8028a6174228f73b304d5fa92337b0da714913923cc36eec465"
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/gc_object.h": {
+      "bytes": 285583,
+      "sha256": "64fe4289b8fa5363afc5bd6a01897f1c3043d335bd6465d18ff2db53d529eaec"
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/wasm_module.cppm": {
+      "bytes": 2976,
+      "sha256": "604437b348bb23e2829f9455aa98c51164bf33664dece435f3d5f800ab4637ce"
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/impl.h": {
+      "bytes": 1110,
+      "sha256": "4041b9dd22d42a37aed10a8466a9b7d899449840651bf45cfe9995f8272602c2"
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/impl.cppm": {
+      "bytes": 1265,
+      "sha256": "908fcf01297fc04aa2e681077f2b9943b199da85af35472810b6de75bcf721ae"
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/gc_trace_metadata.h": {
+      "bytes": 8782,
+      "sha256": "998b85e4e38568f4ff60e2e0438e092565c7bd17c7ddf7d540b6007a8a090ab9"
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/gc_trace_metadata.cppm": {
+      "bytes": 669,
+      "sha256": "346b9eb541ae8043ec43ee0d6b799194928ae8fda69b4762cfe81a306ba52b7c"
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/collection_local_membership.inc": {
+      "bytes": 2462,
+      "sha256": "1cd30d5393bbbab452cf38f0386cf6480c9cc8c2fab3532c5b96552f8694bf7f"
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/compact_numeric/descriptor.h": {
+      "bytes": 31354,
+      "sha256": "9a770293c14aa2fd7406af8dff5b4b3c0d6d34a4f9511b3f0b2b546872dffb62"
+    },
+    "uwvm2/benchmark/0004.wasm3-core/gc_collection_local_membership_ring.cc": {
+      "bytes": 9125,
+      "sha256": "606be478b913f7c8b979dcbc0da031574c7e48686658088e99759208ffe5d897"
+    },
+    "uwvm2/test/0014.llvm_jit/llvm_jit_gc_collection_local_membership_cache_key.cc": {
+      "bytes": 729,
+      "sha256": "3aec13d4dad92c754083619dcb155eee91bed698218433792b0d2910c6875363"
+    },
+    "uwvm2/test/0019.gc_statepoint/gc_collection_local_membership.cc": {
+      "bytes": 12800,
+      "sha256": "0bf5bf542e31b20fe0fffbe7e19f5275224bb956137f36d2f3aa4b73875b771b"
+    },
+    "uwvm2-ros/src/uwvm2/runtime/llvm_jit_cache/environment.h": {
+      "bytes": 42587,
+      "sha256": "088d7066bb442c392eec42d14a516ecd4a626236fcb6f796d5a5f28d661b52f4"
+    },
+    "uwvm2-ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_status_dispatch.inc": {
+      "bytes": 6974,
+      "sha256": "52bcb00db2cb6ad622cb877e9d74bb9b440ba193b8bdf8a701854a6534abc9ae"
+    },
+    "uwvm2-ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_struct_set32.inc": {
+      "bytes": 12251,
+      "sha256": "b6f3f43ba557479ec84d3170c8b651b7bf104cc349e5bd7675adc195165c9dc2"
+    },
+    "uwvm2-ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_struct_set32_bridge.inc": {
+      "bytes": 3087,
+      "sha256": "8266bff375688586caea42c082b9256643d538e8972df3f81ccf719adfdbddf4"
+    },
+    "uwvm2-ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h": {
+      "bytes": 77577,
+      "sha256": "c83a2540769cb8028a6174228f73b304d5fa92337b0da714913923cc36eec465"
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/gc_object.h": {
+      "bytes": 285583,
+      "sha256": "64fe4289b8fa5363afc5bd6a01897f1c3043d335bd6465d18ff2db53d529eaec"
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/wasm_module.cppm": {
+      "bytes": 2976,
+      "sha256": "604437b348bb23e2829f9455aa98c51164bf33664dece435f3d5f800ab4637ce"
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/impl.h": {
+      "bytes": 1110,
+      "sha256": "4041b9dd22d42a37aed10a8466a9b7d899449840651bf45cfe9995f8272602c2"
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/impl.cppm": {
+      "bytes": 1265,
+      "sha256": "908fcf01297fc04aa2e681077f2b9943b199da85af35472810b6de75bcf721ae"
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/gc_trace_metadata.h": {
+      "bytes": 8782,
+      "sha256": "998b85e4e38568f4ff60e2e0438e092565c7bd17c7ddf7d540b6007a8a090ab9"
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/gc_trace_metadata.cppm": {
+      "bytes": 669,
+      "sha256": "346b9eb541ae8043ec43ee0d6b799194928ae8fda69b4762cfe81a306ba52b7c"
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/collection_local_membership.inc": {
+      "bytes": 2462,
+      "sha256": "1cd30d5393bbbab452cf38f0386cf6480c9cc8c2fab3532c5b96552f8694bf7f"
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/compact_numeric/descriptor.h": {
+      "bytes": 31354,
+      "sha256": "9a770293c14aa2fd7406af8dff5b4b3c0d6d34a4f9511b3f0b2b546872dffb62"
+    },
+    "uwvm2-ros/benchmark/0004.wasm3-core/gc_collection_local_membership_ring.cc": {
+      "bytes": 9125,
+      "sha256": "606be478b913f7c8b979dcbc0da031574c7e48686658088e99759208ffe5d897"
+    },
+    "uwvm2-ros/test/0014.llvm_jit/llvm_jit_gc_collection_local_membership_cache_key.cc": {
+      "bytes": 729,
+      "sha256": "3aec13d4dad92c754083619dcb155eee91bed698218433792b0d2910c6875363"
+    },
+    "uwvm2-ros/test/0019.gc_statepoint/gc_collection_local_membership.cc": {
+      "bytes": 12800,
+      "sha256": "0bf5bf542e31b20fe0fffbe7e19f5275224bb956137f36d2f3aa4b73875b771b"
+    }
+  },
+  "old_production_pins": {
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/gc_object.h": {
+      "sha256": "209de02c372a7c082be0aada2760699b6a543631fa9e280b4263ebae528ea456",
+      "exists": true
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/gc_trace_metadata.h": {
+      "sha256": null,
+      "exists": false
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/gc_trace_metadata.cppm": {
+      "sha256": null,
+      "exists": false
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/compact_numeric/descriptor.h": {
+      "sha256": "aa290fd3ba2ed501996594d73f64967f0224ec902d0ba86cba77c171ba3c9894",
+      "exists": true
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/impl.h": {
+      "sha256": "8d7bdd4e9fe2eb4278460db0cd802d898211839ed27a0f30e6ad56f8b1656544",
+      "exists": true
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/impl.cppm": {
+      "sha256": "357023c9b5487eabeea81f6335a1ffce0a7537855a4f143472fcb5cfcf7e2153",
+      "exists": true
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/wasm_module.cppm": {
+      "sha256": "8e9739ce6297be70bc2a2f92d7d5041948e029bf7c94116815f627f206e442eb",
+      "exists": true
+    },
+    "uwvm2/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_struct_set32_bridge.inc": {
+      "sha256": null,
+      "exists": false
+    },
+    "uwvm2/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h": {
+      "sha256": "d53ae23d6c073c46ce3c21925db653b6c2f27523aee2ed34d26d6522405ff297",
+      "exists": true
+    },
+    "uwvm2/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_status_dispatch.inc": {
+      "sha256": null,
+      "exists": false
+    },
+    "uwvm2/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_struct_set32.inc": {
+      "sha256": null,
+      "exists": false
+    },
+    "uwvm2/src/uwvm2/runtime/llvm_jit_cache/environment.h": {
+      "sha256": "b5cd7b702b03ef679cb031a526b4f4bbd5d2a5784dda42198574fc0987e428b7",
+      "exists": true
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/gc_object.h": {
+      "sha256": "209de02c372a7c082be0aada2760699b6a543631fa9e280b4263ebae528ea456",
+      "exists": true
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/gc_trace_metadata.h": {
+      "sha256": null,
+      "exists": false
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/gc_trace_metadata.cppm": {
+      "sha256": null,
+      "exists": false
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/compact_numeric/descriptor.h": {
+      "sha256": "aa290fd3ba2ed501996594d73f64967f0224ec902d0ba86cba77c171ba3c9894",
+      "exists": true
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/impl.h": {
+      "sha256": "8d7bdd4e9fe2eb4278460db0cd802d898211839ed27a0f30e6ad56f8b1656544",
+      "exists": true
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/impl.cppm": {
+      "sha256": "357023c9b5487eabeea81f6335a1ffce0a7537855a4f143472fcb5cfcf7e2153",
+      "exists": true
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/wasm_module.cppm": {
+      "sha256": "8e9739ce6297be70bc2a2f92d7d5041948e029bf7c94116815f627f206e442eb",
+      "exists": true
+    },
+    "uwvm2-ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_struct_set32_bridge.inc": {
+      "sha256": null,
+      "exists": false
+    },
+    "uwvm2-ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h": {
+      "sha256": "d53ae23d6c073c46ce3c21925db653b6c2f27523aee2ed34d26d6522405ff297",
+      "exists": true
+    },
+    "uwvm2-ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_status_dispatch.inc": {
+      "sha256": null,
+      "exists": false
+    },
+    "uwvm2-ros/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_struct_set32.inc": {
+      "sha256": null,
+      "exists": false
+    },
+    "uwvm2-ros/src/uwvm2/runtime/llvm_jit_cache/environment.h": {
+      "sha256": "2617b7c313a28f9f6a9cebbeb1000f11eb063ef1b2506896cf47f4379e4ac0fe",
+      "exists": true
+    },
+    "uwvm2/src/uwvm2/uwvm/runtime/storage/collection_local_membership.inc": {
+      "exists": false,
+      "sha256": null
+    },
+    "uwvm2-ros/src/uwvm2/uwvm/runtime/storage/collection_local_membership.inc": {
+      "exists": false,
+      "sha256": null
+    }
+  },
+  "runtime_preserved": [
+    {
+      "repository": "uwvm2",
+      "path": "src/uwvm2/runtime/lib/uwvm_runtime.h",
+      "action": "preserve entire R5 source unchanged",
+      "bytes": 28104,
+      "sha256": "bc0ad285d7376b5ba6c21c0d1aaeb5345baa30432ce6ac321d0571e32b605065"
+    },
+    {
+      "repository": "uwvm2",
+      "path": "src/uwvm2/runtime/lib/uwvm_runtime.default.cpp",
+      "action": "preserve entire R5 source unchanged",
+      "bytes": 1304328,
+      "sha256": "8a812e2a97de1be42072786d9c154f8fa20ca1cbebc3440ca92994e8b6f1e8e4"
+    },
+    {
+      "repository": "uwvm2-ros",
+      "path": "src/uwvm2/runtime/lib/uwvm_runtime.h",
+      "action": "preserve entire R5 source unchanged",
+      "bytes": 26141,
+      "sha256": "845e24d037e77fd66ac68d0dbb30ab7fbf8a3993ee904f177ab02cdae6ff7ee1"
+    },
+    {
+      "repository": "uwvm2-ros",
+      "path": "src/uwvm2/runtime/lib/uwvm_runtime.default.cpp",
+      "action": "preserve entire R5 source unchanged",
+      "bytes": 909800,
+      "sha256": "e25dda2cc7f5c6ff139d5e936ee57f74e138029fe72ca2e5405d3957c9314954"
+    }
+  ],
+  "derived_environment": {
+    "uwvm2": {
+      "bytes": 43652,
+      "sha256": "381a8ad81599cf33e71367b3f7fe016ee4a16ab1b3fd6ca4463aace8359ecf1a"
+    },
+    "uwvm2-ros": {
+      "bytes": 43061,
+      "sha256": "c13c0c4635f5f83acf41b550b534f1b31552a4a51f06348d089b844c14d0646d"
+    }
+  },
+  "metadata_cache_key_reason": "conservative collector-profile isolation; no proven cache overrun or public ABI repair"
+}

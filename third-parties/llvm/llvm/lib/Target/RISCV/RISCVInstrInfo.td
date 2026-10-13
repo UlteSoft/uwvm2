@@ -58,6 +58,17 @@ def riscv_tail      : RVSDNode<"TAIL", SDT_RISCVCall,
                                [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
                                 SDNPVariadic]>;
 
+// Callee-pop tail transfers additionally carry the incoming-to-outgoing SP
+// delta. The frame lowering pass consumes it before emitting an ordinary tail.
+def SDT_RISCVTCReturn : SDTypeProfile<0, -1,
+                                        [SDTCisVT<0, XLenVT>, SDTCisVT<1, XLenVT>]>;
+def riscv_tc_return : RVSDNode<"TC_RETURN", SDT_RISCVTCReturn,
+                                [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
+                                 SDNPVariadic]>;
+def riscv_sw_guarded_tc_return
+    : RVSDNode<"SW_GUARDED_TC_RETURN", SDT_RISCVTCReturn,
+               [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue, SDNPVariadic]>;
+
 // Software guarded calls for large code model
 def riscv_sw_guarded_call : RVSDNode<"SW_GUARDED_CALL", SDT_RISCVCall,
                                      [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
@@ -1896,6 +1907,22 @@ def PseudoTAILIndirectX7 : Pseudo<(outs), (ins GPRX7:$rs1),
                                   [(riscv_sw_guarded_tail GPRX7:$rs1)]>,
                            PseudoInstExpansion<(JALR X0, GPR:$rs1, 0)>;
 }
+
+// Preserve the genuine tail transfer across frame lowering. In particular,
+// this is not a normal call followed by a return when prototypes differ.
+let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [X2] in {
+def PseudoTCRETURN : Pseudo<(outs), (ins call_symbol:$dst, ixlenimm_li:$delta), []>;
+def PseudoTCRETURNIndirect
+    : Pseudo<(outs), (ins GPRTCNonX7:$rs1, ixlenimm_li:$delta),
+             [(riscv_tc_return GPRTCNonX7:$rs1, timm:$delta)]>;
+def PseudoTCRETURNIndirectX7
+    : Pseudo<(outs), (ins GPRX7:$rs1, ixlenimm_li:$delta),
+             [(riscv_sw_guarded_tc_return GPRX7:$rs1, timm:$delta)]>;
+}
+def : Pat<(riscv_tc_return (iPTR tglobaladdr:$dst), timm:$delta),
+          (PseudoTCRETURN tglobaladdr:$dst, timm:$delta)>;
+def : Pat<(riscv_tc_return (iPTR texternalsym:$dst), timm:$delta),
+          (PseudoTCRETURN texternalsym:$dst, timm:$delta)>;
 
 def : Pat<(riscv_tail (iPTR tglobaladdr:$dst)),
           (PseudoTAIL tglobaladdr:$dst)>;

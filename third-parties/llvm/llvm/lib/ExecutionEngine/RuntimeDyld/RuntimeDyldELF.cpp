@@ -27,6 +27,9 @@ using namespace llvm::support::endian;
 
 #define DEBUG_TYPE "dyld"
 
+// Cold linked-library ABI proof for GNU ARM EHABI TARGET2/GOT_PREL support.
+extern "C" uint32_t uwvm_llvm_arm_ehabi_target2_abi_v1() { return 1; }
+
 static void or32le(void *P, int32_t V) { write32le(P, read32le(P) | V); }
 
 static void or32AArch64Imm(void *L, uint64_t Imm) {
@@ -611,8 +614,15 @@ void RuntimeDyldELF::resolveARMRelocation(const SectionEntry &Section,
 
   switch (Type) {
   default:
-    llvm_unreachable("Not implemented relocation type!");
+    // An unsupported relocation must not fall through into unrelated native
+    // code in release builds where llvm_unreachable is an optimizer promise.
+    HasError = true;
+    ErrorStr = "Unsupported ARM RuntimeDyld relocation";
+    return;
 
+  case ELF::R_ARM_REL32:
+    support::ulittle32_t::ref{TargetPtr} = Value - FinalAddress;
+    break;
   case ELF::R_ARM_NONE:
     break;
     // Write a 31bit signed offset
@@ -920,6 +930,10 @@ void RuntimeDyldELF::setMipsABI(const ObjectFile &Obj) {
   IsMipsN64ABI = Obj.getFileFormatName() == "elf64-mips";
 }
 
+// Defined in the actual loader archive: installing a newer declaration alone
+// cannot qualify medium-model cross-section TOC relocations.
+unsigned RuntimeDyld::getUWVMPPC64TOCRelativeRelocations() noexcept { return 1u; }
+
 // Return the .TOC. section and offset.
 Error RuntimeDyldELF::findPPC64TOCSection(const ELFObjectFileBase &Obj,
                                           ObjSectionToIDMap &LocalSections,
@@ -1071,23 +1085,160 @@ static inline uint16_t applyPPChighesta (uint64_t value) {
   return ((value + 0x8000) >> 48) & 0xffff;
 }
 
+// Revision 11: ELF32 calls and EH frames need more than the address halves.
+// Keep overflow checks in Release builds; truncating a branch can jump into
+// unrelated VM code. Integer writes follow the object's byte order.
 void RuntimeDyldELF::resolvePPC32Relocation(const SectionEntry &Section,
-                                            uint64_t Offset, uint64_t Value,
-                                            uint32_t Type, int64_t Addend) {
+                                         uint64_t Offset, uint64_t Value,
+                                         uint32_t Type, int64_t Addend) {
   uint8_t *LocalAddress = Section.getAddressWithOffset(Offset);
+  uint64_t Result = Value + Addend;
+  uint64_t Place = Section.getLoadAddressWithOffset(Offset);
   switch (Type) {
   default:
-    report_fatal_error("Relocation type not implemented yet!");
-    break;
+    report_fatal_error("Unsupported PPC32 MCJIT relocation");
+  case ELF::R_PPC_NONE:
+    return;
+  case ELF::R_PPC_ADDR32:
+    if (!isUInt<32>(Result))
+      report_fatal_error("PPC32 address relocation overflow");
+    writeInt32BE(LocalAddress, Result);
+    return;
   case ELF::R_PPC_ADDR16_LO:
-    writeInt16BE(LocalAddress, applyPPClo(Value + Addend));
-    break;
+    if (!isUInt<32>(Result))
+      report_fatal_error("PPC32 address-half relocation overflow");
+    writeInt16BE(LocalAddress, applyPPClo(Result));
+    return;
   case ELF::R_PPC_ADDR16_HI:
-    writeInt16BE(LocalAddress, applyPPChi(Value + Addend));
-    break;
+    if (!isUInt<32>(Result))
+      report_fatal_error("PPC32 address-half relocation overflow");
+    writeInt16BE(LocalAddress, applyPPChi(Result));
+    return;
   case ELF::R_PPC_ADDR16_HA:
-    writeInt16BE(LocalAddress, applyPPCha(Value + Addend));
-    break;
+    if (!isUInt<32>(Result))
+      report_fatal_error("PPC32 address-half relocation overflow");
+    writeInt16BE(LocalAddress, applyPPCha(Result));
+    return;
+  case ELF::R_PPC_REL16_LO:
+    writeInt16BE(LocalAddress, applyPPClo(Result - Place));
+    return;
+  case ELF::R_PPC_REL16_HI:
+    writeInt16BE(LocalAddress, applyPPChi(Result - Place));
+    return;
+  case ELF::R_PPC_REL16_HA:
+    writeInt16BE(LocalAddress, applyPPCha(Result - Place));
+    return;
+  case ELF::R_PPC_REL24: {
+    int64_t Delta = static_cast<int64_t>(Result - Place);
+    if (!isInt<26>(Delta) || (Delta & 3))
+      report_fatal_error("PPC32 branch relocation overflow or misalignment");
+    uint32_t Inst = readBytesUnaligned(LocalAddress, 4);
+    writeInt32BE(LocalAddress, (Inst & 0xfc000003) | (Delta & 0x03fffffc));
+    return;
+  }
+  case ELF::R_PPC_REL32: {
+    int64_t Delta = static_cast<int64_t>(Result - Place);
+    if (!isInt<32>(Delta))
+      report_fatal_error("PPC32 PC-relative relocation overflow");
+    writeInt32BE(LocalAddress, Delta);
+    return;
+  }
+  }
+}
+
+// SPARC V9 static abs64 MCJIT. These are relocations, not register or memory
+// capabilities: the debugger still authenticates the compiler's function body
+// and never admits loader stubs into its public native instruction range.
+void RuntimeDyldELF::resolveSparc64Relocation(const SectionEntry &Section,
+                                           uint64_t Offset, uint64_t Value,
+                                           uint32_t Type, int64_t Addend) {
+  uint8_t *Address = Section.getAddressWithOffset(Offset);
+  uint64_t Result = Value + Addend;
+  int64_t Delta = static_cast<int64_t>(Result -
+                                     Section.getLoadAddressWithOffset(Offset));
+  auto Field = [&](uint32_t Mask, uint32_t Bits) {
+    uint32_t Inst = readBytesUnaligned(Address, 4);
+    writeInt32BE(Address, (Inst & ~Mask) | (Bits & Mask));
+  };
+  // ELF64 SPARC encodes an additional signed 24-bit value in r_info's type
+  // data. Only OLO10 consumes it; retain it while dispatching on the low byte.
+  int64_t TypeData = SignExtend64<24>(Type >> 8);
+  switch (Type & 0xff) {
+  default:
+    report_fatal_error("Unsupported SPARC64 MCJIT relocation");
+  case ELF::R_SPARC_NONE:
+    return;
+  case ELF::R_SPARC_64:
+  case ELF::R_SPARC_UA64:
+    writeInt64BE(Address, Result);
+    return;
+  case ELF::R_SPARC_32:
+  case ELF::R_SPARC_UA32:
+    if (!isUInt<32>(Result))
+      report_fatal_error("SPARC64 32-bit address relocation overflow");
+    writeInt32BE(Address, Result);
+    return;
+  case ELF::R_SPARC_DISP64:
+    writeInt64BE(Address, Delta);
+    return;
+  case ELF::R_SPARC_DISP32:
+    if (!isInt<32>(Delta))
+      report_fatal_error("SPARC64 PC-relative relocation overflow");
+    writeInt32BE(Address, Delta);
+    return;
+  case ELF::R_SPARC_HI22:
+  case ELF::R_SPARC_LM22:
+    Field(0x3fffff, Result >> 10);
+    return;
+  case ELF::R_SPARC_LO10:
+    Field(0x3ff, Result);
+    return;
+  case ELF::R_SPARC_HH22:
+    Field(0x3fffff, Result >> 42);
+    return;
+  case ELF::R_SPARC_HM10:
+    Field(0x3ff, Result >> 32);
+    return;
+  case ELF::R_SPARC_H44:
+    if (!isUInt<44>(Result))
+      report_fatal_error("SPARC64 44-bit address relocation overflow");
+    Field(0x3fffff, Result >> 22);
+    return;
+  case ELF::R_SPARC_M44:
+    Field(0x3ff, Result >> 12);
+    return;
+  case ELF::R_SPARC_L44:
+    Field(0xfff, Result);
+    return;
+  case ELF::R_SPARC_HIX22:
+    Field(0x3fffff, ~Result >> 10);
+    return;
+  case ELF::R_SPARC_LOX10:
+    Field(0x1fff, (Result & 0x3ff) | 0x1c00);
+    return;
+  case ELF::R_SPARC_OLO10: {
+    int64_t Bits = static_cast<int64_t>(Result & 0x3ff) + TypeData;
+    if (!isInt<13>(Bits))
+      report_fatal_error("SPARC64 OLO10 relocation overflow");
+    Field(0x1fff, Bits);
+    return;
+  }
+  case ELF::R_SPARC_WDISP30:
+  case ELF::R_SPARC_WPLT30:
+    if (!isInt<32>(Delta) || (Delta & 3))
+      report_fatal_error("SPARC64 call relocation overflow or misalignment");
+    Field(0x3fffffff, static_cast<uint64_t>(Delta) >> 2);
+    return;
+  case ELF::R_SPARC_WDISP22:
+    if (!isInt<24>(Delta) || (Delta & 3))
+      report_fatal_error("SPARC64 branch relocation overflow or misalignment");
+    Field(0x3fffff, static_cast<uint64_t>(Delta) >> 2);
+    return;
+  case ELF::R_SPARC_WDISP19:
+    if (!isInt<21>(Delta) || (Delta & 3))
+      report_fatal_error("SPARC64 branch relocation overflow or misalignment");
+    Field(0x7ffff, static_cast<uint64_t>(Delta) >> 2);
+    return;
   }
 }
 
@@ -1285,7 +1436,8 @@ static void applyITypeImmRISCV(uint8_t *InstrAddr, uint32_t Imm) {
 void RuntimeDyldELF::resolveRISCVRelocation(const SectionEntry &Section,
                                             uint64_t Offset, uint64_t Value,
                                             uint32_t Type, int64_t Addend,
-                                            SID SectionID) {
+                                            SID SectionID,
+                                            uint64_t CallStubOffset) {
   switch (Type) {
   default: {
     std::string Err = "Unimplemented reloc type: " + std::to_string(Type);
@@ -1296,8 +1448,27 @@ void RuntimeDyldELF::resolveRISCVRelocation(const SectionEntry &Section,
     // Last 12 bits to the jalr instruction
   case ELF::R_RISCV_CALL:
   case ELF::R_RISCV_CALL_PLT: {
+    if (Offset > Section.getSize() || Section.getSize() - Offset < 8 ||
+        Offset > UINT32_MAX - 4)
+      report_fatal_error("RISC-V call relocation is outside its section");
     uint64_t P = Section.getLoadAddressWithOffset(Offset);
     uint64_t PCOffset = Value + Addend - P;
+    // RV64 AUIPC sign-extends its 32-bit result before adding the signed low
+    // 12 bits. The carry from bit 11 must therefore fit, too: checking the
+    // unrounded displacement alone incorrectly accepts the top 2 KiB. RV32
+    // address arithmetic wraps at XLEN and reaches the whole address space.
+    auto InRange = [](uint64_t Delta) {
+      return isInt<32>(static_cast<int64_t>(Delta + 0x800));
+    };
+    if (Arch == Triple::riscv64 && !InRange(PCOffset)) {
+      if (!CallStubOffset)
+        report_fatal_error("RISC-V call relocation out of range without a stub");
+      PCOffset = Section.getLoadAddressWithOffset(CallStubOffset) - P;
+      if (!InRange(PCOffset))
+        report_fatal_error("RISC-V call stub out of range");
+    }
+    // [safe: complete AUIPC/JALR pair within Section] [section_end]
+    //        Offset and Offset + 4 each designate a full four-byte instruction.
     applyUTypeImmRISCV(Section.getAddressWithOffset(Offset), PCOffset);
     applyITypeImmRISCV(Section.getAddressWithOffset(Offset + 4), PCOffset);
     break;
@@ -1447,6 +1618,39 @@ void RuntimeDyldELF::resolveRISCVRelocation(const SectionEntry &Section,
 void RuntimeDyldELF::resolveRelocation(const RelocationEntry &RE,
                                        uint64_t Value) {
   const SectionEntry &Section = Sections[RE.SectionID];
+  if (Arch == Triple::ppc64 || Arch == Triple::ppc64le) {
+    uint32_t Type;
+    switch (RE.RelType) {
+    case ELF::R_PPC64_TOC16:       Type = ELF::R_PPC64_ADDR16; break;
+    case ELF::R_PPC64_TOC16_DS:    Type = ELF::R_PPC64_ADDR16_DS; break;
+    case ELF::R_PPC64_TOC16_LO:    Type = ELF::R_PPC64_ADDR16_LO; break;
+    case ELF::R_PPC64_TOC16_LO_DS: Type = ELF::R_PPC64_ADDR16_LO_DS; break;
+    case ELF::R_PPC64_TOC16_HI:    Type = ELF::R_PPC64_ADDR16_HI; break;
+    case ELF::R_PPC64_TOC16_HA:    Type = ELF::R_PPC64_ADDR16_HA; break;
+    default:
+      return resolveRelocation(Section, RE.Offset, Value, RE.RelType, RE.Addend,
+                               RE.SymOffset, RE.SectionID);
+    }
+    // A medium-model constant pool may live in .rodata rather than .toc.
+    // Both bases are actual final section load addresses, including after a
+    // memory manager remaps either section. Do not cancel unequal bases or
+    // freeze an allocation-time address in the addend.
+    uint64_t Delta = getSectionLoadAddress(RE.Sections.SectionA) -
+                     getSectionLoadAddress(RE.Sections.SectionB);
+    int64_t Displacement = static_cast<int64_t>(Delta + RE.Addend);
+    bool Whole = RE.RelType == ELF::R_PPC64_TOC16 ||
+                 RE.RelType == ELF::R_PPC64_TOC16_DS;
+    bool DS = RE.RelType == ELF::R_PPC64_TOC16_DS ||
+              RE.RelType == ELF::R_PPC64_TOC16_LO_DS;
+    if ((Whole && !isInt<16>(Displacement)) ||
+        (!Whole && !isInt<32>(Displacement)) ||
+        (DS && (Displacement & 3) != 0)) {
+      HasError = true;
+      ErrorStr = "PPC64 TOC-relative relocation is out of range or unaligned";
+      return;
+    }
+    return resolvePPC64Relocation(Section, RE.Offset, Delta, Type, RE.Addend);
+  }
   return resolveRelocation(Section, RE.Offset, Value, RE.RelType, RE.Addend,
                            RE.SymOffset, RE.SectionID);
 }
@@ -1485,6 +1689,9 @@ void RuntimeDyldELF::resolveRelocation(const SectionEntry &Section,
   case Triple::ppc64le:
     resolvePPC64Relocation(Section, Offset, Value, Type, Addend);
     break;
+  case Triple::sparcv9:
+    resolveSparc64Relocation(Section, Offset, Value, Type, Addend);
+    break;
   case Triple::systemz:
     resolveSystemZRelocation(Section, Offset, Value, Type, Addend);
     break;
@@ -1494,7 +1701,8 @@ void RuntimeDyldELF::resolveRelocation(const SectionEntry &Section,
     break;
   case Triple::riscv32: // Fall through.
   case Triple::riscv64:
-    resolveRISCVRelocation(Section, Offset, Value, Type, Addend, SectionID);
+    resolveRISCVRelocation(Section, Offset, Value, Type, Addend, SectionID,
+                          SymOffset);
     break;
   default:
     llvm_unreachable("Unsupported CPU type!");
@@ -1831,6 +2039,18 @@ RuntimeDyldELF::processRelocationRef(
             0);
         Section.advanceStubOffset(getMaxStubSize());
       }
+    } else if (RelType == ELF::R_ARM_TARGET2 || RelType == ELF::R_ARM_GOT_PREL) {
+      // GNU ARM ELF TARGET2 uses the GOT-relative-to-place policy. EHABI's
+      // indirect typeinfo encoding reads the target from this retained slot;
+      // writing a direct typeinfo address here changes the exception ABI.
+      auto *Placeholder = computePlaceholderAddress(SectionID, Offset);
+      int64_t ImplicitAddend = static_cast<int32_t>(read32le(Placeholder));
+      uint64_t GOTOffset = findOrAllocGOTEntry(Value, ELF::R_ARM_ABS32);
+      // Value.Offset belongs to the slot target; the relocation addends
+      // belong exclusively to the place-to-slot displacement, exactly once.
+      resolveGOTOffsetRelocation(SectionID, Offset,
+                                GOTOffset + Addend + ImplicitAddend,
+                                ELF::R_ARM_REL32);
     } else {
       uint32_t *Placeholder =
         reinterpret_cast<uint32_t*>(computePlaceholderAddress(SectionID, Offset));
@@ -2030,6 +2250,57 @@ RuntimeDyldELF::processRelocationRef(
       processSimpleRelocation(SectionID, Offset, RelType, Value);
     }
 
+  } else if (Arch == Triple::ppc || Arch == Triple::ppcle ||
+             Arch == Triple::sparcv9) {
+    bool IsPPC32 = Arch != Triple::sparcv9;
+    bool IsCall = IsPPC32 ? RelType == ELF::R_PPC_REL24
+                         : ((RelType & 0xff) == ELF::R_SPARC_WDISP30 ||
+                            (RelType & 0xff) == ELF::R_SPARC_WPLT30);
+    if (!IsCall) {
+      processSimpleRelocation(SectionID, Offset, RelType, Value);
+      return ++RelI;
+    }
+    SectionEntry &Section = Sections[SectionID];
+    // Only same-section destinations have a known displacement before remote
+    // section mapping. External and cross-section calls use a full-width tail
+    // stub, preserving the caller's LR/o7 and its stack/register window.
+    int64_t Delta = Value.Addend - static_cast<int64_t>(Offset);
+    bool Direct = !Value.SymbolName && Value.SectionID == SectionID &&
+                  !(Delta & 3) && (IsPPC32 ? isInt<26>(Delta) : isInt<32>(Delta));
+    if (Direct) {
+      processSimpleRelocation(SectionID, Offset, RelType, Value);
+      return ++RelI;
+    }
+    auto [It, Inserted] = Stubs.try_emplace(Value);
+    if (Inserted) {
+      It->second = Section.getStubOffset();
+      uint8_t *Stub = createStubFunction(Section.getAddressWithOffset(It->second));
+      auto Add = [&](unsigned StubOffset, unsigned Kind) {
+        RelocationEntry RE(SectionID, Stub - Section.getAddress() + StubOffset,
+                           Kind, Value.Addend);
+        if (Value.SymbolName)
+          addRelocationForSymbol(RE, Value.SymbolName);
+        else
+          addRelocationForSection(RE, Value.SectionID);
+      };
+      if (IsPPC32) {
+        unsigned LowHalf = IsTargetLittleEndian ? 0 : 2;
+        Add(LowHalf, ELF::R_PPC_ADDR16_HI);
+        Add(4 + LowHalf, ELF::R_PPC_ADDR16_LO);
+      } else {
+        Add(0, ELF::R_SPARC_HH22);
+        Add(4, ELF::R_SPARC_HM10);
+        Add(12, ELF::R_SPARC_LM22);
+        Add(16, ELF::R_SPARC_LO10);
+      }
+      Section.advanceStubOffset(getMaxStubSize());
+    }
+    // Leave this relocation deferred. The section's target load address can
+    // change after loadObject; resolving to its original host address here
+    // would bake in an invalid remote displacement.
+    RelocationEntry RE(SectionID, Offset, RelType, It->second);
+    addRelocationForSection(RE, SectionID);
+    return ++RelI;
   } else if (Arch == Triple::ppc64 || Arch == Triple::ppc64le) {
     if (RelType == ELF::R_PPC64_REL24) {
       // Determine ABI variant in use for this object.
@@ -2140,33 +2411,38 @@ RuntimeDyldELF::processRelocationRef(
                RelType == ELF::R_PPC64_TOC16_LO_DS ||
                RelType == ELF::R_PPC64_TOC16_HI ||
                RelType == ELF::R_PPC64_TOC16_HA) {
-      // These relocations are supposed to subtract the TOC address from
-      // the final value.  This does not fit cleanly into the RuntimeDyld
-      // scheme, since there may be *two* sections involved in determining
-      // the relocation value (the section of the symbol referred to by the
-      // relocation, and the TOC section associated with the current module).
-      //
-      // Fortunately, these relocations are currently only ever generated
-      // referring to symbols that themselves reside in the TOC, which means
-      // that the two sections are actually the same.  Thus they cancel out
-      // and we can immediately resolve the relocation right now.
-      switch (RelType) {
-      case ELF::R_PPC64_TOC16: RelType = ELF::R_PPC64_ADDR16; break;
-      case ELF::R_PPC64_TOC16_DS: RelType = ELF::R_PPC64_ADDR16_DS; break;
-      case ELF::R_PPC64_TOC16_LO: RelType = ELF::R_PPC64_ADDR16_LO; break;
-      case ELF::R_PPC64_TOC16_LO_DS: RelType = ELF::R_PPC64_ADDR16_LO_DS; break;
-      case ELF::R_PPC64_TOC16_HI: RelType = ELF::R_PPC64_ADDR16_HI; break;
-      case ELF::R_PPC64_TOC16_HA: RelType = ELF::R_PPC64_ADDR16_HA; break;
-      default: llvm_unreachable("Wrong relocation type.");
-      }
-
+      // Keep both section identities until final relocation. Medium-model
+      // direct references to local constant pools need not reside in .toc.
       RelocationValueRef TOCValue;
       if (auto Err = findPPC64TOCSection(Obj, ObjSectionToID, TOCValue))
         return std::move(Err);
-      if (Value.SymbolName || Value.SectionID != TOCValue.SectionID)
-        llvm_unreachable("Unsupported TOC relocation.");
-      Value.Addend -= TOCValue.Addend;
-      resolveRelocation(Sections[SectionID], Offset, Value.Addend, RelType, 0);
+      if (Value.SymbolName)
+        return make_error<RuntimeDyldError>(
+            "PPC64 TOC-relative relocation requires a local section");
+      if (Value.SectionID == TOCValue.SectionID) {
+        // Preserve the original same-section fast path: the two bases cancel
+        // independently of allocation/remapping and no section pair is needed.
+        uint32_t Type;
+        switch (RelType) {
+        case ELF::R_PPC64_TOC16:       Type = ELF::R_PPC64_ADDR16; break;
+        case ELF::R_PPC64_TOC16_DS:    Type = ELF::R_PPC64_ADDR16_DS; break;
+        case ELF::R_PPC64_TOC16_LO:    Type = ELF::R_PPC64_ADDR16_LO; break;
+        case ELF::R_PPC64_TOC16_LO_DS: Type = ELF::R_PPC64_ADDR16_LO_DS; break;
+        case ELF::R_PPC64_TOC16_HI:    Type = ELF::R_PPC64_ADDR16_HI; break;
+        case ELF::R_PPC64_TOC16_HA:    Type = ELF::R_PPC64_ADDR16_HA; break;
+        default: llvm_unreachable("Wrong TOC relocation type");
+        }
+        resolveRelocation(Sections[SectionID], Offset,
+                          Value.Addend - TOCValue.Addend, Type, 0);
+        return ++RelI;
+      }
+      RelocationEntry RE(SectionID, Offset, RelType, Value.Addend,
+                         Value.SectionID, 0, TOCValue.SectionID,
+                         TOCValue.Addend, false, 0);
+      addRelocationForSection(RE, Value.SectionID);
+      // Reassigning either base must recompute this same displacement.
+      if (Value.SectionID != TOCValue.SectionID)
+        addRelocationForSection(RE, TOCValue.SectionID);
     } else {
       // There are two ways to refer to the TOC address directly: either
       // via a ELF::R_PPC64_TOC relocation (where both symbol and addend are
@@ -2359,6 +2635,56 @@ RuntimeDyldELF::processRelocationRef(
       processSimpleRelocation(SectionID, Offset, RelType, Value);
     }
   } else if (Arch == Triple::riscv32 || Arch == Triple::riscv64) {
+    if (RelType == ELF::R_RISCV_CALL || RelType == ELF::R_RISCV_CALL_PLT) {
+      // Same-section calls do not depend on the eventual section address.
+      // External and cross-section targets can be anywhere in the RV64 address
+      // space, so reserve a full-range destination before final relocation.
+      // Keep the target relocation on the original call as well: resolution
+      // uses the direct call whenever possible, avoiding a needless extra jump.
+      uint64_t StubOffset = 0;
+      if (Arch == Triple::riscv64 && MemMgr.allowStubAllocation() &&
+          (Value.SymbolName || Value.SectionID != SectionID)) {
+        SectionEntry &Section = Sections[SectionID];
+        auto [It, Inserted] = Stubs.try_emplace(Value);
+        if (Inserted) {
+          StubOffset = alignTo(Section.getStubOffset(), getStubAlignment());
+          if (StubOffset > UINT32_MAX - getMaxStubSize())
+            report_fatal_error("RISC-V call stub section offset out of range");
+          It->second = StubOffset;
+          // computeSectionStubBufSize reserves one 24-byte entry per CALL,
+          // plus alignment padding. All later entries remain 8-byte aligned.
+          // [safe: reserved stub allocation] [allocation_end]
+          //        ^^ Stub denotes 24 writable bytes; literal at +16 is aligned.
+          auto *Stub = Section.getAddressWithOffset(StubOffset);
+          support::endian::write32le(Stub, 0x00000e17);      // auipc t3, 0
+          support::endian::write32le(Stub + 4, 0x010e3e03);  // ld t3, 16(t3)
+          support::endian::write32le(Stub + 8, 0x000e0067);  // jr t3
+          support::endian::write32le(Stub + 12, 0x00000013); // nop
+          // t3 is the same scratch register used by JITLink's RISC-V PLT.
+          // jr preserves ra and sp, so calls/tail calls and native unwinding
+          // retain their original return address and create no extra frame.
+          RelocationEntry TargetRE(SectionID, StubOffset + 16, ELF::R_RISCV_64,
+                                   Value.Addend);
+          if (Value.SymbolName)
+            addRelocationForSymbol(TargetRE, Value.SymbolName);
+          else
+            addRelocationForSection(TargetRE, Value.SectionID);
+          Section.advanceStubOffset(StubOffset - Section.getStubOffset() +
+                                    getMaxStubSize());
+        } else {
+          StubOffset = It->second;
+        }
+      }
+      // CALL's SymOffset is exclusively an optional stub offset, not the
+      // symbol offset used by other relocation kinds. The addend still includes
+      // local symbol offsets and is applied exactly once to both destinations.
+      RelocationEntry RE(SectionID, Offset, RelType, Value.Addend, StubOffset);
+      if (Value.SymbolName)
+        addRelocationForSymbol(RE, Value.SymbolName);
+      else
+        addRelocationForSection(RE, Value.SectionID);
+      return ++RelI;
+    }
     // *_LO12 relocation receive information about a symbol from the
     // corresponding *_HI20 relocation, so we have to collect this information
     // before resolving
@@ -2716,12 +3042,15 @@ size_t RuntimeDyldELF::getGOTEntrySize() {
   case Triple::loongarch64:
   case Triple::ppc64:
   case Triple::ppc64le:
+  case Triple::sparcv9:
   case Triple::systemz:
     Result = sizeof(uint64_t);
     break;
   case Triple::x86:
   case Triple::arm:
   case Triple::thumb:
+  case Triple::ppc:
+  case Triple::ppcle:
     Result = sizeof(uint32_t);
     break;
   case Triple::mips:
@@ -3041,6 +3370,9 @@ bool RuntimeDyldELF::relocationNeedsGot(const RelocationRef &R) const {
 }
 
 bool RuntimeDyldELF::relocationNeedsStub(const RelocationRef &R) const {
+  if (Arch == Triple::riscv64)
+    return R.getType() == ELF::R_RISCV_CALL ||
+           R.getType() == ELF::R_RISCV_CALL_PLT;
   if (Arch != Triple::x86_64)
     return true;  // Conservative answer
 

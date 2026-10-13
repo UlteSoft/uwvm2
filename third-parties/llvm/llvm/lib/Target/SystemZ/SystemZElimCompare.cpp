@@ -235,6 +235,33 @@ bool SystemZElimCompare::convertToLoadAndTrap(
     if (getRegReferences(*MBBI, SrcReg))
       return false;
 
+  // The load moves from MI to Branch. Its result being unused in between does
+  // not prove that its address or memory contents are unchanged. Do not sink
+  // volatile/atomic loads, cross stores/calls/barriers, or reuse an address
+  // register that has been redefined (including an overlapping subregister).
+  if (MI.hasOrderedMemoryRef())
+    return false;
+  Register Base = MI.getOperand(1).getReg();
+  Register Index = MI.getOperand(3).getReg();
+  MBBI = MI;
+  for (++MBBI; MBBI != MBBE; ++MBBI)
+    if (MBBI->mayStore() || MBBI->isCall() ||
+        MBBI->hasUnmodeledSideEffects() || MBBI->hasOrderedMemoryRef() ||
+        (Base && getRegReferences(*MBBI, Base).Def) ||
+        (Index && getRegReferences(*MBBI, Index).Def))
+      return false;
+
+  // Sinking extends the address registers' live ranges. Their earlier last
+  // uses can no longer kill them, even if the resulting machine instructions
+  // happen not to overwrite the hardware register before the new load.
+  MBBI = MI;
+  for (++MBBI; MBBI != MBBE; ++MBBI) {
+    if (Base)
+      MBBI->clearRegisterKills(Base, TRI);
+    if (Index)
+      MBBI->clearRegisterKills(Index, TRI);
+  }
+
   // The transformation is OK.  Rebuild Branch as a load-and-trap.
   while (Branch->getNumOperands())
     Branch->removeOperand(0);
@@ -243,7 +270,8 @@ bool SystemZElimCompare::convertToLoadAndTrap(
       .add(MI.getOperand(0))
       .add(MI.getOperand(1))
       .add(MI.getOperand(2))
-      .add(MI.getOperand(3));
+      .add(MI.getOperand(3))
+      .cloneMemRefs(MI);
   // The debug instr tracking for the load target now used by the load-and-trap
   // needs to be updated.
   MI.getParent()->getParent()->substituteDebugValuesForInst(MI, *Branch);

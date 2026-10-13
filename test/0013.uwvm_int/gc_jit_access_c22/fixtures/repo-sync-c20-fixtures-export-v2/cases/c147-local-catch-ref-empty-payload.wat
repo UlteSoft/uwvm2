@@ -1,0 +1,1 @@
+(module (tag $t) (func (export "_start") (local $e exnref) block $caught (result exnref) try_table (result exnref) (catch_ref $t $caught) throw $t unreachable end end local.set $e local.get $e ref.is_null if unreachable end block $done try_table (catch $t $done) local.get $e throw_ref unreachable end end))

@@ -1,0 +1,53 @@
+{
+  "cases": [
+    {
+      "name": "reference-read",
+      "oracle": 1618083840,
+      "reads_per_start": 131072,
+      "writes_per_start": 0,
+      "scope": "Typed reference array and struct access; checks checksum and final1024slots after writes. No forced collection, no cycle garbage, no parallel mutator.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/wasmtime-codegen-analysis-a1/fixtures/reference-read.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/wasmtime-codegen-analysis-a1/fixtures/reference-read.wasm",
+      "wat_sha": "53c8ccfdceca887c0f2e81af782d3eecfd8307098f2dae050bada2a28a41d192",
+      "wasm_sha": "c8cb3827e22fb5e8ad7199a32327f978ecdbeb8c24dd3f4cba03964265d0a8e6"
+    },
+    {
+      "name": "reference-write-same",
+      "oracle": 1618083840,
+      "reads_per_start": 132096,
+      "writes_per_start": 131072,
+      "scope": "Typed reference array and struct access; checks checksum and final1024slots after writes. No forced collection, no cycle garbage, no parallel mutator.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/wasmtime-codegen-analysis-a1/fixtures/reference-write-same.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/wasmtime-codegen-analysis-a1/fixtures/reference-write-same.wasm",
+      "wat_sha": "deb32fb960e21f9972b425073f8539353e7aa0397ececebac186d6c45b1b8972",
+      "wasm_sha": "ecc5a7b3a3c8683a9d8f9877c38384cae9d57ef1697eb5b0920bbb86fd71f6f7"
+    },
+    {
+      "name": "reference-write-alternate",
+      "oracle": 1253965824,
+      "reads_per_start": 132096,
+      "writes_per_start": 131072,
+      "scope": "Typed reference array and struct access; checks checksum and final1024slots after writes. No forced collection, no cycle garbage, no parallel mutator.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/wasmtime-codegen-analysis-a1/fixtures/reference-write-alternate.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/wasmtime-codegen-analysis-a1/fixtures/reference-write-alternate.wasm",
+      "wat_sha": "d74153baa504376010a2d632085f90aee65ad52d48a42d029ab4037662ecc2ea",
+      "wasm_sha": "1912375d7d2b54a7032d87a9235e5eba053201441a851d1e4218749e11ab2640"
+    },
+    {
+      "name": "numeric-i32-write-read",
+      "oracle": 4294901760,
+      "reads_per_start": 132096,
+      "writes_per_start": 131072,
+      "scope": "Typed numeric array writes and reads, checksum plus final1024slots. Access test, not collector throughput.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/wasmtime-codegen-analysis-a1/fixtures/numeric-i32-write-read.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/wasmtime-codegen-analysis-a1/fixtures/numeric-i32-write-read.wasm",
+      "wat_sha": "93243705d23b80258d9b7b90861007931beed128c2b4138dbe1639da7b08249c",
+      "wasm_sha": "9f39a9e5b72594a594054d8b03b72f15f074ba7545e863044ef8d8b5d8599840"
+    }
+  ],
+  "converter_dso_sha": "e8b92b84cafbd553a8fe1c96ddff1673c3f252849b033b63b11b573ca4e5912e",
+  "cgroup": "0::/system.slice/docker-4dd58ad4560fde2ab9b539e4ef9cab1fac531654e99ad554aff1fce8ae0eae37.scope\n",
+  "affinity": [
+    6
+  ]
+}

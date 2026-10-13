@@ -21,7 +21,7 @@ def main():
     build = args.llvm_build.resolve()
     args.out.mkdir(parents=True, exist_ok=False)
     version = json.loads((build/'uwvm-llvm-version.json').read_text())['version']
-    if version != '23.1.1-uwvm-ros.6':
+    if version != '23.1.1-uwvm-ros.13':
         raise RuntimeError(f'Not the pinned ROS LLVM: {version}')
     records = []
     tests = root/'third-parties/llvm/llvm/test/CodeGen'

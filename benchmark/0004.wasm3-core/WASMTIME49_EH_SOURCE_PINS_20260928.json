@@ -1,0 +1,599 @@
+{
+  "scope": "bounded local primary-source audit; no new VM execution, no compiler or perf invocation; no product source edits",
+  "wasmtime_commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b",
+  "wavm_commit": "4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09",
+  "sources": [
+    {
+      "path": "crates/wasmtime/src/runtime/vm.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm.rs",
+      "bytes": 19742,
+      "sha256": "48d25caa83abd5debadfb44884e89b9d3287931610faae9c2bbf152bae4c3ed6",
+      "provenance_batch": "pins-extra1.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/wasmtime/src/runtime/vm/gc/enabled.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/gc/enabled.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__gc__enabled.rs",
+      "bytes": 1768,
+      "sha256": "16857e19653def14f73f4543d32a2d36d47aa78d60ea68041d7d3e320ea0ef38",
+      "provenance_batch": "pins-extra1.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__gc__enabled.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/cranelift/src/translate/stack.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/translate/stack.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cranelift__src__translate__stack.rs",
+      "bytes": 23226,
+      "sha256": "9266956d0fb4137d993f2a858e85e0d620f1c7aba60a790a53b00a2047d0942c",
+      "provenance_batch": "pins-extra1.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cranelift__src__translate__stack.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/wasmtime/src/runtime/store/gc.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/store/gc.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__store__gc.rs",
+      "bytes": 46583,
+      "sha256": "0b154fadafb1e09843b9d59867e6e921625677de7062a4a7c6e288615484d98a",
+      "provenance_batch": "pins-extra1.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__store__gc.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/wasmtime/src/runtime/vm/throw.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/throw.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__throw.rs",
+      "bytes": 5689,
+      "sha256": "f9a3e69a27e3c045124a609c30dddf28696ed5a7dced506628614968e631f8a5",
+      "provenance_batch": "pins-extra2.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__throw.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/wasmtime/src/runtime/vm/gc/enabled/copying.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/gc/enabled/copying.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__gc__enabled__copying.rs",
+      "bytes": 46826,
+      "sha256": "2f014aa49e4380c586f95edbfa900a78538c41724cbc7f81193fc1327313fc29",
+      "provenance_batch": "pins-extra2.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__gc__enabled__copying.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/wasmtime/src/runtime/vm/gc/enabled/drc.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/gc/enabled/drc.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__gc__enabled__drc.rs",
+      "bytes": 50859,
+      "sha256": "78a109648f872d50d3f83c6ede81d028faa78e766824921367d5bc08486f191b",
+      "provenance_batch": "pins-extra2.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__gc__enabled__drc.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/cranelift/src/compiler.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/compiler.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cranelift__src__compiler.rs",
+      "bytes": 73188,
+      "sha256": "ac2d44d286858b766db738a4513d296f2f8160edd3dd2cbbd0852fafdbdf4291",
+      "provenance_batch": "pins-extra2.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cranelift__src__compiler.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/unwinder/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/unwinder/src/lib.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__lib.rs",
+      "bytes": 794,
+      "sha256": "2ec35116bdec38a26e6d9199a578ce13e5ea572ff296d7facfd9f6d1df85246f",
+      "provenance_batch": "pins-extra2.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__lib.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/wasmtime/src/runtime/vm/gc/enabled/exnref.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/gc/enabled/exnref.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__gc__enabled__exnref.rs",
+      "bytes": 7736,
+      "sha256": "bbb91ddcc5f2953485304e11c7bd54658dd391646dbba491d4b8420343c2a85c",
+      "provenance_batch": "pins-extra2.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__gc__enabled__exnref.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/unwinder/src/throw.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/unwinder/src/throw.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__throw.rs",
+      "bytes": 3125,
+      "sha256": "38715b33ec3e5adc5cc4686c6205c9b064fc14542d4aa1877b8c3ecf43eb6cc8",
+      "provenance_batch": "pins-extra3.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__throw.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/unwinder/src/stackwalk.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/unwinder/src/stackwalk.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__stackwalk.rs",
+      "bytes": 13387,
+      "sha256": "c20df50c6499d1473f0ed23e56f33424e17e7106da36fb791971de331a96aa0c",
+      "provenance_batch": "pins-extra3.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__stackwalk.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/unwinder/src/arch/mod.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/unwinder/src/arch/mod.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__arch__mod.rs",
+      "bytes": 5802,
+      "sha256": "b831791f9086b353703fa6332048e22eb39a2dff4e21fcb5db7be20df4447420",
+      "provenance_batch": "pins-extra3.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__arch__mod.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/unwinder/src/arch/aarch64.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/unwinder/src/arch/aarch64.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__arch__aarch64.rs",
+      "bytes": 6764,
+      "sha256": "4daf28dcd10780235ff1216f82c6f21c1c8afd803c594a851277eca8f8e3eecd",
+      "provenance_batch": "pins-extra3.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__arch__aarch64.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/unwinder/src/exception_table.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/unwinder/src/exception_table.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__exception_table.rs",
+      "bytes": 18145,
+      "sha256": "457d067b93cbe6c2f0c915d090ae785002188f7a737a7f29451856eb9186fe23",
+      "provenance_batch": "pins-extra3.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__exception_table.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/unwinder/README.md",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/unwinder/README.md",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__README.md",
+      "bytes": 552,
+      "sha256": "6432a60fe44fbc14fc055d28f4d0fe21da93f12ddfdff42d31146fd1ca4bb536",
+      "provenance_batch": "pins-extra3.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__README.md",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/environ/src/tunables.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/environ/src/tunables.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__environ__src__tunables.rs",
+      "bytes": 25489,
+      "sha256": "491fbad87aa4802600835fbf6949c58c446a9e99a39001df109e95633aa4706b",
+      "provenance_batch": "pins-extra3.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__environ__src__tunables.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/cli-flags/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cli-flags/src/lib.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cli-flags__src__lib.rs",
+      "bytes": 74895,
+      "sha256": "c8ee8b874666065f395ba1945782c29a97c6d3ab42ce783221a6f8c296d70836",
+      "provenance_batch": "pins-extra3.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cli-flags__src__lib.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/unwinder/src/arch/x86.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/unwinder/src/arch/x86.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__arch__x86.rs",
+      "bytes": 1549,
+      "sha256": "eeb4b7406201b8722435b51e2aa80c1e1b78521e03f0a241db49cbfa736bfd1e",
+      "provenance_batch": "pins-extra4.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__arch__x86.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/unwinder/src/arch/riscv64.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/unwinder/src/arch/riscv64.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__arch__riscv64.rs",
+      "bytes": 1255,
+      "sha256": "5db586d5db0db7a8dac25494e16a8ca1f4e1da7bae2c5e25ceb9313dc83d8cca",
+      "provenance_batch": "pins-extra4.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__arch__riscv64.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/unwinder/src/arch/s390x.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/unwinder/src/arch/s390x.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__arch__s390x.rs",
+      "bytes": 1376,
+      "sha256": "41c7c097574675c5637e1817b3ed222d93049afb162a39e9e14000e8d06e52f5",
+      "provenance_batch": "pins-extra4.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__unwinder__src__arch__s390x.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b",
+      "path": "crates/cranelift/src/lib.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/lib.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/wasmtime__crates__cranelift__src__lib.rs",
+      "bytes": 16391,
+      "sha256": "16fe4bd473c3d0cbba83d4d857aaecfd6836408a8f4e4aac41f4dc190cb16b88",
+      "provenance_batch": "pins-extra5.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/wasmtime__crates__cranelift__src__lib.rs"
+    },
+    {
+      "repository": "WAVM/WAVM",
+      "commit": "4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09",
+      "path": "Lib/LLVMJIT/EmitExceptions.cpp",
+      "url": "https://raw.githubusercontent.com/WAVM/WAVM/4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09/Lib/LLVMJIT/EmitExceptions.cpp",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/wavm__Lib__LLVMJIT__EmitExceptions.cpp",
+      "bytes": 13464,
+      "sha256": "776911f1c7dca2820010086d594961d9faec793399112ada8234f818fcf0e079",
+      "provenance_batch": "pins-extra5.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/wavm__Lib__LLVMJIT__EmitExceptions.cpp"
+    },
+    {
+      "repository": "WAVM/WAVM",
+      "commit": "4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09",
+      "path": "Lib/LLVMJIT/EmitContext.h",
+      "url": "https://raw.githubusercontent.com/WAVM/WAVM/4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09/Lib/LLVMJIT/EmitContext.h",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/wavm__Lib__LLVMJIT__EmitContext.h",
+      "bytes": 14240,
+      "sha256": "842456383fbf2ec86a5b1330c68cd8225ce6bb972aee485adbf508478f83d145",
+      "provenance_batch": "pins-extra5.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/wavm__Lib__LLVMJIT__EmitContext.h"
+    },
+    {
+      "repository": "WAVM/WAVM",
+      "commit": "4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09",
+      "path": "Lib/LLVMJIT/EmitModule.cpp",
+      "url": "https://raw.githubusercontent.com/WAVM/WAVM/4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09/Lib/LLVMJIT/EmitModule.cpp",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/wavm__Lib__LLVMJIT__EmitModule.cpp",
+      "bytes": 12217,
+      "sha256": "b549b2d306c474ebcc5ba72e5da22544e13fc7cb2412a91a194e22ecef72169c",
+      "provenance_batch": "pins-extra5.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/wavm__Lib__LLVMJIT__EmitModule.cpp"
+    },
+    {
+      "path": "crates/cranelift/src/func_environ.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/func_environ.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cranelift__src__func_environ.rs",
+      "bytes": 257878,
+      "sha256": "37af5f2f787ab799430e21d89a364c7018c76ff9a707d6ee2c79a89d8ee54bb8",
+      "provenance_batch": "pins-initial.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cranelift__src__func_environ.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/cranelift/src/translate/code_translator.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/translate/code_translator.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cranelift__src__translate__code_translator.rs",
+      "bytes": 202985,
+      "sha256": "f5842b82fa363263a9c079a2f010bd0685cff91db151c2a9e6d8027b9d8987dd",
+      "provenance_batch": "pins-initial.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cranelift__src__translate__code_translator.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/cranelift/src/translate/func_translator.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/translate/func_translator.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cranelift__src__translate__func_translator.rs",
+      "bytes": 14995,
+      "sha256": "e56bf8fec42a156f7d67d69293a40adb65c49832f2ed545985ce156e32449794",
+      "provenance_batch": "pins-initial.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cranelift__src__translate__func_translator.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/cranelift/src/func_environ/gc.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/func_environ/gc.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cranelift__src__func_environ__gc.rs",
+      "bytes": 67827,
+      "sha256": "2971bb01897fad7b127fd90a5413242a22c211311a0b9f6992b4fb44955483f0",
+      "provenance_batch": "pins-initial.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__cranelift__src__func_environ__gc.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/wasmtime/src/runtime/vm/libcalls.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/libcalls.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__libcalls.rs",
+      "bytes": 38847,
+      "sha256": "3dcdcaf8ce7281a0498c794275fa5cd0adc0e77f3891ea6b9fbc96ca2802f105",
+      "provenance_batch": "pins-initial.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__libcalls.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/wasmtime/src/runtime/vm/traphandlers.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/traphandlers.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__traphandlers.rs",
+      "bytes": 59531,
+      "sha256": "04c6ee683575ad84f6b1eccf08be27561e5397d10db542e60a61dd6e363d1863",
+      "provenance_batch": "pins-initial.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__traphandlers.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/wasmtime/src/runtime/vm/gc.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/gc.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__gc.rs",
+      "bytes": 16022,
+      "sha256": "d3724a09842fb8e3e638e2cb965716b98c2b32bb586669503c50391ea6440edb",
+      "provenance_batch": "pins-initial.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__wasmtime__src__runtime__vm__gc.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "path": "crates/environ/src/builtin.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/environ/src/builtin.rs",
+      "file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__environ__src__builtin.rs",
+      "bytes": 16889,
+      "sha256": "4ccdc48f88fd7478792aede19041808dc86052927bd4491575f8c93587c3aacd",
+      "provenance_batch": "pins-initial.json",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/crates__environ__src__builtin.rs",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    },
+    {
+      "name": "wavm-exception",
+      "url": "https://raw.githubusercontent.com/WAVM/WAVM/4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09/Lib/Runtime/Exception.cpp",
+      "bytes": 12125,
+      "sha256": "d109804683a9fa728e9950e3d4c5f19f903d840ac6a36b6d10c4b79ea06557bc",
+      "file": "wavm-exception.txt",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/wavm-exception.txt",
+      "repository": "WAVM/WAVM",
+      "commit": "4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09"
+    },
+    {
+      "name": "wasmtime-config",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/config.rs",
+      "bytes": 225844,
+      "sha256": "2763a78934a53e38e586b5b8de281fab651c7400652c3b05588e1e9d2800d39a",
+      "file": "wasmtime-config.txt",
+      "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/wasmtime-config.txt",
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b"
+    }
+  ],
+  "path_guess_failures": [
+    {
+      "path": "crates/wasmtime/src/runtime/vm/exceptions.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/exceptions.rs",
+      "error": "HTTPError: HTTP Error 404: Not Found",
+      "provenance_batch": "pins-extra1.json"
+    },
+    {
+      "path": "crates/cranelift/src/translate/handler_state.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/translate/handler_state.rs",
+      "error": "HTTPError: HTTP Error 404: Not Found",
+      "provenance_batch": "pins-extra1.json"
+    },
+    {
+      "path": "crates/wasmtime/src/runtime/vm/traphandlers/handler.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/traphandlers/handler.rs",
+      "error": "HTTPError: HTTP Error 404: Not Found",
+      "provenance_batch": "pins-extra1.json"
+    },
+    {
+      "path": "crates/gc/src/copying.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/gc/src/copying.rs",
+      "error": "HTTPError: HTTP Error 404: Not Found",
+      "provenance_batch": "pins-extra1.json"
+    },
+    {
+      "path": "crates/unwinder/src/arch.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/unwinder/src/arch.rs",
+      "error": "HTTPError: HTTP Error 404: Not Found",
+      "provenance_batch": "pins-extra3.json"
+    },
+    {
+      "path": "crates/unwinder/src/arch/x86_64.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/unwinder/src/arch/x86_64.rs",
+      "error": "HTTPError: HTTP Error 404: Not Found",
+      "provenance_batch": "pins-extra3.json"
+    },
+    {
+      "path": "crates/environ/src/inlining.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/environ/src/inlining.rs",
+      "error": "HTTPError: HTTP Error 404: Not Found",
+      "provenance_batch": "pins-extra3.json"
+    },
+    {
+      "path": "crates/cranelift/src/builtin.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/builtin.rs",
+      "error": "HTTPError: HTTP Error 404: Not Found",
+      "provenance_batch": "pins-extra4.json"
+    },
+    {
+      "path": "crates/wasmtime/src/runtime/vm/exception.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/exception.rs",
+      "error": "HTTPError: HTTP Error 404: Not Found",
+      "provenance_batch": "pins-initial.json"
+    },
+    {
+      "path": "crates/cranelift/src/builtins.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/builtins.rs",
+      "error": "HTTPError: HTTP Error 404: Not Found",
+      "provenance_batch": "pins-initial.json"
+    }
+  ],
+  "ros_llvm23_source_exploration": {
+    "version_file_declares": "23.1.1",
+    "qualification": "source inspection only, not an executed backend/ABI probe",
+    "files": [
+      {
+        "path": "third-parties/llvm/cmake/Modules/LLVMVersion.cmake",
+        "sha256": "a3b6155ffb943312d74bedc04ae6a360280f9be0abc6d541d23904bf504640f6",
+        "bytes": 325,
+        "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/ros-llvm23__cmake__Modules__LLVMVersion.cmake"
+      },
+      {
+        "path": "third-parties/llvm/llvm/include/llvm/IR/CallingConv.h",
+        "sha256": "6c6ffa106e002efc57e6ff833f63f8205e1742b0c46f5c3a393ecc11df3fbe0d",
+        "bytes": 11959,
+        "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/ros-llvm23__llvm__include__llvm__IR__CallingConv.h"
+      },
+      {
+        "path": "third-parties/llvm/llvm/include/llvm/IR/Instruction.def",
+        "sha256": "558e6587da72368b753b6967024dd1a4b8cddc76655abb4c27763594e842ff93",
+        "bytes": 8879,
+        "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/ros-llvm23__llvm__include__llvm__IR__Instruction.def"
+      },
+      {
+        "path": "third-parties/llvm/llvm/include/llvm/IR/Intrinsics.td",
+        "sha256": "b5a8d57479913bdc760451288d21f594d272bb02f9853e1959f1497def9d659c",
+        "bytes": 160903,
+        "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/ros-llvm23__llvm__include__llvm__IR__Intrinsics.td"
+      },
+      {
+        "path": "third-parties/llvm/llvm/lib/Target/X86/X86RegisterInfo.cpp",
+        "sha256": "3961a7c946a6a4cc043f6f396169aa86def3b2a5fa37bc3110eff17a9fc2f503",
+        "bytes": 46052,
+        "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/ros-llvm23__llvm__lib__Target__X86__X86RegisterInfo.cpp"
+      },
+      {
+        "path": "third-parties/llvm/llvm/lib/Target/X86/X86CallingConv.td",
+        "sha256": "7a536e2b392a89202088d92fb9ab52b9b6977e1f5c0776109a8e76bcba2f3026",
+        "bytes": 52632,
+        "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/ros-llvm23__llvm__lib__Target__X86__X86CallingConv.td"
+      },
+      {
+        "path": "third-parties/llvm/llvm/lib/Target/AArch64/AArch64RegisterInfo.cpp",
+        "sha256": "790fe6fb0cfa0d6688206750ef95f2601a04d1e6320a156806d4e6dda8f2a8ec",
+        "bytes": 62234,
+        "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/ros-llvm23__llvm__lib__Target__AArch64__AArch64RegisterInfo.cpp"
+      },
+      {
+        "path": "third-parties/llvm/llvm/lib/Target/AArch64/AArch64CallingConvention.td",
+        "sha256": "b5d01761386012ba1f8dc14e534779d1a53c0576d3be6cad9af6fccf334f5c45",
+        "bytes": 36602,
+        "saved_file": "build/wasm3-evidence/wasmtime49-eh-source-audit-20260928/ros-llvm23__llvm__lib__Target__AArch64__AArch64CallingConvention.td"
+      }
+    ]
+  },
+  "official_llvm_release_docs_version": "23.1.0",
+  "actual_wasmtime_eh_machine_code_captured": false,
+  "historical_measurement_batches": [
+    {
+      "batch": "eh-caught-ros-env2",
+      "inputs_sha256": "cb4db97e3b63f6961307804a00f8084fd4d0c910063c8fec128ca5f8c2ccb0fb",
+      "runs_sha256": "ddb5a22d1bece8412eb01f8af31ce3b2c4a44270825f4c887dd9782f628dde1b",
+      "summary_sha256": "9bf8c48c1fea47471be60e36741926193f00f8f335035cca6d4f62a9aa071e81",
+      "wat_sha256": "106240b668266c97b8f7187a32683a038d47fae31eca2facf2ba580a04ab0aa4",
+      "wasm_sha256": "560243a56c6b29dbe0337548fa96626db2c168e56ea69d88208cffa4dfc48560",
+      "wasmtime_sha256": "c36ef7e6548600b09bcb34cb3ee4c138f3e7b01893347ec7f48fdb8e6050aa94",
+      "command": [
+        "taskset",
+        "-c",
+        "0",
+        "/work/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+        "run",
+        "-C",
+        "cache=n",
+        "-W",
+        "exceptions=y",
+        "/work/wasm3-resume-20260924/evidence/followup-c7f9-43a37-20260928/eh-caught-ros-env2/eh_throws.wasm"
+      ],
+      "wall_ns": [
+        96557458,
+        94625072,
+        94450422,
+        96722969,
+        98222346,
+        94053073,
+        97292480,
+        96143192,
+        96419700
+      ],
+      "catches": [
+        500000,
+        500000,
+        500000,
+        500000,
+        500000,
+        500000,
+        500000,
+        500000,
+        500000
+      ],
+      "old_product_source_id": "sha256:43a37bcffcae8dc85dba5f7e9896b0046da00bce8cdb1ea35a625f04a83a1c1a"
+    },
+    {
+      "batch": "eh-caught-ordinary-env2",
+      "inputs_sha256": "7142c30b79c384f45e80ffa8c24e98d194d9b15fdf309054a5de698c3437478e",
+      "runs_sha256": "5129f2a8927adb7e8c344dfaaa340dd3b76c21729136cbe8fcf08afb794b9b64",
+      "summary_sha256": "eadccea6f9ddc42985bc7915b9023d35c8425eb8253b0ab4d0fc9015044ea43c",
+      "wat_sha256": "106240b668266c97b8f7187a32683a038d47fae31eca2facf2ba580a04ab0aa4",
+      "wasm_sha256": "560243a56c6b29dbe0337548fa96626db2c168e56ea69d88208cffa4dfc48560",
+      "wasmtime_sha256": "c36ef7e6548600b09bcb34cb3ee4c138f3e7b01893347ec7f48fdb8e6050aa94",
+      "command": [
+        "taskset",
+        "-c",
+        "0",
+        "/work/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+        "run",
+        "-C",
+        "cache=n",
+        "-W",
+        "exceptions=y",
+        "/work/wasm3-resume-20260924/evidence/followup-c7f9-43a37-20260928/eh-caught-ordinary-env2/eh_throws.wasm"
+      ],
+      "wall_ns": [
+        98231119,
+        98771438,
+        98622751,
+        95835425,
+        95713973,
+        94658383,
+        93941088,
+        93899520,
+        94431275
+      ],
+      "catches": [
+        500000,
+        500000,
+        500000,
+        500000,
+        500000,
+        500000,
+        500000,
+        500000,
+        500000
+      ],
+      "old_product_source_id": "sha256:c7f97991ba559981a71543aa4c692ec3b9ccd1cbd68057ce14469f7723062841"
+    }
+  ],
+  "report_sha256": "e0e82cdc818d50d4bded3a1e3c4f1a3c475fa4dd4f7013ebee2441c9e686b248"
+}

@@ -1,0 +1,105 @@
+{
+  "schema": "uwvm-live-table-gc-members-qualification-v1",
+  "passed": true,
+  "date": "2026-10-07",
+  "repositories": [
+    "uwvm2",
+    "uwvm2-ros"
+  ],
+  "backend": "full LLVM JIT",
+  "architectures": [
+    "x86_64",
+    "riscv64 QEMU",
+    "aarch64 QEMU"
+  ],
+  "source_cut": "source212",
+  "source_identities": {
+    "uwvm2": "sha256:c9052516f4bead683100a034f39d8c4b843ffda562c530e2702f366080bf6fa6",
+    "uwvm2-ros": "sha256:6a98e1dd7c2b4031cdd94f3c7a6b62146b83d70767794073e6dc2016442c2c58"
+  },
+  "latest_tree_qualified": false,
+  "production_cpp_changed": false,
+  "actual_VM_sessions": 172,
+  "matrix_VM_sessions": 168,
+  "smoke_VM_sessions": 4,
+  "exact_value_pauses": 4311,
+  "exact_table_pages": 29488,
+  "exact_GC_member_pages": 6000,
+  "independently_validated_paired_modules": 14,
+  "source_hashes": {
+    "wasm_live_container_cases.py": "78ceb424b966da7e20cb2d15a2ea6ca5dd4ccc422e0086e634cbb904ebd58253",
+    "run_wasm_live_containers_cli.py": "fcf30d4db029f49f08bbd3a3d82f6d875caa73ef3976bf7437ecdcfdad485a24"
+  },
+  "scope": {
+    "all_four_table_index_width_pairs": true,
+    "current_table_size_and_original_indices": true,
+    "table_and_member_end_empty_pages": true,
+    "packed_i8_i16_array_values": true,
+    "array_set_fill_overlap_copy": true,
+    "array_new_and_init_data": true,
+    "signed_unsigned_guest_readback": true,
+    "local_and_typed_table_GC_roots": true,
+    "shared_structure_mutation_both_paths": true,
+    "unchanged_genuine_stop_ids": true,
+    "full_Core3_state_coverage": false,
+    "invalid_or_stale_path_coverage": false,
+    "huge_table_indices_above_2p32": false,
+    "whole_instance_restore": false,
+    "performance_qualification": false
+  },
+  "preexecution_input_hash_count": 30264,
+  "status_transition_correction": {
+    "preserved_failed_closure": "audit354",
+    "passing_successor": "audit357",
+    "proof": "status356-transition.json",
+    "source_and_product_bytes_changed": false,
+    "VM_matrix_repeated": false
+  },
+  "resource": {
+    "owned_RSS_peak_bytes": 316936192,
+    "folder_high_water_bytes": 14433415168,
+    "minimum_global_free_bytes": 66195144704,
+    "all_max_OOM_events_zero": true
+  },
+  "final_resource": {
+    "passed": true,
+    "qualification_sha256": "21cb1b3150f0fbf24e08130a5aa03401e9bd8e1adb12bfe9c9407e1e697b5646",
+    "manifest_sha256": "a105652cc29ae71b6f6b91993323a57becf8641863dc5b7cf562f98b1ed2fab0",
+    "archive_sha256": "9dee1a63d01b3de15c52b3003ca28bad78084d56bce4968a1c862ecc199dbbca",
+    "archive_bytes": 8131386,
+    "member_count": 598,
+    "package_receipt_sha256": "8f347c0b118ec5db413f6150ff9da4787e70372aa4c78eb355508bb1b23b62e3",
+    "actual_package_root_pid": 134932,
+    "actual_root_reaped_exit": 0,
+    "all_owned_processes_retired": true,
+    "foreign_processes_signalled": [],
+    "foreign_processes_adopted": [],
+    "final_owned_folder_high_water_bytes": 14441992192,
+    "final_linux_free_bytes": 66154160128,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  "evidence": {
+    "directory": "/Users/liyinan/Documents/MacroModel/wasm-core3-debug-audit-20261007-r1",
+    "qualification": "QUALIFIED357.json",
+    "qualification_sha256": "21cb1b3150f0fbf24e08130a5aa03401e9bd8e1adb12bfe9c9407e1e697b5646",
+    "archive": "delivery358.tar.gz",
+    "archive_sha256": "9dee1a63d01b3de15c52b3003ca28bad78084d56bce4968a1c862ecc199dbbca",
+    "archive_bytes": 8131386,
+    "transport_verification": "DELIVERY360-local-verification.json"
+  },
+  "remaining": [
+    "array.new_elem/array.init_elem targeted live-state coverage",
+    "more GC subtyping/cycles and invalid-path/stale-handle combinations",
+    "huge table indices above 2^32",
+    "full VM qualification on the remaining Linux architectures",
+    "whole-instance checkpoint restoration",
+    "debug-off performance qualification"
+  ]
+}

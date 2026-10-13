@@ -1,0 +1,1620 @@
+{
+  "schema": "uwvm-windows-fixed30-r2-attempt2-actual-static-report-v1",
+  "result": "PASS: four Windows SDK standalone regular-process launcher compile/link/COFF/PE cells",
+  "source_input": {
+    "bytes": 4581168,
+    "directory_members": 263,
+    "embedded_manifest": 1,
+    "local_original": "/tmp/uwvm-qemu-windows-raii-launcher-source-frozen-20261003-r1/source.tar.gz",
+    "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-source-20261003-r1/source.tar.gz",
+    "sha256": "bf9a6f95d4709255cb2fcb004726016841e156d4c0948598b3b2c683a0ea002e",
+    "source_leaves": 1516,
+    "source_manifest_sha256": "3fc0506765f8a2b5f13e5b0efc9983ae659ba2b0453e17a7386a2ef571b6f339"
+  },
+  "source_recipe_manifest_sha256": "632779de33194b155eaad0fbbee6ec92030c762f020de9d4f48350a06839e50a",
+  "setup_recipe_manifest_sha256": "ffca4c8b9b7552ce63ef266717a09e3012718074b7ca4758ef40394b4b793f57",
+  "execution_plan_sha256": "7d5ddffea4655a7be5529b1647d60d44dd3f9de478cf24817609ddb139bf6d20",
+  "commands_sha256": "faf1380a382ec923a5731315cffaa5559e14d44757961acf14d0153fbeba7298",
+  "supervisor_sha256": "16ade4cecc5b757f0b791d9129b1cc1d335871b77955df6ffe147967415c76df",
+  "closure_sha256": "cd5de357266e818315aef05399f475c7a05e33558b6637ab068bda61a602ca57",
+  "checked_wrapper_sha256": "c16bc50abb95eaa25e6e334fb99e06cb44f84328c35af01a2bdb438725924d1a",
+  "actual_input_before_sha256": "2a2dfd3b2139e4e3130b1e7c2fd6c0e607437a29b48087b918b3862edac7fd4d",
+  "actual_input_after_sha256": "5ba45ac75a4c22eda68bc2ee6911868390402aab30bc132d164f3709f1b83b4a",
+  "actual_input_file_count": 7118,
+  "qualification": {
+    "actual_crosscompile_and_static_link": true,
+    "actual_fresh_MD_and_COFF_PE_inspection": true,
+    "SDK_static_compiler_rt_libunwind_provider": true,
+    "actual_guest_execution": false,
+    "actual_guest_DLL_runtime_closure": false,
+    "native_trap_TF_GPR_NI": false,
+    "fresh_product_three_TU": false,
+    "ROS_vendored_self_contained_product": false,
+    "true_named_module": false,
+    "whole_Wasm3_or_checkpoint_restore": false
+  },
+  "limits": {
+    "memory_max": 68719476736,
+    "swap_max": 0,
+    "owned_RSS_soft": 8589934592,
+    "stage_file_limit": 536870912,
+    "stage_log_limit": 33554432,
+    "suite_deadline_seconds": 600,
+    "CPU_pool": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ]
+  },
+  "actual_peak_owned_RSS_bytes": 419540992,
+  "actual_wall_seconds_sum": 46.60246409701358,
+  "original_stages": [
+    {
+      "label": "input-before",
+      "argv_sha256": "36aca059e01898c6aff45e70d7c67ef3673f4bb48b71d3d40c4da4238ea1e6cf",
+      "returncode": 0,
+      "wall_seconds": 1.7779787260005833,
+      "aggregate_owned_rss_peak_bytes": 38957056,
+      "log_sha256": "d13167784a406c38acb5c126a32875b73746056638e806944d91f7814b88f997",
+      "Popen_root_pidfd_retirement": {
+        "pid": 416144,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 416144,
+          "birth": 6337925,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-eh-compile",
+      "argv_sha256": "83d7393a49148135e2201b075f349541fc9c8ca710b461e5d599d2e36c1a47fb",
+      "returncode": 0,
+      "wall_seconds": 7.335575733995938,
+      "aggregate_owned_rss_peak_bytes": 419540992,
+      "log_sha256": "f672bb73b7a3bac94935530f13616faab50b62038d8a51909f49cf6ebf33acba",
+      "Popen_root_pidfd_retirement": {
+        "pid": 416275,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 416275,
+          "birth": 6338102,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-eh-object-bind",
+      "argv_sha256": "b2b7befc0faa9899a071415e5ab764d3016f3bd7c0a9210911e5cba9dca9ad36",
+      "returncode": 0,
+      "wall_seconds": 0.4683515680007986,
+      "aggregate_owned_rss_peak_bytes": 29298688,
+      "log_sha256": "5b60553948be8ad5f456a9a46e798683d4d028e61dcd89fa7c437ade8eb93ad5",
+      "Popen_root_pidfd_retirement": {
+        "pid": 416381,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 416381,
+          "birth": 6338836,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-eh-link",
+      "argv_sha256": "0512dd3b90ecae8b1e9445a931f1c47a188d541b8bd67bf3bf77cc4a62859935",
+      "returncode": 0,
+      "wall_seconds": 1.2802890890015988,
+      "aggregate_owned_rss_peak_bytes": 193155072,
+      "log_sha256": "457ba2c81da429e8f378134c922e6c55c3df95d2c17059c77595f6420479caab",
+      "Popen_root_pidfd_retirement": {
+        "pid": 416486,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 416486,
+          "birth": 6338883,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        },
+        {
+          "pid": 416589,
+          "birth": 6338908,
+          "pidfd_readable": true,
+          "reaped_returncode": null
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-eh-binary-bind",
+      "argv_sha256": "f042f399c2e3f4004ab6202accc4b5754d0d6eb7d2dd122a77f50bfac4a0e179",
+      "returncode": 0,
+      "wall_seconds": 0.3686668830050621,
+      "aggregate_owned_rss_peak_bytes": 10055680,
+      "log_sha256": "e573101fa1e051559aa3adf14645aecaa9ea7225b8ed622dc4fce0d5e7ef75e3",
+      "Popen_root_pidfd_retirement": {
+        "pid": 416623,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 416623,
+          "birth": 6339011,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-eh-imports",
+      "argv_sha256": "444ad6a2a7b25c170b85d0a813b095b6c04f787a3d8ac5d56e586c06fc00db90",
+      "returncode": 0,
+      "wall_seconds": 0.6720922899985453,
+      "aggregate_owned_rss_peak_bytes": 51601408,
+      "log_sha256": "1a714a66c3c9811aedbe1d37c5ac85fdb3dec5c390d4f527261dc75103303bd7",
+      "Popen_root_pidfd_retirement": {
+        "pid": 416724,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 416724,
+          "birth": 6339048,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-eh-bridge-disassembly",
+      "argv_sha256": "b1a3f70f9f23bfb1f5ffe579faea6f15333468bebe346b24c8bbdb010ee49543",
+      "returncode": 0,
+      "wall_seconds": 0.3675954209975316,
+      "aggregate_owned_rss_peak_bytes": 10129408,
+      "log_sha256": "db90d24056aaea8b826ce30e47b9c9238faa3dc14aab6f3c6910fe5a943537f6",
+      "Popen_root_pidfd_retirement": {
+        "pid": 416825,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 416825,
+          "birth": 6339115,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-eh-coff-relocations",
+      "argv_sha256": "82f0bc51a09badca11e73f79e5c20bedd210d1caecef2781563f32375b70b980",
+      "returncode": 0,
+      "wall_seconds": 1.124156136000238,
+      "aggregate_owned_rss_peak_bytes": 51441664,
+      "log_sha256": "12f4931b9156f244dce4c2bcdb63fe7d4848b29a38f840691721adeba7727e9c",
+      "Popen_root_pidfd_retirement": {
+        "pid": 416926,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 416926,
+          "birth": 6339152,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-noeh-compile",
+      "argv_sha256": "2b15f297bf3a91a38ba9b744366594c5b0be9daf36e782f976bf8db523de4143",
+      "returncode": 0,
+      "wall_seconds": 7.3265050549962325,
+      "aggregate_owned_rss_peak_bytes": 410017792,
+      "log_sha256": "f672bb73b7a3bac94935530f13616faab50b62038d8a51909f49cf6ebf33acba",
+      "Popen_root_pidfd_retirement": {
+        "pid": 417029,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 417029,
+          "birth": 6339265,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-noeh-object-bind",
+      "argv_sha256": "a2332685a88fb10b76c3019879afb8553dc59335ef5fef2a1bfd1ec4a16cd2b8",
+      "returncode": 0,
+      "wall_seconds": 0.4685510900017107,
+      "aggregate_owned_rss_peak_bytes": 29302784,
+      "log_sha256": "be0eb6e427b0ddb190b16ed08545d2c94af5e5efe6bba3dfa85d1a43edc93d01",
+      "Popen_root_pidfd_retirement": {
+        "pid": 417170,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 417170,
+          "birth": 6339997,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-noeh-link",
+      "argv_sha256": "d871d16e396c58a210938dce572a7727080b5bdec118ef4e0b8051d8cf2720ad",
+      "returncode": 0,
+      "wall_seconds": 0.36722314799408196,
+      "aggregate_owned_rss_peak_bytes": 10465280,
+      "log_sha256": "a9211678f8af1d69cb262dde5c82e7af50435667054e87a746c271977ff4db77",
+      "Popen_root_pidfd_retirement": {
+        "pid": 417274,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 417274,
+          "birth": 6340044,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-noeh-binary-bind",
+      "argv_sha256": "e8b1cadf0b8c98a4faf216fe7f94fdaf8654733bf26ec0eaf6d72d49548fac87",
+      "returncode": 0,
+      "wall_seconds": 0.36747592800384155,
+      "aggregate_owned_rss_peak_bytes": 10027008,
+      "log_sha256": "721b00cb68adecce4acae4aa42d820940c16a8268da763f16915cd70021f2205",
+      "Popen_root_pidfd_retirement": {
+        "pid": 417394,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 417394,
+          "birth": 6340081,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-noeh-imports",
+      "argv_sha256": "be8241d630f1f3d3f179a61d6ff3353553044362694cc4ed7c326ac21e9b1bdc",
+      "returncode": 0,
+      "wall_seconds": 0.36883005400159163,
+      "aggregate_owned_rss_peak_bytes": 10346496,
+      "log_sha256": "b96b757b1e881f23efcbccf7f548e5f2d5863e441b83443eb705703b3398f035",
+      "Popen_root_pidfd_retirement": {
+        "pid": 417497,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 417497,
+          "birth": 6340118,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-noeh-bridge-disassembly",
+      "argv_sha256": "cc5f7e0670a09dea182f172b8099cf03285a8fc30b41082d42e04a892557da56",
+      "returncode": 0,
+      "wall_seconds": 0.36797458700311836,
+      "aggregate_owned_rss_peak_bytes": 10338304,
+      "log_sha256": "43d96aa454cb2a7aafb59ea3850f154842a8ea3761e6cdb490195c63c77f59f0",
+      "Popen_root_pidfd_retirement": {
+        "pid": 417599,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 417599,
+          "birth": 6340155,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-ros-noeh-coff-relocations",
+      "argv_sha256": "b1b97c4dce5c749d9c842d66d52616bc350ce5adbf027651fa33bf1b475d5e3c",
+      "returncode": 0,
+      "wall_seconds": 0.9749654719998944,
+      "aggregate_owned_rss_peak_bytes": 51138560,
+      "log_sha256": "41d341f0286780816c9998a785e2bceddf979dfb92c4ade7a29b2569d90ee2bf",
+      "Popen_root_pidfd_retirement": {
+        "pid": 417701,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 417701,
+          "birth": 6340192,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-eh-compile",
+      "argv_sha256": "92b918d7f7aec1ecf614a6d97f36ec01b9146179031aea48783aaff97f0aa0d7",
+      "returncode": 0,
+      "wall_seconds": 7.426287756999955,
+      "aggregate_owned_rss_peak_bytes": 418848768,
+      "log_sha256": "f672bb73b7a3bac94935530f13616faab50b62038d8a51909f49cf6ebf33acba",
+      "Popen_root_pidfd_retirement": {
+        "pid": 417804,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 417804,
+          "birth": 6340289,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-eh-object-bind",
+      "argv_sha256": "e2f9e93042be4a235337fb9e4f1a6036ae9adb2a6c1e0c5f7eec9c1cc1d4f950",
+      "returncode": 0,
+      "wall_seconds": 0.4693950689979829,
+      "aggregate_owned_rss_peak_bytes": 29306880,
+      "log_sha256": "d140b1d9ccf98b48c8a522911c5d29920f47a2073298cdedd02e667ab8cf7790",
+      "Popen_root_pidfd_retirement": {
+        "pid": 417908,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 417908,
+          "birth": 6341032,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-eh-link",
+      "argv_sha256": "bc9da7e8aa9c5bbee3097e20694af917fbace5851603da0a86784ae831baf7d3",
+      "returncode": 0,
+      "wall_seconds": 1.2767599860017071,
+      "aggregate_owned_rss_peak_bytes": 191246336,
+      "log_sha256": "748edb9f7035e1be032be95756db5b360181022d044c773ffa774e7312522668",
+      "Popen_root_pidfd_retirement": {
+        "pid": 418039,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 418039,
+          "birth": 6341079,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        },
+        {
+          "pid": 418141,
+          "birth": 6341104,
+          "pidfd_readable": true,
+          "reaped_returncode": null
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-eh-binary-bind",
+      "argv_sha256": "37f7a154b2b350540bacd97857b0769a772d2101783af017074a8eb7cf24c813",
+      "returncode": 0,
+      "wall_seconds": 0.36719926800287794,
+      "aggregate_owned_rss_peak_bytes": 10031104,
+      "log_sha256": "febe62a20cb5ee9e9976b8755d1c99313e8f9199a2d74ea5338324c1cb869962",
+      "Popen_root_pidfd_retirement": {
+        "pid": 418174,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 418174,
+          "birth": 6341207,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-eh-imports",
+      "argv_sha256": "ae44a15832922b08e5a37a000b3ef8f850c5ba688173e4295cb2086bb1f5dfd6",
+      "returncode": 0,
+      "wall_seconds": 0.5708962009957759,
+      "aggregate_owned_rss_peak_bytes": 51138560,
+      "log_sha256": "f6b8f18b6f7bb7d93da09dba6196e465b1356860cdc2f9757c21a384031f85f3",
+      "Popen_root_pidfd_retirement": {
+        "pid": 418279,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 418279,
+          "birth": 6341244,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-eh-bridge-disassembly",
+      "argv_sha256": "b8da9988002fd120ed5684e7f8107aa36a674ab07f62f11f07aa93a4c0a09601",
+      "returncode": 0,
+      "wall_seconds": 0.36762905600335216,
+      "aggregate_owned_rss_peak_bytes": 10366976,
+      "log_sha256": "6afae9301de455718e1fab4e6918cd8c5ab987c2b5e233181c5ec0cd4be4b1b9",
+      "Popen_root_pidfd_retirement": {
+        "pid": 418379,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 418379,
+          "birth": 6341301,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-eh-coff-relocations",
+      "argv_sha256": "8cdd29419106f620648560f606cb134024931edae5b5b12b2f6b14d5cba53465",
+      "returncode": 0,
+      "wall_seconds": 0.9767804840012104,
+      "aggregate_owned_rss_peak_bytes": 50888704,
+      "log_sha256": "ac4bd9625ee3e0c4cd6f80c03d77fba8e4edc900df69efb8eec03994246063bd",
+      "Popen_root_pidfd_retirement": {
+        "pid": 418482,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 418482,
+          "birth": 6341338,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-noeh-compile",
+      "argv_sha256": "b60b12ff8174e3cceeb8fd370f77fcd9d337fe7d3ddf810788ce22bc691906aa",
+      "returncode": 0,
+      "wall_seconds": 7.325822190003237,
+      "aggregate_owned_rss_peak_bytes": 411856896,
+      "log_sha256": "f672bb73b7a3bac94935530f13616faab50b62038d8a51909f49cf6ebf33acba",
+      "Popen_root_pidfd_retirement": {
+        "pid": 418584,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 418584,
+          "birth": 6341436,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-noeh-object-bind",
+      "argv_sha256": "506203cf4f4d54cf5e1e502c06d04fd8ccae0dc353088f456d0248899518b7ac",
+      "returncode": 0,
+      "wall_seconds": 0.46829071300453506,
+      "aggregate_owned_rss_peak_bytes": 29245440,
+      "log_sha256": "fcbc65324e6ef390ae4dba68f44f18ff4dc6c4c80130bb9b41bca7f6e0f8486a",
+      "Popen_root_pidfd_retirement": {
+        "pid": 418688,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 418688,
+          "birth": 6342169,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-noeh-link",
+      "argv_sha256": "5fc3e7390ff8729535751f1937071826ed7509aca332fba76097393e22756e4e",
+      "returncode": 0,
+      "wall_seconds": 0.36609383299946785,
+      "aggregate_owned_rss_peak_bytes": 10432512,
+      "log_sha256": "7151d19c2ce53a3425b9c35c6b2520396a046fb81cafe5b1d7daddc7280a3e65",
+      "Popen_root_pidfd_retirement": {
+        "pid": 418790,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 418790,
+          "birth": 6342215,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-noeh-binary-bind",
+      "argv_sha256": "ec80a82f9f2211b7ffbdfe1e1eca60c13c687bd563fdacae551371cc1daa7c1e",
+      "returncode": 0,
+      "wall_seconds": 0.3666104020012426,
+      "aggregate_owned_rss_peak_bytes": 10063872,
+      "log_sha256": "93bc2977dfa860651664924549739c8672bf8ab908558112ed0300f8ec260288",
+      "Popen_root_pidfd_retirement": {
+        "pid": 418906,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 418906,
+          "birth": 6342252,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-noeh-imports",
+      "argv_sha256": "07f1b58d6ea00383ead12da0253024e23644e38f3f52181288bab275f119c839",
+      "returncode": 0,
+      "wall_seconds": 0.36681167800270487,
+      "aggregate_owned_rss_peak_bytes": 10383360,
+      "log_sha256": "a018249d0b7654a5d41cc34fa19b6ec9f3f253047fdd28dc3da995672b3b4de5",
+      "Popen_root_pidfd_retirement": {
+        "pid": 419007,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 419007,
+          "birth": 6342289,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-noeh-bridge-disassembly",
+      "argv_sha256": "bb5d338640e6860a6d3cb5d507a2f0eb9024d5a5bc21a56092620ad0e4191a04",
+      "returncode": 0,
+      "wall_seconds": 0.36740789499890525,
+      "aggregate_owned_rss_peak_bytes": 10346496,
+      "log_sha256": "b1926925159a8e85feea44d193ed991aeaa57d2f8302f6ac588f93198075c0da",
+      "Popen_root_pidfd_retirement": {
+        "pid": 419109,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 419109,
+          "birth": 6342326,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "uwvm2-noeh-coff-relocations",
+      "argv_sha256": "b60b890dc1d9fc69d2c874657aff67af821c4c0fc2cc61f15537458bce4d5f60",
+      "returncode": 0,
+      "wall_seconds": 0.8749848579973332,
+      "aggregate_owned_rss_peak_bytes": 50778112,
+      "log_sha256": "f92a96d383a53ebe782f556acdf4640fa1f8ccff87e8f05ab2ca9da82353ff98",
+      "Popen_root_pidfd_retirement": {
+        "pid": 419211,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 419211,
+          "birth": 6342363,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    },
+    {
+      "label": "input-after",
+      "argv_sha256": "7d79b951c03307fa09a571afd406e5d7e01f51e0e3ef16e60b6bbe9f690a9b81",
+      "returncode": 0,
+      "wall_seconds": 1.3752635260025272,
+      "aggregate_owned_rss_peak_bytes": 28860416,
+      "log_sha256": "30e0c4f6f94640a797df2f4f5fa41f04ffde5901a39def6fcf1fd9ad3212ef49",
+      "Popen_root_pidfd_retirement": {
+        "pid": 419315,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      "retirement": [
+        {
+          "pid": 419315,
+          "birth": 6342450,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ]
+    }
+  ],
+  "actual_variants": [
+    {
+      "label": "uwvm2-ros-eh",
+      "actual_object": {
+        "bytes": 341763,
+        "device": 66307,
+        "inode": 26269719,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-ros-eh/regular-launcher.obj",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-ros-eh/regular-launcher.obj",
+        "sha256": "f66ef5af23fdad2dc5b3dca655d758e9ca67cbe316121f9f34bc5df229f3716e"
+      },
+      "actual_PE": {
+        "bytes": 632320,
+        "device": 66307,
+        "inode": 26269722,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-ros-eh/regular-launcher.exe",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-ros-eh/regular-launcher.exe",
+        "sha256": "98601685c4e405426443b528f79e63eee56679f9bd751a8415b7af731ba7c0ae"
+      },
+      "actual_MD_dependencies": 1527,
+      "actual_archive_member_count": 178,
+      "actual_link_reading_inputs": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-w64-windows-gnu/libclang_rt.builtins.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crt2u.o",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtbegin.o",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtend.o",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libadvapi32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libkernel32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingw32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingwex.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmoldname.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmsvcrt.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libntdll.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libshell32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libuser32.a",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-ros-eh/regular-launcher.obj"
+      ],
+      "actual_static_provider_records": [
+        {
+          "bytes": 259642,
+          "device": 66307,
+          "inode": 18096193,
+          "path": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-w64-windows-gnu/libclang_rt.builtins.a",
+          "resolved": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-unknown-windows-gnu/libclang_rt.builtins.a",
+          "sha256": "17c4db794b21e489a1356d35666a647ae0203faff9c0f08b5144798940c6435f"
+        },
+        {
+          "bytes": 26707,
+          "device": 66307,
+          "inode": 19582944,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crt2u.o",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crt2u.o",
+          "sha256": "1df32b81a0779d4fdc1f43c0dd9c75ceaf69c8232d20adc7fd039ce7e507a05b"
+        },
+        {
+          "bytes": 749,
+          "device": 66307,
+          "inode": 19582945,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtbegin.o",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtbegin.o",
+          "sha256": "e1a046e584fe09f2ba82c0c849102d8407a1ffd9369f0f1f03ec29029a05fe60"
+        },
+        {
+          "bytes": 749,
+          "device": 66307,
+          "inode": 19582946,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtend.o",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtend.o",
+          "sha256": "1f6d462da169123ef388d3bc52acbdb430faf76677d4592051fd82f19b615ce2"
+        },
+        {
+          "bytes": 694266,
+          "device": 66307,
+          "inode": 19582966,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libadvapi32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libadvapi32.a",
+          "sha256": "6f79fdc88047b8bfcf96475d1960b08c204e0627466c4d5c12eb4575dfc481ed"
+        },
+        {
+          "bytes": 3578998,
+          "device": 66307,
+          "inode": 19583004,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++.a",
+          "sha256": "aa0f98c5deb041ee1894938473c514de4c1b21384b3087831b1b6236f36c6b96"
+        },
+        {
+          "bytes": 1577286,
+          "device": 66307,
+          "inode": 19583326,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libkernel32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libkernel32.a",
+          "sha256": "1335fa57d677c0cfd6f63ecd4297faf98bf7e594648d332e4ede137c886ebb46"
+        },
+        {
+          "bytes": 151818,
+          "device": 66307,
+          "inode": 19583378,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingw32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingw32.a",
+          "sha256": "7a784312a2bfee1ec33cf0b5c64c4140de0292af5d7fd873ad9f380a20213bc4"
+        },
+        {
+          "bytes": 1986022,
+          "device": 66307,
+          "inode": 19583379,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingwex.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingwex.a",
+          "sha256": "15ffcae92820ba70602a4209ebbd5593f65917137d9cc9c983cdfe96cd726721"
+        },
+        {
+          "bytes": 1764,
+          "device": 66307,
+          "inode": 19583391,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmoldname.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmoldname.a",
+          "sha256": "d692810dcc87fa077b74056bd1d3b12add19b3d0ecafd6f0150efb76b7842412"
+        },
+        {
+          "bytes": 2208998,
+          "device": 66307,
+          "inode": 19583471,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmsvcrt.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmsvcrt.a",
+          "sha256": "4a04ef07c7e267a4b29d2ed3757603fd49b78437bf25741bdeaca2c35dd14b06"
+        },
+        {
+          "bytes": 1851036,
+          "device": 66307,
+          "inode": 19583511,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libntdll.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libntdll.a",
+          "sha256": "2aa0fb774a55989f0d1b0202aa7273c0ee9fdaa2b42355fc4464464d9f209984"
+        },
+        {
+          "bytes": 309246,
+          "device": 66307,
+          "inode": 19583666,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libshell32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libshell32.a",
+          "sha256": "039077484372d238bd9146fb349e20705ae8f574b2b4a4aad4fdffa77ae3f458"
+        },
+        {
+          "bytes": 95756,
+          "device": 66307,
+          "inode": 19583752,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a",
+          "sha256": "6c26b3a7446360327d1c71197b134c2c536afbdf8c21e73f3c53ff3b9f450544"
+        },
+        {
+          "bytes": 756526,
+          "device": 66307,
+          "inode": 19583761,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libuser32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libuser32.a",
+          "sha256": "c4037f8211d7c53d80ce49dbcd305cf668c6fd5f4c610ba534a9929dba156b3d"
+        }
+      ],
+      "actual_DLL_import_names": [
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "kernel32.dll",
+        "ntdll.dll"
+      ],
+      "wmain": {
+        "stack_reservation_bytes": 40,
+        "call_relocation_offset": 5,
+        "callee": "_ZN12_GLOBAL__N_13runEiPPw",
+        "callee_definition_offset": 32,
+        "exit_relocation_offset": 13,
+        "exit_import": "__imp_ExitProcess",
+        "disassembly_evidence": {
+          "bytes": 633,
+          "original_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-windows-raii-launcher-cold-r2-attempt2/uwvm2-ros-eh-bridge-disassembly.log",
+          "sha256": "db90d24056aaea8b826ce30e47b9c9238faa3dc14aab6f3c6910fe5a943537f6"
+        },
+        "COFF_evidence": {
+          "bytes": 560969,
+          "original_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-windows-raii-launcher-cold-r2-attempt2/uwvm2-ros-eh-coff-relocations.log",
+          "sha256": "12f4931b9156f244dce4c2bcdb63fe7d4848b29a38f840691721adeba7727e9c"
+        }
+      },
+      "compile_warning": "Clang reports link-only runtime/stdlib flags unused at -c; actual subsequent link Reading inputs bind compiler-rt and SDK libunwind."
+    },
+    {
+      "label": "uwvm2-ros-noeh",
+      "actual_object": {
+        "bytes": 330128,
+        "device": 66307,
+        "inode": 26269725,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-ros-noeh/regular-launcher.obj",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-ros-noeh/regular-launcher.obj",
+        "sha256": "34ac745c7b6111d0e152d7accd4cc09d834b37ac9722a08f29dbd00659aa7a12"
+      },
+      "actual_PE": {
+        "bytes": 382464,
+        "device": 66307,
+        "inode": 26269728,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-ros-noeh/regular-launcher.exe",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-ros-noeh/regular-launcher.exe",
+        "sha256": "c33ae32ee7835f5f0a5a0b8f49d2054b769168053788d41eca1aacd92011b684"
+      },
+      "actual_MD_dependencies": 1527,
+      "actual_archive_member_count": 118,
+      "actual_link_reading_inputs": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-w64-windows-gnu/libclang_rt.builtins.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crt2u.o",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtbegin.o",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtend.o",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libadvapi32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libkernel32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingw32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingwex.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmoldname.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmsvcrt.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libntdll.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libshell32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libuser32.a",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-ros-noeh/regular-launcher.obj"
+      ],
+      "actual_static_provider_records": [
+        {
+          "bytes": 259642,
+          "device": 66307,
+          "inode": 18096193,
+          "path": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-w64-windows-gnu/libclang_rt.builtins.a",
+          "resolved": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-unknown-windows-gnu/libclang_rt.builtins.a",
+          "sha256": "17c4db794b21e489a1356d35666a647ae0203faff9c0f08b5144798940c6435f"
+        },
+        {
+          "bytes": 26707,
+          "device": 66307,
+          "inode": 19582944,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crt2u.o",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crt2u.o",
+          "sha256": "1df32b81a0779d4fdc1f43c0dd9c75ceaf69c8232d20adc7fd039ce7e507a05b"
+        },
+        {
+          "bytes": 749,
+          "device": 66307,
+          "inode": 19582945,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtbegin.o",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtbegin.o",
+          "sha256": "e1a046e584fe09f2ba82c0c849102d8407a1ffd9369f0f1f03ec29029a05fe60"
+        },
+        {
+          "bytes": 749,
+          "device": 66307,
+          "inode": 19582946,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtend.o",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtend.o",
+          "sha256": "1f6d462da169123ef388d3bc52acbdb430faf76677d4592051fd82f19b615ce2"
+        },
+        {
+          "bytes": 694266,
+          "device": 66307,
+          "inode": 19582966,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libadvapi32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libadvapi32.a",
+          "sha256": "6f79fdc88047b8bfcf96475d1960b08c204e0627466c4d5c12eb4575dfc481ed"
+        },
+        {
+          "bytes": 3578998,
+          "device": 66307,
+          "inode": 19583004,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++.a",
+          "sha256": "aa0f98c5deb041ee1894938473c514de4c1b21384b3087831b1b6236f36c6b96"
+        },
+        {
+          "bytes": 1577286,
+          "device": 66307,
+          "inode": 19583326,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libkernel32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libkernel32.a",
+          "sha256": "1335fa57d677c0cfd6f63ecd4297faf98bf7e594648d332e4ede137c886ebb46"
+        },
+        {
+          "bytes": 151818,
+          "device": 66307,
+          "inode": 19583378,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingw32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingw32.a",
+          "sha256": "7a784312a2bfee1ec33cf0b5c64c4140de0292af5d7fd873ad9f380a20213bc4"
+        },
+        {
+          "bytes": 1986022,
+          "device": 66307,
+          "inode": 19583379,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingwex.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingwex.a",
+          "sha256": "15ffcae92820ba70602a4209ebbd5593f65917137d9cc9c983cdfe96cd726721"
+        },
+        {
+          "bytes": 1764,
+          "device": 66307,
+          "inode": 19583391,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmoldname.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmoldname.a",
+          "sha256": "d692810dcc87fa077b74056bd1d3b12add19b3d0ecafd6f0150efb76b7842412"
+        },
+        {
+          "bytes": 2208998,
+          "device": 66307,
+          "inode": 19583471,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmsvcrt.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmsvcrt.a",
+          "sha256": "4a04ef07c7e267a4b29d2ed3757603fd49b78437bf25741bdeaca2c35dd14b06"
+        },
+        {
+          "bytes": 1851036,
+          "device": 66307,
+          "inode": 19583511,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libntdll.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libntdll.a",
+          "sha256": "2aa0fb774a55989f0d1b0202aa7273c0ee9fdaa2b42355fc4464464d9f209984"
+        },
+        {
+          "bytes": 309246,
+          "device": 66307,
+          "inode": 19583666,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libshell32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libshell32.a",
+          "sha256": "039077484372d238bd9146fb349e20705ae8f574b2b4a4aad4fdffa77ae3f458"
+        },
+        {
+          "bytes": 95756,
+          "device": 66307,
+          "inode": 19583752,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a",
+          "sha256": "6c26b3a7446360327d1c71197b134c2c536afbdf8c21e73f3c53ff3b9f450544"
+        },
+        {
+          "bytes": 756526,
+          "device": 66307,
+          "inode": 19583761,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libuser32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libuser32.a",
+          "sha256": "c4037f8211d7c53d80ce49dbcd305cf668c6fd5f4c610ba534a9929dba156b3d"
+        }
+      ],
+      "actual_DLL_import_names": [
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "kernel32.dll",
+        "ntdll.dll"
+      ],
+      "wmain": {
+        "stack_reservation_bytes": 40,
+        "call_relocation_offset": 5,
+        "callee": "_ZN12_GLOBAL__N_13runEiPPw",
+        "callee_definition_offset": 32,
+        "exit_relocation_offset": 13,
+        "exit_import": "__imp_ExitProcess",
+        "disassembly_evidence": {
+          "bytes": 635,
+          "original_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-windows-raii-launcher-cold-r2-attempt2/uwvm2-ros-noeh-bridge-disassembly.log",
+          "sha256": "43d96aa454cb2a7aafb59ea3850f154842a8ea3761e6cdb490195c63c77f59f0"
+        },
+        "COFF_evidence": {
+          "bytes": 510177,
+          "original_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-windows-raii-launcher-cold-r2-attempt2/uwvm2-ros-noeh-coff-relocations.log",
+          "sha256": "41d341f0286780816c9998a785e2bceddf979dfb92c4ade7a29b2569d90ee2bf"
+        }
+      },
+      "compile_warning": "Clang reports link-only runtime/stdlib flags unused at -c; actual subsequent link Reading inputs bind compiler-rt and SDK libunwind."
+    },
+    {
+      "label": "uwvm2-eh",
+      "actual_object": {
+        "bytes": 341519,
+        "device": 66307,
+        "inode": 26269731,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-eh/regular-launcher.obj",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-eh/regular-launcher.obj",
+        "sha256": "12d6c466e494f3e3684dff0798354cec0b3ce8a6be71f1deb09db50c7fce4ef5"
+      },
+      "actual_PE": {
+        "bytes": 631808,
+        "device": 66307,
+        "inode": 26269734,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-eh/regular-launcher.exe",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-eh/regular-launcher.exe",
+        "sha256": "728774e40ec7323b22e7db838f441bb354e9b575c8d39c12928a3c8abfda0a50"
+      },
+      "actual_MD_dependencies": 1527,
+      "actual_archive_member_count": 178,
+      "actual_link_reading_inputs": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-w64-windows-gnu/libclang_rt.builtins.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crt2u.o",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtbegin.o",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtend.o",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libadvapi32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libkernel32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingw32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingwex.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmoldname.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmsvcrt.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libntdll.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libshell32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libuser32.a",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-eh/regular-launcher.obj"
+      ],
+      "actual_static_provider_records": [
+        {
+          "bytes": 259642,
+          "device": 66307,
+          "inode": 18096193,
+          "path": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-w64-windows-gnu/libclang_rt.builtins.a",
+          "resolved": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-unknown-windows-gnu/libclang_rt.builtins.a",
+          "sha256": "17c4db794b21e489a1356d35666a647ae0203faff9c0f08b5144798940c6435f"
+        },
+        {
+          "bytes": 26707,
+          "device": 66307,
+          "inode": 19582944,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crt2u.o",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crt2u.o",
+          "sha256": "1df32b81a0779d4fdc1f43c0dd9c75ceaf69c8232d20adc7fd039ce7e507a05b"
+        },
+        {
+          "bytes": 749,
+          "device": 66307,
+          "inode": 19582945,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtbegin.o",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtbegin.o",
+          "sha256": "e1a046e584fe09f2ba82c0c849102d8407a1ffd9369f0f1f03ec29029a05fe60"
+        },
+        {
+          "bytes": 749,
+          "device": 66307,
+          "inode": 19582946,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtend.o",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtend.o",
+          "sha256": "1f6d462da169123ef388d3bc52acbdb430faf76677d4592051fd82f19b615ce2"
+        },
+        {
+          "bytes": 694266,
+          "device": 66307,
+          "inode": 19582966,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libadvapi32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libadvapi32.a",
+          "sha256": "6f79fdc88047b8bfcf96475d1960b08c204e0627466c4d5c12eb4575dfc481ed"
+        },
+        {
+          "bytes": 3578998,
+          "device": 66307,
+          "inode": 19583004,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++.a",
+          "sha256": "aa0f98c5deb041ee1894938473c514de4c1b21384b3087831b1b6236f36c6b96"
+        },
+        {
+          "bytes": 1577286,
+          "device": 66307,
+          "inode": 19583326,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libkernel32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libkernel32.a",
+          "sha256": "1335fa57d677c0cfd6f63ecd4297faf98bf7e594648d332e4ede137c886ebb46"
+        },
+        {
+          "bytes": 151818,
+          "device": 66307,
+          "inode": 19583378,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingw32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingw32.a",
+          "sha256": "7a784312a2bfee1ec33cf0b5c64c4140de0292af5d7fd873ad9f380a20213bc4"
+        },
+        {
+          "bytes": 1986022,
+          "device": 66307,
+          "inode": 19583379,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingwex.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingwex.a",
+          "sha256": "15ffcae92820ba70602a4209ebbd5593f65917137d9cc9c983cdfe96cd726721"
+        },
+        {
+          "bytes": 1764,
+          "device": 66307,
+          "inode": 19583391,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmoldname.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmoldname.a",
+          "sha256": "d692810dcc87fa077b74056bd1d3b12add19b3d0ecafd6f0150efb76b7842412"
+        },
+        {
+          "bytes": 2208998,
+          "device": 66307,
+          "inode": 19583471,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmsvcrt.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmsvcrt.a",
+          "sha256": "4a04ef07c7e267a4b29d2ed3757603fd49b78437bf25741bdeaca2c35dd14b06"
+        },
+        {
+          "bytes": 1851036,
+          "device": 66307,
+          "inode": 19583511,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libntdll.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libntdll.a",
+          "sha256": "2aa0fb774a55989f0d1b0202aa7273c0ee9fdaa2b42355fc4464464d9f209984"
+        },
+        {
+          "bytes": 309246,
+          "device": 66307,
+          "inode": 19583666,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libshell32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libshell32.a",
+          "sha256": "039077484372d238bd9146fb349e20705ae8f574b2b4a4aad4fdffa77ae3f458"
+        },
+        {
+          "bytes": 95756,
+          "device": 66307,
+          "inode": 19583752,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a",
+          "sha256": "6c26b3a7446360327d1c71197b134c2c536afbdf8c21e73f3c53ff3b9f450544"
+        },
+        {
+          "bytes": 756526,
+          "device": 66307,
+          "inode": 19583761,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libuser32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libuser32.a",
+          "sha256": "c4037f8211d7c53d80ce49dbcd305cf668c6fd5f4c610ba534a9929dba156b3d"
+        }
+      ],
+      "actual_DLL_import_names": [
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "kernel32.dll",
+        "ntdll.dll"
+      ],
+      "wmain": {
+        "stack_reservation_bytes": 40,
+        "call_relocation_offset": 5,
+        "callee": "_ZN12_GLOBAL__N_13runEiPPw",
+        "callee_definition_offset": 32,
+        "exit_relocation_offset": 13,
+        "exit_import": "__imp_ExitProcess",
+        "disassembly_evidence": {
+          "bytes": 629,
+          "original_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-windows-raii-launcher-cold-r2-attempt2/uwvm2-eh-bridge-disassembly.log",
+          "sha256": "6afae9301de455718e1fab4e6918cd8c5ab987c2b5e233181c5ec0cd4be4b1b9"
+        },
+        "COFF_evidence": {
+          "bytes": 560965,
+          "original_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-windows-raii-launcher-cold-r2-attempt2/uwvm2-eh-coff-relocations.log",
+          "sha256": "ac4bd9625ee3e0c4cd6f80c03d77fba8e4edc900df69efb8eec03994246063bd"
+        }
+      },
+      "compile_warning": "Clang reports link-only runtime/stdlib flags unused at -c; actual subsequent link Reading inputs bind compiler-rt and SDK libunwind."
+    },
+    {
+      "label": "uwvm2-noeh",
+      "actual_object": {
+        "bytes": 329892,
+        "device": 66307,
+        "inode": 26269737,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-noeh/regular-launcher.obj",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-noeh/regular-launcher.obj",
+        "sha256": "d7adf504f7a43b80a8503700f2d8b62427c7efe29e80bb3a9c2b51c402e7cf3d"
+      },
+      "actual_PE": {
+        "bytes": 381952,
+        "device": 66307,
+        "inode": 26269740,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-noeh/regular-launcher.exe",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-noeh/regular-launcher.exe",
+        "sha256": "3b698b5cb8bbfa835edc3df955576b5c2fc5d32596d117c0aede2509b1a3ba46"
+      },
+      "actual_MD_dependencies": 1527,
+      "actual_archive_member_count": 118,
+      "actual_link_reading_inputs": [
+        "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-w64-windows-gnu/libclang_rt.builtins.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crt2u.o",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtbegin.o",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtend.o",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libadvapi32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libkernel32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingw32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingwex.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmoldname.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmsvcrt.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libntdll.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libshell32.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a",
+        "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libuser32.a",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-20261003-r2/uwvm2-noeh/regular-launcher.obj"
+      ],
+      "actual_static_provider_records": [
+        {
+          "bytes": 259642,
+          "device": 66307,
+          "inode": 18096193,
+          "path": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-w64-windows-gnu/libclang_rt.builtins.a",
+          "resolved": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-unknown-windows-gnu/libclang_rt.builtins.a",
+          "sha256": "17c4db794b21e489a1356d35666a647ae0203faff9c0f08b5144798940c6435f"
+        },
+        {
+          "bytes": 26707,
+          "device": 66307,
+          "inode": 19582944,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crt2u.o",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crt2u.o",
+          "sha256": "1df32b81a0779d4fdc1f43c0dd9c75ceaf69c8232d20adc7fd039ce7e507a05b"
+        },
+        {
+          "bytes": 749,
+          "device": 66307,
+          "inode": 19582945,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtbegin.o",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtbegin.o",
+          "sha256": "e1a046e584fe09f2ba82c0c849102d8407a1ffd9369f0f1f03ec29029a05fe60"
+        },
+        {
+          "bytes": 749,
+          "device": 66307,
+          "inode": 19582946,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtend.o",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/crtend.o",
+          "sha256": "1f6d462da169123ef388d3bc52acbdb430faf76677d4592051fd82f19b615ce2"
+        },
+        {
+          "bytes": 694266,
+          "device": 66307,
+          "inode": 19582966,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libadvapi32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libadvapi32.a",
+          "sha256": "6f79fdc88047b8bfcf96475d1960b08c204e0627466c4d5c12eb4575dfc481ed"
+        },
+        {
+          "bytes": 3578998,
+          "device": 66307,
+          "inode": 19583004,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++.a",
+          "sha256": "aa0f98c5deb041ee1894938473c514de4c1b21384b3087831b1b6236f36c6b96"
+        },
+        {
+          "bytes": 1577286,
+          "device": 66307,
+          "inode": 19583326,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libkernel32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libkernel32.a",
+          "sha256": "1335fa57d677c0cfd6f63ecd4297faf98bf7e594648d332e4ede137c886ebb46"
+        },
+        {
+          "bytes": 151818,
+          "device": 66307,
+          "inode": 19583378,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingw32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingw32.a",
+          "sha256": "7a784312a2bfee1ec33cf0b5c64c4140de0292af5d7fd873ad9f380a20213bc4"
+        },
+        {
+          "bytes": 1986022,
+          "device": 66307,
+          "inode": 19583379,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingwex.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmingwex.a",
+          "sha256": "15ffcae92820ba70602a4209ebbd5593f65917137d9cc9c983cdfe96cd726721"
+        },
+        {
+          "bytes": 1764,
+          "device": 66307,
+          "inode": 19583391,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmoldname.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmoldname.a",
+          "sha256": "d692810dcc87fa077b74056bd1d3b12add19b3d0ecafd6f0150efb76b7842412"
+        },
+        {
+          "bytes": 2208998,
+          "device": 66307,
+          "inode": 19583471,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmsvcrt.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libmsvcrt.a",
+          "sha256": "4a04ef07c7e267a4b29d2ed3757603fd49b78437bf25741bdeaca2c35dd14b06"
+        },
+        {
+          "bytes": 1851036,
+          "device": 66307,
+          "inode": 19583511,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libntdll.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libntdll.a",
+          "sha256": "2aa0fb774a55989f0d1b0202aa7273c0ee9fdaa2b42355fc4464464d9f209984"
+        },
+        {
+          "bytes": 309246,
+          "device": 66307,
+          "inode": 19583666,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libshell32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libshell32.a",
+          "sha256": "039077484372d238bd9146fb349e20705ae8f574b2b4a4aad4fdffa77ae3f458"
+        },
+        {
+          "bytes": 95756,
+          "device": 66307,
+          "inode": 19583752,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a",
+          "sha256": "6c26b3a7446360327d1c71197b134c2c536afbdf8c21e73f3c53ff3b9f450544"
+        },
+        {
+          "bytes": 756526,
+          "device": 66307,
+          "inode": 19583761,
+          "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libuser32.a",
+          "resolved": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libuser32.a",
+          "sha256": "c4037f8211d7c53d80ce49dbcd305cf668c6fd5f4c610ba534a9929dba156b3d"
+        }
+      ],
+      "actual_DLL_import_names": [
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "kernel32.dll",
+        "ntdll.dll"
+      ],
+      "wmain": {
+        "stack_reservation_bytes": 40,
+        "call_relocation_offset": 5,
+        "callee": "_ZN12_GLOBAL__N_13runEiPPw",
+        "callee_definition_offset": 32,
+        "exit_relocation_offset": 13,
+        "exit_import": "__imp_ExitProcess",
+        "disassembly_evidence": {
+          "bytes": 631,
+          "original_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-windows-raii-launcher-cold-r2-attempt2/uwvm2-noeh-bridge-disassembly.log",
+          "sha256": "b1926925159a8e85feea44d193ed991aeaa57d2f8302f6ac588f93198075c0da"
+        },
+        "COFF_evidence": {
+          "bytes": 510172,
+          "original_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-windows-raii-launcher-cold-r2-attempt2/uwvm2-noeh-coff-relocations.log",
+          "sha256": "f92a96d383a53ebe782f556acdf4640fa1f8ccff87e8f05ab2ca9da82353ff98"
+        }
+      },
+      "compile_warning": "Clang reports link-only runtime/stdlib flags unused at -c; actual subsequent link Reading inputs bind compiler-rt and SDK libunwind."
+    }
+  ],
+  "original_retirement_bridge": {
+    "schema": "uwvm-original-supervisor-lane-retirement-v1",
+    "ticket_id": "f23cd5c5b4cc4cf48b56d096cfbaa9ef",
+    "commands_sha256": "faf1380a382ec923a5731315cffaa5559e14d44757961acf14d0153fbeba7298",
+    "supervisor_sha256": "16ade4cecc5b757f0b791d9129b1cc1d335871b77955df6ffe147967415c76df",
+    "original_receipts_sha256": "5ee674e6ea38d42e67182354c3269ad0bc82acff2acbb2183cc95c0874ce50de",
+    "supervisor_complete": true,
+    "owned_tasks_retired": true,
+    "executed_commands": 30,
+    "planned_commands": 30,
+    "work_passed": true
+  },
+  "original_retired_ticket": {
+    "admission": {
+      "boot_id": "83f582ec-ff7f-41ce-9631-2c0fbb865aeb",
+      "init": {
+        "argv": [
+          "sleep",
+          "infinity"
+        ],
+        "birth": 21355,
+        "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope",
+        "exe": "/usr/bin/sleep",
+        "pid": 10154,
+        "ppid": 10125,
+        "state": "S",
+        "uid": [
+          1000,
+          1000,
+          1000,
+          1000
+        ]
+      },
+      "limits": {
+        "cpuset.cpus.effective": "0,2,4,6,16-31",
+        "memory.max": "68719476736",
+        "memory.swap.max": "0"
+      },
+      "memory_events": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "observed_at_ns": 1791011143822757709
+    },
+    "authority": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/checkpoint-be-source-20261003-r4/lane-authority.json",
+    "authority_sha256": "8e945d950426546d2963d4d8e9ca7e2016d567e7c03a058e21625b6ec919ba26",
+    "commands": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-source-20261003-r2/commands.json",
+    "commands_sha256": "faf1380a382ec923a5731315cffaa5559e14d44757961acf14d0153fbeba7298",
+    "controller": {
+      "argv": [
+        "python3",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-source-20261003-r2/supervisor.proposal.py",
+        "--out",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-windows-raii-launcher-cold-r2-attempt2",
+        "--command-json",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/windows-raii-launcher-cold-source-20261003-r2/commands.json",
+        "--deadline-seconds",
+        "600",
+        "--lane-authority",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/checkpoint-be-source-20261003-r4/lane-authority.json",
+        "--lane-authority-sha256",
+        "8e945d950426546d2963d4d8e9ca7e2016d567e7c03a058e21625b6ec919ba26"
+      ],
+      "birth": 6337915,
+      "cgroup": "0::/user.slice/user-1000.slice/session-1684.scope",
+      "exe": "/usr/bin/python3.14",
+      "pid": 416136,
+      "ppid": 416135,
+      "state": "R",
+      "uid": [
+        1000,
+        1000,
+        1000,
+        1000
+      ]
+    },
+    "owner": "/root/qemu_platform_tests",
+    "retired_at_ns": 1791011190497328596,
+    "retirement": {
+      "boot_id": "83f582ec-ff7f-41ce-9631-2c0fbb865aeb",
+      "init": {
+        "argv": [
+          "sleep",
+          "infinity"
+        ],
+        "birth": 21355,
+        "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope",
+        "exe": "/usr/bin/sleep",
+        "pid": 10154,
+        "ppid": 10125,
+        "state": "S",
+        "uid": [
+          1000,
+          1000,
+          1000,
+          1000
+        ]
+      },
+      "limits": {
+        "cpuset.cpus.effective": "0,2,4,6,16-31",
+        "memory.max": "68719476736",
+        "memory.swap.max": "0"
+      },
+      "memory_events": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "observed_at_ns": 1791011190497325636
+    },
+    "schema": "uwvm-native-qemu-lane-ticket-v1",
+    "started_at_ns": 1791011143822966359,
+    "state": "retired",
+    "suite": "windows-raii-launcher-cold-build-20261003-r2",
+    "supervisor_receipt": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-windows-raii-launcher-cold-r2-attempt2/lane-retirement.json",
+    "supervisor_receipt_sha256": "c7f03e7a8b885644141d711ca715ca4141262cf065802fd926855ce164bae353",
+    "ticket_id": "f23cd5c5b4cc4cf48b56d096cfbaa9ef"
+  },
+  "child_wait_status_scope": "Two actual linker descendants have readable original PIDFD and null outer wait status because their compiler parent reaped them. All thirty original direct Popen children have actual wait4 status zero; null descendant status remains null.",
+  "raw_evidence": {
+    "archive_path": "/tmp/uwvm-windows-fixed30-r2-attempt2-actual-small-evidence-20261003-r1.tar.gz",
+    "archive_bytes": 886613,
+    "archive_sha256": "4d86cd181a7d78cd50412be7976440d66fb3ed3934e99b1523e54467ba313dcb",
+    "manifest_path": "/tmp/uwvm-windows-fixed30-r2-attempt2-actual-small-evidence-20261003-r1/manifest.json",
+    "manifest_sha256": "be2b967eba5a20df1863150c8b3dbdad916eab6c8d46de5e8ed43f93559d15ca",
+    "original_payloads": 62,
+    "all_payload_size_SHA_checked_independently": true,
+    "large_input_before_kept_compressed_only": true
+  },
+  "previous_failure_preserved": "test/0022.qemu_platforms/windows_fixed30_r2_attempt1_actual_input_failure_20261003.json",
+  "next_acceptance": "Fresh Windows guest with matching four PE images, nonbreakaway owned Job, suspended-child admission before resume, regular output files, full 32-bit child status and real kernel trap/GPR retirement. Static wmain inspection is separate from a native trap bridge."
+}

@@ -1,0 +1,341 @@
+{
+  "cases": [
+    {
+      "name": "new-i8",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-i8.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-i8.wasm",
+      "wasm_sha": "0565c75f7e6c6fae07f02010363d5f097e1cdb552167a00d59a258d875f64f9f",
+      "trap": null
+    },
+    {
+      "name": "default-zero-i8",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-i8.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-i8.wasm",
+      "wasm_sha": "6f7de750f49da2738ef8728997f2863ed61e22bb0348db60456597c8150d66c3",
+      "trap": null
+    },
+    {
+      "name": "fixed-three-i8",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-i8.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-i8.wasm",
+      "wasm_sha": "871543f2c43535cc88947b116b2df17baab380d3eef39b24f9c8e8f7ff2a3645",
+      "trap": null
+    },
+    {
+      "name": "new-i16",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-i16.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-i16.wasm",
+      "wasm_sha": "db8dfcf54f62cd9fbcceeba5930cf0ae381591a2cd42e5bb04ccaad3c9ebb153",
+      "trap": null
+    },
+    {
+      "name": "default-zero-i16",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-i16.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-i16.wasm",
+      "wasm_sha": "a2cd23dee8165ba519e56deea454dc7f8153245f5337ea7bd22e9e520b00e444",
+      "trap": null
+    },
+    {
+      "name": "fixed-three-i16",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-i16.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-i16.wasm",
+      "wasm_sha": "e1b124032b41394b179b86cd5f3ca7e683877ce55ad384543dc3a1e45074a323",
+      "trap": null
+    },
+    {
+      "name": "new-i32",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-i32.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-i32.wasm",
+      "wasm_sha": "0b1a2d2956885c2bf57a8581b29adc08c855fc9667765a75fbf901fba31d7ae3",
+      "trap": null
+    },
+    {
+      "name": "default-zero-i32",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-i32.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-i32.wasm",
+      "wasm_sha": "5bc5b40c0a7817d078c7cf36cb44c60e012385f8b3b7eee61e7857badf76acbc",
+      "trap": null
+    },
+    {
+      "name": "fixed-three-i32",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-i32.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-i32.wasm",
+      "wasm_sha": "b4ee6b7b3e27803073aed751dc6b429c8c87951ccfce81a9c37876c7208e3cb3",
+      "trap": null
+    },
+    {
+      "name": "new-i64",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-i64.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-i64.wasm",
+      "wasm_sha": "e56e7d5a12e8800b4d5c69cad4d0bf2c82984f1392ae3a59c9144f138edba7e2",
+      "trap": null
+    },
+    {
+      "name": "default-zero-i64",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-i64.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-i64.wasm",
+      "wasm_sha": "12da6c8a31260b11b010871f75d29196543929442e2003b5be99283ef9850951",
+      "trap": null
+    },
+    {
+      "name": "fixed-three-i64",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-i64.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-i64.wasm",
+      "wasm_sha": "bff6f8741463268226ed007384f6685355791bfed8d41cdab28f421ddf831613",
+      "trap": null
+    },
+    {
+      "name": "new-f32",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-f32.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-f32.wasm",
+      "wasm_sha": "f5728139289d58660f8a796734e3e0090837dc118f3377dab126612042227da6",
+      "trap": null
+    },
+    {
+      "name": "default-zero-f32",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-f32.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-f32.wasm",
+      "wasm_sha": "4e815718200269ad5f2077d8c1e6ebe700cdf144fa6f40cb87819ed8a7314c84",
+      "trap": null
+    },
+    {
+      "name": "fixed-three-f32",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-f32.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-f32.wasm",
+      "wasm_sha": "35f797ccd922f021b4136a8369821d8f6294b3921be3ad6bef4010d534633ba2",
+      "trap": null
+    },
+    {
+      "name": "new-f64",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-f64.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-f64.wasm",
+      "wasm_sha": "d6b871b0186e0a01ec0b8c58ca55dd93797928461f3bfa891c7b544cb99a866e",
+      "trap": null
+    },
+    {
+      "name": "default-zero-f64",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-f64.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-f64.wasm",
+      "wasm_sha": "aa092f97f44878db183c55a1b08ec1743a43c59766dc23a0dbc4901580e39c51",
+      "trap": null
+    },
+    {
+      "name": "fixed-three-f64",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-f64.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-f64.wasm",
+      "wasm_sha": "aed049f654081dfa137f7dee965ff757a3589710aaa7b6f0798f08afa16edca9",
+      "trap": null
+    },
+    {
+      "name": "new-v128",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-v128.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-v128.wasm",
+      "wasm_sha": "ba83fd65d9b0f3b897f829d22a2f7d957615384a4e35e42ebe0d2ae362b9d63a",
+      "trap": null
+    },
+    {
+      "name": "default-zero-v128",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-v128.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-v128.wasm",
+      "wasm_sha": "3ccf282260ba7464ad2299bbd5dbf613fd0a9f66a7b30e564211d46710713c4a",
+      "trap": null
+    },
+    {
+      "name": "fixed-three-v128",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-v128.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-v128.wasm",
+      "wasm_sha": "c1e032b9d17f55310b767aeb28a3d8d7a149263c9105bcc517e2765db602353f",
+      "trap": null
+    },
+    {
+      "name": "new-i31",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-i31.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-i31.wasm",
+      "wasm_sha": "a5034a6927b331c6999589d434d7abcd400b170f0dd52dbde6df303aa6a670f9",
+      "trap": null
+    },
+    {
+      "name": "default-zero-i31",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-i31.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-i31.wasm",
+      "wasm_sha": "4421344c58a2869fba88b07f761064286f2b575b883731ce6ef885b8aaa74980",
+      "trap": null
+    },
+    {
+      "name": "fixed-three-i31",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-i31.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-i31.wasm",
+      "wasm_sha": "4602e8734d08c1ef91948dfc89d1758ba1f723c3f3a7b3ad37ff9b7237db9de4",
+      "trap": null
+    },
+    {
+      "name": "new-struct",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-struct.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-struct.wasm",
+      "wasm_sha": "41884ce643a38baa71d3afd3ad3e9227968bac00ac579c1815c6e00402862914",
+      "trap": null
+    },
+    {
+      "name": "default-zero-struct",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-struct.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-struct.wasm",
+      "wasm_sha": "f231f6d272b9b494134bc02ace89dbace7def82556c8f6821f9d74bb33133d14",
+      "trap": null
+    },
+    {
+      "name": "fixed-three-struct",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-struct.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-struct.wasm",
+      "wasm_sha": "7916e7f6f42b9d6520f80a678b87b9954d6cba0c25b5cd7165f6a6db8be91d1c",
+      "trap": null
+    },
+    {
+      "name": "new-func",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-func.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/new-func.wasm",
+      "wasm_sha": "a52b721f04814c0e8440acd9a15ce6310b1f403a4366f119c0b7cbb0a411990c",
+      "trap": null
+    },
+    {
+      "name": "default-zero-func",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-func.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/default-zero-func.wasm",
+      "wasm_sha": "fe54f5418816530c8ff029d8b6196f846865c0edad9c9bc7f9d4f31ce0fc5489",
+      "trap": null
+    },
+    {
+      "name": "fixed-three-func",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-func.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-three-func.wasm",
+      "wasm_sha": "1c99b25bd93d0bc2d967152011a5238ff994b96500643ffac641b57fbe16f7c4",
+      "trap": null
+    },
+    {
+      "name": "fixed-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/fixed-empty.wasm",
+      "wasm_sha": "785b4e2fa33eae3d538841545127fb5119f9b0192fe5c45dddd3d7f945e92ac0",
+      "trap": null
+    },
+    {
+      "name": "immutable-numeric",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/immutable-numeric.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/immutable-numeric.wasm",
+      "wasm_sha": "1efc58f5449a067a753e8631957d694ba9cdefd4225149c5647222d05771df09",
+      "trap": null
+    },
+    {
+      "name": "data-length-and-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/data-length-and-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/data-length-and-empty.wasm",
+      "wasm_sha": "36a8654e09f04e652c9a4d9163aaf2c3d0b0bb9534f9d632a765c3b6a4890e12",
+      "trap": null
+    },
+    {
+      "name": "data-real-bounds-trap",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/data-real-bounds-trap.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/data-real-bounds-trap.wasm",
+      "wasm_sha": "9948dde0b5f359e4a6b6d60041c384ee947cb90e3eb661cc7d40dbf808c4bac1",
+      "trap": "bounds"
+    },
+    {
+      "name": "elem-length-and-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/elem-length-and-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/elem-length-and-empty.wasm",
+      "wasm_sha": "97f728848a0eaee5b7a9f8ecc0dfc7690f7547915aae3bc0640efd9b3d96f1e3",
+      "trap": "invalid"
+    },
+    {
+      "name": "elem-typed-length-and-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/elem-typed-length-and-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/elem-typed-length-and-empty.wasm",
+      "wasm_sha": "8ad500f59a7dfd34433fac46e05ae4b93e52e75c052486d9b3d052a8557e83c5",
+      "trap": null
+    },
+    {
+      "name": "null-array-trap",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/null-array-trap.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/null-array-trap.wasm",
+      "wasm_sha": "956a16fc9bac9ac2bf65bdf3e9922a7de313054332dda8222691574c249e3a03",
+      "trap": "null"
+    },
+    {
+      "name": "subtype-ref-cast-local-select",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/subtype-ref-cast-local-select.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/subtype-ref-cast-local-select.wasm",
+      "wasm_sha": "64b76592aa5bee794903257675923258895d5924cb4f7378c3f38ee66d24e006",
+      "trap": "select"
+    },
+    {
+      "name": "subtype-ref-cast-typed-select",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/subtype-ref-cast-typed-select.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/subtype-ref-cast-typed-select.wasm",
+      "wasm_sha": "78b2a2627fe4d9b0916f8e101fc6b5268cfb1bfb5d4c3747279b5b1c77ae80cf",
+      "trap": null
+    },
+    {
+      "name": "loop-local-reassignment-branch-tee",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/loop-local-reassignment-branch-tee.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/loop-local-reassignment-branch-tee.wasm",
+      "wasm_sha": "170768ba13a20b632ff0806e0ebb9eee2cf2b54c66570cbff6ed16d7feab3622",
+      "trap": null
+    },
+    {
+      "name": "root-live-across-collection",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/root-live-across-collection.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/root-live-across-collection.wasm",
+      "wasm_sha": "1dfdcb33f1ee6289f1f3e59a8b0066ca99b039e9312a30bb28a6e8f4af38edf5",
+      "trap": null
+    },
+    {
+      "name": "parameter-call-return-unknown",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/parameter-call-return-unknown.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/parameter-call-return-unknown.wasm",
+      "wasm_sha": "702076b54ead7b11f6dc2748bfb8255caa30849190f7ec32059f1b8c548c173a",
+      "trap": null
+    },
+    {
+      "name": "self-tail-swapping-parameters",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/self-tail-swapping-parameters.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/self-tail-swapping-parameters.wasm",
+      "wasm_sha": "21e8bafaff9a797c413ced2279057be5211ea3535b184a00f79aed17095227ba",
+      "trap": null
+    },
+    {
+      "name": "EH-ref-root-live",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/EH-ref-root-live.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/EH-ref-root-live.wasm",
+      "wasm_sha": "302f51473c7f95e33ec7b786e47d0d9dd474002ded3d3b508ea9474de7fdaa72",
+      "trap": null
+    },
+    {
+      "name": "known-to-unknown-return-overwrites-shadow",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/known-to-unknown-return-overwrites-shadow.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/known-to-unknown-return-overwrites-shadow.wasm",
+      "wasm_sha": "6dc51640289ad0cb3ba473c0c724a07c1075711cdb5ec0745dcdfc594b6f09b7",
+      "trap": null
+    },
+    {
+      "name": "known-to-null-return-clears-shadow",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/known-to-null-return-clears-shadow.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/known-to-null-return-clears-shadow.wasm",
+      "wasm_sha": "8d60e713bec5c74967eb2fa30441ff5aa2e1f0bb05b9dd3eb6e0785f5c7e2ca8",
+      "trap": "null"
+    },
+    {
+      "name": "loop-known-unknown-join-runtime-shadow",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/loop-known-unknown-join-runtime-shadow.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/loop-known-unknown-join-runtime-shadow.wasm",
+      "wasm_sha": "d22a134b51addbcfc82de06003ec9695e9bb604c98099d1572274ada23538fe3",
+      "trap": null
+    },
+    {
+      "name": "self-tail-resets-declared-null-shadow",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/self-tail-resets-declared-null-shadow.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/array-length-boundaries-c20/self-tail-resets-declared-null-shadow.wasm",
+      "wasm_sha": "080803fd7cbdef506c17b0470073933435f333769b002946c03247685432b3a7",
+      "trap": "null"
+    }
+  ],
+  "harness_sha": "631270c01b7f7c2b90184dd11774a09cdde4890654f5c686b21b5172e7d2f063"
+}

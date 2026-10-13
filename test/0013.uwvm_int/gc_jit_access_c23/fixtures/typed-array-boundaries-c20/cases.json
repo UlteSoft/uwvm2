@@ -1,0 +1,551 @@
+{
+  "cases": [
+    {
+      "name": "i8-immutable",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable.wasm",
+      "wasm_sha": "126e06f58d9cc2b37ea773a2f42d6c03dcf4c6fffa5136249762a04c77be400e",
+      "trap": null
+    },
+    {
+      "name": "i8-immutable-fixed",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-fixed.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-fixed.wasm",
+      "wasm_sha": "a0fa99f0a99a3160e11a6eb42ed296b86e156903fac410a04dce73e2ff945c93",
+      "trap": null
+    },
+    {
+      "name": "i8-immutable-default",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-default.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-default.wasm",
+      "wasm_sha": "354fd774364a28cc7779b4162367cf85d2ad14e17ddd9746b228e5052c2547ff",
+      "trap": null
+    },
+    {
+      "name": "i8-immutable-at-length",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-at-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-at-length.wasm",
+      "wasm_sha": "9973b3274ff9f6368e178ec34c00021f2c804b3389f0354510039c09f1a8cc18",
+      "trap": "bounds"
+    },
+    {
+      "name": "i8-immutable-UINTMAX",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-UINTMAX.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-UINTMAX.wasm",
+      "wasm_sha": "3d12cecb46ce9aec4b40c05644c96f9c3510963cede13ab44996d6da08dbaed1",
+      "trap": "bounds"
+    },
+    {
+      "name": "i8-immutable-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-empty.wasm",
+      "wasm_sha": "7f903e0841b3530f36059847236af9fed194fd587166e1ca04098475e4dab87c",
+      "trap": "bounds"
+    },
+    {
+      "name": "i8-immutable-null",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-null.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-null.wasm",
+      "wasm_sha": "454a56085d518e4390c1d680039c469959118630812e333405c29d6821905043",
+      "trap": "null"
+    },
+    {
+      "name": "i8-immutable-subtype",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-subtype.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-immutable-subtype.wasm",
+      "wasm_sha": "7157fd1ddee188142dceaee2636d6c54f3bbabb80abbdd5eae231f85943e92eb",
+      "trap": null
+    },
+    {
+      "name": "i16-immutable",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable.wasm",
+      "wasm_sha": "30f3f847ee8f6bf294b6591f8ea277523311ac080754c10e85e47430c89c2c49",
+      "trap": null
+    },
+    {
+      "name": "i16-immutable-fixed",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-fixed.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-fixed.wasm",
+      "wasm_sha": "8ac34090ec35018064ea9ad6bcdd57ce342daaf7ee7abc22bf637e6ace05cb75",
+      "trap": null
+    },
+    {
+      "name": "i16-immutable-default",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-default.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-default.wasm",
+      "wasm_sha": "035b6669b966f79edd40efd4a119cc3ef3237895ab3cacf9d72122100f919b78",
+      "trap": null
+    },
+    {
+      "name": "i16-immutable-at-length",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-at-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-at-length.wasm",
+      "wasm_sha": "e8b6982e2d244af59e33b792a39f4e1c58f15ca92526bdcea6b5812f39ab6543",
+      "trap": "bounds"
+    },
+    {
+      "name": "i16-immutable-UINTMAX",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-UINTMAX.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-UINTMAX.wasm",
+      "wasm_sha": "2882d0fc9a812b376b7638df0501f023a20a695d9e8ddf160c869579584b1b71",
+      "trap": "bounds"
+    },
+    {
+      "name": "i16-immutable-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-empty.wasm",
+      "wasm_sha": "af19522e6daac2b3f60ecdf5ece9cb3c1866c29e908a6af179ed9671297dd177",
+      "trap": "bounds"
+    },
+    {
+      "name": "i16-immutable-null",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-null.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-null.wasm",
+      "wasm_sha": "80d6d435a459e8e52fcf2022a91693efcbf00d0e594c86e183befbf42b43b8c7",
+      "trap": "null"
+    },
+    {
+      "name": "i16-immutable-subtype",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-subtype.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-immutable-subtype.wasm",
+      "wasm_sha": "3f46651ee8c4f5771eb9a0094608adb68e85207a5cc909a4ab8864abbdee51ef",
+      "trap": null
+    },
+    {
+      "name": "i32-immutable",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable.wasm",
+      "wasm_sha": "60894f6b01499cb443d879c562ff1cc9eef084fefd2b09e7fe7bc9f34d324772",
+      "trap": null
+    },
+    {
+      "name": "i32-immutable-fixed",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-fixed.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-fixed.wasm",
+      "wasm_sha": "f3ead205fad627eac36423557bcb5962f20814f6b1cf64d577589c04f2dbaed0",
+      "trap": null
+    },
+    {
+      "name": "i32-immutable-default",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-default.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-default.wasm",
+      "wasm_sha": "343a8cb2fc6a963f30ba1c101d3b85c2dee055f3bcad4d2d6e5dcbf42c72de9e",
+      "trap": null
+    },
+    {
+      "name": "i32-immutable-at-length",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-at-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-at-length.wasm",
+      "wasm_sha": "1cf9a974b9d1e5bcbf669868a55c280bb9225bec67f92479765c7656380c0224",
+      "trap": "bounds"
+    },
+    {
+      "name": "i32-immutable-UINTMAX",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-UINTMAX.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-UINTMAX.wasm",
+      "wasm_sha": "71602807753cbb8d605c79f20a4ed36b0f2ffb71c4edae986db8cd56047d6815",
+      "trap": "bounds"
+    },
+    {
+      "name": "i32-immutable-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-empty.wasm",
+      "wasm_sha": "1a401a05b4ac7b8fc451b4fe4e82cdaad6009db87cb6e64f9bb12a04b2ad65e3",
+      "trap": "bounds"
+    },
+    {
+      "name": "i32-immutable-null",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-null.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-null.wasm",
+      "wasm_sha": "6148e7dc5cd018dc5b566d15ed0d315fc4c56189e83b28be6ea516b82e0b8677",
+      "trap": "null"
+    },
+    {
+      "name": "i32-immutable-subtype",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-subtype.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-immutable-subtype.wasm",
+      "wasm_sha": "d8f6ac8f5a4a9ff2237bf7d6dec69e534ad89b0382f5b67f667a8936b25a339d",
+      "trap": null
+    },
+    {
+      "name": "f32-immutable",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable.wasm",
+      "wasm_sha": "ffd79b97e26122bc43b0b9ff6d46ea9924f202a520c5949757c3525f8d3bbe02",
+      "trap": null
+    },
+    {
+      "name": "f32-immutable-fixed",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-fixed.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-fixed.wasm",
+      "wasm_sha": "95950f1dc8269ebdf3a6ee4d31ad30a4579194d8530233463cac9a9a622174f1",
+      "trap": null
+    },
+    {
+      "name": "f32-immutable-default",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-default.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-default.wasm",
+      "wasm_sha": "627035193a2e91c1ceff823c3742a64e0455d8007ff2f92b89432ecf159acccd",
+      "trap": null
+    },
+    {
+      "name": "f32-immutable-at-length",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-at-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-at-length.wasm",
+      "wasm_sha": "89bcf21fc188efe08d91bba9c6ba0a45dd82a0f613a16b01fd9bf20d9911949b",
+      "trap": "bounds"
+    },
+    {
+      "name": "f32-immutable-UINTMAX",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-UINTMAX.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-UINTMAX.wasm",
+      "wasm_sha": "e77a80dd917efaee1f7cbfe24d7558c0a07878585b58c9e6ae0419c2e214907f",
+      "trap": "bounds"
+    },
+    {
+      "name": "f32-immutable-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-empty.wasm",
+      "wasm_sha": "afae3736bc6c49892a2ac20f12b1fe90f59d6f989377fea7def38bbc1bd4b04c",
+      "trap": "bounds"
+    },
+    {
+      "name": "f32-immutable-null",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-null.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-null.wasm",
+      "wasm_sha": "1ea0df718dcfb1f442787bee3762ed3ba03fd12254b31af49a6ebbe8ad667d24",
+      "trap": "null"
+    },
+    {
+      "name": "f32-immutable-subtype",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-subtype.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-immutable-subtype.wasm",
+      "wasm_sha": "6fad6d3d611afe177167c19e257be84ee9188641ab8600f42536d6aa0e951bfe",
+      "trap": null
+    },
+    {
+      "name": "i8-mut",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut.wasm",
+      "wasm_sha": "68ad0da7fe020d639b25190d6f535284151f97de8162f835a1634fd67051914f",
+      "trap": null
+    },
+    {
+      "name": "i8-mut-fixed",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-fixed.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-fixed.wasm",
+      "wasm_sha": "04010be6b1e9aa2fa34f52ee8d4b61aa44a3e76f7a81bad90008b5cb378db71b",
+      "trap": null
+    },
+    {
+      "name": "i8-mut-default",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-default.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-default.wasm",
+      "wasm_sha": "ebd124c210cdf059cbb214f22a2a0844db49ed7fdf1b08058ba9fb7452065f29",
+      "trap": null
+    },
+    {
+      "name": "i8-mut-at-length",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-at-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-at-length.wasm",
+      "wasm_sha": "6135a6a5dfd6fe2e12643f3c1ef4bc4e8df3a7c3dfc03daa08a820c966451296",
+      "trap": "bounds"
+    },
+    {
+      "name": "i8-mut-UINTMAX",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-UINTMAX.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-UINTMAX.wasm",
+      "wasm_sha": "cf97f4154cced912ecacc85f37a78a8d5fe319a677b61a20bd244fc5841b87fa",
+      "trap": "bounds"
+    },
+    {
+      "name": "i8-mut-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-empty.wasm",
+      "wasm_sha": "44c93d8ba2103e5a3e07c35871ea85be155ad488321ad7145c2ea7469b76c26b",
+      "trap": "bounds"
+    },
+    {
+      "name": "i8-mut-null",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-null.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-null.wasm",
+      "wasm_sha": "b911303a38bc21a0b66075917b9134ecc852f66d1b40a4a99fc643f086f0ad5d",
+      "trap": "null"
+    },
+    {
+      "name": "i8-mut-alias-set-fill-loop",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-alias-set-fill-loop.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-alias-set-fill-loop.wasm",
+      "wasm_sha": "844c4bfc4a649a568dc80f3315ecf0fb34e0ca093dedf330030927db01e57bea",
+      "trap": null
+    },
+    {
+      "name": "i8-mut-copy",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-copy.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-copy.wasm",
+      "wasm_sha": "7066768caac1762bf451135507c56152f2791f761d735871a9ef333846f0439d",
+      "trap": null
+    },
+    {
+      "name": "i8-mut-subtype",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-subtype.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i8-mut-subtype.wasm",
+      "wasm_sha": "d23d26f443e8535a531d9b8dbc60764e74e0679b889463832f92676d1958cb8a",
+      "trap": null
+    },
+    {
+      "name": "i16-mut",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut.wasm",
+      "wasm_sha": "23827ff57895c1eb2cfbe1d661bcbf7b6e2a99a0a2262376125f029aa4686b38",
+      "trap": null
+    },
+    {
+      "name": "i16-mut-fixed",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-fixed.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-fixed.wasm",
+      "wasm_sha": "6649b174cc54a0b98459eefe44e107be5f7dd7b7a13c15e78b39d4b38d33e98f",
+      "trap": null
+    },
+    {
+      "name": "i16-mut-default",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-default.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-default.wasm",
+      "wasm_sha": "e90dfcd0d09cc97fb54dba625c02c727f07e46d1c21992ee262522d41a5df5da",
+      "trap": null
+    },
+    {
+      "name": "i16-mut-at-length",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-at-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-at-length.wasm",
+      "wasm_sha": "188912da8f0b2d593424f105d9571b29c6eaffbf93bd85de73c3ee919dcf1629",
+      "trap": "bounds"
+    },
+    {
+      "name": "i16-mut-UINTMAX",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-UINTMAX.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-UINTMAX.wasm",
+      "wasm_sha": "bb9d68751acb634f73355743a28704d8aa919b2b284df39aa1f6099b4c8b43cc",
+      "trap": "bounds"
+    },
+    {
+      "name": "i16-mut-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-empty.wasm",
+      "wasm_sha": "36eb1c4f337baac4ec774d9cf9a58868315d732006a88b20bf00ce1b9e1f12fb",
+      "trap": "bounds"
+    },
+    {
+      "name": "i16-mut-null",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-null.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-null.wasm",
+      "wasm_sha": "a4881f334bfd9acaa809d598935eb5af12a5d87377c6e24b06cdd41f36d438fc",
+      "trap": "null"
+    },
+    {
+      "name": "i16-mut-alias-set-fill-loop",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-alias-set-fill-loop.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-alias-set-fill-loop.wasm",
+      "wasm_sha": "6e2de5f4e655dfd0a2476b912950803c47bb091a0f3b6553da2645d35744b89f",
+      "trap": null
+    },
+    {
+      "name": "i16-mut-copy",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-copy.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-copy.wasm",
+      "wasm_sha": "cc9194909784c301f8eb0009912f9995ea28f82f2875870b00d51ce0579443db",
+      "trap": null
+    },
+    {
+      "name": "i16-mut-subtype",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-subtype.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i16-mut-subtype.wasm",
+      "wasm_sha": "cfd7a432b106a9b9c6b072eeac7e91a9fc7a3d6b2eb93cf995b4ecbe0a3787cc",
+      "trap": null
+    },
+    {
+      "name": "i32-mut",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut.wasm",
+      "wasm_sha": "aa2448374e598e2979baa3bd427402d9dc42d69904a6be4e1ed94f239e89b779",
+      "trap": null
+    },
+    {
+      "name": "i32-mut-fixed",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-fixed.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-fixed.wasm",
+      "wasm_sha": "ff589537e3032fc6cc8b2e11dc3d9c50c5f3a298ed58fb9d2ce7c0e922ad7097",
+      "trap": null
+    },
+    {
+      "name": "i32-mut-default",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-default.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-default.wasm",
+      "wasm_sha": "00b7744e1a53aa49b1f860c0d963f6dee76329f7af2868002c2120c7e0bee686",
+      "trap": null
+    },
+    {
+      "name": "i32-mut-at-length",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-at-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-at-length.wasm",
+      "wasm_sha": "75ef3c36ee7425ddd382391dc5b45e5999f0ac4721eda04431092e0e78e3b90c",
+      "trap": "bounds"
+    },
+    {
+      "name": "i32-mut-UINTMAX",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-UINTMAX.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-UINTMAX.wasm",
+      "wasm_sha": "bd161a752130c182f7ce871cca2d4548364eb732fe6f1d6bd0acd2594518052c",
+      "trap": "bounds"
+    },
+    {
+      "name": "i32-mut-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-empty.wasm",
+      "wasm_sha": "aa566384957e63b001c1180edaa303e7f5cd589f7d1caa5735c0833dbcd626a3",
+      "trap": "bounds"
+    },
+    {
+      "name": "i32-mut-null",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-null.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-null.wasm",
+      "wasm_sha": "11b70a46f5900ecc28ec44cd07fe96e7175f9bdc81b08c9104c8be64dafeb477",
+      "trap": "null"
+    },
+    {
+      "name": "i32-mut-alias-set-fill-loop",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-alias-set-fill-loop.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-alias-set-fill-loop.wasm",
+      "wasm_sha": "cfcb5b335af5759f50cf91d010a8d6ea360d9e00440ed511eed79579703ad2fb",
+      "trap": null
+    },
+    {
+      "name": "i32-mut-copy",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-copy.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-copy.wasm",
+      "wasm_sha": "3232b924b1a0040f4bce4c02169e2a969acc8daaf2c7676a4522249290341419",
+      "trap": null
+    },
+    {
+      "name": "i32-mut-subtype",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-subtype.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/i32-mut-subtype.wasm",
+      "wasm_sha": "3203f8800d38885f82be145dc66306d0856da2db4c150ac030d668a5f6aae65a",
+      "trap": null
+    },
+    {
+      "name": "f32-mut",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut.wasm",
+      "wasm_sha": "b628305052c4ff4ec15970601188e477e224e3048f3b95b65242cb8012fc6a99",
+      "trap": null
+    },
+    {
+      "name": "f32-mut-fixed",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-fixed.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-fixed.wasm",
+      "wasm_sha": "3076debb7d53cb24975d725fba5cdc7417a5acd1e1192245b57e05aab1cbb374",
+      "trap": null
+    },
+    {
+      "name": "f32-mut-default",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-default.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-default.wasm",
+      "wasm_sha": "e79a5b43ca5977b3d8be9c660b986dc1aaa676049238c87250d3c8be7b139372",
+      "trap": null
+    },
+    {
+      "name": "f32-mut-at-length",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-at-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-at-length.wasm",
+      "wasm_sha": "19d9dcb05a45730acd2f9f1c3070cdaf12cc9d772f3d50647c77c7958affcdb2",
+      "trap": "bounds"
+    },
+    {
+      "name": "f32-mut-UINTMAX",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-UINTMAX.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-UINTMAX.wasm",
+      "wasm_sha": "536ba873ff5b60bcac569448486133be8609a6bb610b8591c1ebe679be028af7",
+      "trap": "bounds"
+    },
+    {
+      "name": "f32-mut-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-empty.wasm",
+      "wasm_sha": "85845b1fe172d23ae37c0c46df98a3a8847798be71c168724f26a8994d98944c",
+      "trap": "bounds"
+    },
+    {
+      "name": "f32-mut-null",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-null.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-null.wasm",
+      "wasm_sha": "27419183ad01f2fbb44ac3a2c1b3fbfb0e5b8241afcc6873a587dcc851b95514",
+      "trap": "null"
+    },
+    {
+      "name": "f32-mut-alias-set-fill-loop",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-alias-set-fill-loop.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-alias-set-fill-loop.wasm",
+      "wasm_sha": "a90dc34489acde8db607588354e2900e2e1905b5ee8f4ab337b821fc8ab7dfcd",
+      "trap": null
+    },
+    {
+      "name": "f32-mut-copy",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-copy.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-copy.wasm",
+      "wasm_sha": "af0d63c1bbd02382454f49e43376958cbead445b3ad95bc7daa80014126a4736",
+      "trap": null
+    },
+    {
+      "name": "f32-mut-subtype",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-subtype.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/f32-mut-subtype.wasm",
+      "wasm_sha": "7fe3450ee59c5d3d5c3245f15fdcb48477b72996e4809aa998a130dfc9f8f47a",
+      "trap": null
+    },
+    {
+      "name": "data-i8",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/data-i8.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/data-i8.wasm",
+      "wasm_sha": "c626722e4a54d9edf63c21dbf21aba990cfb4021553898ad03ae1e8ae11953d5",
+      "trap": null
+    },
+    {
+      "name": "data-i16",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/data-i16.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/data-i16.wasm",
+      "wasm_sha": "b6e43bf3251ec16f0f865ce2a1300a17d198b1416dce46b174d177851bc871f3",
+      "trap": null
+    },
+    {
+      "name": "data-i32",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/data-i32.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/data-i32.wasm",
+      "wasm_sha": "70bb5751cb68124e115b5114a8191cf736c8ee30d285fd54c95700959aba90d4",
+      "trap": null
+    },
+    {
+      "name": "root-live-across-30000-allocations",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/root-live-across-30000-allocations.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/root-live-across-30000-allocations.wasm",
+      "wasm_sha": "5f4b24405d95972f59456bc3997f80e6455df70a04dbbbf41809d06413dd0415",
+      "trap": null
+    },
+    {
+      "name": "parameter-return-unknown",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/parameter-return-unknown.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/parameter-return-unknown.wasm",
+      "wasm_sha": "6af6e8ac07f79a56d0dd329dd78a45889e1087ae01020648aeb0c8356638312c",
+      "trap": null
+    },
+    {
+      "name": "exception-between-reads",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/exception-between-reads.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-boundaries-c20/exception-between-reads.wasm",
+      "wasm_sha": "62560241d4f5d08f6721b26a1105cc390f071ea887a9f8867dc7fd2eff5e30c4",
+      "trap": null
+    }
+  ],
+  "harness_sha": "41a771a2f40beb072b77e21d50f437e8f38af1b621b205e072fafe0bb7bf1f7d"
+}

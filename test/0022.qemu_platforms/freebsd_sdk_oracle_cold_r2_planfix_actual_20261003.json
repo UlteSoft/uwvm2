@@ -1,0 +1,128 @@
+{
+  "ROS_bundled_LLVM23_product_qualified": false,
+  "actual_SDK_provider_sha256": "250aa737639c465c746a3332ffa59c8503d1cb399ba8b7c110b8d4ced31cf93a",
+  "actual_command_sha256": "ae003fcfba8e540d8aaa1dc70a74e28c25868dbfbd1dfd20d30c4ad3c4d33c7b",
+  "actual_compiler_version": "clang version 23.0.0git (https://github.com/llvm/llvm-project.git 4c4c1db7c69a6fda6cfa6bc6066bb09a433edc89)",
+  "actual_guard_sha256": "22b67df036ceebc0bfdc11cf1a056c8d1360425f60146296d9f8c86515f223ad",
+  "actual_guest_executed": false,
+  "actual_platform_kernel_qualified": false,
+  "actual_remaining_roster": [
+    10154
+  ],
+  "actual_source_manifest_sha256": "58b066d3454eed5b972036bc14f081e9d8284408ab9f568e66507a445e42f8b3",
+  "actual_target": "x86_64-unknown-freebsd15.1",
+  "all_original_stages_passed": true,
+  "executed_commands": 27,
+  "max_actual_owned_rss_bytes": 375701504,
+  "memory_events_after": {
+    "high": 0,
+    "low": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_group_kill": 0,
+    "oom_kill": 0
+  },
+  "memory_max_bytes": 68719476736,
+  "named_module_qualified": false,
+  "native_debugger_qualified": false,
+  "original_known_PIDFDs_ready": true,
+  "original_receipts_sha256": "bfc2bd8e6e53572bd284feb1ebe71024f0024b178aa178fc6ea8b0b3c8e23ad8",
+  "original_retirement_sha256": "cd9a94675ddc72fa204d3ae84a64792b1a1b4f915d1984bd57a64b854575cc91",
+  "original_root_PIDFDs_ready_and_reaped_zero": true,
+  "raw_archive_sha256": "2dbfb14662e36f90235af67a6afada41b2d34cfa3ea2f31296aabfec8994e31c",
+  "raw_evidence_local": "/tmp/uwvm-qemu-freebsd-sdk-oracle-cold-r2-planfix-attempt1-small-evidence",
+  "raw_manifest_sha256": "f9722aec7e03fc4a23c3245342063568b89839e4d90831a87cbcdf15435c8b48",
+  "schema": "uwvm-qemu-freebsd-sdk-oracle-cold-r2-planfix-actual-v1",
+  "scope": "standalone frozen fast_io header/SDK oracle cross-compile and actual MD/CRT/linktrace/ELF runtime binding only",
+  "sum_actual_stage_wall_seconds": 40.63833353800874,
+  "swap_max_bytes": 0,
+  "symbol_version_binding_qualified": false,
+  "ticket_id": "1f37e534a0ab4e95aae39c279a1fb5d0",
+  "ticket_state": "retired",
+  "variants": [
+    {
+      "DT_NEEDED": [
+        "libc++.so.1",
+        "libcxxrt.so.1",
+        "libm.so.5",
+        "libgcc_s.so.1",
+        "libc.so.7"
+      ],
+      "ELF_OSABI": 9,
+      "ELF_class": 64,
+      "ELF_data": "little",
+      "ELF_machine": 62,
+      "actual_binary_bytes": 732920,
+      "actual_binary_sha256": "0607ae8c7cc9d40ffcfccfa1ddf18cc4223805f03d47142a53a60e0fbb7819b0",
+      "actual_guest_executed": false,
+      "interpreters": [
+        "/libexec/ld-elf.so.1"
+      ],
+      "label": "uwvm2-ros-eh",
+      "target_runtime_entries": 7
+    },
+    {
+      "DT_NEEDED": [
+        "libc++.so.1",
+        "libcxxrt.so.1",
+        "libm.so.5",
+        "libc.so.7"
+      ],
+      "ELF_OSABI": 9,
+      "ELF_class": 64,
+      "ELF_data": "little",
+      "ELF_machine": 62,
+      "actual_binary_bytes": 724032,
+      "actual_binary_sha256": "2872be59c7645a785258590a5285a2b21f689108dacfafddd45e782c7a61e89c",
+      "actual_guest_executed": false,
+      "interpreters": [
+        "/libexec/ld-elf.so.1"
+      ],
+      "label": "uwvm2-ros-noeh",
+      "target_runtime_entries": 7
+    },
+    {
+      "DT_NEEDED": [
+        "libc++.so.1",
+        "libcxxrt.so.1",
+        "libm.so.5",
+        "libgcc_s.so.1",
+        "libc.so.7"
+      ],
+      "ELF_OSABI": 9,
+      "ELF_class": 64,
+      "ELF_data": "little",
+      "ELF_machine": 62,
+      "actual_binary_bytes": 732600,
+      "actual_binary_sha256": "682ff931ca6fc64d96d345ee7550c339d019eef307c1533743b49764d98caa41",
+      "actual_guest_executed": false,
+      "interpreters": [
+        "/libexec/ld-elf.so.1"
+      ],
+      "label": "uwvm2-eh",
+      "target_runtime_entries": 7
+    },
+    {
+      "DT_NEEDED": [
+        "libc++.so.1",
+        "libcxxrt.so.1",
+        "libm.so.5",
+        "libc.so.7"
+      ],
+      "ELF_OSABI": 9,
+      "ELF_class": 64,
+      "ELF_data": "little",
+      "ELF_machine": 62,
+      "actual_binary_bytes": 723712,
+      "actual_binary_sha256": "7a03157425d3ca8ddeebbb01ee899b430cc066af4a7147e74d16519fbea38670",
+      "actual_guest_executed": false,
+      "interpreters": [
+        "/libexec/ld-elf.so.1"
+      ],
+      "label": "uwvm2-noeh",
+      "target_runtime_entries": 7
+    }
+  ],
+  "verified_raw_members": 65,
+  "whole_VM_restore_qualified": false
+}

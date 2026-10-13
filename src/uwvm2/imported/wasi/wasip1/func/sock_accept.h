@@ -183,15 +183,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
         ) noexcept
     {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-        if(env.wasip1_memory == nullptr) [[unlikely]]
-        {
-            // Security issues inherent to virtual machines
-            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-        }
-# endif
 
-        auto& memory{*env.wasip1_memory};
+        auto const memory_pointer{env.get_memory()};
+        if(memory_pointer == nullptr) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault; }
+        auto& memory{*memory_pointer};
 
         check_wasip1_guest_pointer_alignment<4uz>(ro_fd_ptrsz, u8"sock_accept.ro_fd (fd)");
 
@@ -498,6 +493,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
 
                     ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, ro_fd_ptrsz, new_fd);
+                    if(env.debug_fd_created!=nullptr) { env.debug_fd_created(new_fd); }
 
 #  ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
                     // Encode the peer address into the __wasi_addr_port_t layout used by WASIX:
@@ -765,6 +761,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
 
                     ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, ro_fd_ptrsz, new_fd);
+                    if(env.debug_fd_created!=nullptr) { env.debug_fd_created(new_fd); }
 
 #  ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
                     // Encode the peer address into the __wasi_addr_port_t layout used by WASIX:

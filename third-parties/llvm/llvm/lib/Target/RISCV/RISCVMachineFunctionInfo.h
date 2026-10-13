@@ -27,6 +27,8 @@ namespace yaml {
 struct RISCVMachineFunctionInfo final : public yaml::MachineFunctionInfo {
   int VarArgsFrameIndex;
   int VarArgsSaveSize;
+  unsigned ArgumentStackToRestore = 0;
+  bool HasTailCCStackCall = false;
 
   RISCVMachineFunctionInfo() = default;
   RISCVMachineFunctionInfo(const llvm::RISCVMachineFunctionInfo &MFI);
@@ -39,6 +41,8 @@ template <> struct MappingTraits<RISCVMachineFunctionInfo> {
   static void mapping(IO &YamlIO, RISCVMachineFunctionInfo &MFI) {
     YamlIO.mapOptional("varArgsFrameIndex", MFI.VarArgsFrameIndex);
     YamlIO.mapOptional("varArgsSaveSize", MFI.VarArgsSaveSize);
+    YamlIO.mapOptional("argumentStackToRestore", MFI.ArgumentStackToRestore, 0U);
+    YamlIO.mapOptional("hasTailCCStackCall", MFI.HasTailCCStackCall, false);
   }
 };
 } // end namespace yaml
@@ -66,6 +70,13 @@ private:
   uint64_t RVVPadding = 0;
   /// Size of stack frame to save callee saved registers
   unsigned CalleeSavedStackSize = 0;
+
+  // TailCC uses a callee-popped, stack-aligned argument area. Its CFA denotes
+  // the caller's SP before that area was allocated, even after differing-arity
+  // tail transfers. A normal TailCC stack call uses a dynamic call frame so
+  // both normal returns and exception landing pads restore that same SP.
+  unsigned ArgumentStackToRestore = 0;
+  bool HasTailCCStackCall = false;
 
   /// Incoming indirect argument pointers saved as virtual registers, keyed by
   /// formal parameter index. Used for musttail forwarding of indirect args.
@@ -136,7 +147,8 @@ public:
   bool useSaveRestoreLibCalls(const MachineFunction &MF) const {
     // We cannot use fixed locations for the callee saved spill slots if the
     // function uses a varargs save area, or is an interrupt handler.
-    return !isPushable(MF) &&
+    return MF.getFunction().getCallingConv() != CallingConv::Tail &&
+           !isPushable(MF) &&
            MF.getSubtarget<RISCVSubtarget>().enableSaveRestore() &&
            VarArgsSaveSize == 0 && !MF.getFrameInfo().hasTailCall() &&
            !MF.getFunction().hasFnAttribute("interrupt");
@@ -150,6 +162,11 @@ public:
 
   uint64_t getRVVPadding() const { return RVVPadding; }
   void setRVVPadding(uint64_t Padding) { RVVPadding = Padding; }
+
+  unsigned getArgumentStackToRestore() const { return ArgumentStackToRestore; }
+  void setArgumentStackToRestore(unsigned Size) { ArgumentStackToRestore = Size; }
+  bool hasTailCCStackCall() const { return HasTailCCStackCall; }
+  void setHasTailCCStackCall() { HasTailCCStackCall = true; }
 
   unsigned getCalleeSavedStackSize() const { return CalleeSavedStackSize; }
   void setCalleeSavedStackSize(unsigned Size) { CalleeSavedStackSize = Size; }

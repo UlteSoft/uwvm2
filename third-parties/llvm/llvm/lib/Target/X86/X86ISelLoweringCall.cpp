@@ -1909,7 +1909,8 @@ SDValue X86TargetLowering::LowerFormalArguments(
   // Align stack specially for tail calls.
   if (shouldGuaranteeTCO(CallConv,
                          MF.getTarget().Options.GuaranteedTailCallOpt))
-    StackSize = GetAlignedArgumentStackSize(StackSize, DAG);
+    StackSize = GetAlignedArgumentStackSize(
+        CCInfo.getAlignedCallFrameSize(), DAG);
 
   if (IsVarArg)
     VarArgsLoweringHelper(FuncInfo, dl, DAG, Subtarget, CallConv, CCInfo)

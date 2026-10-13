@@ -26,7 +26,12 @@ module;
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#if defined(UWVM2_TEST_CAPTURE_NATIVE_JIT_OBJECT)
+# include <fcntl.h>
+# include <uwvm2/runtime/lib/uwvm_runtime_posix_abi.h>
+#endif
 #include <memory>
+#include <limits>
 #include <string>
 #include <utility>
 // macro

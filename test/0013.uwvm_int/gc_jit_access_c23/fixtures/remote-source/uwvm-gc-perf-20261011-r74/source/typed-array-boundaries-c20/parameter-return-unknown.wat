@@ -1,0 +1,1 @@
+(module (type $a (array (mut i32))) (func $echo (param (ref $a)) (result (ref $a)) local.get 0) (func $get (param (ref $a)) (param i32) (result i32) local.get 0 local.get 1 array.get $a) (func (export "_start") i32.const 42 i32.const 7 array.new $a call $echo i32.const 6 call $get i32.const 42 i32.ne if unreachable end ))

@@ -425,15 +425,15 @@ struct nt_create_file_nothrow_common_return_t
 template <bool zw>
 inline nt_create_file_nothrow_common_return_t nt_create_file_nothrow_common(void *directory, ::fast_io::win32::nt::unicode_string *relative_path, nt_open_mode const &mode) noexcept
 {
-	::fast_io::win32::security_attributes sec_attr{sizeof(::fast_io::win32::security_attributes), nullptr, true};
+	// NT expects a SECURITY_DESCRIPTOR, not the Win32 SECURITY_ATTRIBUTES wrapper.
+	// Null uses the token default security; OBJ_INHERIT above controls inheritance.
 	::fast_io::win32::nt::object_attributes obj{.Length = sizeof(::fast_io::win32::nt::object_attributes),
 												.RootDirectory = directory,
 												.ObjectName = relative_path,
 												.Attributes = mode.ObjAttributes,
-												.SecurityDescriptor =
-													mode.ObjAttributes & 0x00000002 ? __builtin_addressof(sec_attr) : nullptr,
+												.SecurityDescriptor = nullptr,
 												.SecurityQualityOfService = nullptr};
-	void *handle;
+	void *handle{};
 	::fast_io::win32::nt::io_status_block block;
 	auto const status{::fast_io::win32::nt::nt_create_file<zw>(
 		__builtin_addressof(handle), mode.DesiredAccess, __builtin_addressof(obj), __builtin_addressof(block), nullptr,

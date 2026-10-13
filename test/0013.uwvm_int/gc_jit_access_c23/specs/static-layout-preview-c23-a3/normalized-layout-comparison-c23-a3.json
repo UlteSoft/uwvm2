@@ -1,0 +1,27 @@
+{
+  "rows": [
+    {
+      "case": "i8-write-read",
+      "identical_normalized_disassembly": true,
+      "first_difference": null,
+      "instructions": [
+        444,
+        444
+      ],
+      "scope": "Only actual movabs literals normalized; local instruction offsets and every other instruction unchanged. Static disassembly is not performance proof."
+    },
+    {
+      "case": "i32-write-read",
+      "identical_normalized_disassembly": false,
+      "first_difference": [
+        "a: sub\trsp, 0x88",
+        "a: sub\trsp, 0x98"
+      ],
+      "instructions": [
+        444,
+        483
+      ],
+      "scope": "Only actual movabs literals normalized; local instruction offsets and every other instruction unchanged. Static disassembly is not performance proof."
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+(module (type $a (array i32)) (tag $e (param i32)) (func (export "_start") (local $a (ref null $a)) i32.const 42 i32.const 37 array.new $a local.set $a (block $caught (result i32) (try_table (result i32) (catch $e $caught) i32.const 9 throw $e)) drop local.get $a array.len i32.const 37 i32.ne if unreachable end))

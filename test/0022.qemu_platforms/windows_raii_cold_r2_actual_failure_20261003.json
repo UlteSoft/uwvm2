@@ -1,0 +1,65 @@
+{
+  "schema": "uwvm-qemu-component-actual-failure-v1",
+  "suite": "windows-raii-cold-r2-attempt1",
+  "repository": "uwvm2-ros",
+  "variant": "eh",
+  "planned_stages": 26,
+  "executed_stages": 4,
+  "stage_returncodes": [
+    [
+      "input-before",
+      0
+    ],
+    [
+      "uwvm2-ros-eh-compile",
+      0
+    ],
+    [
+      "uwvm2-ros-eh-object-bind",
+      0
+    ],
+    [
+      "uwvm2-ros-eh-link",
+      1
+    ]
+  ],
+  "diagnostic": "owned build-plan harness used -Wl,--trace, which the actual LLVM23 MinGW driver rejects; source fixture compiled to fresh AMD64 COFF but no PE or guest was produced",
+  "source_manifest_sha256": "dc02a40b6aef585ee6a472064bf58c91e59626e7f4e91ab3008c3a30a110814d",
+  "source_archive_sha256": "bfb2bf71b8097d0f0d706b98734310b44ffd54594479cd12cb4944bc24905f03",
+  "native_target": "x86_64-w64-windows-gnu",
+  "actual_target_provider": "Windows SDK libc++ ABI1 __1",
+  "actual_coff_object_created": true,
+  "actual_pe_created": false,
+  "actual_guest_executed": false,
+  "qualification_passed": false,
+  "original_pidfd_retirement_verified": true,
+  "ticket_id": "f0497e78fd3e408ab768ac03d4990c3d",
+  "ticket_state": "retired",
+  "lane_retirement_sha256": "5dece2f0ce987bf2006ab9ea5e4de7a7f330e5e43f23a6525b63d5b38ec5cf84",
+  "original_receipts_sha256": "6ca7704b1ee62bc31eb053a1e2b132ac7f63c5da6875bc0e8021af7de66daf2e",
+  "memory_max_bytes": 68719476736,
+  "swap_max_bytes": 0,
+  "compile_cpu_pool": "16-31",
+  "aggregate_owned_rss_peak_bytes": 445210624,
+  "memory_events_after": {
+    "low": 0,
+    "high": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_kill": 0,
+    "oom_group_kill": 0
+  },
+  "remaining_roster": [
+    10154
+  ],
+  "raw_packet": {
+    "path": "/tmp/uwvm-qemu-windows-raii-cold-r2-attempt1-small-evidence",
+    "members": 14,
+    "bytes": 702123,
+    "sha256": "55b81ffceb5e49b96ac6a720000476508d4dded2c2a2d19e4ecd4373672d7a23"
+  },
+  "owner_source_fix_required": false,
+  "old_r3_product_binaries_qualified": false,
+  "owned_harness_fix_required": true,
+  "coff_qualification_scope": "uwvm2-ros EH standalone fixture only; other three variants not compiled"
+}

@@ -1,0 +1,1 @@
+(module(type $t(func(result i32)))(func $f(type $t) i32.const 71)(elem declare func $f)(table i64 2 funcref)(func(export "_start") i64.const 0 ref.func $f table.set 0 i64.const 0 call_indirect(type $t) i32.const 71 i32.ne if unreachable end table.size i64.const 2 i64.ne if unreachable end))

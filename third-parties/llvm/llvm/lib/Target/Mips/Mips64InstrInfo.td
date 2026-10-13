@@ -291,6 +291,30 @@ let AdditionalPredicates = [NotInMicroMips],
 }
 def PseudoReturn64 : PseudoReturnBase<GPR64Opnd>, GPR_64;
 
+// Retain the signed argument-area delta until PEI restores this frame.
+// The resulting transfer is the existing no-link jump with a delay slot.
+let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1,
+    hasDelaySlot = 1, hasExtraSrcRegAllocReq = 1, isCTI = 1, Defs = [AT],
+    Uses = [SP_64],
+    AdditionalPredicates = [NotInMips16Mode, NotInMicroMips] in {
+  def TCRETURN64 : PseudoSE<(outs),
+      (ins calltarget:$target, tailcc_n64_delta:$delta), []>,
+      ISA_MIPS3_NOT_32R6_64R6, PTR_64;
+  let AdditionalPredicates = [NotInMips16Mode, NotInMicroMips,
+                              NoIndirectJumpGuards] in
+  def TCRETURNREG64 : PseudoSE<(outs),
+      (ins GPR64Opnd:$rs, tailcc_n64_delta:$delta),
+      [(MipsTailReturn GPR64Opnd:$rs, timm:$delta)]>,
+      ISA_MIPS3_NOT_32R6_64R6, PTR_64;
+  let AdditionalPredicates = [NotInMips16Mode, NotInMicroMips,
+                              UseIndirectJumpsHazard] in
+  def TCRETURNREGHB64 : PseudoSE<(outs),
+      (ins GPR64Opnd:$rs, tailcc_n64_delta:$delta),
+      [(MipsTailReturn GPR64Opnd:$rs, timm:$delta)]>,
+      ISA_MIPS32R2_NOT_32R6_64R6, PTR_64;
+}
+
+
 let AdditionalPredicates = [NotInMips16Mode, NotInMicroMips,
                             NoIndirectJumpGuards] in {
   def TAILCALLREG64 : TailCallReg<JR64, GPR64Opnd>, ISA_MIPS3_NOT_32R6_64R6,
@@ -1289,3 +1313,10 @@ def : MipsInstAlias<"sleu $rs, $imm", (SLEUImm64 GPR64Opnd:$rs,
 
 def : MipsInstAlias<"rdhwr $rt, $rs",
                     (RDHWR64 GPR64Opnd:$rt, HWRegsOpnd:$rs, 0), 1>, GPR_64;
+
+let AdditionalPredicates = [NotInMips16Mode, NotInMicroMips] in {
+  def : MipsPat<(MipsTailReturn (i64 tglobaladdr:$dst), timm:$delta),
+                (TCRETURN64 tglobaladdr:$dst, timm:$delta)>, PTR_64;
+  def : MipsPat<(MipsTailReturn (i64 texternalsym:$dst), timm:$delta),
+                (TCRETURN64 texternalsym:$dst, timm:$delta)>, PTR_64;
+}

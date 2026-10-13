@@ -43,6 +43,7 @@
 # include <uwvm2/runtime/compiler/shared/strict_float.h>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/validation/standard/wasm3/relaxed_simd.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
@@ -2381,7 +2382,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                                         Op == simd_code::f32x4_min || Op == simd_code::f32x4_max};
             constexpr bool arithmetic64{Op == simd_code::f64x2_add || Op == simd_code::f64x2_sub || Op == simd_code::f64x2_mul || Op == simd_code::f64x2_div ||
                                         Op == simd_code::f64x2_min || Op == simd_code::f64x2_max};
-            if constexpr(strict_float::needs_integer_abi && (arithmetic32 || arithmetic64))
+            if constexpr(Op == simd_code::i16x8_relaxed_dot_i8x16_i7x16_s)
+            {
+                auto const a{load_uint_lanes<u8, 16uz>(lhs)};
+                auto const b{load_uint_lanes<u8, 16uz>(rhs)};
+                lane_array<u16, 8uz> out{};
+                for(::std::size_t i{}; i != 8uz; ++i)
+                {
+                    auto const x{static_cast<s32>(as_signed_lane<u8>(a.lane[2uz * i])) * as_signed_lane<u8>(b.lane[2uz * i])};
+                    auto const y{static_cast<s32>(as_signed_lane<u8>(a.lane[2uz * i + 1uz])) * as_signed_lane<u8>(b.lane[2uz * i + 1uz])};
+                    auto const sum{x + y};
+                    out.lane[i] = static_cast<u16>(sum > 32767 ? 32767 : sum < -32768 ? -32768 : sum);
+                }
+                return store_uint_lanes<u16, 8uz>(out);
+            }
+            else if constexpr(strict_float::needs_integer_abi && (arithmetic32 || arithmetic64))
             {
                 using UInt = ::std::conditional_t<arithmetic32, u32, u64>;
                 constexpr ::std::size_t count{16uz / sizeof(UInt)};
@@ -2918,6 +2933,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                 static_assert(dependent_false_v<Op>, "unhandled SIMD binary opcode");
             }
         }
+
+        template <simd_code Op>
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 eval_full_ternop(wasm_v128 a, wasm_v128 b, wasm_v128 c) noexcept
+        {
+            if constexpr(Op == simd_code::i32x4_relaxed_dot_i8x16_i7x16_add_s)
+            {
+                auto const pairs{eval_full_binop<simd_code::i16x8_relaxed_dot_i8x16_i7x16_s>(a, b)};
+                auto const sums{eval_full_unop<simd_code::i32x4_extadd_pairwise_i16x8_s>(pairs)};
+                return eval_full_binop<simd_code::i32x4_add>(sums, c);
+            }
+            else
+            {
+                static_assert(Op == simd_code::f32x4_relaxed_madd || Op == simd_code::f32x4_relaxed_nmadd ||
+                              Op == simd_code::f64x2_relaxed_madd || Op == simd_code::f64x2_relaxed_nmadd);
+                constexpr bool narrow{Op == simd_code::f32x4_relaxed_madd || Op == simd_code::f32x4_relaxed_nmadd};
+                constexpr bool negative{Op == simd_code::f32x4_relaxed_nmadd || Op == simd_code::f64x2_relaxed_nmadd};
+                // Fixed unfused projection: use the existing strict arithmetic/bit-negation paths.
+                // The intermediate rounding is observable; no reassociation or fast-math flags.
+                auto product{eval_full_binop<narrow ? simd_code::f32x4_mul : simd_code::f64x2_mul>(a, b)};
+                if constexpr(negative) { product = eval_full_unop<narrow ? simd_code::f32x4_neg : simd_code::f64x2_neg>(product); }
+                return eval_full_binop<narrow ? simd_code::f32x4_add : simd_code::f64x2_add>(product, c);
+            }
+        }
+
 
         template <simd_code Op>
         [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr wasm_v128 eval_full_shift(wasm_v128 lhs, wasm_i32 rhs) noexcept
@@ -3531,7 +3570,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
     template <typename Visitor>
     [[nodiscard]] inline constexpr bool visit_wasm1p1_simd_instruction(simd_code opcode, Visitor&& visitor)
     {
-        switch(opcode)
+        switch(static_cast<simd_code>(::uwvm2::validation::standard::wasm3::relaxed_simd_canonical_opcode(static_cast<::std::uint_least32_t>(opcode))))
         {
             case simd_code::v128_load:
                 return visitor.template operator()<simd_code::v128_load,
@@ -3839,6 +3878,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::shared
                                                    wasm1p1_simd_scalar_kind::i32,
                                                    0uz,
                                                    0u>();
+            case simd_code::f32x4_relaxed_madd:
+                return visitor.template operator()<simd_code::f32x4_relaxed_madd, wasm1p1_simd_instruction_kind::ternary, wasm1p1_simd_scalar_kind::none, 0uz, 0u>();
+            case simd_code::f32x4_relaxed_nmadd:
+                return visitor.template operator()<simd_code::f32x4_relaxed_nmadd, wasm1p1_simd_instruction_kind::ternary, wasm1p1_simd_scalar_kind::none, 0uz, 0u>();
+            case simd_code::f64x2_relaxed_madd:
+                return visitor.template operator()<simd_code::f64x2_relaxed_madd, wasm1p1_simd_instruction_kind::ternary, wasm1p1_simd_scalar_kind::none, 0uz, 0u>();
+            case simd_code::f64x2_relaxed_nmadd:
+                return visitor.template operator()<simd_code::f64x2_relaxed_nmadd, wasm1p1_simd_instruction_kind::ternary, wasm1p1_simd_scalar_kind::none, 0uz, 0u>();
+            case simd_code::i16x8_relaxed_dot_i8x16_i7x16_s:
+                return visitor.template operator()<simd_code::i16x8_relaxed_dot_i8x16_i7x16_s, wasm1p1_simd_instruction_kind::binary, wasm1p1_simd_scalar_kind::none, 0uz, 0u>();
+            case simd_code::i32x4_relaxed_dot_i8x16_i7x16_add_s:
+                return visitor.template operator()<simd_code::i32x4_relaxed_dot_i8x16_i7x16_add_s, wasm1p1_simd_instruction_kind::ternary, wasm1p1_simd_scalar_kind::none, 0uz, 0u>();
             case simd_code::v128_bitselect:
                 return visitor.template operator()<simd_code::v128_bitselect,
                                                    wasm1p1_simd_instruction_kind::ternary,

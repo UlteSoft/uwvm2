@@ -443,13 +443,35 @@ function get_llvm_jit_options()
     local result = {llvm_version = dependency.version, static_mode = get_static_link_mode(),
         llvm_stdlib = dependency.stdlib}
     local seen = {}
+    -- This belongs to the shared SDK option: target on_load callbacks may be
+    -- replaced by later platform callbacks and leave CLI/runtime inconsistent.
+    local sdk_version = result.llvm_full_version or result.llvm_version or ""
+    local owner_revision = tonumber(sdk_version:match("%-uwvm%-ros%.(%d+)"))
+    local native_arch = string.lower(tostring(get_config("arch") or os.arch() or ""))
+    local native_plat = get_config("plat") or ""
+    if owner_revision and owner_revision >= 10 and get_config("use-llvm-compiler") and
+       ((native_plat == "macosx" and (native_arch == "arm64" or native_arch == "aarch64" or get_config("macos-x64-native-step"))) or
+        (native_plat == "mingw" and (native_arch == "x86_64" or native_arch == "x64" or native_arch == "amd64"))) then
+        _append_unique(result, seen, "defines", "UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2=1")
+    end
+
+    if dependency.runtimes then
+        local runtime = dependency.runtimes
+        _append_unique(result, seen, "cxxflags", "-nostdinc++")
+        for _, directory in ipairs({runtime.include, runtime.abi_include, runtime.unwind_include}) do
+            _append_unique(result, seen, "sysincludedirs", directory)
+        end
+        for _, field in ipairs({"ldflags", "shflags"}) do
+            _append_unique(result, seen, field, "-nostdlib++ --unwindlib=none")
+        end
+    end
     for _, item in ipairs(dependency.compile.includes or {}) do
         _append_unique(result, seen, "sysincludedirs", item.path)
     end
     for _, item in ipairs(dependency.compile.defines or {}) do
         _append_unique(result, seen, "defines", item.define)
     end
-    if result.llvm_stdlib == "libc++" then
+    if result.llvm_stdlib == "libc++" and not dependency.runtimes then
         _add_llvm_libcxx_runtime_paths(result, seen, dependency, path.join(dependency.build, "lib"))
     end
     local link_arguments, archives = llvm_link_arguments(dependency)
@@ -458,6 +480,28 @@ function get_llvm_jit_options()
     local ordered = os.args(link_arguments)
     result.ldflags = table.join(result.ldflags or {}, ordered)
     result.shflags = table.join(result.shflags or {}, ordered)
+    if dependency.runtimes then
+        -- Retain CMake's actual repeated/grouped static closure after LLVM.
+        -- Never replace it with -lc++/-lc++abi/-lunwind or search SDK directories.
+        _append_unique(result, seen, "ldflags", dependency.runtimes.link_flags)
+        _append_unique(result, seen, "shflags", dependency.runtimes.link_flags)
+    end
+    -- The selected macOS cross sysroot can ship libc++ 23 headers with atomic
+    -- wait/notify symbols newer than the system SDK's libc++ stub. Resolve
+    -- those symbols from its matching static runtimes after LLVM archives.
+    local macos_sysroot = get_config("sysroot")
+    if not dependency.runtimes and result.llvm_stdlib == "libc++" and (get_config("plat") or ""):lower() == "macosx" and
+       macos_sysroot and macos_sysroot ~= "" then
+        local runtime_dir = path.join(macos_sysroot, "usr", "lib")
+        local libcxx_archive = path.join(runtime_dir, "libc++.a")
+        local libcxxabi_archive = path.join(runtime_dir, "libc++abi.a")
+        if os.isfile(libcxx_archive) and os.isfile(libcxxabi_archive) then
+            _append_unique(result, seen, "ldflags", libcxx_archive)
+            _append_unique(result, seen, "ldflags", libcxxabi_archive)
+            _append_unique(result, seen, "shflags", libcxx_archive)
+            _append_unique(result, seen, "shflags", libcxxabi_archive)
+        end
+    end
     cprint("using ROS bundled LLVM ... ${color.success}%s (%s), %d archive entries",
         dependency.build, dependency.version, archives)
     dependency.options = result
@@ -701,6 +745,11 @@ end
 ---Getting the unwindlib option
 ---@return string | nil --unwindlib option
 function get_unwindlib_option()
+    local execution = get_config("execution-jit")
+    if execution == "llvm" or execution == "default" then
+        local bundled = import("utility.bundled_runtimes", {anonymous = true})
+        if bundled.enabled() then return nil end -- absolute paired closure owns the provider
+    end
     local config = get_config("unwindlib")
     local force = config:startswith("force")
     local lib = force and string.sub(config, 7, #config) or config

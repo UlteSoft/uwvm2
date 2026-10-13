@@ -38,7 +38,8 @@ bool llvm::CC_RISCV(unsigned ValNo, MVT ValVT, MVT LocVT,
   if (State.getCallingConv() == CallingConv::GHC)
     return CC_RISCV_GHC(ValNo, ValVT, LocVT, LocInfo, ArgFlags, OrigTy, State);
 
-  if (State.getCallingConv() == CallingConv::Fast)
+  if (State.getCallingConv() == CallingConv::Fast ||
+      State.getCallingConv() == CallingConv::Tail)
     return CC_RISCV_FastCC(ValNo, ValVT, LocVT, LocInfo, ArgFlags, OrigTy,
                            State);
 
@@ -793,10 +794,18 @@ static bool CC_RISCV_FastCC(unsigned ValNo, MVT ValVT, MVT LocVT,
       return false;
     }
 
-    // Pass scalable vectors indirectly. Pass fixed vectors indirectly if we
-    // have a free GPR.
+    // TailCC permits different prototypes, so a fixed vector that does not
+    // fit registers must have its own outgoing stack slot, not an indirect
+    // pointer into a same-position incoming argument. Scalable stack arguments
+    // need a separate dynamically sized tail ABI and are not supported yet.
+    if (State.getCallingConv() == CallingConv::Tail && LocVT.isScalableVector())
+      report_fatal_error("RISC-V tailcc scalable vector stack arguments are "
+                         "not supported");
+
+    // Other conventions may use an indirect pointer when a GPR is free.
     if (LocVT.isScalableVector() ||
-        State.getFirstUnallocated(ArgGPRs) != ArgGPRs.size()) {
+        (State.getCallingConv() != CallingConv::Tail &&
+         State.getFirstUnallocated(ArgGPRs) != ArgGPRs.size())) {
       LocInfo = CCValAssign::Indirect;
       LocVT = XLenVT;
     }

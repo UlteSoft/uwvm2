@@ -40,6 +40,7 @@ module;
 # include <unistd.h>
 #endif
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+# include <uwvm2/runtime/compiler/llvm_jit/pinned_version.h>
 # include <llvm/Config/llvm-config.h>
 # include <llvm/ADT/StringMap.h>
 # include <llvm/ADT/StringRef.h>

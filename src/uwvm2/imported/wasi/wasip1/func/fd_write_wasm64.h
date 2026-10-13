@@ -96,14 +96,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t iovs_len,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t nwritten) noexcept
     {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-        if(env.wasip1_memory == nullptr) [[unlikely]]
-        {
-            // Security issues inherent to virtual machines
-            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-        }
-# endif
-        auto& memory{*env.wasip1_memory};
+        auto const memory_pointer{env.get_memory()};
+        if(memory_pointer == nullptr) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault; }
+        auto& memory{*memory_pointer};
 
         check_wasip1_guest_pointer_alignment<8uz>(iovs, u8"fd_write_wasm64.iovs (ciovec64)");
         check_wasip1_guest_pointer_alignment<8uz>(nwritten, u8"fd_write_wasm64.nwritten (size64)");
@@ -388,7 +383,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
 
-            switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
+            if(env.debug_console_write!=nullptr &&
+               env.debug_console_write(curr_fd.wasi_fd.ptr->checkpoint_stdio_index,scatter_base,scatter_length))
+            { for(::std::size_t i{}; i<scatter_length; ++i) { total_bytes_write+=scatter_base[i].len; } }
+            else switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
             {
                 [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
                 {

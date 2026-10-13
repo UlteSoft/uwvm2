@@ -1,0 +1,1 @@
+(module (type $a (array i64))  (func (export "_start") i64.const 42 i32.const 259 array.new $a array.len i32.const 259 i32.ne if unreachable end))

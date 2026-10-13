@@ -1,0 +1,135 @@
+Wasm 深栈调试修复与验证 — 2026-10-05
+
+uwvm2 与 uwvm2-ros 已同步完成本次物理调用帧上限修复。
+真实 Wasm activation 身份链不再截断于 64 帧；64 现在仅是分块存储大小。
+增长发生在真实函数进入/宿主桥接路径，块地址稳定并复用高水位容量。
+SIGTRAP 路径只比较已有数据，不分配、不加锁、不依靠 DWARF 伪造调用身份。
+返回、尾调用、异常展开、宿主嵌套以及 native cursor 的实际 release ACK 保持身份约束。
+
+默认每个身份账本预算为 256 MiB。Linux x86_64 的内联最低预算为 5632 字节，
+其他 ABI 由 sizeof 计算。实际预算、分配或身份耗尽会明确失败，拒绝不完整预览。
+冷启动宿主接口：
+llvm_jit_configure_debug_activation_storage_host_api(std::size_t bytes) noexcept
+必须在相关编译计划、执行桥接和发布前配置；不是执行中的调试开关。
+只读观察的 frames=0 表示不设固定帧数上限。可恢复检查点的默认 4096 帧预算
+仍是独立契约；本次没有宣称 10,000 帧恢复检查点或任意外部 IO 回滚。
+
+CLI 与 DAP：
+frames wasm THREAD STOP_ID FIRST COUNT
+frames source THREAD STOP_ID FIRST COUNT
+每页 COUNT 为 1..128，物理 ordinal 从当前帧 0 开始，total 是真实完整链长度。
+例如当前线程 1、stop 42：
+  frames wasm 1 42 4096 16
+  operands 1 4096 0 64
+  locals 1 4096 0 64
+恢复执行后必须使用新的真实 stop ID。DAP 自动分页并返回真实 totalFrames。
+分页期间重新核对完整停止线程集合；旧 frame/scope 引用会失效。
+完整 Wasm 页不可用时明确报错，不再把有限的 bt 窗口当成完整栈。
+热替换扫描所有暂停参与者的完整真实链：64 帧之外的活动祖先也会阻止替换；
+同一停止点的非活动目标可替换。传统诊断 bt 的 64 帧窗口不再充当替换授权。
+
+精确 typed operands/locals 预览仍以真实 Wasm opcode/safepoint 为边界。
+任意 native PC 的当前 Wasm 栈值没有被伪造。保留简短提示：
+Note: Last Wasm safepoint snapshot; may differ from current native state.
+ASM 操作仍限于认证过的生成 Wasm 上下文，不能借本次改动调试 VM 宿主代码。
+DWARF 的 inline/path 预算与物理 activation 深度是不同的限制。
+
+完整检查还修复了：
+- fast_io display 列表的裸 char 指针条件表达式导致的编译错误。
+- 源帧 DAP 成功返回分支遗漏停止集合复核，以及失败后的有界 bt 回退。
+- DWARF 相对目录未结合所属 CU 的 DW_AT_comp_dir，导致绝对源路径断点失败。
+  现在按 DW_AT_stmt_list 对应的行号表解析，复制有界嵌入式元数据；
+  错误偏移、冲突的共享表目录、嵌入 NUL 和超限路径会被拒绝。
+  不读取源文件，不使用调试器进程工作目录猜测，不新增 native PC 授权。
+新增路径拼接、输出和参数解析沿用 fast_io；保存并保留其他 agent 的并发修改。
+
+所有实际编译、验证器、VM、组件测试和 QEMU 执行均在 SSH linux 的 keeper cgroup：
+/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope
+memory.max=64 GiB、swap=0。选中的最终 28 条通过记录逐条核对了 argv，
+OOM/oom_kill/oom_group_kill 计数前后不变；共享组此前已有非零 OOM 历史。
+测试监督器未采用或发送信号给外部任务。
+
+验证结果：
+- R12 两个产品的运行库/宿主/完整 CLI、组件、控制器、公开 activation API：
+  42 条编译/链接/测试命令通过，实际依赖与 SDK 内容哈希核对通过。
+- 每个产品原有 CLI/JIT 资格测试 117 个用例通过：
+  深栈 15、深层 EH/tail 4、operand 28、Core3 debugger 56、
+  opcode step 8、代码生成 2、替换脚本 2、真实 VM 回复驱动 DAP 2。
+- 实际深度覆盖 63/64/65/128/1024/4097/10000，读取深层真实 i32/i64 值；
+  10,000 层 EH 展开，20,000 次 return_call，活动祖先拒绝替换、
+  非活动函数替换、native stop 拒绝当前 typed 值、分页边界均通过。
+- 最终 C++16 增量 CLI：两个 main 重新编译/链接；保留并校验 R12 runtime.o
+  和 host-api.o。依赖文件证明新增源码映射头不属于这两个保留对象的输入。
+- 最终 CLI 每个产品重新通过 15 个深栈用例与 2 个真实 VM/DAP 深栈用例。
+  DAP 测试使用真实 console 回复；没有宣称覆盖 socket/auth 启动链。
+- 每个产品 DWARF4、DWARF5 的实际 -O1 -g guest 均通过 instruction/unwind
+  两种策略下的源断点、ignore/hits、自动 display、启停删除、补全和容量测试；
+  每种 DWARF 102 项检查，每个产品共 204 项。
+- 最终源映射与 DWARF index 组件测试通过；每个产品控制器 1449 项检查、
+  16 轮两个参与者的测试通过。
+- 最终 DAP 每个产品 190 项测试；query-evidence 每个产品 6 项测试通过。
+- 10 个 QEMU Linux 架构共 40 次 DATA 组件执行通过：
+  aarch64, riscv64, i686, powerpc64, powerpc64le, mips64, mips64el,
+  sparc64, loongarch64, s390x。
+  范围为动态身份账本与 native 前缀 DATA 比较；不是各架构完整 VM 或真实
+  SIGTRAP/ASM 体验资格测试。
+- 未启用 dbg 的数字夹具实际机器码与重定位和修复前一致，
+  没有 debug hook 或 native owner table；启用时有实际 owner table。
+  executable .ltext 为 231 字节，SHA256：
+  ff117b9c6c19a73d1d6f8372957e44a593ff44190341c816ab18068e4e288ff5
+  这不是完整程序性能基准，也不能据此声称所有工作负载零耗时差异。
+
+本次实际 SDK 是经核对的 Linux X86 静态闭包，63 个 LLVM archive，
+包含重新验证过的 AsmPrinter、BitReader、BitWriter、IRSymtab 来源/对象/归档。
+ROS vendor .10 是供应商版本号。没有宣称当前并发更新的完整 .11 SDK 或其他
+目标工具链已经通过。当前 MCJIT 新 PPC/SPARC 条件分支在该 X86 SDK 中未启用，
+使用实际产品编译参数的预处理结果与已测版本逐字节一致。
+当前工作区新增的 WASIp1 portable 功能属于并发任务，不包含在本次 C++ 快照中。
+
+可复核的实际执行与证据根：
+/dev/shm/wasm-deep-stack-20261005-r1
+最终 CLI：
+  uwvm2/build-r16/main
+  uwvm2-ros/build-r16/main
+SHA256：
+  uwvm2     e9f329e8451dec92614fb5455bff6178481ebb263778c7d274e7100de439937d
+  uwvm2-ros 4c3496692a1f6dc4c2245e08cdfca4147a00b2b1d36ff9032c359d7a8c19e6a2
+
+独立完整源码归档（无需遗失的初始 R1 临时包）：
+/home/macromodel/Documents/uwvm3-implementation/wasm-debug-local-archive-mirror-20261005/
+tested-source-final16-adapter17-harness18.tar.gz
+91,026,684 字节；SHA256：
+faa442eaeca788da94faa8c7e595b08299b23c0a75c592bc0834e3714c401f42
+展开后直接得到 uwvm2/ 与 uwvm2-ros/。
+源码快照 ID：
+  uwvm2     sha256:6e092616345c7040e6d52b2c708854b5dde5594b6915ec062257165f15598341
+  uwvm2-ros sha256:762a0aee14438da362631530e255455d2b07436814ffd29aaa06c46e8f2dec28
+这是 R12 基础加精确 C++16、DAP17、display harness18 的快照。
+所有 TU 内嵌编译标记保持 R12 一致；完整快照 ID 与该标记是不同字段，
+不能把旧标记宣称为新整个工作区的内容哈希。
+
+资格证据归档在同一磁盘目录：
+wasm-deep-stack-qualified-evidence-final18.tar.gz
+31,203,480 字节；SHA256：
+9a62306385f301b27257c758e5b340e5f1990cf7ce29001fa8dac6cab2933e1a
+逐个校验 3074 个文件，包括通过/失败尝试、日志、结果、manifest 和监督器。
+关键索引：
+  qualified-final16-adapter17-harness18.json
+  qualified-inputs-final16.json
+  cli-qualified-final12-final13.json
+  cross-qualified-r12.json
+  codegen-qualified-final12.json
+  owner-sdk-qualified-r12.json
+  tested-source-final16-adapter17-harness18.json
+
+为释放 tmpfs，本任务关闭的 R7/R14 构建和 R12 main/中间对象已先归档，
+逐个复核成员字节和 SHA256 后才删除；R12 runtime/host 与最终 R16 保留。
+旧产物归档及对应 manifest 在同一磁盘目录，SHA256：
+  retired-own-deep-r7-r14.tar.gz
+  0894ab6dcf0b78af64aace47e636de898ad0e3f50b40724b0ee8fa74dd00a0e6
+  retired-own-deep-r12-main-intermediate.tar.gz
+  d57ebf9cbc2cf64a69bf67279553b195025d94af45cbefe7acec7067960bda08
+未删除项目源码或外部任务产物。早期 R1 临时源码包没有远端同名副本；
+可复现材料以上述新独立完整源码归档为准。
+
+后续归档状态（完整审阅期间更新）：原 R16 最终 CLI 与剩余旧构建产物已完成逐个成员校验后归档，不再全部保留在 tmpfs。恢复包在本机 /tmp/wasm-full-audit-20261005/retired-deep-remaining-builds.tar.gz，SHA256 0469703e4546d3871d2543e84c531108ecb687345044d98d14d2d054fa1050c8；相邻 manifest 记录精确原路径与成员哈希。以上结果仍属于历史冻结源码快照，后续当前源码验证另行记录。

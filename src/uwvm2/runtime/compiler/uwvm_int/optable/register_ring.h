@@ -704,6 +704,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(Remaining != 0uz);
 
             ValType const v{get_curr_val_from_operand_stack_top<CompileOption, ValType, WritePos>(typeref...)};
+            // ring spill: reserved bytes [remaining values][next value] ... spill_end
+            // [safe cached-value span                         ] unsafe (before reserved span)
+            // ^^ write_ptr retreats by sizeof(ValType); preceding ring count/top advance reserved the complete spill span.
             write_ptr -= sizeof(ValType);
             ::std::memcpy(write_ptr, ::std::addressof(v), sizeof(ValType));
 
@@ -734,6 +737,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             using stack_ptr_t = ::std::remove_cvref_t<TypeRef...[1u]>;
             static_assert(::std::same_as<stack_ptr_t, ::std::byte*>);
 
+            // register-ring spill: operand_base ... [live stack][cached values to spill] | frame_end
+            // [safe through compile-time ring count and frame byte maximum     ] unsafe (past frame_end)
+            // ^^ typeref...[1u] advances by sizeof(ValType) * Count; the cached values already belong to the validated logical stack.
             typeref...[1u] += sizeof(ValType) * Count;
 
             ::std::byte* write_ptr{typeref...[1u]};
@@ -754,6 +760,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(is_uwvm_interpreter_valtype_supported<ValType>());
 
             ValType const v{get_curr_val_from_operand_stack_top<CompileOption, ValType, StartPos>(typeref...)};
+            // ring spill: reserved bytes [remaining values][next value] ... spill_end
+            // [safe cached-value span                         ] unsafe (before reserved span)
+            // ^^ write_ptr retreats by sizeof(ValType); preceding ring count/top advance reserved the complete spill span.
             write_ptr -= sizeof(ValType);
             ::std::memcpy(write_ptr, ::std::addressof(v), sizeof(ValType));
 
@@ -779,6 +788,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             ValType v;  // no init
             ::std::memcpy(::std::addressof(v), read_ptr, sizeof(ValType));
+            // ring fill: spilled bytes [next value][remaining values] old_top
+            // [safe previously spilled value span              ] unsafe (past old_top)
+            // ^^ read_ptr advances by sizeof(ValType); preceding top retreat and ring count bound every read.
             read_ptr += sizeof(ValType);
             set_curr_val_to_stacktop_cache<CompileOption, ValType, WritePos>(v, typeref...);
 
@@ -811,6 +823,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             // Operand stack memory is laid out deep->top in ascending addresses.
             // Load it in that order, and fill the ring in stack-top direction (towards StartPos).
+            // register-ring fill: operand_base ... [spilled cached values] old_top ... frame_end
+            // [safe bytes previously spilled in this frame             ] unsafe (before operand_base)
+            // ^^ typeref...[1u] retreats by sizeof(ValType) * Count; ring count and validated stack depth prove those bytes exist.
             typeref...[1u] -= sizeof(ValType) * Count;
             ::std::byte* read_ptr{typeref...[1u]};
             constexpr ::std::size_t deepest_pos{ring_advance_next_pos<StartPos, Count - 1uz, RangeBegin, RangeEnd>()};
@@ -840,6 +855,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             ValType v;  // no init
             ::std::memcpy(::std::addressof(v), read_ptr, sizeof(ValType));
+            // ring fill: spilled bytes [next value][remaining values] old_top
+            // [safe previously spilled value span              ] unsafe (past old_top)
+            // ^^ read_ptr advances by sizeof(ValType); preceding top retreat and ring count bound every read.
             read_ptr += sizeof(ValType);
             set_curr_val_to_stacktop_cache<CompileOption, ValType, StartPos>(v, typeref...);
         }
@@ -1021,6 +1039,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert((sizeof...(RestValType) + 1uz) <= (range_end - range_begin), "Type list length exceeds ring size.");
 
             constexpr ::std::size_t total_size{(sizeof(FirstValType) + ... + sizeof(RestValType))};
+            // register-ring spill: operand_base ... [live stack][cached values to spill] | frame_end
+            // [safe through compile-time ring count and frame byte maximum     ] unsafe (past frame_end)
+            // ^^ typeref...[1u] advances by total_size; the cached values already belong to the validated logical stack.
             typeref...[1u] += total_size;
 
             ::std::byte* write_ptr{typeref...[1u]};
@@ -1174,6 +1195,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert((sizeof...(RestValType) + 1uz) <= (range_end - range_begin), "Type list length exceeds ring size.");
 
             constexpr ::std::size_t total_size{(sizeof(FirstValType) + ... + sizeof(RestValType))};
+            // register-ring fill: operand_base ... [spilled cached values] old_top ... frame_end
+            // [safe bytes previously spilled in this frame             ] unsafe (before operand_base)
+            // ^^ typeref...[1u] retreats by total_size; ring count and validated stack depth prove those bytes exist.
             typeref...[1u] -= total_size;
             ::std::byte* read_ptr{typeref...[1u]};
             ::uwvm2::runtime::compiler::uwvm_int::optable::details::
@@ -1403,6 +1427,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         // No immediates: advance to the next opfunc pointer first.
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
 
         if constexpr(int_enabled && fp_enabled)

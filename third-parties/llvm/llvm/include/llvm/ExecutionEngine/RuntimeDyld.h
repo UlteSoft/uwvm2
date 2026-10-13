@@ -189,6 +189,20 @@ public:
     bool FinalizationLocked = false;
   };
 
+  /// Downstream revision-11 ELF loader ABI. Bits 0/1 denote PPC32/SPARC V9.
+  /// Defined in the actual RuntimeDyld library, not an inline header claim.
+  /// Consumers with stale unpatched archives fail to link instead of enabling
+  /// a loader from generated-header/version metadata alone.
+  static LLVM_ABI unsigned getUWVMELFLoaderCapabilities() noexcept;
+
+  /// Exact C musttail with mandatory caller TOC restore in the private PPC64
+  /// JIT ABI. Defined by PowerPC CodeGen, never an inline/version-only claim.
+  static LLVM_ABI unsigned getUWVMPPC64TOCTailABI() noexcept;
+
+  /// Medium-model TOC-relative local-section relocation support. Defined in
+  /// RuntimeDyldELF, independently of PowerPC CodeGen's musttail contract.
+  static LLVM_ABI unsigned getUWVMPPC64TOCRelativeRelocations() noexcept;
+
   /// Construct a RuntimeDyld instance.
   LLVM_ABI RuntimeDyld(MemoryManager &MemMgr, JITSymbolResolver &Resolver);
   RuntimeDyld(const RuntimeDyld &) = delete;

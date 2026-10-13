@@ -55,6 +55,7 @@ export import :runtime_scheduling_policy;
 // partition graph unconditional; backend #if guards belong in each partition's .h.
 export import :runtime_llvm_jit_policy;
 export import :runtime_llvm_jit_full_policy;
+export import :runtime_llvm_jit_exception_dispatch;
 export import :runtime_llvm_jit_call_stack;
 export import :runtime_llvm_jit_cache_path;
 export import :runtime_int;

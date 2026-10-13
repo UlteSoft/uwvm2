@@ -66,9 +66,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         inline static constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte section_id{
             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(::uwvm2::parser::wasm::standard::wasm1::section::section_id::table_sec)};
 
+        // Aggregate over definitions and imports; preserve binary feature requirements without changing value storage.
+        bool requires_function_references{};
+        bool requires_gc{};
+        bool requires_exceptions{};
+        bool requires_reference_types{};
+        bool requires_table64{};
+        // Explicit 0x40 0x00 initializer form occurs only in definitions, never imports.
+        bool requires_table_initializer{};
+        // First successful required encoding, retained solely for cold policy diagnostics.
+        unsigned reference_types_diagnostic_value{};
         ::uwvm2::parser::wasm::standard::wasm1::section::section_span_view sec_span{};
 
         ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::features::final_table_type<Fs...>> tables{};
+
+        // Definition-only expressions, parallel to tables when the extended handler is selected.
+        // An empty expression selects the legacy implicit ref.null initializer. Imports never populate this vector.
+        ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::features::final_wasm_const_expr<Fs...>> initializers{};
     };
 
     /// @brief define handler for ::uwvm2::parser::wasm::standard::wasm1::type::table_type

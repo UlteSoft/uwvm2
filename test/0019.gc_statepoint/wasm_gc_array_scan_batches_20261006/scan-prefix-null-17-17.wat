@@ -1,0 +1,19 @@
+(module
+    (type $n (struct (field (mut (ref null $n))) (field i64)))
+    (type $a (array (mut (ref null eq))))
+    (global $root (mut (ref null $a)) (ref.null $a))
+    (func (export "_start") (local $left (ref null $n)) (local $right (ref null $n))
+      (local $array (ref null $a)) (local $ref (ref null eq)) (local $i i32)
+      ref.null $n i64.const 111 struct.new $n local.set $left
+      ref.null $n i64.const 222 struct.new $n local.set $right
+      local.get $left local.get $right struct.set $n 0
+      local.get $right local.get $left struct.set $n 0
+      i32.const 17 array.new_default $a local.set $array  
+      local.get $array global.set $root
+      ref.null $n local.set $left ref.null $n local.set $right ref.null $a local.set $array
+      i32.const 0 local.set $i loop $churn ref.null $n i64.const 991 struct.new $n drop
+        local.get $i i32.const 1 i32.add local.tee $i i32.const 8192 i32.lt_u br_if $churn end
+      i32.const 0 local.set $i loop $verify
+        global.get $root local.get $i array.get $a local.set $ref local.get $ref ref.is_null i32.eqz if unreachable end
+        local.get $i i32.const 1 i32.add local.tee $i i32.const 17 i32.lt_u br_if $verify end
+      ref.null $a global.set $root))

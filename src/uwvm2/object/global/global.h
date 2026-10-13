@@ -106,6 +106,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::global
         wasm_global_storage_u storage;
         global_type kind;
         bool is_mutable;
+        // Borrowed from the owning runtime module. A direct global.set uses
+        // this cold reference-only boundary hook before publishing a foreign
+        // GC/exnref token; numeric global access never reads it.
+        void const* ref_lease_store{};
     };
 
 }  // namespace uwvm2::object::global

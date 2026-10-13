@@ -1,0 +1,493 @@
+--- a/llvm/lib/Target/LoongArch/LoongArchMachineFunctionInfo.h
++++ b/llvm/lib/Target/LoongArch/LoongArchMachineFunctionInfo.h
+@@ -32,6 +32,10 @@
+ 
+   /// Size of stack frame to save callee saved registers
+   unsigned CalleeSavedStackSize = 0;
++
++  // TailCC owns a callee-popped, aligned incoming argument area.
++  unsigned ArgumentStackToRestore = 0;
++  bool HasTailCCStackCall = false;
+ 
+   /// Incoming indirect argument pointers saved as virtual registers, keyed by
+   /// formal parameter index. Used for musttail forwarding of indirect args.
+@@ -73,6 +77,11 @@
+   unsigned getCalleeSavedStackSize() const { return CalleeSavedStackSize; }
+   void setCalleeSavedStackSize(unsigned Size) { CalleeSavedStackSize = Size; }
+ 
++  unsigned getArgumentStackToRestore() const { return ArgumentStackToRestore; }
++  void setArgumentStackToRestore(unsigned Bytes) { ArgumentStackToRestore = Bytes; }
++  bool hasTailCCStackCall() const { return HasTailCCStackCall; }
++  void setHasTailCCStackCall() { HasTailCCStackCall = true; }
++
+   void setIncomingIndirectArg(unsigned ArgIndex, Register Reg) {
+     IncomingIndirectArgs[ArgIndex] = Reg;
+   }
+--- a/llvm/lib/Target/LoongArch/LoongArchISelLowering.cpp
++++ b/llvm/lib/Target/LoongArch/LoongArchISelLowering.cpp
+@@ -9652,6 +9652,28 @@
+     }
+   }
+ 
++  // TailCC can transfer between different prototypes. A scalarized fixed
++  // vector must own its argument slots, rather than point into the previous
++  // function's soon-to-be-reused frame. Assign every legalized integer part
++  // directly, including vectors split into more than two pieces without LSX.
++  if (State.getCallingConv() == CallingConv::Tail &&
++      ArgFlags.isSplitEnd() && !PendingLocs.empty()) {
++    for (const auto &Part : PendingLocs) {
++      MCRegister PartReg = allocateArgGPR(State);
++      if (PartReg)
++        State.addLoc(CCValAssign::getReg(Part.getValNo(), Part.getValVT(),
++                                        PartReg, GRLenVT, CCValAssign::Full));
++      else
++        State.addLoc(CCValAssign::getMem(
++            Part.getValNo(), Part.getValVT(),
++            State.AllocateStack(GRLen / 8, Align(GRLen / 8)), GRLenVT,
++            CCValAssign::Full));
++    }
++    PendingLocs.clear();
++    PendingArgFlags.clear();
++    return false;
++  }
++
+   // If the split argument only had two elements, it should be passed directly
+   // in registers or on the stack.
+   if (ValVT.isScalarInteger() && ArgFlags.isSplitEnd() &&
+@@ -9952,6 +9974,7 @@
+   default:
+     llvm_unreachable("Unsupported calling convention");
+   case CallingConv::C:
++  case CallingConv::Tail:
+   case CallingConv::Fast:
+   case CallingConv::PreserveNone:
+   case CallingConv::PreserveMost:
+@@ -9990,6 +10013,13 @@
+     CCInfo.AnalyzeFormalArguments(Ins, CC_LoongArch_GHC);
+   else
+     analyzeInputArgs(MF, CCInfo, Ins, /*IsRet=*/false, CC_LoongArch);
++  if (CallConv == CallingConv::Tail) {
++    if (IsVarArg)
++      report_fatal_error("LoongArch tailcc does not support variadic functions");
++    unsigned Bytes = alignTo(CCInfo.getStackSize(),
++                             Subtarget.getFrameLowering()->getStackAlign());
++    MF.getInfo<LoongArchMachineFunctionInfo>()->setArgumentStackToRestore(Bytes);
++  }
+ 
+   for (unsigned i = 0, e = ArgLocs.size(), InsIdx = 0; i != e; ++i, ++InsIdx) {
+     CCValAssign &VA = ArgLocs[i];
+@@ -10160,6 +10190,16 @@
+     if (Arg.Flags.isByVal())
+       return false;
+ 
++  if (CalleeCC == CallingConv::Tail || CallerCC == CallingConv::Tail) {
++    if (CalleeCC != CallerCC || CLI.IsVarArg)
++      return false;
++    // TailCC permits different prototypes, so an incoming indirect pointer
++    // cannot be assumed to exist at the outgoing argument's position.
++    return llvm::none_of(ArgLocs, [](const CCValAssign &VA) {
++      return VA.getLocInfo() == CCValAssign::Indirect;
++    });
++  }
++
+   // musttail bypasses the remaining checks: the checks either reject cases
+   // we handle specially (indirect args are forwarded via incoming pointers,
+   // stack-passed args reuse the matching incoming layout, sret is forwarded
+@@ -10241,6 +10281,22 @@
+ 
+   // Get a count of how many bytes are to be pushed on the stack.
+   unsigned NumBytes = ArgCCInfo.getStackSize();
++  bool IsTailCC = CallConv == CallingConv::Tail;
++  int64_t TailSPDelta = 0;
++  if (IsTailCC) {
++    if (IsVarArg)
++      report_fatal_error("LoongArch tailcc does not support variadic calls");
++    NumBytes = alignTo(NumBytes, Subtarget.getFrameLowering()->getStackAlign());
++    auto *Info = MF.getInfo<LoongArchMachineFunctionInfo>();
++    if (IsTailCall) {
++      TailSPDelta = int64_t(Info->getArgumentStackToRestore()) - NumBytes;
++      if (TailSPDelta < 0)
++        // PEI lays spills below the growing outgoing fixed argument area.
++        MF.getFrameInfo().CreateFixedObject(-TailSPDelta, TailSPDelta, false);
++    } else if (NumBytes) {
++      Info->setHasTailCCStackCall();
++    }
++  }
+ 
+   // Create local copies for byval args.
+   SmallVector<SDValue> ByValArgs;
+@@ -10267,11 +10323,29 @@
+ 
+   if (!IsTailCall)
+     Chain = DAG.getCALLSEQ_START(Chain, NumBytes, 0, CLI.DL);
++  else
++    // Consume incoming loads before potentially overlapping outgoing stores.
++    Chain = DAG.getStackArgumentTokenFactor(Chain);
+ 
+   // Copy argument values to their designated locations.
+   SmallVector<std::pair<Register, SDValue>> RegsToPass;
+   SmallVector<SDValue> MemOpChains;
+   SDValue StackPtr;
++  auto StoreStackArgument = [&](SDValue Value, int64_t Offset) {
++    if (IsTailCall) {
++      int FI = MF.getFrameInfo().CreateFixedObject(
++          Value.getValueType().getStoreSize().getFixedValue(),
++          Offset + TailSPDelta, false);
++      return DAG.getStore(Chain, DL, Value, DAG.getFrameIndex(FI, PtrVT),
++                          MachinePointerInfo::getFixedStack(MF, FI));
++    }
++    if (!StackPtr.getNode())
++      StackPtr = DAG.getCopyFromReg(Chain, DL, LoongArch::R3, PtrVT);
++    SDValue Address = DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
++                                  DAG.getIntPtrConstant(Offset, DL));
++    return DAG.getStore(Chain, DL, Value, Address,
++                        MachinePointerInfo::getStack(MF, Offset));
++  };
+   for (unsigned i = 0, j = 0, e = ArgLocs.size(), OutIdx = 0; i != e;
+        ++i, ++OutIdx) {
+     CCValAssign &VA = ArgLocs[i];
+@@ -10296,15 +10370,7 @@
+ 
+       if (HiVA.isMemLoc()) {
+         // Second half of f64 is passed on the stack.
+-        if (!StackPtr.getNode())
+-          StackPtr = DAG.getCopyFromReg(Chain, DL, LoongArch::R3, PtrVT);
+-        SDValue Address =
+-            DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
+-                        DAG.getIntPtrConstant(HiVA.getLocMemOffset(), DL));
+-        // Emit the store.
+-        MemOpChains.push_back(DAG.getStore(
+-            Chain, DL, Hi, Address,
+-            MachinePointerInfo::getStack(MF, HiVA.getLocMemOffset())));
++        MemOpChains.push_back(StoreStackArgument(Hi, HiVA.getLocMemOffset()));
+       } else {
+         // Second half of f64 is passed in another GPR.
+         Register RegHigh = HiVA.getLocReg();
+@@ -10472,19 +10538,10 @@
+       RegsToPass.push_back(std::make_pair(VA.getLocReg(), ArgValue));
+     } else {
+       assert(VA.isMemLoc() && "Argument not register or memory");
+-      assert((!IsTailCall || (CLI.CB && CLI.CB->isMustTailCall())) &&
++      assert((!IsTailCall || IsTailCC || (CLI.CB && CLI.CB->isMustTailCall())) &&
+              "Tail call not allowed if stack is used for passing parameters");
+ 
+-      // Work out the address of the stack slot.
+-      if (!StackPtr.getNode())
+-        StackPtr = DAG.getCopyFromReg(Chain, DL, LoongArch::R3, PtrVT);
+-      SDValue Address =
+-          DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
+-                      DAG.getIntPtrConstant(VA.getLocMemOffset(), DL));
+-
+-      // Emit the store.
+-      MemOpChains.push_back(
+-          DAG.getStore(Chain, DL, ArgValue, Address, MachinePointerInfo()));
++      MemOpChains.push_back(StoreStackArgument(ArgValue, VA.getLocMemOffset()));
+     }
+   }
+ 
+@@ -10520,6 +10577,8 @@
+   SmallVector<SDValue> Ops;
+   Ops.push_back(Chain);
+   Ops.push_back(Callee);
++  if (IsTailCall && IsTailCC)
++    Ops.push_back(DAG.getTargetConstant(TailSPDelta, DL, GRLenVT));
+ 
+   // Add argument registers to the end of the list so that they are
+   // known live into the call.
+@@ -10545,14 +10604,14 @@
+   default:
+     report_fatal_error("Unsupported code model");
+   case CodeModel::Small:
+-    Op = IsTailCall ? LoongArchISD::TAIL : LoongArchISD::CALL;
++    Op = IsTailCall ? (IsTailCC ? LoongArchISD::TC_RETURN : LoongArchISD::TAIL) : LoongArchISD::CALL;
+     break;
+   case CodeModel::Medium:
+-    Op = IsTailCall ? LoongArchISD::TAIL_MEDIUM : LoongArchISD::CALL_MEDIUM;
++    Op = IsTailCall ? (IsTailCC ? LoongArchISD::TC_RETURN_MEDIUM : LoongArchISD::TAIL_MEDIUM) : LoongArchISD::CALL_MEDIUM;
+     break;
+   case CodeModel::Large:
+     assert(Subtarget.is64Bit() && "Large code model requires LA64");
+-    Op = IsTailCall ? LoongArchISD::TAIL_LARGE : LoongArchISD::CALL_LARGE;
++    Op = IsTailCall ? (IsTailCC ? LoongArchISD::TC_RETURN_LARGE : LoongArchISD::TAIL_LARGE) : LoongArchISD::CALL_LARGE;
+     break;
+   }
+ 
+@@ -10568,7 +10627,7 @@
+   Glue = Chain.getValue(1);
+ 
+   // Mark the end of the call, which is glued to the call itself.
+-  Chain = DAG.getCALLSEQ_END(Chain, NumBytes, 0, Glue, DL);
++  Chain = DAG.getCALLSEQ_END(Chain, NumBytes, IsTailCC ? NumBytes : 0, Glue, DL);
+   Glue = Chain.getValue(1);
+ 
+   // Assign locations to each value returned by this call.
+--- a/llvm/lib/Target/LoongArch/LoongArchInstrInfo.td
++++ b/llvm/lib/Target/LoongArch/LoongArchInstrInfo.td
+@@ -81,6 +81,15 @@
+ def loongarch_probed_alloca : SDNode<"LoongArchISD::PROBED_ALLOCA",
+                                      SDTypeProfile<0, 1, [SDTCisPtrTy<0>]>,
+                                      [SDNPHasChain, SDNPMayStore]>;
++
++def SDT_LoongArchTailReturn : SDTypeProfile<0, -1,
++    [SDTCisVT<0, GRLenVT>, SDTCisVT<1, GRLenVT>]>;
++def loongarch_tcret : SDNode<"LoongArchISD::TC_RETURN", SDT_LoongArchTailReturn,
++    [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue, SDNPVariadic]>;
++def loongarch_tcret_medium : SDNode<"LoongArchISD::TC_RETURN_MEDIUM", SDT_LoongArchTailReturn,
++    [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue, SDNPVariadic]>;
++def loongarch_tcret_large : SDNode<"LoongArchISD::TC_RETURN_LARGE", SDT_LoongArchTailReturn,
++    [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue, SDNPVariadic]>;
+ 
+ // Target-dependent nodes.
+ def loongarch_call : SDNode<"LoongArchISD::CALL", SDT_LoongArchCall,
+@@ -1679,6 +1688,40 @@
+ def PseudoRET : Pseudo<(outs), (ins), [(loongarch_ret)]>,
+                 PseudoInstExpansion<(JIRL R0, R1, 0)>;
+ 
++def tailcc_delta : Operand<GRLenVT>;
++
++// TailCC keeps the signed argument-area delta until PEI emits the epilogue.
++// Convert these pseudos to ordinary no-link tail instructions only afterward.
++let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [R3] in {
++def PseudoTCRETURN_SMALL : Pseudo<(outs), (ins bare_symbol:$dst, tailcc_delta:$delta)>;
++let hasSideEffects = 0, mayStore = 0, mayLoad = 0 in
++def PseudoB_TC_RETURN : Pseudo<(outs), (ins bare_symbol:$dst, tailcc_delta:$delta)>;
++def PseudoTCRETURN_LARGE : Pseudo<(outs), (ins bare_symbol:$dst, tailcc_delta:$delta)>;
++def PseudoTCRETURNIndirect : Pseudo<(outs), (ins GPRT:$rj, tailcc_delta:$delta)>;
++}
++let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1,
++    Uses = [R3], Defs = [R20], Size = 8 in
++def PseudoTCRETURN_MEDIUM : Pseudo<(outs), (ins bare_symbol:$dst, tailcc_delta:$delta)>;
++
++def : Pat<(loongarch_tcret (iPTR tglobaladdr:$dst), timm:$delta),
++          (PseudoTCRETURN_SMALL tglobaladdr:$dst, timm:$delta)>;
++def : Pat<(loongarch_tcret (iPTR texternalsym:$dst), timm:$delta),
++          (PseudoTCRETURN_SMALL texternalsym:$dst, timm:$delta)>;
++def : Pat<(loongarch_tcret_medium (iPTR tglobaladdr:$dst), timm:$delta),
++          (PseudoTCRETURN_MEDIUM tglobaladdr:$dst, timm:$delta)>;
++def : Pat<(loongarch_tcret_medium (iPTR texternalsym:$dst), timm:$delta),
++          (PseudoTCRETURN_MEDIUM texternalsym:$dst, timm:$delta)>;
++def : Pat<(loongarch_tcret_large (iPTR tglobaladdr:$dst), timm:$delta),
++          (PseudoTCRETURN_LARGE tglobaladdr:$dst, timm:$delta)>;
++def : Pat<(loongarch_tcret_large (iPTR texternalsym:$dst), timm:$delta),
++          (PseudoTCRETURN_LARGE texternalsym:$dst, timm:$delta)>;
++def : Pat<(loongarch_tcret GPRT:$rj, timm:$delta),
++          (PseudoTCRETURNIndirect GPRT:$rj, timm:$delta)>;
++def : Pat<(loongarch_tcret_medium GPRT:$rj, timm:$delta),
++          (PseudoTCRETURNIndirect GPRT:$rj, timm:$delta)>;
++def : Pat<(loongarch_tcret_large GPRT:$rj, timm:$delta),
++          (PseudoTCRETURNIndirect GPRT:$rj, timm:$delta)>;
++
+ // Tail call with 'Small' code model.
+ let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [R3] in
+ def PseudoTAIL_SMALL : Pseudo<(outs), (ins bare_symbol:$dst)>;
+--- a/llvm/lib/Target/LoongArch/LoongArchFrameLowering.cpp
++++ b/llvm/lib/Target/LoongArch/LoongArchFrameLowering.cpp
+@@ -29,6 +29,25 @@
+ 
+ #define DEBUG_TYPE "loongarch-frame-lowering"
+ 
++// Keep physical frame indices relative to entry SP. TailCC's CFA instead
++// names the caller's SP before its callee-popped incoming argument area.
++class LoongArchTailCFIBuilder : public CFIInstBuilder {
++  int64_t IncomingArgs;
++public:
++  LoongArchTailCFIBuilder(MachineBasicBlock &MBB,
++                         MachineBasicBlock::iterator Insert,
++                         MachineInstr::MIFlag Flag)
++      : CFIInstBuilder(MBB, Insert, Flag),
++        IncomingArgs(MBB.getParent()->getInfo<LoongArchMachineFunctionInfo>()
++                         ->getArgumentStackToRestore()) {}
++  void buildDefCFA(MCRegister Reg, int64_t Offset) const {
++    CFIInstBuilder::buildDefCFA(Reg, Offset + IncomingArgs);
++  }
++  void buildDefCFAOffset(int64_t Offset, MCSymbol *Label = nullptr) const {
++    CFIInstBuilder::buildDefCFAOffset(Offset + IncomingArgs, Label);
++  }
++};
++
+ // Return true if the specified function should have a dedicated frame
+ // pointer register.  This is true if frame pointer elimination is
+ // disabled, if it needs dynamic stack realignment, if the function has
+@@ -37,7 +56,8 @@
+   const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
+ 
+   const MachineFrameInfo &MFI = MF.getFrameInfo();
+-  return MF.getTarget().Options.DisableFramePointerElim(MF) ||
++  return MF.getInfo<LoongArchMachineFunctionInfo>()->hasTailCCStackCall() ||
++         MF.getTarget().Options.DisableFramePointerElim(MF) ||
+          RegInfo->hasStackRealignment(MF) || MFI.hasVarSizedObjects() ||
+          MFI.isFrameAddressTaken();
+ }
+@@ -196,7 +216,7 @@
+   const LoongArchInstrInfo *TII = STI.getInstrInfo();
+   const bool IsLA64 = STI.is64Bit();
+   const Register SPReg = LoongArch::R3;
+-  CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameSetup);
++  LoongArchTailCFIBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameSetup);
+ 
+   // Simply allocate the stack if it's not big enough to require a probe.
+   if (!NeedProbe || Offset <= ProbeSize) {
+@@ -315,6 +335,9 @@
+   // prologue/epilogue.
+   if (MF.getFunction().getCallingConv() == CallingConv::GHC)
+     return;
++  if (LoongArchFI->getArgumentStackToRestore() && MF.needsFrameMoves())
++    LoongArchTailCFIBuilder(MBB, MBBI, MachineInstr::FrameSetup)
++        .buildDefCFAOffset(0);
+   // Determine the correct frame layout
+   determineFrameLayout(MF);
+ 
+@@ -353,7 +376,8 @@
+   // Iterate over list of callee-saved registers and emit .cfi_offset
+   // directives.
+   for (const auto &Entry : CSI) {
+-    int64_t Offset = MFI.getObjectOffset(Entry.getFrameIdx());
++    int64_t Offset = MFI.getObjectOffset(Entry.getFrameIdx()) -
++                     LoongArchFI->getArgumentStackToRestore();
+     unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createOffset(
+         nullptr, RI->getDwarfRegNum(Entry.getReg(), true), Offset));
+     BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
+@@ -370,7 +394,8 @@
+     // Emit ".cfi_def_cfa $fp, LoongArchFI->getVarArgsSaveSize()"
+     unsigned CFIIndex = MF.addFrameInst(
+         MCCFIInstruction::cfiDefCfa(nullptr, RI->getDwarfRegNum(FPReg, true),
+-                                    LoongArchFI->getVarArgsSaveSize()));
++                                    LoongArchFI->getVarArgsSaveSize() +
++                                    LoongArchFI->getArgumentStackToRestore()));
+     BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
+         .addCFIIndex(CFIIndex)
+         .setMIFlag(MachineInstr::FrameSetup);
+@@ -427,6 +452,23 @@
+   MachineBasicBlock::iterator MBBI = MBB.getFirstTerminator();
+   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
+ 
++  int64_t ArgumentPop = LoongArchFI->getArgumentStackToRestore();
++  if (MBBI != MBB.end()) {
++    unsigned TailOpcode = 0;
++    switch (MBBI->getOpcode()) {
++    case LoongArch::PseudoB_TC_RETURN: TailOpcode = LoongArch::PseudoB_TAIL; break;
++    case LoongArch::PseudoTCRETURN_SMALL: TailOpcode = LoongArch::PseudoTAIL_SMALL; break;
++    case LoongArch::PseudoTCRETURN_MEDIUM: TailOpcode = LoongArch::PseudoTAIL_MEDIUM; break;
++    case LoongArch::PseudoTCRETURN_LARGE: TailOpcode = LoongArch::PseudoTAIL_LARGE; break;
++    case LoongArch::PseudoTCRETURNIndirect: TailOpcode = LoongArch::PseudoTAILIndirect; break;
++    }
++    if (TailOpcode) {
++      ArgumentPop = MBBI->getOperand(1).getImm();
++      MBBI->removeOperand(1);
++      MBBI->setDesc(STI.getInstrInfo()->get(TailOpcode));
++    }
++  }
++
+   const auto &CSI = MFI.getCalleeSavedInfo();
+   // Skip to before the restores of callee-saved registers.
+   auto LastFrameDestroy = MBBI;
+@@ -460,7 +502,7 @@
+   // cannot authenticate a stopped return instruction. Keep synchronous
+   // call-site unwinding unchanged; emit these rows only for async tables.
+   bool AsyncCFI = MF.getFunction().getUWTableKind() == UWTableKind::Async;
+-  CFIInstBuilder CFIBuilder(MBB, LastFrameDestroy,
++  LoongArchTailCFIBuilder CFIBuilder(MBB, LastFrameDestroy,
+                             MachineInstr::FrameDestroy);
+   if (AsyncCFI)
+     CFIBuilder.buildDefCFA(SPReg, StackSize);
+@@ -485,10 +527,11 @@
+ 
+   // Deallocate stack. The new row follows the actual SP adjustment, never
+   // a constant-materialization instruction preceding that adjustment.
+-  adjustReg(MBB, MBBI, DL, SPReg, SPReg, StackSize, MachineInstr::FrameDestroy);
++  adjustReg(MBB, MBBI, DL, SPReg, SPReg, int64_t(StackSize) + ArgumentPop,
++            MachineInstr::FrameDestroy);
+   if (AsyncCFI) {
+     CFIBuilder.setInsertPoint(MBBI);
+-    CFIBuilder.buildDefCFA(SPReg, 0);
++    CFIBuilder.buildDefCFA(SPReg, -ArgumentPop);
+   }
+ }
+ 
+@@ -621,7 +664,8 @@
+ // Let eliminateCallFramePseudoInstr preserve stack space for it.
+ bool LoongArchFrameLowering::hasReservedCallFrame(
+     const MachineFunction &MF) const {
+-  return !MF.getFrameInfo().hasVarSizedObjects();
++  return !MF.getInfo<LoongArchMachineFunctionInfo>()->hasTailCCStackCall() &&
++         !MF.getFrameInfo().hasVarSizedObjects();
+ }
+ 
+ // Eliminate ADJCALLSTACKDOWN, ADJCALLSTACKUP pseudo instructions.
+@@ -639,6 +683,8 @@
+     // allocation (e.g. alloca), which means it's not possible to allocate
+     // space for outgoing arguments from within the function prologue.
+     int64_t Amount = MI->getOperand(0).getImm();
++    if (MI->getOpcode() == LoongArch::ADJCALLSTACKUP)
++      Amount -= MI->getOperand(1).getImm(); // TailCC callee already popped it.
+ 
+     if (Amount != 0) {
+       // Ensure the stack remains aligned after adjustment.
+@@ -742,6 +788,9 @@
+ 
+ bool LoongArchFrameLowering::enableShrinkWrapping(
+     const MachineFunction &MF) const {
++  if (MF.getFunction().getCallingConv() == CallingConv::Tail ||
++      MF.getInfo<LoongArchMachineFunctionInfo>()->hasTailCCStackCall())
++    return false;
+   // Keep the conventional code flow when not optimizing.
+   if (MF.getFunction().hasOptNone())
+     return false;
+--- a/llvm/lib/Target/LoongArch/LoongArchExpandPseudoInsts.cpp
++++ b/llvm/lib/Target/LoongArch/LoongArchExpandPseudoInsts.cpp
+@@ -166,6 +166,8 @@
+     return expandFunctionCALL(MBB, MBBI, NextMBBI, /*IsTailCall=*/false);
+   case LoongArch::PseudoTAIL_SMALL:
+   case LoongArch::PseudoTAIL_LARGE:
++  case LoongArch::PseudoTCRETURN_SMALL:
++  case LoongArch::PseudoTCRETURN_LARGE:
+     return expandFunctionCALL(MBB, MBBI, NextMBBI, /*IsTailCall=*/true);
+   case LoongArch::PseudoBRIND:
+     // If the PseudoBRIND is used to table jump, then emit a label to annotate
+@@ -663,6 +665,8 @@
+   MachineInstr &MI = *MBBI;
+   DebugLoc DL = MI.getDebugLoc();
+   const MachineOperand &Func = MI.getOperand(0);
++  bool IsTailCC = MI.getOpcode() == LoongArch::PseudoTCRETURN_SMALL ||
++                  MI.getOpcode() == LoongArch::PseudoTCRETURN_LARGE;
+   MachineInstrBuilder CALL;
+   unsigned Opcode;
+ 
+@@ -675,8 +679,12 @@
+     // bl func
+     // TAIL:
+     // b func
+-    Opcode = IsTailCall ? LoongArch::PseudoB_TAIL : LoongArch::BL;
++    Opcode = IsTailCall ? (IsTailCC ? LoongArch::PseudoB_TC_RETURN
++                                   : LoongArch::PseudoB_TAIL)
++                        : LoongArch::BL;
+     CALL = BuildMI(MBB, MBBI, DL, TII->get(Opcode)).add(Func);
++    if (IsTailCC)
++      CALL.add(MI.getOperand(1));
+     break;
+   }
+   case CodeModel::Large: {
+@@ -684,7 +692,9 @@
+     // indirectly in case of going through the GOT, then JIRL_TAIL or
+     // JIRL_CALL to $addr.
+     Opcode =
+-        IsTailCall ? LoongArch::PseudoJIRL_TAIL : LoongArch::PseudoJIRL_CALL;
++        IsTailCall ? (IsTailCC ? LoongArch::PseudoTCRETURNIndirect
++                              : LoongArch::PseudoJIRL_TAIL)
++                   : LoongArch::PseudoJIRL_CALL;
+     Register AddrReg =
+         IsTailCall
+             ? MF->getRegInfo().createVirtualRegister(&LoongArch::GPRRegClass)
+@@ -695,7 +705,11 @@
+     unsigned LAOpcode = UseGOT ? LoongArch::LDX_D : LoongArch::ADD_D;
+     expandLargeAddressLoad(MBB, MBBI, NextMBBI, LAOpcode, MO, Func, AddrReg,
+                            false);
+-    CALL = BuildMI(MBB, MBBI, DL, TII->get(Opcode)).addReg(AddrReg).addImm(0);
++    CALL = BuildMI(MBB, MBBI, DL, TII->get(Opcode)).addReg(AddrReg);
++    if (IsTailCC)
++      CALL.add(MI.getOperand(1));
++    else
++      CALL.addImm(0);
+     break;
+   }
+   }

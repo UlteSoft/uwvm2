@@ -1,0 +1,149 @@
+{
+  "cases": [
+    {
+      "name": "i8-write",
+      "trap": null,
+      "provider": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i8-write-provider.wasm",
+        "sha": "7af218048bbe0103e169866e1e19b69ab185a0cceae261830829ee6d425ffec1"
+      },
+      "importer": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i8-write-importer.wasm",
+        "sha": "e0fed53e5492fd1d381705fa98440e041e2447c0866ff9aa457707d810ffb95c"
+      }
+    },
+    {
+      "name": "i8-null",
+      "trap": "null",
+      "provider": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i8-null-provider.wasm",
+        "sha": "b4ba5581e66b19189a669d9df202344709f8a90ba027bc2d760b6b1a331527c3"
+      },
+      "importer": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i8-null-importer.wasm",
+        "sha": "8f13f1e4adde5c3e343ef339abfa7a6eb24898414b24b3fc312f1e38cbfcc38d"
+      }
+    },
+    {
+      "name": "i8-bounds",
+      "trap": "bounds",
+      "provider": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i8-bounds-provider.wasm",
+        "sha": "7af218048bbe0103e169866e1e19b69ab185a0cceae261830829ee6d425ffec1"
+      },
+      "importer": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i8-bounds-importer.wasm",
+        "sha": "49f054c5bcad35364122a1b98b5826e5cb97dfe645041e0c7f969130500cd826"
+      }
+    },
+    {
+      "name": "i16-write",
+      "trap": null,
+      "provider": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i16-write-provider.wasm",
+        "sha": "0c4dfeb5d8cbfde84e8e12651941fc9c5383da3909e86a5e6b84a65a1b5ade0d"
+      },
+      "importer": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i16-write-importer.wasm",
+        "sha": "4314b3b61f7935fe847a05d8086f1ac94eb46769d2fe1f2b1cacd311be28b304"
+      }
+    },
+    {
+      "name": "i16-null",
+      "trap": "null",
+      "provider": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i16-null-provider.wasm",
+        "sha": "be7f9994f0d85111b4fdbf4a489040abbdeba62b037e6160362052e9271ee128"
+      },
+      "importer": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i16-null-importer.wasm",
+        "sha": "545bc69f63db6d7f76219fd6fe40297130c50663b168902b64c7ab4d9ba45957"
+      }
+    },
+    {
+      "name": "i16-bounds",
+      "trap": "bounds",
+      "provider": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i16-bounds-provider.wasm",
+        "sha": "0c4dfeb5d8cbfde84e8e12651941fc9c5383da3909e86a5e6b84a65a1b5ade0d"
+      },
+      "importer": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i16-bounds-importer.wasm",
+        "sha": "8e679390144e412813d26582b0b9a26237ee5392afba6695571b71ae9cfb7ba1"
+      }
+    },
+    {
+      "name": "i32-write",
+      "trap": null,
+      "provider": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i32-write-provider.wasm",
+        "sha": "1b870758f010240dc410a1780d1026326e3091185087b66d7bc18b5e39a0db6e"
+      },
+      "importer": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i32-write-importer.wasm",
+        "sha": "9a3452e2f391e182476182a919318db2a397ceb3b2f86e0e8ed65a8c37fb2f3e"
+      }
+    },
+    {
+      "name": "i32-null",
+      "trap": "null",
+      "provider": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i32-null-provider.wasm",
+        "sha": "42e3f2c1cabfb6cb6119faea553fe79bec4f53d4eb25c47b31c979ed225fa957"
+      },
+      "importer": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i32-null-importer.wasm",
+        "sha": "b12b09caec91fcf70c5598fc193b43e1f362b205dbb0ca8bda391db68e52b51d"
+      }
+    },
+    {
+      "name": "i32-bounds",
+      "trap": "bounds",
+      "provider": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i32-bounds-provider.wasm",
+        "sha": "1b870758f010240dc410a1780d1026326e3091185087b66d7bc18b5e39a0db6e"
+      },
+      "importer": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/i32-bounds-importer.wasm",
+        "sha": "b16032fccace599778863f758661a48de322d6879f256da867500d2d1f81083b"
+      }
+    },
+    {
+      "name": "f32-write",
+      "trap": null,
+      "provider": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/f32-write-provider.wasm",
+        "sha": "4cbdafb9a9f5b5a3115a1013ba0169f437cdb1c37c1ce70ddc1b93a9715439e9"
+      },
+      "importer": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/f32-write-importer.wasm",
+        "sha": "06be74c4e7de705465e7d21d6960c349f2e519e8f277976944b08562f879321f"
+      }
+    },
+    {
+      "name": "f32-null",
+      "trap": "null",
+      "provider": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/f32-null-provider.wasm",
+        "sha": "ef1be6369177d00b7a96bb1c052465ce7ab71b3f60fff3523b21da06df397ff9"
+      },
+      "importer": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/f32-null-importer.wasm",
+        "sha": "f927f0b3f4f2b09fa687aa4663acaa7ba2b9dc6110dc5c8f0fd9251cace4bda9"
+      }
+    },
+    {
+      "name": "f32-bounds",
+      "trap": "bounds",
+      "provider": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/f32-bounds-provider.wasm",
+        "sha": "4cbdafb9a9f5b5a3115a1013ba0169f437cdb1c37c1ce70ddc1b93a9715439e9"
+      },
+      "importer": {
+        "path": "/tmp/uwvm-gc-perf-20261011-r74/source/foreign-typed-store-c21/f32-bounds-importer.wasm",
+        "sha": "172bf3642c6dfcd4840af9ccfb4b3cdc7c3aa47355833812332444a04f2db4ba"
+      }
+    }
+  ],
+  "scope": "Actual foreign owner+subtype; different receiver type-index namespace. Setter first operation after50000allocationchurn, f32NaN/packedtruncation and adjacent slot untouched; null/bounds setter traps. Foreign autoGC eligibility not claimed."
+}

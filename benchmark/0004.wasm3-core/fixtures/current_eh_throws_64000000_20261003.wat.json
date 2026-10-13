@@ -1,0 +1,30 @@
+{
+  "schema": "uwvm-same-algorithm-long-EH-fixture-source-r1",
+  "source_only": true,
+  "native_executed": false,
+  "semantic_passed": false,
+  "performance_passed": false,
+  "formal_acceptance": false,
+  "path": "benchmark/0004.wasm3-core/fixtures/current_eh_throws_64000000_20261003.wat",
+  "bytes": 1411,
+  "sha256": "071c7291d0da39c2c2067d139bcd001e3f737ea5372abbd99f857f94d69b1cc8",
+  "derivation": {
+    "original_generator": "test/0017.runtime/run_wasm_exception_performance.py",
+    "original_generator_sha256": "af6c5b3e97c99c7d0cda7665c7ba8aabb0b0329fc0a1a76eb350dbdaa90bbfee",
+    "original_wat_bytes": 1409,
+    "original_wat_sha256": "106240b668266c97b8f7187a32683a038d47fae31eca2facf2ba580a04ab0aa4",
+    "original_wasm_sha256": "560243a56c6b29dbe0337548fa96626db2c168e56ea69d88208cffa4dfc48560",
+    "changes": [
+      "iteration bound 8000000 -> 64000000",
+      "checked LCG result 0x00259a00 -> 0x11ecd000",
+      "checked catch count 500000 -> 4000000"
+    ]
+  },
+  "expected": {
+    "iterations": 64000000,
+    "LCG_result_u32": 300732416,
+    "catches": 4000000,
+    "period_mod16": 16
+  },
+  "measurement_scope": "Use the existing frozen source-bound semantic/plain/pureHW protocols. New Wasm parse/validate + exact byte SHA and actual cold are required before timing. Old short samples are retained. Whole-process reference wall and internal guest timer remain separate; sub100ms observations remain unqualified."
+}

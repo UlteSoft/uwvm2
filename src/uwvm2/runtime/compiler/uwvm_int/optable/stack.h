@@ -106,8 +106,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
+        // operand frame: operand_base ... [live prefix][typed input bytes] old_top ... frame_end
+        //                [validated existing stack depth       ] unsafe before operand_base
+        // ^^ type...[1u] retreats by sizeof(OperandT); the emitter proved this typed input was live.
         type...[1u] -= sizeof(OperandT);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -131,7 +137,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
+        // operand pop: operand_base ... [validated live bytes] old_top ... frame_end
+        // [safe existing stack prefix                   ] unsafe (before operand_base)
+        // ^^ typeref...[1u] retreats by sizeof(OperandT); the emitted stack effect proves those bytes are live.
         typeref...[1u] -= sizeof(OperandT);
     }
 
@@ -155,12 +167,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
         static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         imm_t bytes{};  // init
         ::std::memcpy(::std::addressof(bytes), type...[0], sizeof(bytes));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ type...[0] advances by sizeof(bytes); translation emitted the matching typed slot.
         type...[0] += sizeof(bytes);
 
+        // bulk drop: operand_base ... [remaining values][emitter-checked live bytes] old_top
+        //            [validated existing stack prefix] unsafe before operand_base
+        // ^^ type...[1u] retreats by the emitted static_cast<::std::size_t>(bytes); this is not a guest runtime count.
         type...[1u] -= static_cast<::std::size_t>(bytes);
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -184,12 +205,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         imm_t bytes{};  // init
         ::std::memcpy(::std::addressof(bytes), typeref...[0], sizeof(bytes));
+        // bytecode: [consumed prefix][current typed immediate][following slots] | stream_end
+        //                              [complete emitted slot] safe to its end
+        // ^^ typeref...[0] advances by sizeof(bytes); translation emitted the matching typed slot.
         typeref...[0] += sizeof(bytes);
 
+        // bulk drop: operand_base ... [emitter-validated live bytes] old_top ... frame_end
+        // [safe existing stack prefix                      ] unsafe (before operand_base)
+        // ^^ typeref...[1u] retreats by the translator-emitted static_cast<::std::size_t>(bytes), not a guest-controlled runtime size.
         typeref...[1u] -= static_cast<::std::size_t>(bytes);
     }
 
@@ -261,6 +291,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                         ValueT const v1_mem{peek_nth_val_from_operand_stack_cache<ValueT, 1uz>(type...)};
                         ValueT const out{cond != wasm_i32{0} ? v1_mem : v2_mem};
                         set_nth_val_to_operand_stack_cache<ValueT, 1uz>(out, type...);
+                        // operand frame: operand_base ... [live prefix][typed input bytes] old_top ... frame_end
+                        //                [validated existing stack depth       ] unsafe before operand_base
+                        // ^^ type...[1u] retreats by sizeof(ValueT); the emitter proved this typed input was live.
                         type...[1u] -= sizeof(ValueT);
                     }
                 }
@@ -298,6 +331,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             // floating conditional/value-return helper can quiet it on x87/68881.
             // memmove, not memcpy, also permits selecting the destination itself.
                 // Select bytes, not native FP values. The selected address may equal the destination.
+                // operand frame: operand_base ... [live prefix][typed input bytes] old_top ... frame_end
+                //                [validated existing stack depth       ] unsafe before operand_base
+                // ^^ type...[1u] retreats by sizeof(ValueT); the emitter proved this typed input was live.
                 type...[1u] -= sizeof(ValueT);
                 ::std::memmove(type...[1u] - sizeof(ValueT),
                                cond != wasm_i32{0} ? type...[1u] - sizeof(ValueT) : type...[1u], sizeof(ValueT));
@@ -337,12 +373,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             // floating conditional/value-return helper can quiet it on x87/68881.
             // memmove, not memcpy, also permits selecting the destination itself.
                 // Select bytes, not native FP values. The selected address may equal the destination.
+                // operand frame: operand_base ... [live prefix][typed input bytes] old_top ... frame_end
+                //                [validated existing stack depth       ] unsafe before operand_base
+                // ^^ type...[1u] retreats by sizeof(ValueT); the emitter proved this typed input was live.
                 type...[1u] -= sizeof(ValueT);
                 ::std::memmove(type...[1u] - sizeof(ValueT),
                                cond != wasm_i32{0} ? type...[1u] - sizeof(ValueT) : type...[1u], sizeof(ValueT));
             }
         }
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -368,10 +410,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         wasm_i32 const cond{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
         // Select bytes, not native FP values. The selected address may equal the destination.
+        // operand pop: operand_base ... [validated live bytes] old_top ... frame_end
+        // [safe existing stack prefix                   ] unsafe (before operand_base)
+        // ^^ typeref...[1u] retreats by sizeof(ValueT); the emitted stack effect proves those bytes are live.
         typeref...[1u] -= sizeof(ValueT);
         ::std::memmove(typeref...[1u] - sizeof(ValueT),
                        cond != wasm_i32{0} ? typeref...[1u] - sizeof(ValueT) : typeref...[1u], sizeof(ValueT));

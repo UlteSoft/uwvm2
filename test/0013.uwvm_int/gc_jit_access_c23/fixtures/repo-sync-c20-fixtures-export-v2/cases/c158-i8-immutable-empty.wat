@@ -1,0 +1,1 @@
+(module (type $a (array i8))  (func (export "_start") i32.const -127 i32.const 0 array.new $a i32.const 0 array.get_u $a drop))

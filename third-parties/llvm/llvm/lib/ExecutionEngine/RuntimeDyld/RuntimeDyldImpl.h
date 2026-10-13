@@ -136,7 +136,8 @@ public:
   };
 
   /// SymOffset - Section offset of the relocation entry's symbol (used for GOT
-  /// lookup).
+  /// lookup). For RISC-V CALL/CALL_PLT only, an optional same-section call stub
+  /// offset instead; zero means no stub was reserved.
   union {
     uint64_t SymOffset;
     SectionPair Sections;

@@ -1,0 +1,131 @@
+{
+  "schema": "uwvm-dap-pretrap-note-protocol-v1",
+  "passed": true,
+  "protocol_only": true,
+  "actual_tests_per_repository": 40,
+  "actual_total_tests": 80,
+  "adapter_sha256": "6c6becb145f14c3dbd0aae376e9fba107f9111158a62c01533046d49968fe0ff",
+  "actual_protocol_PIDFD_proofs": [
+    {
+      "label": "protocol-uwvm2",
+      "output_sha256": "a3bc9634c3cb4b18baca8156ca0e3e33bc77114d254d3a87a9b6a852df959e25",
+      "argv": [
+        "env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "PYTHONPATH=/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/dap-trap-notice-r1/uwvm2/test/0018.debugger",
+        "/usr/bin/python3",
+        "-m",
+        "unittest",
+        "test_dap_wasm_trap",
+        "test_dap_wasm_state",
+        "test_dap_wasm_scope_pages",
+        "-v"
+      ],
+      "pid": 491750,
+      "birth": 2641439,
+      "admission": {
+        "pid": 491750,
+        "birth": 2641439,
+        "parent_pid": 491661,
+        "uid": [
+          1000,
+          1000,
+          1000,
+          1000
+        ],
+        "cgroup": "0::/system.slice/docker-d3b12e6d323a0f28c2408989fff41a1ca1a991e19945919bc870337dd0afae03.scope\n",
+        "affinity": [
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ],
+        "bootstrap_executable_sha256": "b8d8288faefdd300201f43fcf00f6f539a27218eeed3a3dff5ab10b9c4c99700",
+        "pidfd_acquired_before_payload": true
+      },
+      "pidfd_readable": true,
+      "started": 1791381654.6196387,
+      "finished": 1791381654.8549538,
+      "actual_reaped_returncode": 0
+    },
+    {
+      "label": "protocol-uwvm2-ros",
+      "output_sha256": "a3bc9634c3cb4b18baca8156ca0e3e33bc77114d254d3a87a9b6a852df959e25",
+      "argv": [
+        "env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "PYTHONPATH=/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/dap-trap-notice-r1/uwvm2-ros/test/0018.debugger",
+        "/usr/bin/python3",
+        "-m",
+        "unittest",
+        "test_dap_wasm_trap",
+        "test_dap_wasm_state",
+        "test_dap_wasm_scope_pages",
+        "-v"
+      ],
+      "pid": 491751,
+      "birth": 2641462,
+      "admission": {
+        "pid": 491751,
+        "birth": 2641462,
+        "parent_pid": 491661,
+        "uid": [
+          1000,
+          1000,
+          1000,
+          1000
+        ],
+        "cgroup": "0::/system.slice/docker-d3b12e6d323a0f28c2408989fff41a1ca1a991e19945919bc870337dd0afae03.scope\n",
+        "affinity": [
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ],
+        "bootstrap_executable_sha256": "b8d8288faefdd300201f43fcf00f6f539a27218eeed3a3dff5ab10b9c4c99700",
+        "pidfd_acquired_before_payload": true
+      },
+      "pidfd_readable": true,
+      "started": 1791381654.8553283,
+      "finished": 1791381655.090813,
+      "actual_reaped_returncode": 0
+    }
+  ],
+  "actual_parent_retirement": {
+    "pid": 491661,
+    "pidfd_readable": true,
+    "actual_reaped_returncode": 1
+  },
+  "cgroup": "0::/system.slice/docker-d3b12e6d323a0f28c2408989fff41a1ca1a991e19945919bc870337dd0afae03.scope\n",
+  "memory_max_bytes": 68719476736,
+  "swap_max_bytes": 0,
+  "failed_parent_batch_passed": false,
+  "parent_failure": "native main C++ FastIO raw character pointer rejection; protocol tests passed before compilation",
+  "runtime_capture_qualified": false,
+  "whole_latest_working_tree_qualified": false,
+  "receipts_sha256": "92a66ed1504897c7829c32370254469746604789f7e513a964096e440e619c07"
+}

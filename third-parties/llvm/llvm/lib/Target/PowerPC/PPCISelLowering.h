@@ -668,7 +668,7 @@ namespace llvm {
 
     bool IsEligibleForTailCallOptimization(
         const GlobalValue *CalleeGV, CallingConv::ID CalleeCC,
-        CallingConv::ID CallerCC, bool isVarArg,
+        CallingConv::ID CallerCC, const CallBase *CB, bool isVarArg,
         const SmallVectorImpl<ISD::InputArg> &Ins) const;
 
     bool IsEligibleForTailCallOptimization_64SVR4(

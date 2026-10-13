@@ -35,6 +35,7 @@ import :def;
 import :feature_def;
 import :types;
 import :data_count_section;
+import :tag_section;
 import :data_section;
 import :element_section;
 import :sequence;

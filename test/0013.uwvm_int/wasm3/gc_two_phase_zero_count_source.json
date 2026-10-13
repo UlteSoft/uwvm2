@@ -1,0 +1,14 @@
+{
+  "schema": "uwvm-core3-GC-policy-zero-count-source-cell-v1",
+  "source_only": true,
+  "oracle_passed": false,
+  "binary_hex": "0061736d0100000001040160000003020100070a01065f737461727400000a06010401006e0b",
+  "zero_based_local_type_offset": 36,
+  "local_run_count": 1,
+  "local_count": 0,
+  "type_byte": "6e",
+  "validation_gc_on": "accept",
+  "validation_gc_off": "reject",
+  "type_section_requires_gc": false,
+  "note": "Only a zero-count compressed anyref local run; Core3 still validates/gates its encoded type. Official validate/print and actual API results pending."
+}

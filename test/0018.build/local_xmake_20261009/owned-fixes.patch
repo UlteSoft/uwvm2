@@ -1,0 +1,318 @@
+--- a/xmake/utility/bundled_runtimes.lua
++++ b/xmake/utility/bundled_runtimes.lua
+@@ -148,6 +148,10 @@
+     verify_provider_flags(input.cxxflags)
+     verify_provider_flags(input.linkflags)
+     local cmake = assert(find_tool("cmake"), "ROS runtimes require CMake >= 3.20")
++    -- libc++ header generators import modules from the verified source tree.
++    -- Keep Python bytecode in memory so our own build does not add unmanifested
++    -- __pycache__ files and make the next strict source verification fail.
++    local cmake_environment = {envs = {PYTHONDONTWRITEBYTECODE = "1"}}
+     local ninja = assert(find_tool("ninja"), "ROS runtimes require Ninja")
+     local cross_file = input.cross_file
+     local compiler_rt = selected("rtlib") == "compiler-rt"
+@@ -228,12 +232,16 @@
+                 end
+                 table.insert(args, "-DLLVM_DEFAULT_TARGET_TRIPLE=" .. target)
+             end
+-            if selected("sysroot") then table.insert(args, "-DCMAKE_SYSROOT=" .. path.absolute(selected("sysroot"))) end
++            if selected("sysroot") then
++                local sysroot = path.absolute(selected("sysroot"))
++                table.insert(args, "-DCMAKE_SYSROOT=" .. sysroot)
++                if input.plat == "macosx" then table.insert(args, "-DCMAKE_OSX_SYSROOT=" .. sysroot) end
++            end
+             if not os.isfile(cache) or not os.isfile(stamp) or io.readfile(stamp) ~= key .. "\n" then
+                 io.writefile(path.join(build, "settings.txt"), text)
+-                os.vrunv(cmake.program, args)
+-            end
+-            os.vrunv(cmake.program, {"--build", build, "--parallel", tostring(input.jobs), "--target", "build.ninja"})
++                os.vrunv(cmake.program, args, cmake_environment)
++            end
++            os.vrunv(cmake.program, {"--build", build, "--parallel", tostring(input.jobs), "--target", "build.ninja"}, cmake_environment)
+             local llvm_flags = import("utility.bundled_llvm", {anonymous = true})
+             for line in io.lines(cache) do
+                 local value = line:match("^CMAKE_C[_X]*_FLAGS[^:]*:STRING=(.*)$")
+@@ -244,7 +252,7 @@
+                 llvm_flags.verify_fp_flags(fragment.fragment)
+                 verify_provider_flags(fragment.fragment)
+             end
+-            os.vrunv(cmake.program, {"--build", build, "--parallel", tostring(input.jobs), "--target", "cxx_static", "cxxabi_static", "unwind_static"})
++            os.vrunv(cmake.program, {"--build", build, "--parallel", tostring(input.jobs), "--target", "cxx_static", "cxxabi_static", "unwind_static"}, cmake_environment)
+             result = read_contract(build)
+             result.identity = key
+             result.source_id = source_id
+--- a/xmake/utility/bundled_llvm.lua
++++ b/xmake/utility/bundled_llvm.lua
+@@ -306,6 +306,7 @@
+     end
+     local source_id = verify_source(root)
+     local cmake = assert(find_tool("cmake"), "Bundled LLVM requires CMake >= 3.20")
++    local cmake_environment = {envs = {PYTHONDONTWRITEBYTECODE = "1"}}
+     local ninja = assert(find_tool("ninja"), "Bundled LLVM requires Ninja")
+     local cc, cxx = compiler("cc"), compiler("cxx")
+     local plat, arch = get_config("plat") or os.host(), get_config("arch") or os.arch()
+@@ -452,6 +453,11 @@
+                 "-DBUILD_SHARED_LIBS=OFF", "-DLLVM_ENABLE_ZLIB=OFF", "-DLLVM_ENABLE_ZSTD=OFF",
+                 "-DLLVM_ENABLE_LIBXML2=OFF", "-DLLVM_ENABLE_CURL=OFF", "-DLLVM_ENABLE_LIBEDIT=OFF",
+                 "-DLLVM_ENABLE_ASSERTIONS=OFF", "-DLLVM_ENABLE_EH=OFF", "-DLLVM_ENABLE_RTTI=OFF",
++                -- Keep the pinned source's namespace lookup independent of
++                -- bootstrap PCH serialization (some Clang builds lose the
++                -- PatternMatchHelpers using-directive from LLVMCore's PCH).
++                -- This also bounds disk/memory use during serial builds.
++                "-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON",
+                 "-DLLVM_ENABLE_LTO=OFF", "-DLLVM_PARALLEL_LINK_JOBS=1",
+                 "-DLLVM_PARALLEL_COMPILE_JOBS=" .. tostring(jobs)}
+             if crt then
+@@ -487,7 +493,11 @@
+                 end
+                 table.insert(args, "-DCMAKE_TOOLCHAIN_FILE=" .. cross_file)
+             end
+-            if selected("sysroot") then table.insert(args, "-DCMAKE_SYSROOT=" .. path.absolute(selected("sysroot"))) end
++            if selected("sysroot") then
++                local sysroot = path.absolute(selected("sysroot"))
++                table.insert(args, "-DCMAKE_SYSROOT=" .. sysroot)
++                if plat == "macosx" then table.insert(args, "-DCMAKE_OSX_SYSROOT=" .. sysroot) end
++            end
+             if runtimes then
+                 -- CMake puts standard libraries after LLVM host-tool objects.
+                 -- A driver implicit library or an early global flag cannot
+@@ -496,14 +506,16 @@
+                 -- LLVM probes EH registration with C, not C++. Link those real
+                 -- probes to this same provider instead of accidentally detecting
+                 -- libgcc/libSystem and later resolving another dynamic unwinder.
++                -- Linker forwarding options have positional operands. Passing
++                -- them as REQUIRED_LIBRARIES converts symbols to -l names and
++                -- de-duplicates -Xlinker. Preserve the ordered driver group as
++                -- link options, with actual runtime archives after probe objects.
+                 local required = {}
+-                for _, argument in ipairs(runtimes.link_arguments) do
+-                    if argument ~= "-nostdlib++" and argument ~= "--unwindlib=none" then
+-                        table.insert(required, argument)
+-                    end
++                for _, name in ipairs({"libc++.a", "libc++abi.a", "libunwind.a"}) do
++                    table.insert(required, runtimes.archives[name])
+                 end
+                 table.insert(args, "-DCMAKE_REQUIRED_LIBRARIES=" .. table.concat(required, ";"))
+-                table.insert(args, "-DCMAKE_REQUIRED_LINK_OPTIONS=--unwindlib=none")
++                table.insert(args, "-DCMAKE_REQUIRED_LINK_OPTIONS=SHELL:" .. runtimes.link_flags)
+                 table.insert(args, "-DUWVM_ROS_PAIRED_RUNTIME_PROVIDER=ON")
+             elseif macos_libcxx then
+                 -- The standalone LLVM 23 Darwin SDK may expose libc++23
+@@ -526,7 +538,7 @@
+                 or #os.files(path.join(build, ".cmake/api/v1/reply/index-*.json")) == 0 then
+                 cprint("Building ROS bundled LLVM %s from verified sources (%s)", version, key:sub(1, 12))
+                 io.writefile(path.join(build, "settings.txt"), settings_text)
+-                os.vrunv(cmake.program, args)
++                os.vrunv(cmake.program, args, cmake_environment)
+             end
+             if cross_file and plat == "mingw" and arch == "x86_64" then
+                 -- Clang/C++ target flags do not configure CMake's independent
+@@ -543,7 +555,7 @@
+             -- library build can regenerate an unsafe configuration behind it.
+             -- The generator is explicitly Ninja, so build.ninja is available;
+             -- this step builds no LLVM archive or metadata consumer executable.
+-            os.vrunv(cmake.program, {"--build", build, "--parallel", tostring(jobs), "--target", "build.ninja"})
++            os.vrunv(cmake.program, {"--build", build, "--parallel", tostring(jobs), "--target", "build.ninja"}, cmake_environment)
+             -- Also inspect CMake's resolved flags: a cross toolchain can add
+             -- flags independently of xmake's command-line configuration.
+             for line in io.lines(path.join(build, "CMakeCache.txt")) do
+@@ -556,7 +568,7 @@
+             result = read_contract(build)
+             -- Only real library targets are built. The metadata-only consumer
+             -- target and llvm-config executable are never built or executed.
+-            os.vrunv(cmake.program, {"--build", build, "--parallel", tostring(jobs), "--target", "llvm-libraries"})
++            os.vrunv(cmake.program, {"--build", build, "--parallel", tostring(jobs), "--target", "llvm-libraries"}, cmake_environment)
+             -- Read again after the build as well; never publish a stale reply
+             -- if the build system regenerated during its dependency checks.
+             result = read_contract(build)
+--- a/xmake/llvm/runtimes_contract.cmake
++++ b/xmake/llvm/runtimes_contract.cmake
+@@ -55,6 +55,36 @@
+       message(FATAL_ERROR "ROS runtime provider must be static: ${target}")
+     endif()
+   endforeach()
++  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
++    # Apple system libraries can call typed allocation even when the bootstrap
++    # compiler does not emit it. Use the pinned upstream compatibility shims,
++    # retaining exactly these definitions through dead stripping.
++    target_sources(cxxabi_static PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../libcxxabi/src/vendor/apple/shims.cpp")
++    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
++      set(uwvm_size_type m)
++    else()
++      set(uwvm_size_type j)
++    endif()
++    foreach(symbol
++        "__ZdaPvRKSt9nothrow_tSt19__type_descriptor_t"
++        "__ZdaPvSt19__type_descriptor_t"
++        "__ZdaPv${uwvm_size_type}St19__type_descriptor_t"
++        "__ZdlPvRKSt9nothrow_tSt19__type_descriptor_t"
++        "__ZdlPvSt19__type_descriptor_t"
++        "__ZdlPv${uwvm_size_type}St19__type_descriptor_t"
++        "__Zna${uwvm_size_type}RKSt9nothrow_tSt19__type_descriptor_t"
++        "__Zna${uwvm_size_type}St19__type_descriptor_t"
++        "__Znw${uwvm_size_type}RKSt9nothrow_tSt19__type_descriptor_t"
++        "__Znw${uwvm_size_type}St19__type_descriptor_t")
++      target_link_options(cxxabi_static INTERFACE "LINKER:-u,${symbol}")
++    endforeach()
++    # Resolve exception entry points from the paired archive before libSystem.
++    # Select the needed members rather than force-loading every object: Darwin
++    # lld can emit duplicate zero-length compact-unwind entries for empty
++    # members, masking a real frame and making even throw/catch(int) terminate.
++    target_link_options(unwind_static INTERFACE
++      "LINKER:-u,__Unwind_RaiseException" "LINKER:-u,__Unwind_Resume")
++  endif()
+   add_executable(uwvm_ros_runtimes_contract EXCLUDE_FROM_ALL "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/contract.cpp")
+   target_link_libraries(uwvm_ros_runtimes_contract PRIVATE cxx_static cxxabi_static unwind_static)
+   target_compile_options(uwvm_ros_runtimes_contract PRIVATE -nostdinc++)
+--- /dev/null
++++ b/test/0018.build/check_macos_paired_runtime.py
+@@ -0,0 +1,97 @@
++#!/usr/bin/env python3
++"""Run real native exception/thread paths against a ROS CMake runtime contract.
++
++Usage: python3 check_macos_paired_runtime.py <bundled-runtimes build> <output>
++Run under the local build memory supervisor; this driver is not a memory cap.
++"""
++import argparse
++import hashlib
++import json
++from pathlib import Path
++import platform
++import shlex
++import subprocess
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("runtime_build", type=Path)
++    parser.add_argument("output", type=Path)
++    args = parser.parse_args()
++    if platform.system() != "Darwin":
++        parser.error("This fixture requires native macOS execution")
++    build = args.runtime_build.resolve(strict=True)
++    output = args.output.resolve()
++    if not (build / "complete.txt").is_file():
++        raise RuntimeError("Runtime source build has no completion receipt")
++    inputs = json.loads((build / "runtime-inputs.json").read_text())
++    if (build / "complete.txt").read_text().strip() != inputs["identity"]:
++        raise RuntimeError("Runtime identity differs from its completion receipt")
++    for name, key in (("libc++.a", "libcxx"), ("libc++abi.a", "libcxxabi"),
++                      ("libunwind.a", "libunwind")):
++        digest = hashlib.sha256((build / "lib" / name).read_bytes()).hexdigest()
++        if digest != inputs["archives"][key].lower():
++            raise RuntimeError("Runtime archive differs from its recorded build: " + name)
++    site = hashlib.sha256((build / "include/c++/v1/__config_site").read_bytes()).hexdigest()
++    if site != inputs["config_site_sha256"].lower():
++        raise RuntimeError("Generated libc++ ABI configuration differs from its build")
++    cache = {}
++    for line in (build / "CMakeCache.txt").read_text().splitlines():
++        if line and not line.startswith(("#", "//")) and "=" in line:
++            key, value = line.split("=", 1)
++            cache[key.split(":", 1)[0]] = value
++    reply = build / ".cmake/api/v1/reply"
++    index = json.loads(sorted(reply.glob("index-*.json"))[-1].read_text())
++    model = json.loads((reply / index["reply"]["codemodel-v2"]["jsonFile"]).read_text())
++    config = model["configurations"]
++    if len(config) != 1 or config[0]["name"] != "Release":
++        raise RuntimeError("Expected the paired Release runtime contract")
++    target = next(t for t in config[0]["targets"] if t["name"] == "uwvm_ros_runtimes_contract")
++    contract = json.loads((reply / target["jsonFile"]).read_text())
++    arguments = []
++    archives = set()
++    for fragment in contract["link"]["commandFragments"]:
++        if fragment["role"] == "flags" and fragment.get("backtrace") is None:
++            continue
++        for argument in shlex.split(fragment["fragment"]):
++            if argument.endswith(".a") and not argument.startswith("-"):
++                archive = (build / argument).resolve(strict=True)
++                archive.relative_to(build)
++                archives.add(archive.name)
++                argument = str(archive)
++            arguments.append(argument)
++    if archives != {"libc++.a", "libc++abi.a", "libunwind.a"}:
++        raise RuntimeError("The consumer must use exactly the paired runtime archives")
++    compiler = cache["CMAKE_CXX_COMPILER"]
++    command = [compiler, "-Qunused-arguments", "-nostdinc++", "-isystem",
++               str(build / "include/c++/v1"), "-std=c++17", "-O3",
++               "-Wall", "-Wextra", "-Werror", "-pthread"]
++    if cache.get("CMAKE_OSX_SYSROOT"):
++        command += ["-isysroot", cache["CMAKE_OSX_SYSROOT"]]
++    if cache.get("CMAKE_CXX_COMPILER_TARGET"):
++        command += ["--target=" + cache["CMAKE_CXX_COMPILER_TARGET"]]
++    command += shlex.split(cache.get("CMAKE_EXE_LINKER_FLAGS", ""))
++    source = Path(__file__).parent / "fixtures/macos_paired_runtime/probe.cpp"
++    command += [str(source), "-o", str(output)] + arguments
++    output.parent.mkdir(parents=True, exist_ok=True)
++    receipt = {"command": command, "runtime_build": str(build),
++               "runtime_inputs": inputs, "passed": False}
++    try:
++        subprocess.run(command, check=True)
++        subprocess.run([str(output)], check=True, timeout=30)
++        undefined = subprocess.check_output(["/usr/bin/nm", "-u", str(output)], text=True)
++        for symbol in ("__Unwind_RaiseException", "__Unwind_Resume",
++                       "___gxx_personality_v0", "___cxa_throw"):
++            if symbol in undefined.split():
++                raise RuntimeError("Exception path escaped to an external provider: " + symbol)
++        libraries = subprocess.check_output(["/usr/bin/otool", "-L", str(output)], text=True)
++        if "/usr/lib/libc++" in libraries:
++            raise RuntimeError("The static consumer unexpectedly imports system libc++")
++        receipt.update(passed=True, undefined_symbols=undefined, linked_libraries=libraries)
++    finally:
++        output.with_suffix(".json").write_text(json.dumps(receipt, indent=2) + "\n")
++    print("PASS: native static initialization, integer catch, thread, exception_ptr rethrow and cleanup")
++
++
++if __name__ == "__main__":
++    main()
+--- /dev/null
++++ b/test/0018.build/fixtures/macos_paired_runtime/probe.cpp
+@@ -0,0 +1,49 @@
++// Native paired-runtime smoke: static initialization, an OS thread,
++// cross-thread exception_ptr, rethrow and actual unwinder landing pads.
++// The build driver must select matching generated libc++ headers/archives.
++#include <atomic>
++#include <cstring>
++#include <exception>
++#include <stdexcept>
++#include <thread>
++#include <vector>
++
++namespace
++{
++    std::vector<int> initialized_before_main(64u, 7);
++    std::atomic<int> unwound_frames{};
++    struct cleanup_witness
++    {
++        ~cleanup_witness() { unwound_frames.fetch_add(1); }
++    };
++    [[gnu::noinline]] void throw_from_nested_frame()
++    {
++        cleanup_witness witness;
++        std::vector<int> lifetime(32u, 9);
++        if(lifetime.front() == 9) { throw std::runtime_error("paired-runtime"); }
++    }
++}
++
++int main()
++{
++    if(initialized_before_main.size() != 64u || initialized_before_main.back() != 7) { return 1; }
++    bool caught_integer{};
++    try { throw 42; }
++    catch(int value) { caught_integer = value == 42; }
++    if(!caught_integer) { return 6; }
++    std::exception_ptr captured;
++    std::thread worker([&]
++    {
++        try { throw_from_nested_frame(); }
++        catch(...) { captured = std::current_exception(); }
++    });
++    worker.join();
++    if(!captured || unwound_frames.load() != 1) { return 2; }
++    try { std::rethrow_exception(captured); }
++    catch(std::runtime_error const& error)
++    {
++        return std::strcmp(error.what(), "paired-runtime") == 0 ? 0 : 3;
++    }
++    catch(...) { return 4; }
++    return 5;
++}

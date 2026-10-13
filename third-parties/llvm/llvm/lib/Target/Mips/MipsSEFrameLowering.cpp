@@ -39,10 +39,44 @@
 #include "llvm/Support/MathExtras.h"
 #include <cassert>
 #include <cstdint>
+#include <iterator>
 #include <utility>
 #include <vector>
 
 using namespace llvm;
+
+// The debugger consumes asynchronous rows at real instruction boundaries.
+// EH-return and interrupt stubs have separate state transitions; do not give
+// those paths the conventional N64 frame rules below.
+static bool needsN64AsyncCFI(const MachineFunction &MF,
+                             const MipsSubtarget &STI) {
+  return STI.getABI().IsN64() && !STI.inMips16Mode() &&
+         !STI.inMicroMipsMode() &&
+         MF.getFunction().getUWTableKind() == UWTableKind::Async &&
+         !MF.getFunction().hasFnAttribute("interrupt") &&
+         !MF.getInfo<MipsFunctionInfo>()->callsEhReturn();
+}
+
+// Frame objects use entry SP. TailCC's CFA names the original caller SP,
+// before its callee-popped incoming area.
+class MipsTailCFIBuilder : public CFIInstBuilder {
+  int64_t IncomingArgs;
+public:
+  MipsTailCFIBuilder(MachineBasicBlock &MBB,
+                    MachineBasicBlock::iterator Insert, MachineInstr::MIFlag Flag)
+      : CFIInstBuilder(MBB, Insert, Flag),
+        IncomingArgs(MBB.getParent()->getInfo<MipsFunctionInfo>()
+                         ->getArgumentStackToRestore()) {}
+  void buildDefCFA(MCRegister Reg, int64_t Offset) const {
+    CFIInstBuilder::buildDefCFA(Reg, Offset + IncomingArgs);
+  }
+  void buildDefCFAOffset(int64_t Offset) const {
+    CFIInstBuilder::buildDefCFAOffset(Offset + IncomingArgs);
+  }
+  void buildOffset(MCRegister Reg, int64_t Offset) const {
+    CFIInstBuilder::buildOffset(Reg, Offset - IncomingArgs);
+  }
+};
 
 static std::pair<unsigned, unsigned> getMFHiLoOpc(unsigned Src) {
   if (Mips::ACC64RegClass.contains(Src))
@@ -419,10 +453,23 @@ void MipsSEFrameLowering::emitPrologue(MachineFunction &MF,
   // First, compute final stack size.
   uint64_t StackSize = MFI.getStackSize();
 
+  // A frameless leaf still returns through the live N64 link register.
+  if (needsN64AsyncCFI(MF, STI))
+    CFIInstBuilder(MBB, MBBI, MachineInstr::FrameSetup)
+        .buildSameValue(Mips::RA_64);
+
+  if (MipsFI->getArgumentStackToRestore() && MF.needsFrameMoves())
+    MipsTailCFIBuilder(MBB, MBBI, MachineInstr::FrameSetup)
+        .buildDefCFAOffset(0);
+
   // No need to allocate space on the stack.
   if (StackSize == 0 && !MFI.adjustsStack()) return;
 
-  CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::NoFlags);
+  // CFIFixup must remember the completed prologue, rather than the
+  // entry-only RA rule, when a return precedes another live framed block.
+  MipsTailCFIBuilder CFIBuilder(MBB, MBBI, needsN64AsyncCFI(MF, STI)
+                                           ? MachineInstr::FrameSetup
+                                           : MachineInstr::NoFlags);
 
   // Adjust stack.
   TII.adjustStackPtr(SP, -StackSize, MBB, MBBI);
@@ -652,6 +699,7 @@ void MipsSEFrameLowering::emitEpilogue(MachineFunction &MF,
 
   const MipsSEInstrInfo &TII =
       *static_cast<const MipsSEInstrInfo *>(STI.getInstrInfo());
+  const MipsRegisterInfo &RegInfo = *STI.getRegisterInfo();
 
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
   MipsABIInfo ABI = STI.getABI();
@@ -659,6 +707,22 @@ void MipsSEFrameLowering::emitEpilogue(MachineFunction &MF,
   unsigned FP = ABI.GetFramePtr();
   unsigned ZERO = ABI.GetNullPtr();
   unsigned MOVE = ABI.GetGPRMoveOp();
+
+  bool AsyncCFI = needsN64AsyncCFI(MF, STI);
+  int64_t ArgumentPop = MipsFI->getArgumentStackToRestore();
+  if (MBBI != MBB.end()) {
+    unsigned TailOpcode = 0;
+    switch (MBBI->getOpcode()) {
+    case Mips::TCRETURN64: TailOpcode = Mips::TAILCALL; break;
+    case Mips::TCRETURNREG64: TailOpcode = Mips::TAILCALLREG64; break;
+    case Mips::TCRETURNREGHB64: TailOpcode = Mips::TAILCALLREGHB64; break;
+    }
+    if (TailOpcode) {
+      ArgumentPop = MBBI->getOperand(1).getImm();
+      MBBI->removeOperand(1);
+      MBBI->setDesc(TII.get(TailOpcode));
+    }
+  }
 
   // if framepointer enabled, restore the stack pointer.
   if (hasFP(MF)) {
@@ -670,6 +734,26 @@ void MipsSEFrameLowering::emitEpilogue(MachineFunction &MF,
 
     // Insert instruction "move $sp, $fp" at this location.
     BuildMI(MBB, I, DL, TII.get(MOVE), SP).addReg(FP).addReg(ZERO);
+    if (AsyncCFI)
+      CFIInstBuilder(MBB, I, MachineInstr::FrameDestroy)
+          .buildDefCFARegister(SP);
+  }
+
+  if (AsyncCFI) {
+    // Observe the actual restore instructions rather than assuming a saved
+    // register is already live. In particular, FP cannot remain the CFA
+    // base after its caller value has been loaded.
+    MachineBasicBlock::iterator I = MBBI;
+    for (unsigned N = 0; N != MFI.getCalleeSavedInfo().size(); ++N)
+      --I;
+    for (; I != MBBI; ++I) {
+      if (!I->mayLoad())
+        continue;
+      for (const CalleeSavedInfo &Saved : MFI.getCalleeSavedInfo())
+        if (I->modifiesRegister(Saved.getReg(), &RegInfo))
+          CFIInstBuilder(MBB, std::next(I), MachineInstr::FrameDestroy)
+              .buildSameValue(Saved.getReg());
+    }
   }
 
   if (MipsFI->callsEhReturn()) {
@@ -694,11 +778,11 @@ void MipsSEFrameLowering::emitEpilogue(MachineFunction &MF,
   // Get the number of bytes from FrameInfo
   uint64_t StackSize = MFI.getStackSize();
 
-  if (!StackSize)
-    return;
-
-  // Adjust stack.
-  TII.adjustStackPtr(SP, StackSize, MBB, MBBI);
+  if (int64_t(StackSize) + ArgumentPop)
+    TII.adjustStackPtr(SP, int64_t(StackSize) + ArgumentPop, MBB, MBBI);
+  if (AsyncCFI)
+    MipsTailCFIBuilder(MBB, MBBI, MachineInstr::FrameDestroy)
+        .buildDefCFA(SP, -ArgumentPop);
 }
 
 void MipsSEFrameLowering::emitInterruptEpilogueStub(
@@ -800,7 +884,8 @@ MipsSEFrameLowering::hasReservedCallFrame(const MachineFunction &MF) const {
   // immediate field and there are no variable sized objects on the stack.
   // Make sure the second register scavenger spill slot can be accessed with one
   // instruction.
-  return isInt<16>(MFI.getMaxCallFrameSize() + getStackAlignment()) &&
+  return !MF.getInfo<MipsFunctionInfo>()->hasTailCCStackCall() &&
+         isInt<16>(MFI.getMaxCallFrameSize() + getStackAlignment()) &&
     !MFI.hasVarSizedObjects();
 }
 

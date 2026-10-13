@@ -1,0 +1,1 @@
+(module (type $a (array (mut i8)))  (func (export "_start") (local $a (ref null $a)) (local $b (ref null $a)) i32.const 4 array.new_default $a local.set $a i32.const -127 i32.const 4 array.new $a local.set $b local.get $a i32.const 1 local.get $b i32.const 0 i32.const 3 array.copy $a $a local.get $a i32.const 3 array.get_u $a i32.const 129 i32.ne if unreachable end ))

@@ -1,0 +1,1 @@
+(module (memory 1) (func (export "_start") (local $i i32) loop $l i32.const 0 local.get $i i32.const 3 i32.mul i32.const 1 i32.add i32.store local.get $i i32.const 1 i32.add local.tee $i i32.const 10000 i32.lt_u br_if $l end i32.const 0 i32.load i32.const 29998 i32.ne if unreachable end))

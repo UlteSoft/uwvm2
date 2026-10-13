@@ -1,0 +1,86 @@
+{
+  "schema": "uwvm-qemu-component-actual-failure-v1",
+  "suite": "windows-raii-cold-r3-attempt1",
+  "repository": "uwvm2-ros",
+  "variant": "noeh",
+  "planned_stages": 26,
+  "executed_stages": 8,
+  "stage_returncodes": [
+    [
+      "input-before",
+      0
+    ],
+    [
+      "uwvm2-ros-eh-compile",
+      0
+    ],
+    [
+      "uwvm2-ros-eh-object-bind",
+      0
+    ],
+    [
+      "uwvm2-ros-eh-link",
+      0
+    ],
+    [
+      "uwvm2-ros-eh-binary-bind",
+      0
+    ],
+    [
+      "uwvm2-ros-eh-imports",
+      0
+    ],
+    [
+      "uwvm2-ros-eh-bridge-disassembly",
+      0
+    ],
+    [
+      "uwvm2-ros-noeh-compile",
+      1
+    ]
+  ],
+  "diagnostic": "Windows fast_io shared_memory/win32.h unguarded try/rethrow in lines199/206 is rejected by -fno-exceptions. ROS EH independent fresh COFF/PE/provider/import/bridge collection succeeded, guest and three other cells remain unqualified.",
+  "source_manifest_sha256": "dc02a40b6aef585ee6a472064bf58c91e59626e7f4e91ab3008c3a30a110814d",
+  "source_archive_sha256": "bfb2bf71b8097d0f0d706b98734310b44ffd54594479cd12cb4944bc24905f03",
+  "native_target": "x86_64-w64-windows-gnu",
+  "actual_target_provider": "Windows SDK libc++ ABI1 __1",
+  "actual_coff_object_created": true,
+  "actual_pe_created": true,
+  "actual_guest_executed": false,
+  "qualification_passed": false,
+  "original_pidfd_retirement_verified": true,
+  "ticket_id": "1416e96aa3c04898a6e36f7fc1f73f18",
+  "ticket_state": "retired",
+  "lane_retirement_sha256": "de58f3f4145c6055af53949076eac8f76d502ddba9ed54b64958bc830feb1476",
+  "original_receipts_sha256": "35346b59ad6aaea026da04cfca06c56d4624e466a0bd7bb6b61d1477a2c2a103",
+  "memory_max_bytes": 68719476736,
+  "swap_max_bytes": 0,
+  "compile_cpu_pool": "16-31",
+  "aggregate_owned_rss_peak_bytes": 444837888,
+  "memory_events_after": {
+    "low": 0,
+    "high": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_kill": 0,
+    "oom_group_kill": 0
+  },
+  "remaining_roster": [
+    10154
+  ],
+  "raw_packet": {
+    "path": "/tmp/uwvm-qemu-windows-raii-cold-r3-attempt1-small-evidence",
+    "members": 22,
+    "bytes": 1025344,
+    "sha256": "e7f1df2cf509e414fe14f59bad83c2fda6b35de7b4f086057ac09b257f5521b1"
+  },
+  "owner_source_fix_required": true,
+  "old_r3_product_binaries_qualified": false,
+  "owned_harness_fix_required": false,
+  "coff_qualification_scope": "uwvm2-ros EH standalone only; noEH compile failed and ordinary cells were not reached",
+  "pe_sha256": "ce001d5294854129ef42681e2aa92901b0e4e2796b8b9b2b5a644ba807f1e6ba",
+  "pe_bytes": 875008,
+  "native_instruction_bridge_review_accepted": false,
+  "DLL_runtime_closure_qualified": false,
+  "actual_unwind_provider": "default MinGW libgcc_s_seh-1.dll; no ROS vendoredLLVM23 paired-runtime claim"
+}

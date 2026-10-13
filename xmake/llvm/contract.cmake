@@ -13,6 +13,36 @@ if((CMAKE_CROSSCOMPILING OR UWVM_ROS_REQUIRE_EXPLICIT_HOST_TRIPLE) AND
   message(FATAL_ERROR "ROS cross LLVM requires an explicit LLVM_HOST_TRIPLE in the CMake toolchain")
 endif()
 
+# These ABI probes must link against the actual target unwinder. Cross
+# toolchains often use STATIC_LIBRARY try-compiles; that only archives unresolved
+# references and falsely detects libunwind's __unw_add_dynamic_fde on GNU libgcc.
+# Paired providers also require fresh probes after a former runtime selection.
+if(UWVM_ROS_PAIRED_RUNTIME_PROVIDER OR CMAKE_CROSSCOMPILING OR UWVM_ROS_REQUIRE_EXPLICIT_HOST_TRIPLE)
+  foreach(probe HAVE_REGISTER_FRAME HAVE_DEREGISTER_FRAME HAVE_UNW_ADD_DYNAMIC_FDE)
+    unset(${probe} CACHE)
+    unset(${probe})
+  endforeach()
+  function(uwvm_ros_check_target_eh_registration)
+    # A cross toolchain may select STATIC_LIBRARY to skip its linker. That
+    # would only archive unresolved symbol addresses and falsely qualify a
+    # missing unwinder. Force real links for these three C probes only; this
+    # function leaves the caller's try_compile policy unchanged and never runs
+    # a target executable. The selected runtime stays in REQUIRED_LIBRARIES.
+    set(CMAKE_TRY_COMPILE_TARGET_TYPE EXECUTABLE)
+    include(CheckSymbolExists)
+    set(declarations "${CMAKE_CURRENT_SOURCE_DIR}/cmake/unwind.h")
+    check_symbol_exists(__register_frame "${declarations}" HAVE_REGISTER_FRAME)
+    check_symbol_exists(__deregister_frame "${declarations}" HAVE_DEREGISTER_FRAME)
+    check_symbol_exists(__unw_add_dynamic_fde "${declarations}" HAVE_UNW_ADD_DYNAMIC_FDE)
+    foreach(probe HAVE_REGISTER_FRAME HAVE_DEREGISTER_FRAME HAVE_UNW_ADD_DYNAMIC_FDE)
+      # Publish only actual check results. LLVM's subsequent checks reuse these
+      # fresh answers; no HAVE_* success value is supplied by the contract.
+      set(${probe} "${${probe}}" PARENT_SCOPE)
+    endforeach()
+  endfunction()
+  uwvm_ros_check_target_eh_registration()
+endif()
+
 function(uwvm_ros_export_llvm_contract)
   # Our explicit Release build has its own CRT/ABI/cache policy, independent of
   # the application's debug mode and the JIT's guest optimization level. Reject
@@ -21,7 +51,7 @@ function(uwvm_ros_export_llvm_contract)
   if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
     message(FATAL_ERROR "ROS bundled LLVM must use the Release build configuration")
   endif()
-  if(NOT PACKAGE_VERSION STREQUAL "23.1.1-uwvm-ros.6")
+  if(NOT PACKAGE_VERSION STREQUAL "23.1.1-uwvm-ros.13")
     message(FATAL_ERROR "ROS LLVM contract requires the pinned patched release")
   endif()
   # LLVM itself only warns when Native is absent. That is useful for an AOT
@@ -40,10 +70,31 @@ function(uwvm_ros_export_llvm_contract)
   if(NOT LLVM_DEFAULT_TARGET_TRIPLE STREQUAL LLVM_HOST_TRIPLE)
     message(FATAL_ERROR "ROS native JIT requires LLVM_DEFAULT_TARGET_TRIPLE to match LLVM_HOST_TRIPLE")
   endif()
+  if(UWVM_ROS_PAIRED_RUNTIME_PROVIDER AND NOT CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
+     NOT LLVM_NATIVE_ARCH STREQUAL "ARM")
+    # These are real C compile/link probe results, using the exact paired static
+    # provider supplied in CMAKE_REQUIRED_LIBRARIES. Do not force HAVE_* cache
+    # values: doing so would hide a missing archive/symbol and enable a fallback
+    # runtime lookup into another unwinder. ARM32 EHABI and Windows SEH retain
+    # their existing native-EH qualification boundaries; they are not DWARF.
+    if(NOT HAVE_REGISTER_FRAME OR NOT HAVE_DEREGISTER_FRAME OR NOT HAVE_UNW_ADD_DYNAMIC_FDE)
+      message(FATAL_ERROR "Paired ROS DWARF runtime must pass all three actual EH-registration link probes")
+    endif()
+  endif()
+  set(uwvm_ros_native_asm_parser)
+  set(uwvm_ros_native_disassembler)
+  # Native register witnesses consume target inline assembly. nativecodegen
+  # omits its parser; every static MCJIT consumer needs the actual dependency.
+  list(APPEND uwvm_ros_native_asm_parser "${LLVM_NATIVE_ARCH}AsmParser")
+  # Cold disassembly of copied, owned JIT bytes exists on all native ISAs.
+  # Its link dependency is independent of the platform's machine-step gate.
+  list(APPEND uwvm_ros_native_disassembler "${LLVM_NATIVE_ARCH}Disassembler")
   llvm_map_components_to_libnames(uwvm_ros_components
     core support analysis target linker executionengine mcjit runtimedyld
-    passes scalaropts transformutils instcombine bitreader bitwriter object
-    targetparser nativecodegen)
+    # The host debugger's bounded embedded DWARF parser needs a real direct
+    # dependency, including for static consumers and late debug activation.
+    passes scalaropts transformutils instcombine bitreader bitwriter object debuginfodwarf
+    targetparser nativecodegen ${uwvm_ros_native_asm_parser} ${uwvm_ros_native_disassembler})
   foreach(component IN LISTS uwvm_ros_components)
     if(NOT TARGET "${component}")
       message(FATAL_ERROR "Required ROS LLVM component is unavailable: ${component}")
@@ -76,6 +127,9 @@ function(uwvm_ros_export_llvm_contract)
   target_include_directories(uwvm_ros_llvm_contract PRIVATE
     "${LLVM_MAIN_INCLUDE_DIR}" "${LLVM_INCLUDE_DIR}")
   target_link_libraries(uwvm_ros_llvm_contract PRIVATE ${uwvm_ros_components})
+  # Cross-regression builds need this exact library closure, not unrelated LLVM
+  # tools or analysis utilities. Keep the metadata executable unbuilt.
+  add_custom_target(uwvm_ros_llvm_contract_dependencies DEPENDS ${uwvm_ros_components})
   # The CMake file API exports the full link order, including platform system
   # libraries, groups and any repeats. Do not maintain a second library-name
   # graph in Lua or infer it from filenames. ABI inputs come from the same

@@ -1,0 +1,42 @@
+{
+  "actual_guards_retired": true,
+  "checkpoint_format_version": 3,
+  "checkpoint_source_revision": "r3",
+  "compile_owned_rss_peak_bytes": 415281152,
+  "compile_result": "failed",
+  "cpuset": "0,2,4,6,16-31",
+  "diagnostics": [
+    {
+      "line": 20,
+      "owner": "/root/fast_io_global",
+      "problem": "std::memcpy is not declared in this real big-endian scalar compilation path",
+      "source": "third-parties/fast_io/include/fast_io_crypto/hash/sha256_scalar.h"
+    },
+    {
+      "line": 20,
+      "owner": "/root/fast_io_global",
+      "problem": "std::memcpy is not declared in this real big-endian scalar compilation path",
+      "source": "third-parties/fast_io/include/fast_io_crypto/hash/sha512_scalar.h"
+    },
+    {
+      "fixed_source_revision": "r4",
+      "line": 221,
+      "owner": "/root/debug_checkpoint",
+      "problem": "Endianness ternary decays to raw const char* rejected by fast_io print",
+      "source": "test/0017.runtime/debug_checkpoint_codec.cc"
+    }
+  ],
+  "fixture_or_vm_execution_accepted": false,
+  "memory_scope_note": "Failed compilation peak is observed only; it is not a successful build/runtime maximum or Mac safety qualification.",
+  "outer_memory_max_bytes": 68719476736,
+  "outer_swap_max_bytes": 0,
+  "paired_runtime_or_product_qualification": false,
+  "qemu_executed": false,
+  "raw_evidence_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-checkpoint-s390x-r3-attempt1",
+  "raw_small_manifest_sha256": "8a3f59ff961f88b95fa5f97be1719f564879e7de980a15d6d0fcd4ec7f5356cf",
+  "raw_small_packet_sha256": "1b9907339123d485418bf32917393b2dc792ebd83740ba073b74c5965a5f8072",
+  "schema": "uwvm-qemu-cold-failure-record-v1",
+  "shared_ticket_id": "e4da696f8f14425180c4fe4e66e5f400",
+  "target": "s390x-linux-gnu",
+  "ticket_state": "retired"
+}

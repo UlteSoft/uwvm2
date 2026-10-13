@@ -127,6 +127,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
 
+        if(!typesec.core3_type_kinds.empty() &&
+           (type_index >= typesec.core3_type_kinds.size() ||
+            typesec.core3_type_kinds.index_unchecked(static_cast<::std::size_t>(type_index)) !=
+                ::uwvm2::parser::wasm::standard::wasm3::type::composite_kind::function)) [[unlikely]]
+        {
+            // [import function typeidx ... section_end]
+            // [safe                   ] unsafe (possibly section_end)
+            // ^^ err_curr: the already checked type-index cursor is borrowed for diagnostics only.
+            err.err_curr = section_curr;
+            err.err_selectable.u32 = type_index;
+            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::illegal_type_index;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        }
+
         // Storing Temporary Variables into Modules
         funcptr_r = typesec.types.cbegin() + type_index;
 
@@ -264,6 +278,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 static_assert(::uwvm2::parser::wasm::standard::wasm1::features::has_extern_imports_global_handler<Fs...>);
                 // Note that section_curr may be equal to section_end, which needs to be checked
                 return extern_imports_global_handler(sec_adl, fit_imports.storage.global, module_storage, section_curr, section_end, err, fs_para);
+            }
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::tag:
+            {
+                if constexpr(requires { parse_extended_tag_import(section_curr, section_end, fit_imports.storage.tag_type_index,
+                                                                   module_storage, err, fs_para); })
+                {
+                    // [import name/kind][tag descriptor ... end)
+                    // [safe            ] ^^ returned cursor is bounded by the extension decoder.
+                    return parse_extended_tag_import(section_curr, section_end, fit_imports.storage.tag_type_index,
+                                                     module_storage, err, fs_para);
+                }
+                else
+                {
+                    // [kind][descriptor ... end) diagnostic may equal end; it is not dereferenced.
+                    //        ^^ err_curr
+                    err.err_curr = section_curr; err.err_selectable.u8 = 4u;
+                    err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::illegal_importdesc_prefix;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
             }
             [[unlikely]] default:
             {
@@ -835,8 +868,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         define_imported_and_defined_exceeding_checker(sec_adl, final_extern_type_adl, module_storage, importsec_importdesc_begin, section_curr, err, fs_para);
 #endif
 
-        constexpr bool allow_multi_memory{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_memory<Fs...>()};
-        if constexpr(!allow_multi_memory)
+        bool const allow_multi_memory{::uwvm2::parser::wasm::standard::wasm1::features::multi_memory_enabled(fs_para)};
+        if(!allow_multi_memory)
         {
             // When multiple memory allocations are not permitted, ensure no more than one is checked.
             constexpr auto mem_pos{

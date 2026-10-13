@@ -1,0 +1,49 @@
+--- a/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.cpp
++++ b/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.cpp
+@@ -26,6 +26,9 @@
+ using namespace llvm::support::endian;
+ 
+ #define DEBUG_TYPE "dyld"
++
++// Cold linked-library ABI proof for GNU ARM EHABI TARGET2/GOT_PREL support.
++extern "C" uint32_t uwvm_llvm_arm_ehabi_target2_abi_v1() { return 1; }
+ 
+ static void or32le(void *P, int32_t V) { write32le(P, read32le(P) | V); }
+ 
+@@ -611,8 +614,15 @@
+ 
+   switch (Type) {
+   default:
+-    llvm_unreachable("Not implemented relocation type!");
+-
++    // An unsupported relocation must not fall through into unrelated native
++    // code in release builds where llvm_unreachable is an optimizer promise.
++    HasError = true;
++    ErrorStr = "Unsupported ARM RuntimeDyld relocation";
++    return;
++
++  case ELF::R_ARM_REL32:
++    support::ulittle32_t::ref{TargetPtr} = Value - FinalAddress;
++    break;
+   case ELF::R_ARM_NONE:
+     break;
+     // Write a 31bit signed offset
+@@ -2029,6 +2039,18 @@
+             0);
+         Section.advanceStubOffset(getMaxStubSize());
+       }
++    } else if (RelType == ELF::R_ARM_TARGET2 || RelType == ELF::R_ARM_GOT_PREL) {
++      // GNU ARM ELF TARGET2 uses the GOT-relative-to-place policy. EHABI's
++      // indirect typeinfo encoding reads the target from this retained slot;
++      // writing a direct typeinfo address here changes the exception ABI.
++      auto *Placeholder = computePlaceholderAddress(SectionID, Offset);
++      int64_t ImplicitAddend = static_cast<int32_t>(read32le(Placeholder));
++      uint64_t GOTOffset = findOrAllocGOTEntry(Value, ELF::R_ARM_ABS32);
++      // Value.Offset belongs to the slot target; the relocation addends
++      // belong exclusively to the place-to-slot displacement, exactly once.
++      resolveGOTOffsetRelocation(SectionID, Offset,
++                                GOTOffset + Addend + ImplicitAddend,
++                                ELF::R_ARM_REL32);
+     } else {
+       uint32_t *Placeholder =
+         reinterpret_cast<uint32_t*>(computePlaceholderAddress(SectionID, Offset));

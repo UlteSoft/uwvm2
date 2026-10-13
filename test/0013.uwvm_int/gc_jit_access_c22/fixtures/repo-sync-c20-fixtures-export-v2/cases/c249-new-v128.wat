@@ -1,0 +1,1 @@
+(module (type $s (struct (field i64))) (type $t (func (result i32))) (func $f (type $t) i32.const 42) (elem declare func $f) (type $a (array (mut v128)))  (func (export "_start") v128.const i32x4 1 2 3 4 i32.const 257 array.new $a array.len i32.const 257 i32.ne if unreachable end))

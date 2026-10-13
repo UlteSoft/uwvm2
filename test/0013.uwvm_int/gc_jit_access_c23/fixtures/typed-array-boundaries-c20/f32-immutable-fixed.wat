@@ -1,0 +1,1 @@
+(module (type $a (array f32))  (func (export "_start") (local $a (ref null $a)) i32.const 2139095041 f32.reinterpret_i32 i32.const 2139095041 f32.reinterpret_i32 array.new_fixed $a 2 local.set $a local.get $a i32.const 1 array.get $a i32.reinterpret_f32 i32.const 2139095041 i32.ne if unreachable end ))

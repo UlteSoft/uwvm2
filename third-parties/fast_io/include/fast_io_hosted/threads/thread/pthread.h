@@ -13,9 +13,13 @@
 #include <sched.h>
 #include <time.h>
 #include <unistd.h>
+#if defined(__FreeBSD__)
+#include <sys/param.h> // SDK release/API availability, not an invented version.
+#endif
 
 #if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
 #include <TargetConditionals.h>
+#include "pthread_mach_death_watch.h"
 #endif
 
 namespace fast_io
@@ -26,6 +30,13 @@ namespace posix
 
 namespace details
 {
+
+#if (defined(__linux__) && defined(__GLIBC__) && !defined(__UCLIBC__) && !defined(__BIONIC__)) || \
+    (defined(__FreeBSD__) && __FreeBSD_version >= 1501000)
+// Separate noexcept ABI name; never call a potentially-throwing C declaration.
+extern int pthread_tryjoin_noexcept(::pthread_t, void **) noexcept asm("pthread_tryjoin_np");
+#endif
+
 
 template <typename Tuple>
 class pthread_thread_start_routine_tuple_allocate_guard
@@ -101,6 +112,9 @@ public:
 private:
 	id id_{};
 	bool joinable_{false};
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+	::fast_io::posix::details::pthread_mach_death_watch death_watch_{};
+#endif
 
 private:
 public:
@@ -131,12 +145,14 @@ public:
 		int ec{};
 		if (__builtin_available(macOS 10.4, iOS 2.0, *)) [[likely]]
 		{
-			ec = ::fast_io::noexcept_call(::pthread_create, __builtin_addressof(this->id_), nullptr, start_routine, start_routine_tuple);
+			ec = ::fast_io::noexcept_call(::pthread_create_suspended_np, __builtin_addressof(this->id_), nullptr, start_routine, start_routine_tuple);
 		}
 		else
 		{
 			ec = ENOSYS;
 		}
+#elif defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+		int ec{::fast_io::noexcept_call(::pthread_create_suspended_np, __builtin_addressof(this->id_), nullptr, start_routine, start_routine_tuple)};
 #else
 		int ec{::fast_io::noexcept_call(::pthread_create, __builtin_addressof(this->id_), nullptr, start_routine, start_routine_tuple)};
 #endif
@@ -147,6 +163,11 @@ public:
 		}
 		(void)storage_guard.release();
 		this->joinable_ = true;
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+		death_watch_.arm(this->id_);
+		auto const port{::fast_io::noexcept_call(::pthread_mach_thread_np,this->id_)};
+		if(::fast_io::noexcept_call(::thread_resume,port)!=KERN_SUCCESS) { ::fast_io::fast_terminate(); }
+#endif
 	}
 
 	inline constexpr pthread_thread(pthread_thread const &) noexcept = delete;
@@ -155,6 +176,9 @@ public:
 	{
 		other.id_ = 0;
 		other.joinable_ = false;
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+		death_watch_.swap(other.death_watch_);
+#endif
 	}
 
 	inline constexpr ~pthread_thread() noexcept
@@ -182,6 +206,39 @@ public:
 		return this->joinable_;
 	}
 
+	// Exclusive HOST owner only: no concurrent join/detach/move/native-handle mutation.
+	// Success reaps the REAL pthread, including its TLS destructors, before clearing
+	// this wrapper's join ownership. Timeout/error leave both owned fields intact.
+	[[nodiscard]] inline ::fast_io::thread_join_result try_join() noexcept
+	{
+		if (!this->joinable_) { return {::fast_io::thread_join_status::not_joinable, 0u}; }
+#if (defined(__linux__) && defined(__GLIBC__) && !defined(__UCLIBC__) && !defined(__BIONIC__)) || \
+    (defined(__FreeBSD__) && __FreeBSD_version >= 1501000)
+		int const ec{::fast_io::posix::details::pthread_tryjoin_noexcept(this->id_, nullptr)};
+		if (ec == 0)
+		{
+			this->id_ = {}; this->joinable_ = false;
+			return {::fast_io::thread_join_status::joined, 0u};
+		}
+		return {ec == EBUSY ? ::fast_io::thread_join_status::pending : ::fast_io::thread_join_status::failed,
+			static_cast<::std::uint_least32_t>(ec)};
+#elif defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+		auto const observed{death_watch_.poll()};
+		if(observed.status!=::fast_io::thread_join_status::joined) { return observed; }
+		// After authenticated kernel death, Darwin's exited/no-joiner path
+		// only reaps its retained pthread allocation; no body/TLS wait remains.
+		int const ec{::fast_io::noexcept_call(::pthread_join,this->id_,nullptr)};
+		if(ec!=0) { return {::fast_io::thread_join_status::failed,static_cast<::std::uint_least32_t>(ec)}; }
+		this->id_={};this->joinable_=false;death_watch_.release();
+		return {::fast_io::thread_join_status::joined,0u};
+#else
+		// Known-unsafe/unknown libc providers cannot be enabled by an opt-in macro.
+		// Retain ownership. Never substitute pthread_join,
+		// body_done, execution-lease drain or a second joiner thread as a bounded ACK.
+		return {::fast_io::thread_join_status::unsupported, static_cast<::std::uint_least32_t>(ENOSYS)};
+#endif
+	}
+
 	inline constexpr void join()
 	{
 		if (!this->joinable()) [[unlikely]]
@@ -206,6 +263,9 @@ public:
 			::fast_io::throw_posix_error(ec);
 		}
 		this->joinable_ = false;
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+		death_watch_.release();
+#endif
 	}
 
 	inline constexpr void detach()
@@ -232,12 +292,18 @@ public:
 			::fast_io::throw_posix_error(ec);
 		}
 		this->joinable_ = false;
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+		death_watch_.release();
+#endif
 	}
 
 	inline constexpr void swap(pthread_thread &other) noexcept
 	{
 		::std::ranges::swap(this->id_, other.id_);
 		::std::ranges::swap(this->joinable_, other.joinable_);
+#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+		death_watch_.swap(other.death_watch_);
+#endif
 	}
 
 	[[nodiscard]]

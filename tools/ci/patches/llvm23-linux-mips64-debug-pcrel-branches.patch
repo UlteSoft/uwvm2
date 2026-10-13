@@ -1,0 +1,45 @@
+--- a/llvm/lib/Target/Mips/MipsBranchExpansion.cpp
++++ b/llvm/lib/Target/Mips/MipsBranchExpansion.cpp
+@@ -92,6 +92,7 @@
+ #include "llvm/CodeGen/MachineOperand.h"
+ #include "llvm/CodeGen/TargetSubtargetInfo.h"
+ #include "llvm/IR/DebugLoc.h"
++#include "llvm/IR/Function.h"
+ #include "llvm/Support/CommandLine.h"
+ #include "llvm/Support/ErrorHandling.h"
+ #include "llvm/Target/TargetMachine.h"
+@@ -932,6 +933,25 @@
+ 
+   MFp = &MF;
+ 
++  // An actual UWVM native-debug function must keep short internal edges in
++  // its exact published body. RuntimeDyld's static R_MIPS_26 path otherwise
++  // sends even local J edges through a section-tail trampoline. Do not make
++  // that trampoline part of the debugger's code/register authority.
++  // B has the same one-MBB operand/delay-slot shape. The existing range pass
++  // below still expands every out-of-range edge; neither ABI nor calls change.
++  bool DebugPcrelChanged = false;
++  if (MF.getFunction().hasFnAttribute("uwvm.native.debug.pcrel") &&
++      ABI.IsN64() && !STI->inMips16Mode() && !STI->inMicroMipsMode() &&
++      !STI->hasMips32r6()) {
++    for (MachineBasicBlock &MBB : MF)
++      for (MachineInstr &MI : MBB)
++        if (MI.getOpcode() == Mips::J && MI.getNumExplicitOperands() == 1 &&
++            MI.getOperand(0).isMBB()) {
++          MI.setDesc(TII->get(Mips::B));
++          DebugPcrelChanged = true;
++        }
++  }
++
+   ForceLongBranchFirstPass = ForceLongBranch;
+   // Run these at least once.
+   bool longBranchChanged = handlePossibleLongBranch();
+@@ -940,7 +960,7 @@
+   bool loadDelaySlotChanged = handleLoadDelaySlot();
+   bool MfloChanged = handleMFLO();
+ 
+-  bool Changed = longBranchChanged || forbiddenSlotChanged ||
++  bool Changed = DebugPcrelChanged || longBranchChanged || forbiddenSlotChanged ||
+                  fpuDelaySlotChanged || loadDelaySlotChanged || MfloChanged;
+ 
+   // Then run them alternatively while there are changes.

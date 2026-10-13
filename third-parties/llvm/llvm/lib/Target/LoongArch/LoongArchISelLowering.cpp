@@ -9652,6 +9652,28 @@ static bool CC_LoongArch(const DataLayout &DL, LoongArchABI::ABI ABI,
     }
   }
 
+  // TailCC can transfer between different prototypes. A scalarized fixed
+  // vector must own its argument slots, rather than point into the previous
+  // function's soon-to-be-reused frame. Assign every legalized integer part
+  // directly, including vectors split into more than two pieces without LSX.
+  if (State.getCallingConv() == CallingConv::Tail &&
+      ArgFlags.isSplitEnd() && !PendingLocs.empty()) {
+    for (const auto &Part : PendingLocs) {
+      MCRegister PartReg = allocateArgGPR(State);
+      if (PartReg)
+        State.addLoc(CCValAssign::getReg(Part.getValNo(), Part.getValVT(),
+                                        PartReg, GRLenVT, CCValAssign::Full));
+      else
+        State.addLoc(CCValAssign::getMem(
+            Part.getValNo(), Part.getValVT(),
+            State.AllocateStack(GRLen / 8, Align(GRLen / 8)), GRLenVT,
+            CCValAssign::Full));
+    }
+    PendingLocs.clear();
+    PendingArgFlags.clear();
+    return false;
+  }
+
   // If the split argument only had two elements, it should be passed directly
   // in registers or on the stack.
   if (ValVT.isScalarInteger() && ArgFlags.isSplitEnd() &&
@@ -9952,6 +9974,7 @@ SDValue LoongArchTargetLowering::LowerFormalArguments(
   default:
     llvm_unreachable("Unsupported calling convention");
   case CallingConv::C:
+  case CallingConv::Tail:
   case CallingConv::Fast:
   case CallingConv::PreserveNone:
   case CallingConv::PreserveMost:
@@ -9990,6 +10013,13 @@ SDValue LoongArchTargetLowering::LowerFormalArguments(
     CCInfo.AnalyzeFormalArguments(Ins, CC_LoongArch_GHC);
   else
     analyzeInputArgs(MF, CCInfo, Ins, /*IsRet=*/false, CC_LoongArch);
+  if (CallConv == CallingConv::Tail) {
+    if (IsVarArg)
+      report_fatal_error("LoongArch tailcc does not support variadic functions");
+    unsigned Bytes = alignTo(CCInfo.getStackSize(),
+                             Subtarget.getFrameLowering()->getStackAlign());
+    MF.getInfo<LoongArchMachineFunctionInfo>()->setArgumentStackToRestore(Bytes);
+  }
 
   for (unsigned i = 0, e = ArgLocs.size(), InsIdx = 0; i != e; ++i, ++InsIdx) {
     CCValAssign &VA = ArgLocs[i];
@@ -10160,6 +10190,16 @@ bool LoongArchTargetLowering::isEligibleForTailCallOptimization(
     if (Arg.Flags.isByVal())
       return false;
 
+  if (CalleeCC == CallingConv::Tail || CallerCC == CallingConv::Tail) {
+    if (CalleeCC != CallerCC || CLI.IsVarArg)
+      return false;
+    // TailCC permits different prototypes, so an incoming indirect pointer
+    // cannot be assumed to exist at the outgoing argument's position.
+    return llvm::none_of(ArgLocs, [](const CCValAssign &VA) {
+      return VA.getLocInfo() == CCValAssign::Indirect;
+    });
+  }
+
   // musttail bypasses the remaining checks: the checks either reject cases
   // we handle specially (indirect args are forwarded via incoming pointers,
   // stack-passed args reuse the matching incoming layout, sret is forwarded
@@ -10241,6 +10281,22 @@ LoongArchTargetLowering::LowerCall(CallLoweringInfo &CLI,
 
   // Get a count of how many bytes are to be pushed on the stack.
   unsigned NumBytes = ArgCCInfo.getStackSize();
+  bool IsTailCC = CallConv == CallingConv::Tail;
+  int64_t TailSPDelta = 0;
+  if (IsTailCC) {
+    if (IsVarArg)
+      report_fatal_error("LoongArch tailcc does not support variadic calls");
+    NumBytes = alignTo(NumBytes, Subtarget.getFrameLowering()->getStackAlign());
+    auto *Info = MF.getInfo<LoongArchMachineFunctionInfo>();
+    if (IsTailCall) {
+      TailSPDelta = int64_t(Info->getArgumentStackToRestore()) - NumBytes;
+      if (TailSPDelta < 0)
+        // PEI lays spills below the growing outgoing fixed argument area.
+        MF.getFrameInfo().CreateFixedObject(-TailSPDelta, TailSPDelta, false);
+    } else if (NumBytes) {
+      Info->setHasTailCCStackCall();
+    }
+  }
 
   // Create local copies for byval args.
   SmallVector<SDValue> ByValArgs;
@@ -10267,11 +10323,29 @@ LoongArchTargetLowering::LowerCall(CallLoweringInfo &CLI,
 
   if (!IsTailCall)
     Chain = DAG.getCALLSEQ_START(Chain, NumBytes, 0, CLI.DL);
+  else
+    // Consume incoming loads before potentially overlapping outgoing stores.
+    Chain = DAG.getStackArgumentTokenFactor(Chain);
 
   // Copy argument values to their designated locations.
   SmallVector<std::pair<Register, SDValue>> RegsToPass;
   SmallVector<SDValue> MemOpChains;
   SDValue StackPtr;
+  auto StoreStackArgument = [&](SDValue Value, int64_t Offset) {
+    if (IsTailCall) {
+      int FI = MF.getFrameInfo().CreateFixedObject(
+          Value.getValueType().getStoreSize().getFixedValue(),
+          Offset + TailSPDelta, false);
+      return DAG.getStore(Chain, DL, Value, DAG.getFrameIndex(FI, PtrVT),
+                          MachinePointerInfo::getFixedStack(MF, FI));
+    }
+    if (!StackPtr.getNode())
+      StackPtr = DAG.getCopyFromReg(Chain, DL, LoongArch::R3, PtrVT);
+    SDValue Address = DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
+                                  DAG.getIntPtrConstant(Offset, DL));
+    return DAG.getStore(Chain, DL, Value, Address,
+                        MachinePointerInfo::getStack(MF, Offset));
+  };
   for (unsigned i = 0, j = 0, e = ArgLocs.size(), OutIdx = 0; i != e;
        ++i, ++OutIdx) {
     CCValAssign &VA = ArgLocs[i];
@@ -10296,15 +10370,7 @@ LoongArchTargetLowering::LowerCall(CallLoweringInfo &CLI,
 
       if (HiVA.isMemLoc()) {
         // Second half of f64 is passed on the stack.
-        if (!StackPtr.getNode())
-          StackPtr = DAG.getCopyFromReg(Chain, DL, LoongArch::R3, PtrVT);
-        SDValue Address =
-            DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
-                        DAG.getIntPtrConstant(HiVA.getLocMemOffset(), DL));
-        // Emit the store.
-        MemOpChains.push_back(DAG.getStore(
-            Chain, DL, Hi, Address,
-            MachinePointerInfo::getStack(MF, HiVA.getLocMemOffset())));
+        MemOpChains.push_back(StoreStackArgument(Hi, HiVA.getLocMemOffset()));
       } else {
         // Second half of f64 is passed in another GPR.
         Register RegHigh = HiVA.getLocReg();
@@ -10472,19 +10538,10 @@ LoongArchTargetLowering::LowerCall(CallLoweringInfo &CLI,
       RegsToPass.push_back(std::make_pair(VA.getLocReg(), ArgValue));
     } else {
       assert(VA.isMemLoc() && "Argument not register or memory");
-      assert((!IsTailCall || (CLI.CB && CLI.CB->isMustTailCall())) &&
+      assert((!IsTailCall || IsTailCC || (CLI.CB && CLI.CB->isMustTailCall())) &&
              "Tail call not allowed if stack is used for passing parameters");
 
-      // Work out the address of the stack slot.
-      if (!StackPtr.getNode())
-        StackPtr = DAG.getCopyFromReg(Chain, DL, LoongArch::R3, PtrVT);
-      SDValue Address =
-          DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
-                      DAG.getIntPtrConstant(VA.getLocMemOffset(), DL));
-
-      // Emit the store.
-      MemOpChains.push_back(
-          DAG.getStore(Chain, DL, ArgValue, Address, MachinePointerInfo()));
+      MemOpChains.push_back(StoreStackArgument(ArgValue, VA.getLocMemOffset()));
     }
   }
 
@@ -10520,6 +10577,8 @@ LoongArchTargetLowering::LowerCall(CallLoweringInfo &CLI,
   SmallVector<SDValue> Ops;
   Ops.push_back(Chain);
   Ops.push_back(Callee);
+  if (IsTailCall && IsTailCC)
+    Ops.push_back(DAG.getTargetConstant(TailSPDelta, DL, GRLenVT));
 
   // Add argument registers to the end of the list so that they are
   // known live into the call.
@@ -10545,14 +10604,14 @@ LoongArchTargetLowering::LowerCall(CallLoweringInfo &CLI,
   default:
     report_fatal_error("Unsupported code model");
   case CodeModel::Small:
-    Op = IsTailCall ? LoongArchISD::TAIL : LoongArchISD::CALL;
+    Op = IsTailCall ? (IsTailCC ? LoongArchISD::TC_RETURN : LoongArchISD::TAIL) : LoongArchISD::CALL;
     break;
   case CodeModel::Medium:
-    Op = IsTailCall ? LoongArchISD::TAIL_MEDIUM : LoongArchISD::CALL_MEDIUM;
+    Op = IsTailCall ? (IsTailCC ? LoongArchISD::TC_RETURN_MEDIUM : LoongArchISD::TAIL_MEDIUM) : LoongArchISD::CALL_MEDIUM;
     break;
   case CodeModel::Large:
     assert(Subtarget.is64Bit() && "Large code model requires LA64");
-    Op = IsTailCall ? LoongArchISD::TAIL_LARGE : LoongArchISD::CALL_LARGE;
+    Op = IsTailCall ? (IsTailCC ? LoongArchISD::TC_RETURN_LARGE : LoongArchISD::TAIL_LARGE) : LoongArchISD::CALL_LARGE;
     break;
   }
 
@@ -10568,7 +10627,7 @@ LoongArchTargetLowering::LowerCall(CallLoweringInfo &CLI,
   Glue = Chain.getValue(1);
 
   // Mark the end of the call, which is glued to the call itself.
-  Chain = DAG.getCALLSEQ_END(Chain, NumBytes, 0, Glue, DL);
+  Chain = DAG.getCALLSEQ_END(Chain, NumBytes, IsTailCC ? NumBytes : 0, Glue, DL);
   Glue = Chain.getValue(1);
 
   // Assign locations to each value returned by this call.

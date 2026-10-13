@@ -1,0 +1,12 @@
+diff --git a/rules/c++/modules/clang/support.lua b/rules/c++/modules/clang/support.lua
+--- a/rules/c++/modules/clang/support.lua
++++ b/rules/c++/modules/clang/support.lua
+@@ -313,7 +313,7 @@ function get_modulefileflag(target)
+     local modulefileflag = _g.modulefileflag
+     if modulefileflag == nil then
+         local compinst = target:compiler("cxx")
+-        if compinst:has_flags("-fmodule-file=" .. os.tmpfile() .. get_bmi_extension(), "cxxflags", {flagskey = "clang_module_file"}) then
++        if semver.compare(get_clang_version(target), "16.0") >= 0 or compinst:has_flags("-fmodule-file=" .. os.tmpfile() .. get_bmi_extension(), "cxxflags", {flagskey = "clang_module_file"}) then
+             modulefileflag = "-fmodule-file="
+         end
+         assert(modulefileflag, "compiler(clang): does not support c++ module!")

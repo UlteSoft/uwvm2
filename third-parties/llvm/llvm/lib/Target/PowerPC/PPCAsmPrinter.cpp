@@ -44,6 +44,7 @@
 #include "llvm/CodeGen/StackMaps.h"
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Module.h"
@@ -791,6 +792,18 @@ static MCSymbol *getMCSymbolForTOCPseudoMO(const MachineOperand &MO,
   }
 }
 
+// Match SelectionDAG's exact opt-in C function TOC-slot contract. Both
+// halves of a medium-model indirect load must name the same synthesized slot;
+// a direct ELFv1 descriptor on @toc@ha paired with the slot on @toc@l is invalid.
+static bool hasUWVMTOCSlot(const MachineOperand &MO,
+                          const PPCSubtarget &Subtarget) {
+  if (!Subtarget.is64BitELFABI() || !MO.isGlobal())
+    return false;
+  const auto *F = dyn_cast<Function>(MO.getGlobal());
+  return F && !F->isVarArg() && F->getCallingConv() == CallingConv::C &&
+         F->getFnAttribute("uwvm-ppc64-toc-tail").getValueAsString() == "1";
+}
+
 static PPCAsmPrinter::TOCEntryType
 getTOCEntryTypeForLinkage(GlobalValue::LinkageTypes Linkage) {
   if (Linkage == GlobalValue::ExternalLinkage ||
@@ -1267,7 +1280,8 @@ void PPCAsmPrinter::emitInstruction(const MachineInstr *MI) {
     PPCMCExpr::Specifier VK = getSpecifier(MO);
 
     const bool GlobalToc =
-        MO.isGlobal() && Subtarget->isGVIndirectSymbol(MO.getGlobal());
+        (MO.isGlobal() && Subtarget->isGVIndirectSymbol(MO.getGlobal())) ||
+        hasUWVMTOCSlot(MO, *Subtarget);
 
     const CodeModel::Model CM =
         IsAIX ? getCodeModel(*Subtarget, TM, MO) : TM.getCodeModel();
@@ -1306,7 +1320,8 @@ void PPCAsmPrinter::emitInstruction(const MachineInstr *MI) {
            "Invalid operand for LDtocL!");
 
     LLVM_DEBUG(assert(
-        (!MO.isGlobal() || Subtarget->isGVIndirectSymbol(MO.getGlobal())) &&
+        (!MO.isGlobal() || Subtarget->isGVIndirectSymbol(MO.getGlobal()) ||
+         hasUWVMTOCSlot(MO, *Subtarget)) &&
         "LDtocL used on symbol that could be accessed directly is "
         "invalid. Must match ADDIStocHA8."));
 

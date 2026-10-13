@@ -1,0 +1,1 @@
+(module (type $a (array i8))  (func (export "_start") ref.null $a i32.const 0 array.get_u $a drop))

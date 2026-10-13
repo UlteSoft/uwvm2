@@ -1,0 +1,178 @@
+{
+  "schema": "uwvm-fixed-wasm-reference-inner-command-audit-v1",
+  "source_only": true,
+  "native_executed": false,
+  "performance_passed": false,
+  "formal_acceptance": false,
+  "build_required_before_inventory": false,
+  "tools": {
+    "wasmtime49": {
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+      "expected_sha256": "c36ef7e6548600b09bcb34cb3ee4c138f3e7b01893347ec7f48fdb8e6050aa94",
+      "actual_historical_version": "49.0.1",
+      "fresh_version_help_DSO_receipts": null
+    },
+    "wavm-inventory": {
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wavm-nightly-2026-04-05/bin/wavm",
+      "bytes": 872592,
+      "expected_sha256": "daf29ef8ebbd9eaa20a13115205b56fafd4b8cfd77b38333c647bb12851ecd23",
+      "actual_version": null,
+      "official_candidate_commit": "4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09",
+      "actual_official_archive_provenance": null,
+      "actual_loader_and_DSO_closure": null,
+      "Core3_GC": "unsupported in pinned official candidate",
+      "modern_try_table_throw_ref": "unsupported in pinned official candidate"
+    }
+  },
+  "tool_inventory_inner_commands": [
+    [
+      "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+      "--version"
+    ],
+    [
+      "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+      "run",
+      "--help"
+    ],
+    [
+      "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+      "run",
+      "-C",
+      "help"
+    ],
+    [
+      "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+      "run",
+      "-W",
+      "help"
+    ],
+    [
+      "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wavm-nightly-2026-04-05/bin/wavm",
+      "version"
+    ],
+    [
+      "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wavm-nightly-2026-04-05/bin/wavm",
+      "help",
+      "run"
+    ]
+  ],
+  "fixtures": {
+    "memory64-random-store-5000000": {
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-memory64-20260928/memory64/fixtures/memory64-random-store-5000000.wasm",
+      "iterations": 5000000,
+      "sha256": "5ed7090a0cbafe866be3eae0bbfc76ceeed6b1cb607dc0bc6392f4a829269fd9",
+      "self_check": "_start exits zero iff scalar result is correct"
+    },
+    "memory64-random-store-50000000": {
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-memory64-20260928/memory64/fixtures/memory64-random-store-50000000.wasm",
+      "iterations": 50000000,
+      "sha256": "322641f90c7b80225e942031988918da63e925e725a72dd2dd1f6c4b28cb36cc",
+      "self_check": "_start exits zero iff scalar result is correct"
+    }
+  },
+  "cold_then_reference_plain_inner_commands": [
+    {
+      "fixture": "memory64-random-store-5000000",
+      "profile": "wasmtime49/memory64/cache-disabled",
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+        "run",
+        "-C",
+        "cache=n",
+        "-W",
+        "memory64=y",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-memory64-20260928/memory64/fixtures/memory64-random-store-5000000.wasm"
+      ],
+      "execution_role": "reference",
+      "timing_qualification": "requires actual identity/exit0/closure; sub100ms observations remain unqualified",
+      "measurement_scope": "whole-process wait4; no singleTID hardware counters",
+      "ready": false
+    },
+    {
+      "fixture": "memory64-random-store-5000000",
+      "profile": "wavm-inventory/memory64/cache-disabled",
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wavm-nightly-2026-04-05/bin/wavm",
+        "run",
+        "--nocache",
+        "--abi=bare",
+        "--function=_start",
+        "--enable",
+        "memory64",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-memory64-20260928/memory64/fixtures/memory64-random-store-5000000.wasm"
+      ],
+      "execution_role": "reference",
+      "timing_qualification": "requires actual identity/exit0/closure; sub100ms observations remain unqualified",
+      "measurement_scope": "whole-process wait4; no singleTID hardware counters",
+      "ready": false
+    },
+    {
+      "fixture": "memory64-random-store-50000000",
+      "profile": "wasmtime49/memory64/cache-disabled",
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wasmtime49-unpacked/wasmtime-v49.0.1-x86_64-linux/wasmtime",
+        "run",
+        "-C",
+        "cache=n",
+        "-W",
+        "memory64=y",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-memory64-20260928/memory64/fixtures/memory64-random-store-50000000.wasm"
+      ],
+      "execution_role": "reference",
+      "timing_qualification": "requires actual identity/exit0/closure; sub100ms observations remain unqualified",
+      "measurement_scope": "whole-process wait4; no singleTID hardware counters",
+      "ready": false
+    },
+    {
+      "fixture": "memory64-random-store-50000000",
+      "profile": "wavm-inventory/memory64/cache-disabled",
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/tools/wavm-nightly-2026-04-05/bin/wavm",
+        "run",
+        "--nocache",
+        "--abi=bare",
+        "--function=_start",
+        "--enable",
+        "memory64",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-memory64-20260928/memory64/fixtures/memory64-random-store-50000000.wasm"
+      ],
+      "execution_role": "reference",
+      "timing_qualification": "requires actual identity/exit0/closure; sub100ms observations remain unqualified",
+      "measurement_scope": "whole-process wait4; no singleTID hardware counters",
+      "ready": false
+    }
+  ],
+  "existing_protocol_adaptation": {
+    "plain_sampler": "91ee4854dcf7f176427f5943895bd9f933a5bfa2819c263c30e78774c8beada8",
+    "guard_adapter": "d96e7eb2795d020ca5bf29800500b98b947db901eb7bf262eff1130da7b863cb",
+    "changes": "keeper-owned narrow function-global plain_role returns reference only for this exact pinned reference set; no original source edits or singleTID counter widening",
+    "reference_terminal_path": "current one actual pinned reference path in the existing guard adapter per-tool invocation; not a product or source identity alias",
+    "each_actual_TID": "original UID/P0/exactCG checks retained",
+    "capture": "stripped and actual stopped witness required",
+    "temperature": "observation only",
+    "frequency": "raw sysfs snapshots; not ROI GHz",
+    "same_byte_current_uwvm_cold": "pending separately; no old-source reuse asserted"
+  },
+  "LD_LIBRARY_PATH": null,
+  "execution_ready": false,
+  "notes": [
+    "Inventory and original scope admission precede cold/measurement; this JSON is a fixed source-data command list, not a launcher.",
+    "WAVM may require its separate actual pinned loader closure; no guessed preload or software fallback.",
+    "Initial 5M case is functional/short control; 50M plain quality still depends on actual duration/identity/frequency.",
+    "Use existing serial ABBA wholewait4 references after complete cold; current product exact build/source/argv is separately bound.",
+    "Current GC families use fixed samebytes Wasmtime49 explicitcopying; DRC cycle-leak or Null not equivalent reclamation.",
+    "WAVM version/help failure is retained actual unsupported/unqualified evidence, not a slow score."
+  ]
+}

@@ -497,22 +497,13 @@ case wasm1_code::f64_copysign:
 // this is a modulo-2^32 wrap, so LLVM `trunc` is the exact representation.
 case wasm1_code::i32_wrap_i64:
 {
-    validate_numeric_unary(u8"i32.wrap_i64", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_width.template operator()<0xa7u>(u8"i32.wrap_i64")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
-                                                       runtime_operand_stack_value_type::i64,
-                                                       runtime_operand_stack_value_type::i32,
-                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-                                                       { return ir_builder.CreateTrunc(operand.value, ::llvm::Type::getInt32Ty(ir_builder.getContext())); }))
-            [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_width(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 
@@ -670,22 +661,13 @@ case wasm1_code::i32_trunc_f64_u:
 // operand when widened to 64 bits.
 case wasm1_code::i64_extend_i32_s:
 {
-    validate_numeric_unary(u8"i64.extend_i32_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64);
-
+    auto const event{validate_integer_width.template operator()<0xacu>(u8"i64.extend_i32_s")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
-                                                       runtime_operand_stack_value_type::i32,
-                                                       runtime_operand_stack_value_type::i64,
-                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-                                                       { return ir_builder.CreateSExt(operand.value, ::llvm::Type::getInt64Ty(ir_builder.getContext())); }))
-            [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_width(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 
@@ -694,22 +676,13 @@ case wasm1_code::i64_extend_i32_s:
 // and widens it without sign propagation.
 case wasm1_code::i64_extend_i32_u:
 {
-    validate_numeric_unary(u8"i64.extend_i32_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64);
-
+    auto const event{validate_integer_width.template operator()<0xadu>(u8"i64.extend_i32_u")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
-                                                       runtime_operand_stack_value_type::i32,
-                                                       runtime_operand_stack_value_type::i64,
-                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-                                                       { return ir_builder.CreateZExt(operand.value, ::llvm::Type::getInt64Ty(ir_builder.getContext())); }))
-            [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_width(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 

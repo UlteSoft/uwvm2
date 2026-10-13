@@ -1,0 +1,112 @@
+--- a/llvm/lib/Target/Mips/MipsSEFrameLowering.cpp
++++ b/llvm/lib/Target/Mips/MipsSEFrameLowering.cpp
+@@ -39,10 +39,23 @@
+ #include "llvm/Support/MathExtras.h"
+ #include <cassert>
+ #include <cstdint>
++#include <iterator>
+ #include <utility>
+ #include <vector>
+ 
+ using namespace llvm;
++
++// The debugger consumes asynchronous rows at real instruction boundaries.
++// EH-return and interrupt stubs have separate state transitions; do not give
++// those paths the conventional N64 frame rules below.
++static bool needsN64AsyncCFI(const MachineFunction &MF,
++                             const MipsSubtarget &STI) {
++  return STI.getABI().IsN64() && !STI.inMips16Mode() &&
++         !STI.inMicroMipsMode() &&
++         MF.getFunction().getUWTableKind() == UWTableKind::Async &&
++         !MF.getFunction().hasFnAttribute("interrupt") &&
++         !MF.getInfo<MipsFunctionInfo>()->callsEhReturn();
++}
+ 
+ static std::pair<unsigned, unsigned> getMFHiLoOpc(unsigned Src) {
+   if (Mips::ACC64RegClass.contains(Src))
+@@ -419,10 +432,19 @@
+   // First, compute final stack size.
+   uint64_t StackSize = MFI.getStackSize();
+ 
++  // A frameless leaf still returns through the live N64 link register.
++  if (needsN64AsyncCFI(MF, STI))
++    CFIInstBuilder(MBB, MBBI, MachineInstr::FrameSetup)
++        .buildSameValue(Mips::RA_64);
++
+   // No need to allocate space on the stack.
+   if (StackSize == 0 && !MFI.adjustsStack()) return;
+ 
+-  CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::NoFlags);
++  // CFIFixup must remember the completed prologue, rather than the
++  // entry-only RA rule, when a return precedes another live framed block.
++  CFIInstBuilder CFIBuilder(MBB, MBBI, needsN64AsyncCFI(MF, STI)
++                                           ? MachineInstr::FrameSetup
++                                           : MachineInstr::NoFlags);
+ 
+   // Adjust stack.
+   TII.adjustStackPtr(SP, -StackSize, MBB, MBBI);
+@@ -652,6 +674,7 @@
+ 
+   const MipsSEInstrInfo &TII =
+       *static_cast<const MipsSEInstrInfo *>(STI.getInstrInfo());
++  const MipsRegisterInfo &RegInfo = *STI.getRegisterInfo();
+ 
+   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
+   MipsABIInfo ABI = STI.getABI();
+@@ -660,6 +683,8 @@
+   unsigned ZERO = ABI.GetNullPtr();
+   unsigned MOVE = ABI.GetGPRMoveOp();
+ 
++  bool AsyncCFI = needsN64AsyncCFI(MF, STI);
++
+   // if framepointer enabled, restore the stack pointer.
+   if (hasFP(MF)) {
+     // Find the first instruction that restores a callee-saved register.
+@@ -670,6 +695,26 @@
+ 
+     // Insert instruction "move $sp, $fp" at this location.
+     BuildMI(MBB, I, DL, TII.get(MOVE), SP).addReg(FP).addReg(ZERO);
++    if (AsyncCFI)
++      CFIInstBuilder(MBB, I, MachineInstr::FrameDestroy)
++          .buildDefCFARegister(SP);
++  }
++
++  if (AsyncCFI) {
++    // Observe the actual restore instructions rather than assuming a saved
++    // register is already live. In particular, FP cannot remain the CFA
++    // base after its caller value has been loaded.
++    MachineBasicBlock::iterator I = MBBI;
++    for (unsigned N = 0; N != MFI.getCalleeSavedInfo().size(); ++N)
++      --I;
++    for (; I != MBBI; ++I) {
++      if (!I->mayLoad())
++        continue;
++      for (const CalleeSavedInfo &Saved : MFI.getCalleeSavedInfo())
++        if (I->modifiesRegister(Saved.getReg(), &RegInfo))
++          CFIInstBuilder(MBB, std::next(I), MachineInstr::FrameDestroy)
++              .buildSameValue(Saved.getReg());
++    }
+   }
+ 
+   if (MipsFI->callsEhReturn()) {
+@@ -699,6 +744,8 @@
+ 
+   // Adjust stack.
+   TII.adjustStackPtr(SP, StackSize, MBB, MBBI);
++  if (AsyncCFI)
++    CFIInstBuilder(MBB, MBBI, MachineInstr::FrameDestroy).buildDefCFA(SP, 0);
+ }
+ 
+ void MipsSEFrameLowering::emitInterruptEpilogueStub(
+--- a/llvm/lib/Target/Mips/MipsDelaySlotFiller.cpp
++++ b/llvm/lib/Target/Mips/MipsDelaySlotFiller.cpp
+@@ -1163,7 +1163,8 @@
+ 
+ bool MipsDelaySlotFiller::terminateSearch(const MachineInstr &Candidate) const {
+   return (Candidate.isTerminator() || Candidate.isCall() ||
+-          Candidate.isPosition() || Candidate.isInlineAsm() ||
++          Candidate.isPosition() || Candidate.isCFIInstruction() ||
++          Candidate.isInlineAsm() ||
+           Candidate.hasUnmodeledSideEffects());
+ }
+ 

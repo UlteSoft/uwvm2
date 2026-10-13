@@ -1,0 +1,7 @@
+# Private paired runtime build
+
+Use the ROS source subset under `third-parties/llvm-runtimes/upstream`, with `paired-static.cmake`. Build `cxx_static cxxabi_static unwind_static generate-cxx-headers` with at most four workers in the admitted cgroup.
+
+The local `EHHeaderParser.hpp` patch specializes the usual ELF `datarel|sdata4` FDE table. It bounds the complete fixed-stride extent before binary search, preserves signed offsets and the final FDE PC-range check, and retains upstream fallback for every other encoding. Exact original/patched hashes and patch identity are in `eh-fixed-encoding.json`. Apply it to a fresh private source tree with `python3 apply-eh-fixed-encoding.py "$task_runtime_source"`; `--check` verifies identity without writing. Build all three paired archives and matching headers together. Actual installation targets are `install-cxx-headers`, `install-cxx`, `install-cxxabi`, `install-unwind`, and `install-unwind-headers`.
+
+On Linux x86-64, a fresh paired-static build in the 64 GiB cgroup passed actual JIT landing-pad tests (18,313 checks, 1,152 executions) and four-reader concurrent CFI publication/retirement tests (48 registrations and eight failed-publication rollbacks). Its ELF had no dynamic libc++/libc++abi/libunwind/libgcc EH provider. These results qualify the tested Linux build; other targets need separate tests. The patch changes table lookup, not cursor ABI, frame registration or CFI interpretation.

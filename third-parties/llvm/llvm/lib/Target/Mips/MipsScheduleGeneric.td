@@ -411,7 +411,8 @@ def : InstRW<[GenericWriteJumpAndLink], (instrs JALR64, JALR64Pseudo,
                                          JALRHB64Pseudo, JALR_HB64)>;
 
 def : InstRW<[GenericWriteJump], (instrs JR_HB64, TAILCALLREG64,
-                                  TAILCALLREGHB64, PseudoReturn64)>;
+                                  TAILCALLREGHB64, PseudoReturn64,
+                                  TCRETURN64, TCRETURNREG64, TCRETURNREGHB64)>;
 
 // MIPS64R6
 // ========

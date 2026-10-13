@@ -1,0 +1,273 @@
+{
+  "64GiB_hard_swap0_8GiB_soft": "original_guard_receipts",
+  "ROS_bundled_product_qualified": false,
+  "actual_guest_executed": false,
+  "actual_inputs_unchanged": true,
+  "actual_kvm": {
+    "enabled": true,
+    "present": true
+  },
+  "actual_overlay_backing": {
+    "backing_file": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/freebsd-clean-image-actual-20261003-r2/FreeBSD-15.1-clean.qcow2",
+    "encrypted": false,
+    "incompatible_features": 0,
+    "qcow2_version": 3,
+    "virtual_bytes": 6477709312
+  },
+  "actual_stages": [
+    {
+      "actual_retirement": [
+        {
+          "birth": 5303338,
+          "pid": 389402,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ],
+      "label": "prepare-seed",
+      "original_root_pidfd": {
+        "actual_reaped_returncode": 0,
+        "pid": 389402,
+        "pidfd_readable": true
+      },
+      "passed": true,
+      "peak_owned_rss_bytes": 22167552,
+      "returncode": 0,
+      "wall_seconds": 3.0899694690015167
+    },
+    {
+      "actual_retirement": [
+        {
+          "birth": 5303647,
+          "pid": 389509,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ],
+      "label": "owned-overlay",
+      "original_root_pidfd": {
+        "actual_reaped_returncode": 0,
+        "pid": 389509,
+        "pidfd_readable": true
+      },
+      "passed": true,
+      "peak_owned_rss_bytes": 10465280,
+      "returncode": 0,
+      "wall_seconds": 0.4136781869965489
+    },
+    {
+      "actual_retirement": [
+        {
+          "birth": 5303689,
+          "pid": 389614,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ],
+      "label": "owned-cidata",
+      "original_root_pidfd": {
+        "actual_reaped_returncode": 0,
+        "pid": 389614,
+        "pidfd_readable": true
+      },
+      "passed": true,
+      "peak_owned_rss_bytes": 10436608,
+      "returncode": 0,
+      "wall_seconds": 0.4171078419967671
+    },
+    {
+      "actual_retirement": [
+        {
+          "birth": 5303731,
+          "pid": 389718,
+          "pidfd_readable": true,
+          "reaped_returncode": 0
+        }
+      ],
+      "label": "bind-guest-manifest",
+      "original_root_pidfd": {
+        "actual_reaped_returncode": 0,
+        "pid": 389718,
+        "pidfd_readable": true
+      },
+      "passed": true,
+      "peak_owned_rss_bytes": 22073344,
+      "returncode": 0,
+      "wall_seconds": 3.089652645001479
+    },
+    {
+      "actual_retirement": [
+        {
+          "birth": 5304040,
+          "pid": 389850,
+          "pidfd_readable": true,
+          "reaped_returncode": 1
+        },
+        {
+          "birth": 5304206,
+          "pid": 389954,
+          "pidfd_readable": true,
+          "reaped_returncode": null
+        }
+      ],
+      "label": "four-profile-guest",
+      "original_root_pidfd": {
+        "actual_reaped_returncode": 1,
+        "pid": 389850,
+        "pidfd_readable": true
+      },
+      "passed": false,
+      "peak_owned_rss_bytes": 63414272,
+      "returncode": 1,
+      "wall_seconds": 8.26759210399905
+    }
+  ],
+  "actual_vcpus": [
+    {
+      "cpu-index": 0,
+      "props": {
+        "core-id": 0,
+        "socket-id": 0,
+        "thread-id": 0
+      },
+      "qom-path": "/machine/unattached/device[0]",
+      "qom-type": "host-x86_64-cpu",
+      "target": "x86_64",
+      "thread-id": 389958
+    },
+    {
+      "cpu-index": 1,
+      "props": {
+        "core-id": 1,
+        "socket-id": 0,
+        "thread-id": 0
+      },
+      "qom-path": "/machine/unattached/device[2]",
+      "qom-type": "host-x86_64-cpu",
+      "target": "x86_64",
+      "thread-id": 389959
+    },
+    {
+      "cpu-index": 2,
+      "props": {
+        "core-id": 2,
+        "socket-id": 0,
+        "thread-id": 0
+      },
+      "qom-path": "/machine/unattached/device[3]",
+      "qom-type": "host-x86_64-cpu",
+      "target": "x86_64",
+      "thread-id": 389960
+    },
+    {
+      "cpu-index": 3,
+      "props": {
+        "core-id": 3,
+        "socket-id": 0,
+        "thread-id": 0
+      },
+      "qom-path": "/machine/unattached/device[4]",
+      "qom-type": "host-x86_64-cpu",
+      "target": "x86_64",
+      "thread-id": 389961
+    }
+  ],
+  "controller_error": "RuntimeError: deleted QEMU file mapping is not admitted",
+  "controller_traceback": "Traceback (most recent call last):\n  File \"/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/freebsd-serial-vm-source-20261003-r2/freebsd151_serial_controller.py\", line 430, in main\n    live_inputs(); mapped_inputs()\n                   ~~~~~~~~~~~~~^^\n  File \"/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/qemu-platform-tests/freebsd-serial-vm-source-20261003-r2/freebsd151_serial_controller.py\", line 352, in mapped_inputs\n    raise RuntimeError('deleted QEMU file mapping is not admitted')\nRuntimeError: deleted QEMU file mapping is not admitted\n",
+  "guest_platform_qualified": false,
+  "original_qemu_retirement": [
+    {
+      "actual_wait_returncode": -9,
+      "birth": 5304206,
+      "original_pidfd_ready": true,
+      "pid": 389954
+    }
+  ],
+  "original_raw_mapping_line_recorded": false,
+  "raw_evidence_files": {
+    "authority/ticket.json": {
+      "bytes": 3745,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/authority/934fbeff80ba4909a4a1090b9b6ff78a.json",
+      "sha256": "34a1f8cee0d86c3201d34a112fec9c1cbadf0b785bb79e97eb688f4116779487"
+    },
+    "guard/bind-guest-manifest.log": {
+      "bytes": 189,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-r2-attempt1/bind-guest-manifest.log",
+      "sha256": "d9d4ef75166472ec83b314598c738cd929474b30fb9119ef54ae60c4be2a6d60"
+    },
+    "guard/four-profile-guest.log": {
+      "bytes": 0,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-r2-attempt1/four-profile-guest.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard/lane-retirement.json": {
+      "bytes": 528,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-r2-attempt1/lane-retirement.json",
+      "sha256": "7dad5cbff55d26bda7154f6d17310713b610803aae4a36a0550c52d5a8684231"
+    },
+    "guard/owned-cidata.log": {
+      "bytes": 0,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-r2-attempt1/owned-cidata.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "guard/owned-overlay.log": {
+      "bytes": 450,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-r2-attempt1/owned-overlay.log",
+      "sha256": "5932d066594ea24ddd7a473962e6d9e12b6de44eb8596449941352c9b3a01235"
+    },
+    "guard/prepare-seed.log": {
+      "bytes": 342,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-r2-attempt1/prepare-seed.log",
+      "sha256": "17c4e307c8de8e3ad482e8f24bf156bac3209d7b6630d69287206ab7dd8fd8c6"
+    },
+    "guard/receipts.json": {
+      "bytes": 42175,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-r2-attempt1/receipts.json",
+      "sha256": "c01f0a010dac02fc13b4ffe9622de0a46be97f49eda5b2be898cb8a07590337f"
+    },
+    "run/cold-qualified.json": {
+      "bytes": 9935,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-20261003-r2/cold-qualified.json",
+      "sha256": "e6a0f31823819ca265eab8b206e7778fae77627198ac93d1146e6ef145f92d97"
+    },
+    "run/controller-receipt.json": {
+      "bytes": 39554,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-20261003-r2/controller-receipt.json",
+      "sha256": "988c0bd396b7c5dc847826823840ebf2b56252d75e8df78d01cb8c2867a64210"
+    },
+    "run/prepared-before.json": {
+      "bytes": 30894,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-20261003-r2/prepared-before.json",
+      "sha256": "f0dc0de30d0fa09ee9df3698bdfb00403bc53fef755423cd9dcc21b776353643"
+    },
+    "run/qemu.log": {
+      "bytes": 0,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-20261003-r2/qemu.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "run/serial-seed-prepared.json": {
+      "bytes": 3679,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-20261003-r2/serial-seed-prepared.json",
+      "sha256": "ea5670dcf6e2b1fe31aed1ec11e1d7dc7879737d486b3634a49352ffd80439ef"
+    },
+    "run/serial.log": {
+      "bytes": 0,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-20261003-r2/serial.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "run/vm-manifest.json": {
+      "bytes": 33232,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-vm-20261003-r2/vm-manifest.json",
+      "sha256": "df598d8c27600a3d63ea2c02a17501f728c596de32ee2b0ad5ee8d3d21979a32"
+    }
+  },
+  "schema": "uwvm-freebsd151-serial-vm-original-failure-evidence-v1",
+  "serial_bytes": 0,
+  "smallraw_local_path": "/tmp/uwvm-qemu-freebsd-serial-r2-attempt1-small-evidence",
+  "smallraw_manifest_sha256": "7e012650e5b100b0df2968f963be0702d2c9dfd8b22ab948c71a881e682bd65c",
+  "stage": "r2-attempt1",
+  "status": "FAIL_PRECONT_DELETED_MAPPING",
+  "ticket_id": "934fbeff80ba4909a4a1090b9b6ff78a",
+  "ticket_retired": true,
+  "wholeVM_restore_qualified": false
+}

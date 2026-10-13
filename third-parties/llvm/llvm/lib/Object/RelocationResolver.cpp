@@ -209,6 +209,8 @@ static bool supportsSystemZ(uint64_t Type) {
   switch (Type) {
   case ELF::R_390_32:
   case ELF::R_390_64:
+  case ELF::R_390_PC32:
+  case ELF::R_390_PC64:
     return true;
   default:
     return false;
@@ -222,6 +224,13 @@ static uint64_t resolveSystemZ(uint64_t Type, uint64_t Offset, uint64_t S,
     return (S + Addend) & 0xFFFFFFFF;
   case ELF::R_390_64:
     return S + Addend;
+  // SystemZ emits PC-relative EH-frame relocations alongside private Wasm
+  // DWARF. Resolve the independent object-reader value in section-relative
+  // coordinates; an unrelated valid EH section must not revoke all rows.
+  case ELF::R_390_PC32:
+    return (S + Addend - Offset) & 0xFFFFFFFF;
+  case ELF::R_390_PC64:
+    return S + Addend - Offset;
   default:
     llvm_unreachable("Invalid relocation type");
   }
@@ -233,6 +242,8 @@ static bool supportsSparc64(uint64_t Type) {
   case ELF::R_SPARC_64:
   case ELF::R_SPARC_UA32:
   case ELF::R_SPARC_UA64:
+  case ELF::R_SPARC_DISP32:
+  case ELF::R_SPARC_DISP64:
     return true;
   default:
     return false;
@@ -247,6 +258,13 @@ static uint64_t resolveSparc64(uint64_t Type, uint64_t Offset, uint64_t S,
   case ELF::R_SPARC_UA32:
   case ELF::R_SPARC_UA64:
     return S + Addend;
+  // JIT V9 EH frames use signed PC-relative relocations. The DWARF object
+  // reader must resolve these too, independently of RuntimeDyld loading;
+  // otherwise a valid EH section invalidates every provenance line/location.
+  case ELF::R_SPARC_DISP32:
+    return (S + Addend - Offset) & 0xFFFFFFFF;
+  case ELF::R_SPARC_DISP64:
+    return S + Addend - Offset;
   default:
     llvm_unreachable("Invalid relocation type");
   }

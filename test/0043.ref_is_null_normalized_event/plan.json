@@ -1,0 +1,181 @@
+{
+  "schema": "uwvm-ref-is-null-modern-short-source-plan-r1",
+  "source_only": true,
+  "native_executions": 0,
+  "oracle_executions": 0,
+  "production_candidate_manifest_sha256": "8cde884af477c19e691d89d6e1d185383a478c6dbbe36f9b99ae568a82dd7105",
+  "borrowed_actual_ref_null_prod_receipt_sha256": "8c94a1fc8389c2bd3c49a6ef1a0396df2fe88fd35517dbbb4fb0b5456eadc622",
+  "official_sources": [
+    "https://webassembly.github.io/spec/core/valid/instructions.html#reference-instructions",
+    "https://webassembly.github.io/spec/core/appendix/algorithm.html",
+    "https://github.com/WebAssembly/spec/blob/main/test/core/ref_is_null.wast"
+  ],
+  "cases": [
+    {
+      "file": "fixtures/non_null_gc_parameter.wat",
+      "valid": true,
+      "dynamic_ref_is_null": true,
+      "features": {
+        "gc": true,
+        "function_references": false,
+        "exceptions": false
+      },
+      "expected": "_start invokes both actual indexed-GC reference parameter functions; nonnull returns0 and null returns1."
+    },
+    {
+      "file": "fixtures/caught_exception_and_noexn.wat",
+      "valid": true,
+      "dynamic_ref_is_null": true,
+      "features": {
+        "gc": false,
+        "function_references": false,
+        "exceptions": true
+      },
+      "expected": "catch_all_ref transfers real nonnull exn to block then D1 returns0; noexn null D1 returns1; GC remains disabled."
+    },
+    {
+      "file": "fixtures/synthetic_unreachable_reference.wat",
+      "valid": true,
+      "dynamic_ref_is_null": true,
+      "features": {
+        "gc": false,
+        "function_references": false,
+        "exceptions": false
+      },
+      "expected": "unreachable D1 has synthetic Bot and no real pop; reachable extern D1 actually returns1. Synthetic D1 is typing-only evidence."
+    },
+    {
+      "file": "fixtures/invalid_concrete_numeric_unreachable.wat",
+      "valid": false,
+      "dynamic_ref_is_null": false,
+      "features": {
+        "gc": false,
+        "function_references": false,
+        "exceptions": false
+      },
+      "expected": "actual i64 above unreachable control base remains concrete and D1 must reject invalid_reference_type, not accept whole dead frame."
+    },
+    {
+      "file": "fixtures/invalid_empty_reachable.wat",
+      "valid": false,
+      "dynamic_ref_is_null": false,
+      "features": {
+        "gc": false,
+        "function_references": false,
+        "exceptions": false
+      },
+      "expected": "reachable empty operand stack is underflow before any physical pop."
+    },
+    {
+      "file": "fixtures/unused_invalid_concrete_reference_32.wat",
+      "valid": false,
+      "dynamic_ref_is_null": false,
+      "features": {
+        "gc": true,
+        "function_references": false,
+        "exceptions": false
+      },
+      "expected": "32 actual local bodies, unused bad function31 outside LLVM adjacent warm group16; admission must reject i32 then D1 despite uncalled body. GC declaration is genuine latest type syntax."
+    }
+  ],
+  "official_oracle": {
+    "parse_all_success": 6,
+    "validate_success": 3,
+    "validate_failure": 3,
+    "tool_path_and_version": "keeper records actual binary SHA/version, loader/dependencies and argv; directory name alone is not version qualification",
+    "commands": [
+      "WASM_TOOLS parse INPUT.wat -o OUTPUT.wasm",
+      "WASM_TOOLS validate OUTPUT.wasm"
+    ],
+    "invalid_bytes_preserved": true,
+    "no_wat_repair_or_parse_only_pass": true
+  },
+  "finite_native_plan": {
+    "first_short_round": [
+      "non_null_gc_parameter",
+      "caught_exception_and_noexn",
+      "invalid_concrete_numeric_unreachable"
+    ],
+    "ordinary_modes": [
+      {
+        "compiler": "int",
+        "mode": "full"
+      },
+      {
+        "compiler": "jit",
+        "mode": "full"
+      },
+      {
+        "compiler": "int",
+        "mode": "lazy"
+      },
+      {
+        "compiler": "jit",
+        "mode": "lazy"
+      }
+    ],
+    "ordinary_additional_contract": "lazy+verification separate if tested; plain lazy cannot claim unused-body admission merely because a called body runs",
+    "ros_modes": [
+      {
+        "compiler": "int",
+        "mode": "full"
+      },
+      {
+        "compiler": "jit",
+        "mode": "full"
+      }
+    ],
+    "entry": "_start; every valid modern positive must execute the actual claimed D1 site",
+    "common_cli_tokens": [
+      "--runtime-compile-threads",
+      "0",
+      "--runtime-scheduling-policy",
+      "func_count",
+      "1",
+      "--wasm-enable-reference-types"
+    ],
+    "compiler_mode_tokens": [
+      "--runtime-custom-compiler",
+      "COMPILER",
+      "--runtime-custom-mode",
+      "MODE"
+    ],
+    "feature_tokens": "one explicit enable/disable token each for gc, function-references, exceptions per case; record actual argv and macro profile",
+    "negative_controls": [
+      {
+        "file": "fixtures/synthetic_unreachable_reference.wat",
+        "disable": "reference-types",
+        "expected": "earliest D1 is typed despite dead synthetic Bot; empty function signature has no earlier rich declaration requirement; exact reference_types feature_required subject/reference type diagnostic",
+        "qualifier": "D1 gate check, no dynamic D1 claim for the dead site"
+      },
+      {
+        "file": "fixtures/non_null_gc_parameter.wat",
+        "disable": "gc",
+        "expected": "exact GC module/type requirement before guest effects; not a D1-specific gate claim"
+      },
+      {
+        "file": "fixtures/caught_exception_and_noexn.wat",
+        "disable": "exceptions",
+        "expected": "EH tag/heap policy rejection, not false GC requirement"
+      }
+    ],
+    "runtime_errors_not_pass": [
+      "unknown flags",
+      "wrong mode",
+      "missing JIT macro roles",
+      "missing entry invocation",
+      "missing LLVM runtime symbols",
+      "signal crashes",
+      "timeouts"
+    ],
+    "unused_invalid_contract": "all function bodies must be validated before any entry effects; late compile failure in function31 cannot substitute admission; retained record/backend support not completed by this event slice",
+    "fresh_sdk_required": "candidate changes aggregate imports/new LLVM helper; use coherent fresh runtime/main/host/BMI, no old SO with new headers"
+  },
+  "asm_plan": {
+    "not_executed": true,
+    "require": "actual original null-tag primitive plus i32 result, endian/ABI correct; no newly emitted guest memory access or guard",
+    "int": "same get_uwvmint_ref_is_null_typed_fptr handler/register-ring spill and pop1/pushi32, actual combine/delay test separate",
+    "llvm": "use actual supported IR/assembly dump option after fresh profile; do not invent flags; include module/object hashes"
+  },
+  "scope": "new six original meaningful WAT fixtures; event slice does not complete all retained Core3/GC/EH/control payloads or default lazy admission"
+}

@@ -1,0 +1,705 @@
+{
+  "cases": [
+    {
+      "name": "i8-bits-0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-0.wasm",
+      "wasm_sha": "5f511073010718d4d1b8c3b75eaf27305094a57b4bf3dd6776d33d709bf71cd3",
+      "trap": null
+    },
+    {
+      "name": "i8-bits-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-1.wasm",
+      "wasm_sha": "418dd5db0c3c1838787be6da4de35b00409dccd53f12edb9a885b9c76d05b39c",
+      "trap": null
+    },
+    {
+      "name": "i8-bits-ffffffff",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-ffffffff.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-ffffffff.wasm",
+      "wasm_sha": "8f37abb81235a4f5cf3c58e86f339a8c0714314de69c7d531f61f717eb89c39e",
+      "trap": null
+    },
+    {
+      "name": "i8-bits-80000000",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-80000000.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-80000000.wasm",
+      "wasm_sha": "6fbabe13dae8525ac9de47426b61be80de68ff1e1387e980ee8e9f17d9e2c463",
+      "trap": null
+    },
+    {
+      "name": "i8-bits-7f800001",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-7f800001.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-7f800001.wasm",
+      "wasm_sha": "bcc9850d6950e8ef1491fb392b25f7d7c8207a1df8a5d1a9b971313ad5e3c247",
+      "trap": null
+    },
+    {
+      "name": "i8-bits-ffc00001",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-ffc00001.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-ffc00001.wasm",
+      "wasm_sha": "15a8447be643f430c3c5b757545c484ae4b60e282b091f0f19fe68ffef7ab232",
+      "trap": null
+    },
+    {
+      "name": "i8-bits-1234fedc",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-1234fedc.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-bits-1234fedc.wasm",
+      "wasm_sha": "a40009fc5c16736885bd5a737d770d07cd8431d88ef2addcb4ea1516497d6df2",
+      "trap": null
+    },
+    {
+      "name": "i8-new-all-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-new-all-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-new-all-1.wasm",
+      "wasm_sha": "5830b03f19ab80627d7a9824c84df775143e2769d92cff4176fa927f21a68cc2",
+      "trap": null
+    },
+    {
+      "name": "i8-default-all-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-default-all-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-default-all-1.wasm",
+      "wasm_sha": "5b29b3d60d6a0f7108b20ccc302a72c68b190d71b62ec5fe90d253ab96293174",
+      "trap": null
+    },
+    {
+      "name": "i8-fixed-all-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-fixed-all-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-fixed-all-1.wasm",
+      "wasm_sha": "ae7d1c35f535cbe0fbc760cee4a038905a4ef98bba97772fefdad79922924470",
+      "trap": null
+    },
+    {
+      "name": "i8-new-all-2",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-new-all-2.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-new-all-2.wasm",
+      "wasm_sha": "7eff0f36c78034a8c2c567212abc1e93336283b75d24de71b8c2be9572ff7607",
+      "trap": null
+    },
+    {
+      "name": "i8-default-all-2",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-default-all-2.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-default-all-2.wasm",
+      "wasm_sha": "c2a905c504b4e9ddc991760fd4164d48f9dbfe9ed67b9dbfb0a88aef6a78abb9",
+      "trap": null
+    },
+    {
+      "name": "i8-fixed-all-2",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-fixed-all-2.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-fixed-all-2.wasm",
+      "wasm_sha": "193288eb4acf7f717332139cc295cd6ac0a48fa584e8e8a8804a8d4100318260",
+      "trap": null
+    },
+    {
+      "name": "i8-new-all-257",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-new-all-257.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-new-all-257.wasm",
+      "wasm_sha": "200b5c06d169f9f0d11f67ae29eeb886ee452c0410b1be7ea9bf4d16dab63d6a",
+      "trap": null
+    },
+    {
+      "name": "i8-default-all-257",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-default-all-257.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-default-all-257.wasm",
+      "wasm_sha": "d1b705e3da1503c8a274805c87dfc228de1ed897e4405b85b9394b102a29bdd8",
+      "trap": null
+    },
+    {
+      "name": "i8-fixed-all-257",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-fixed-all-257.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-fixed-all-257.wasm",
+      "wasm_sha": "2c8fbd4a427d2137d464e1a35dcb7cb11bf2b018306a11afc41916d32f82ebfc",
+      "trap": null
+    },
+    {
+      "name": "i8-subtype-owner-layout",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-subtype-owner-layout.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-subtype-owner-layout.wasm",
+      "wasm_sha": "11cfa92052f18f28d48799191ab6b7a7e328bb8e98a26cde2b240ee2c20d61f8",
+      "trap": null
+    },
+    {
+      "name": "i8-alias-copy-fill",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-alias-copy-fill.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-alias-copy-fill.wasm",
+      "wasm_sha": "f4cdb7232ab5c9fb4507f732f7e9c49ae4fbef5c0ac9cd1dc8c6746bd08d45f9",
+      "trap": null
+    },
+    {
+      "name": "i8-exception-after-write",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-exception-after-write.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-exception-after-write.wasm",
+      "wasm_sha": "d9a8186a58310d8ede065a564a9f124702c64782237b8843be2df1a0b5fc7be9",
+      "trap": null
+    },
+    {
+      "name": "i8-root-survives-collection",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-root-survives-collection.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-root-survives-collection.wasm",
+      "wasm_sha": "ca7108d01dcccd5e30ee4a650707805339e3a70928a57f68aa19d6d48799b3a4",
+      "trap": null
+    },
+    {
+      "name": "i8-trap-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-trap-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-trap-empty.wasm",
+      "wasm_sha": "d46a95bf3389b21279648f2263fe133c44eec3b7fda5497f7dab368937183be0",
+      "trap": "bounds"
+    },
+    {
+      "name": "i8-trap-at-length",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-trap-at-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-trap-at-length.wasm",
+      "wasm_sha": "19687d5cca7cf79bee3d1fa8effde3c4cc912715b6f3b866483519980457f40c",
+      "trap": "bounds"
+    },
+    {
+      "name": "i8-trap-UINTMAX",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-trap-UINTMAX.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-trap-UINTMAX.wasm",
+      "wasm_sha": "8d5e664d888d4e916ed110d76351b1766fd4ef119cf209cfbdac1cfd3c640fad",
+      "trap": "bounds"
+    },
+    {
+      "name": "i8-null-0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-null-0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-null-0.wasm",
+      "wasm_sha": "fd54d84ce4552188e21a31b4918973c864bd77b6897fa2455ef1afc0ea9f8702",
+      "trap": "null"
+    },
+    {
+      "name": "i8-null-4294967295",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-null-4294967295.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i8-null-4294967295.wasm",
+      "wasm_sha": "aa21296c3806c813f21ddab74c57e67bba7eb62a694c00f08eceb1b5758e442b",
+      "trap": "null"
+    },
+    {
+      "name": "i16-bits-0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-0.wasm",
+      "wasm_sha": "eef4d82825d3f46a0d0ab3599e8178043657c1d28042d4e9d787d33933102ae3",
+      "trap": null
+    },
+    {
+      "name": "i16-bits-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-1.wasm",
+      "wasm_sha": "d65be2d0e6a98d35d5212b99b05530dc7aaee2fd22e206309a9b2c6f227819d3",
+      "trap": null
+    },
+    {
+      "name": "i16-bits-ffffffff",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-ffffffff.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-ffffffff.wasm",
+      "wasm_sha": "51dedafb93e4753b5bc30f1781e5b74bf932f6c87b78e270f6bfbf4ee375c6c7",
+      "trap": null
+    },
+    {
+      "name": "i16-bits-80000000",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-80000000.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-80000000.wasm",
+      "wasm_sha": "6a35e28cd824093779b6c2e89aa6da066155492efe764403753de955ea1f165e",
+      "trap": null
+    },
+    {
+      "name": "i16-bits-7f800001",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-7f800001.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-7f800001.wasm",
+      "wasm_sha": "c2af2b28f6bd2bc20d7e4a17c640a5233336a519b67b7f7d7cf4c737cf1d1cc5",
+      "trap": null
+    },
+    {
+      "name": "i16-bits-ffc00001",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-ffc00001.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-ffc00001.wasm",
+      "wasm_sha": "f0eb4604fc93c726895a8822f066296932c3e04a4cd4275da166883cc45d0a09",
+      "trap": null
+    },
+    {
+      "name": "i16-bits-1234fedc",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-1234fedc.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-bits-1234fedc.wasm",
+      "wasm_sha": "ff54d54beddd72a1bfa186d7257dd4cd95af464b6a01f706be83644bac038363",
+      "trap": null
+    },
+    {
+      "name": "i16-new-all-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-new-all-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-new-all-1.wasm",
+      "wasm_sha": "82912837862e82df30dd7bcb1184137a53dc6463ba4e97736e569c81cf8f9fa4",
+      "trap": null
+    },
+    {
+      "name": "i16-default-all-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-default-all-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-default-all-1.wasm",
+      "wasm_sha": "b9759e43b7332308eeda088fee22d1a0c8fe17e929bf3ef6c3f74dda5f6909bd",
+      "trap": null
+    },
+    {
+      "name": "i16-fixed-all-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-fixed-all-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-fixed-all-1.wasm",
+      "wasm_sha": "fed57dae4333ebb78238454b16d6d40d8f5d54f6562c3046b4751c60c88d5698",
+      "trap": null
+    },
+    {
+      "name": "i16-new-all-2",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-new-all-2.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-new-all-2.wasm",
+      "wasm_sha": "3abbbd5fa20badd126a7261c396f1a4cfe18a3d97c640428b4fd95d3df5223a9",
+      "trap": null
+    },
+    {
+      "name": "i16-default-all-2",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-default-all-2.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-default-all-2.wasm",
+      "wasm_sha": "b1fd417bd2d52898a3a9024d5df806b2d101d11c8f6789f531b0fc020147caf9",
+      "trap": null
+    },
+    {
+      "name": "i16-fixed-all-2",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-fixed-all-2.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-fixed-all-2.wasm",
+      "wasm_sha": "f0fe78c33f1582897c081904039605907e28253925e5cac864ff66e3ab37d75f",
+      "trap": null
+    },
+    {
+      "name": "i16-new-all-257",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-new-all-257.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-new-all-257.wasm",
+      "wasm_sha": "d8cb7b4a35e6d495f6f064e8fbb19e74eae8e4be48380daeded34528cc484639",
+      "trap": null
+    },
+    {
+      "name": "i16-default-all-257",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-default-all-257.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-default-all-257.wasm",
+      "wasm_sha": "76cd68ebab78e5a8b87302cdb4d7db65df8f6679d8725b21806e83954db5729e",
+      "trap": null
+    },
+    {
+      "name": "i16-fixed-all-257",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-fixed-all-257.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-fixed-all-257.wasm",
+      "wasm_sha": "49607bfdc625d8f5212894c749cd900f259e2d6556047c3337c5f1c5b0e88c3a",
+      "trap": null
+    },
+    {
+      "name": "i16-subtype-owner-layout",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-subtype-owner-layout.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-subtype-owner-layout.wasm",
+      "wasm_sha": "d728d909a8337d80af5721db3e294f32d82791617a07e1534e494520a26919d1",
+      "trap": null
+    },
+    {
+      "name": "i16-alias-copy-fill",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-alias-copy-fill.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-alias-copy-fill.wasm",
+      "wasm_sha": "9d46663b3b59d68b28805bdd568666f8189cf2fb0082eb2183b4c9db788dfde0",
+      "trap": null
+    },
+    {
+      "name": "i16-exception-after-write",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-exception-after-write.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-exception-after-write.wasm",
+      "wasm_sha": "fae92b37ce39e021e3d32673e2dc7f512cba1a58e6818ae62b9bd6c00249706e",
+      "trap": null
+    },
+    {
+      "name": "i16-root-survives-collection",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-root-survives-collection.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-root-survives-collection.wasm",
+      "wasm_sha": "2a5b18319147c3d7763fd3fc3624625a1970334a5dedc94545b4fa6e9093bac6",
+      "trap": null
+    },
+    {
+      "name": "i16-trap-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-trap-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-trap-empty.wasm",
+      "wasm_sha": "dc77a693619345416c865e310930c13f0a55f40e1b4896e701f400d9304a8115",
+      "trap": "bounds"
+    },
+    {
+      "name": "i16-trap-at-length",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-trap-at-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-trap-at-length.wasm",
+      "wasm_sha": "c48da597c0258507b69aa0ce5a6bb518e02a13b671f016222c973d80d2b71dd0",
+      "trap": "bounds"
+    },
+    {
+      "name": "i16-trap-UINTMAX",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-trap-UINTMAX.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-trap-UINTMAX.wasm",
+      "wasm_sha": "90aa0cc9398fd6c72a0e4b341caef57c4a9220c4ddb50bf46ed33f2354ea378a",
+      "trap": "bounds"
+    },
+    {
+      "name": "i16-null-0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-null-0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-null-0.wasm",
+      "wasm_sha": "0ea5152be37db627a2024ceff29ce4141cb886047f83822b3000ebef099f1c48",
+      "trap": "null"
+    },
+    {
+      "name": "i16-null-4294967295",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-null-4294967295.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i16-null-4294967295.wasm",
+      "wasm_sha": "8c2060110a20ff73256d506759b249104f3ef14954499ec032389e02dc570749",
+      "trap": "null"
+    },
+    {
+      "name": "i32-bits-0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-0.wasm",
+      "wasm_sha": "ba8c10449feeee26f032dcdb91c92d5ad630d498ffbaba65227af82a12359d62",
+      "trap": null
+    },
+    {
+      "name": "i32-bits-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-1.wasm",
+      "wasm_sha": "7400bcc1960e2ddb2087db6e9f1a397f0349cae0e76bb676511c917a1d29ebfe",
+      "trap": null
+    },
+    {
+      "name": "i32-bits-ffffffff",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-ffffffff.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-ffffffff.wasm",
+      "wasm_sha": "47dd62e290060088982559c5c4b89f6d02a410184a00226fa36b893edf91f929",
+      "trap": null
+    },
+    {
+      "name": "i32-bits-80000000",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-80000000.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-80000000.wasm",
+      "wasm_sha": "9ed8bd76b8350dbfca2399e4f9a14dbd1cde72db066a57496d32261bce261db0",
+      "trap": null
+    },
+    {
+      "name": "i32-bits-7f800001",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-7f800001.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-7f800001.wasm",
+      "wasm_sha": "3d30f01dd8109663aff3e7752a2589a05e017d93344add82582aea203945cd79",
+      "trap": null
+    },
+    {
+      "name": "i32-bits-ffc00001",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-ffc00001.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-ffc00001.wasm",
+      "wasm_sha": "163924f2c5ade6fd6eeb4796a8d6a153ae96ff39f069c12c3dc2e4145a929a23",
+      "trap": null
+    },
+    {
+      "name": "i32-bits-1234fedc",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-1234fedc.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-bits-1234fedc.wasm",
+      "wasm_sha": "e24f5b696954dcf188c195ab3fdb461716cca8c94f2c55ee353a2dbb08f86817",
+      "trap": null
+    },
+    {
+      "name": "i32-new-all-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-new-all-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-new-all-1.wasm",
+      "wasm_sha": "1d0975203e0447b1d4bfb5f6ab83055c0ce4107cac098c7449d844df47d28bdc",
+      "trap": null
+    },
+    {
+      "name": "i32-default-all-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-default-all-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-default-all-1.wasm",
+      "wasm_sha": "814ef7a9c850870fbdb4072d0ffab7628f8dbd310b036ae91b29ac2b13b0c1a1",
+      "trap": null
+    },
+    {
+      "name": "i32-fixed-all-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-fixed-all-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-fixed-all-1.wasm",
+      "wasm_sha": "47a2e680a376855cce4fec189cf07b63c7a993e010b7ab59a6b251ea0ff9926e",
+      "trap": null
+    },
+    {
+      "name": "i32-new-all-2",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-new-all-2.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-new-all-2.wasm",
+      "wasm_sha": "7bb5efd1d2011214fbd91af012342abc40769e93fcc6397dc55f7ed799cc44b3",
+      "trap": null
+    },
+    {
+      "name": "i32-default-all-2",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-default-all-2.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-default-all-2.wasm",
+      "wasm_sha": "c5b085da162f1375996b3fa9f4023e770cf2a9f638336816087f2bd2bf449990",
+      "trap": null
+    },
+    {
+      "name": "i32-fixed-all-2",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-fixed-all-2.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-fixed-all-2.wasm",
+      "wasm_sha": "cb0d4fe73aca7f9dc27d1fbcf6bbd7090a3b20d1cc72908d28665c1a57e926f3",
+      "trap": null
+    },
+    {
+      "name": "i32-new-all-257",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-new-all-257.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-new-all-257.wasm",
+      "wasm_sha": "1dc511c00ec3010e1cd6358dfb652f8f48fc3c85a66b042d671d2179a9cb96b3",
+      "trap": null
+    },
+    {
+      "name": "i32-default-all-257",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-default-all-257.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-default-all-257.wasm",
+      "wasm_sha": "d0283c0e4856331470ffd1fcae1934cc4472cccf629fbf2a12486787768d786f",
+      "trap": null
+    },
+    {
+      "name": "i32-fixed-all-257",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-fixed-all-257.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-fixed-all-257.wasm",
+      "wasm_sha": "f1b261db90c0179e331a8ee8b6b2768115bab6d3a98336fd34bedbaab066dc79",
+      "trap": null
+    },
+    {
+      "name": "i32-subtype-owner-layout",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-subtype-owner-layout.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-subtype-owner-layout.wasm",
+      "wasm_sha": "c66d3439a3c817c21d33080c8b653e9c5d2c1f4e6ae13000cc6a4a6cb5478dfc",
+      "trap": null
+    },
+    {
+      "name": "i32-alias-copy-fill",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-alias-copy-fill.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-alias-copy-fill.wasm",
+      "wasm_sha": "e4024b38ab150fc7576421aea119d5da4be9b4c0317baef009195a4dec2e6133",
+      "trap": null
+    },
+    {
+      "name": "i32-exception-after-write",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-exception-after-write.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-exception-after-write.wasm",
+      "wasm_sha": "28cc1a365104855775903f5db5fd674aa96521b7ab76179d5e8106115e4b63a5",
+      "trap": null
+    },
+    {
+      "name": "i32-root-survives-collection",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-root-survives-collection.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-root-survives-collection.wasm",
+      "wasm_sha": "5fd08ffee39d5a14067022aec190be8a5291d53121d32180209e4ac493adbea2",
+      "trap": null
+    },
+    {
+      "name": "i32-trap-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-trap-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-trap-empty.wasm",
+      "wasm_sha": "78df7c10ab7594c6e5fa6e9c161b552d4ac975961a6fe5af26217b6c23657860",
+      "trap": "bounds"
+    },
+    {
+      "name": "i32-trap-at-length",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-trap-at-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-trap-at-length.wasm",
+      "wasm_sha": "323f35641bfd2ac5533a57ef501e33786fa01112036601356a54e28d9198e78f",
+      "trap": "bounds"
+    },
+    {
+      "name": "i32-trap-UINTMAX",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-trap-UINTMAX.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-trap-UINTMAX.wasm",
+      "wasm_sha": "787802694d7c36ea8b35949a4b7cbca38d7c5c50f28fb57149b5de6a5700c8ed",
+      "trap": "bounds"
+    },
+    {
+      "name": "i32-null-0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-null-0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-null-0.wasm",
+      "wasm_sha": "5bbacd267dcf0481fcc29f4e94f85a965886fa7e26f6f69ea28205241d7eb032",
+      "trap": "null"
+    },
+    {
+      "name": "i32-null-4294967295",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-null-4294967295.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/i32-null-4294967295.wasm",
+      "wasm_sha": "c6f31b3a19b7f2246eab465e751df6a10c8f0ed252305103b0d7b4a48cfae33b",
+      "trap": "null"
+    },
+    {
+      "name": "f32-bits-0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-0.wasm",
+      "wasm_sha": "e22bbe554cfdee24ef851fe18858ec4064992833023eea8ff2da38d6e5613cd2",
+      "trap": null
+    },
+    {
+      "name": "f32-bits-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-1.wasm",
+      "wasm_sha": "14881485d499abe5a83ecb98017f581866ef87cb87e4a3b5884cfe8c3a179b1b",
+      "trap": null
+    },
+    {
+      "name": "f32-bits-ffffffff",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-ffffffff.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-ffffffff.wasm",
+      "wasm_sha": "c07d8942ef104aaa2fea891f94b8939fc26a0f65c90ba596f166f569754201bd",
+      "trap": null
+    },
+    {
+      "name": "f32-bits-80000000",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-80000000.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-80000000.wasm",
+      "wasm_sha": "f515d337ef6b6cc2c15319d12cb9a4c84fd283875b54b292cbf3e7bd17fb3931",
+      "trap": null
+    },
+    {
+      "name": "f32-bits-7f800001",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-7f800001.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-7f800001.wasm",
+      "wasm_sha": "0238eb9756abe3418a955b844e4bae20a35c663c749f1e47e545b108cbcede78",
+      "trap": null
+    },
+    {
+      "name": "f32-bits-ffc00001",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-ffc00001.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-ffc00001.wasm",
+      "wasm_sha": "aa9a14d321538fdd913de925b2dbe3efc9975ab6c9b87429e10e431c5d662b5b",
+      "trap": null
+    },
+    {
+      "name": "f32-bits-1234fedc",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-1234fedc.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-bits-1234fedc.wasm",
+      "wasm_sha": "401b907f6a805674f8386107ace5f227be2995a03766f3f156a4167cef354f5f",
+      "trap": null
+    },
+    {
+      "name": "f32-new-all-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-new-all-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-new-all-1.wasm",
+      "wasm_sha": "42ea2a7cda425b294fefee654fb025fb56c7ac5b419bddcb6203c81400bd57a4",
+      "trap": null
+    },
+    {
+      "name": "f32-default-all-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-default-all-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-default-all-1.wasm",
+      "wasm_sha": "33c520ea956d4a14514c7a89662b2f40d217fa856035bdb584b149701e943edc",
+      "trap": null
+    },
+    {
+      "name": "f32-fixed-all-1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-fixed-all-1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-fixed-all-1.wasm",
+      "wasm_sha": "a900c8e006af41bb88260025aef307a25fde97d8e95b856097010275025285fa",
+      "trap": null
+    },
+    {
+      "name": "f32-new-all-2",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-new-all-2.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-new-all-2.wasm",
+      "wasm_sha": "9b040272e2cd5ba663e71c43845db0da974a1bd7e4f2340f574f16cfcb3ac1f4",
+      "trap": null
+    },
+    {
+      "name": "f32-default-all-2",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-default-all-2.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-default-all-2.wasm",
+      "wasm_sha": "77bb5f1ad7dbee96b279a2e2f193cb19f86eb5dab2cb823b90fb563b8d555c27",
+      "trap": null
+    },
+    {
+      "name": "f32-fixed-all-2",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-fixed-all-2.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-fixed-all-2.wasm",
+      "wasm_sha": "53d2d25b5141f97f5f0f96d1a9e53ac8a950791aeeff69edee395989598a1161",
+      "trap": null
+    },
+    {
+      "name": "f32-new-all-257",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-new-all-257.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-new-all-257.wasm",
+      "wasm_sha": "8b17569f6ec31417bb51bee35dbfc78ddecb2b03d68a24f47ecc7428fd57dfb0",
+      "trap": null
+    },
+    {
+      "name": "f32-default-all-257",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-default-all-257.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-default-all-257.wasm",
+      "wasm_sha": "909f77ab83dc2d5e40d6b2d007c2ede5deb360c4425524bebe4df6752e284f4e",
+      "trap": null
+    },
+    {
+      "name": "f32-fixed-all-257",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-fixed-all-257.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-fixed-all-257.wasm",
+      "wasm_sha": "2518386d5ae7e7659ed191486009591b2ddaca8d4e5d0e454393fa3c8e884904",
+      "trap": null
+    },
+    {
+      "name": "f32-subtype-owner-layout",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-subtype-owner-layout.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-subtype-owner-layout.wasm",
+      "wasm_sha": "e7924a0978dc7f52787e7982074d1dc187e77bec79944d42c7823756ee6b7d1e",
+      "trap": null
+    },
+    {
+      "name": "f32-alias-copy-fill",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-alias-copy-fill.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-alias-copy-fill.wasm",
+      "wasm_sha": "96483159a508b046439db2d93656555526e50095ecb25b19b472ccf72ee86b04",
+      "trap": null
+    },
+    {
+      "name": "f32-exception-after-write",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-exception-after-write.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-exception-after-write.wasm",
+      "wasm_sha": "8a166f27a4d6c3d896a1b4d6b2eaa42962a6606a69437089a470fff894043c15",
+      "trap": null
+    },
+    {
+      "name": "f32-root-survives-collection",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-root-survives-collection.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-root-survives-collection.wasm",
+      "wasm_sha": "12fe3cc821a900358fac292b20628898734ee8b37ff9faf8a5a5d72730bbcac7",
+      "trap": null
+    },
+    {
+      "name": "f32-trap-empty",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-trap-empty.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-trap-empty.wasm",
+      "wasm_sha": "1805eb5d75aa7724ff1fecb46efd2a9b8fd268fdf0d7523b94f539cad0283ac6",
+      "trap": "bounds"
+    },
+    {
+      "name": "f32-trap-at-length",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-trap-at-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-trap-at-length.wasm",
+      "wasm_sha": "74e12456add6bc8be4bcf6ef9ca12256499bdfcab63413a99d75f8672523f4ea",
+      "trap": "bounds"
+    },
+    {
+      "name": "f32-trap-UINTMAX",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-trap-UINTMAX.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-trap-UINTMAX.wasm",
+      "wasm_sha": "97f52b3188ab3b018bb87f02c6989eae0925217c5a864752a0c99b7907603020",
+      "trap": "bounds"
+    },
+    {
+      "name": "f32-null-0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-null-0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-null-0.wasm",
+      "wasm_sha": "52f65ec06e4deb98359d7aa843b0197cc6d8de8ffce9d21900ea90c9749aaf67",
+      "trap": "null"
+    },
+    {
+      "name": "f32-null-4294967295",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-null-4294967295.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-c21-a2/f32-null-4294967295.wasm",
+      "wasm_sha": "0e3ba27fb9c3c3a7b80b462c11ea85ca7c6c4d5866e8176a58ecff0164cc9e85",
+      "trap": "null"
+    }
+  ],
+  "scope": "New typed stores: full bit-patterns, NaNs, packed signed/unsigned truncation, lengths1/2/257 with three constructors, aliases/copy/fill, subtypes, EH after write, GC root survival, null and unsigned bounds; independent Wasm assertions."
+}

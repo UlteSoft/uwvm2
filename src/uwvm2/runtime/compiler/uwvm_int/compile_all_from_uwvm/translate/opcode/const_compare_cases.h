@@ -29,6 +29,9 @@ case wasm1_code::i32_const:
                                                             ::fast_io::mnp::leb128_get(imm))};
     if(imm_err != ::fast_io::parse_code::ok) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.invalid_const_immediate.op_code_name = u8"i32.const";
         err.err_code = code_validation_error_code::invalid_const_immediate;
@@ -60,6 +63,9 @@ case wasm1_code::i32_const:
 
                                                       while(scan < code_end && scan[0] == static_cast<::std::byte>(wasm1_code::i32_const))
                                                       {
+                                                          // [checked lookahead opcode] next bytes ... | end
+                                                          // [safe consumed bytes]       | one-past is never dereferenced here
+                                                          // ^^ scan: the bounded scanner and current opcode guard establish a live byte; +1 may equal code_end.
                                                           ++scan;
                                                           wasm_i32 tmp;
                                                           auto const [next, parse_err]{
@@ -67,17 +73,35 @@ case wasm1_code::i32_const:
                                                                                        reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                                        ::fast_io::mnp::leb128_get(tmp))};
                                                           if(parse_err != ::fast_io::parse_code::ok) { return false; }
+                                                          // [bounded decoded immediate] next bytes ... | end
+                                                          // [safe consumed bytes]       | one-past is never dereferenced here
+                                                          // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                                                           scan = reinterpret_cast<::std::byte const*>(next);
+                                                          // [complete checked lookahead prefix] next ... function end
+                                                          // [safe                             ] unsafe (possibly one-past)
+                                                          //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                                                           ++const_count;
                                                       }
 
                                                       ::std::byte const* const drop_begin{scan};
                                                       ::std::byte const* drop_scan{drop_begin};
+                                                      // [checked drop opcode] next bytes ... | end
+                                                      // [safe consumed bytes]       | one-past is never dereferenced here
+                                                      // ^^ drop_scan: the while guard proves drop_scan < code_end and reads one byte before advancing.
                                                       while(drop_scan < code_end && drop_scan[0] == static_cast<::std::byte>(wasm1_code::drop)) { ++drop_scan; }
                                                       ::std::size_t const drop_count{static_cast<::std::size_t>(drop_scan - drop_begin)};
                                                       if(drop_count < const_count) { return false; }
 
+                                                      // constant/drop fusion ... code_end
+                                                      // [safe consumed bytes] unsafe (could be code_end)
+                                                      // ^^ drop_begin + const_count: preceding bounded scan/lookahead proved a position in this code slice.
+                                                      // fused constant/compare operation ... code_end
+                                                      // [safe consumed bytes] unsafe (could be code_end)
+                                                      // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                                                       code_curr = drop_begin + const_count;
+                                                      // constant/drop fusion ... code_end
+                                                      // [safe consumed bytes] unsafe (could be code_end)
+                                                      //                       ^^ code_curr may be one-past; no read occurs here.
                                                       return true;
                                                   }};
 
@@ -158,6 +182,18 @@ case wasm1_code::i32_const:
 #endif
 
     operand_stack_push(wasm_value_type_u::i32);
+    if constexpr(FusedI32Sink::receives_fused_i32_operations)
+    {
+        // [checked opcode / successfully bounded immediate] next ... | code_end
+        // [safe same expression                           ]          | one-past
+        // All cursor advances above belong to the first decoder. DATA copies
+        // only; no sink reparses the slice and no event exists before push.
+        fused_i32_transaction.provider({.opcode = 0x41u,
+            .value = ::std::bit_cast<::std::uint_least32_t>(imm),
+            .source_offset = static_cast<::std::size_t>(op_begin - code_begin),
+            .source_bytes = static_cast<::std::size_t>(code_curr - op_begin),
+            .control_depth = control_flow_stack.size(), .stack_polymorphic = is_polymorphic});
+    }
     break;
 }
 case wasm1_code::i64_const:
@@ -187,6 +223,9 @@ case wasm1_code::i64_const:
                                                             ::fast_io::mnp::leb128_get(imm))};
     if(imm_err != ::fast_io::parse_code::ok) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.invalid_const_immediate.op_code_name = u8"i64.const";
         err.err_code = code_validation_error_code::invalid_const_immediate;
@@ -214,6 +253,9 @@ case wasm1_code::i64_const:
 
                                                       while(scan < code_end && scan[0] == static_cast<::std::byte>(wasm1_code::i64_const))
                                                       {
+                                                          // [checked lookahead opcode] next bytes ... | end
+                                                          // [safe consumed bytes]       | one-past is never dereferenced here
+                                                          // ^^ scan: the bounded scanner and current opcode guard establish a live byte; +1 may equal code_end.
                                                           ++scan;
                                                           wasm_i64 tmp;
                                                           auto const [next, parse_err]{
@@ -221,17 +263,35 @@ case wasm1_code::i64_const:
                                                                                        reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                                        ::fast_io::mnp::leb128_get(tmp))};
                                                           if(parse_err != ::fast_io::parse_code::ok) { return false; }
+                                                          // [bounded decoded immediate] next bytes ... | end
+                                                          // [safe consumed bytes]       | one-past is never dereferenced here
+                                                          // ^^ scan: the successful parse_by_scan result stays inside the current code slice.
                                                           scan = reinterpret_cast<::std::byte const*>(next);
+                                                          // [complete checked lookahead prefix] next ... function end
+                                                          // [safe                             ] unsafe (possibly one-past)
+                                                          //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                                                           ++const_count;
                                                       }
 
                                                       ::std::byte const* const drop_begin{scan};
                                                       ::std::byte const* drop_scan{drop_begin};
+                                                      // [checked drop opcode] next bytes ... | end
+                                                      // [safe consumed bytes]       | one-past is never dereferenced here
+                                                      // ^^ drop_scan: the while guard proves drop_scan < code_end and reads one byte before advancing.
                                                       while(drop_scan < code_end && drop_scan[0] == static_cast<::std::byte>(wasm1_code::drop)) { ++drop_scan; }
                                                       ::std::size_t const drop_count{static_cast<::std::size_t>(drop_scan - drop_begin)};
                                                       if(drop_count < const_count) { return false; }
 
+                                                      // constant/drop fusion ... code_end
+                                                      // [safe consumed bytes] unsafe (could be code_end)
+                                                      // ^^ drop_begin + const_count: preceding bounded scan/lookahead proved a position in this code slice.
+                                                      // fused constant/compare operation ... code_end
+                                                      // [safe consumed bytes] unsafe (could be code_end)
+                                                      // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                                                       code_curr = drop_begin + const_count;
+                                                      // constant/drop fusion ... code_end
+                                                      // [safe consumed bytes] unsafe (could be code_end)
+                                                      //                       ^^ code_curr may be one-past; no read occurs here.
                                                       return true;
                                                   }};
 
@@ -273,6 +333,17 @@ case wasm1_code::i64_const:
 #endif
 
     operand_stack_push(wasm_value_type_u::i64);
+    if constexpr(FusedI32Sink::receives_fused_i32_operations)
+    {
+        // [checked opcode / first bounded i64 LEB / accepted push] next | code_end
+        // [safe unsigned bits and same-expression extent       ]      | one-past
+        // No cursor advance, immediate replay or source pointer in this event.
+        fused_i32_transaction.provider64({.opcode = 0x42u,
+            .value = ::std::bit_cast<::std::uint_least64_t>(imm),
+            .source_offset = static_cast<::std::size_t>(op_begin - code_begin),
+            .source_bytes = static_cast<::std::size_t>(code_curr - op_begin),
+            .control_depth = control_flow_stack.size(), .stack_polymorphic = is_polymorphic});
+    }
     break;
 }
 case wasm1_code::f32_const:
@@ -297,6 +368,9 @@ case wasm1_code::f32_const:
 
     if(static_cast<::std::size_t>(code_end - code_curr) < sizeof(wasm_f32)) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.invalid_const_immediate.op_code_name = u8"f32.const";
         err.err_code = code_validation_error_code::invalid_const_immediate;
@@ -317,7 +391,12 @@ case wasm1_code::f32_const:
     auto const constant_bits{read_wasm_le_u32(code_curr)};
     if((constant_bits & 0x7fffffffu) > 0x7f800000u)
     {
+        // wasm_f32.const four immediate bytes ... code_end
+        // [safe four bytes] unsafe (could be code_end)
+        // ^^ code_curr: preceding size check proved this complete constant.
         code_curr += sizeof(wasm_f32);
+        // [safe four bytes] unsafe (could be code_end)
+        //                      ^^ code_curr may be one-past.
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
         flush_conbine_pending();
 #endif
@@ -345,17 +424,35 @@ case wasm1_code::f32_const:
                                                       while(scan < code_end && scan[0] == static_cast<::std::byte>(wasm1_code::f32_const))
                                                       {
                                                           if(static_cast<::std::size_t>(code_end - scan) < kInstBytes) { return false; }
+                                                          // [complete fixed-width constant] next bytes ... | end
+                                                          // [safe consumed bytes]       | one-past is never dereferenced here
+                                                          // ^^ scan: the preceding code_end - scan >= kInstBytes check proves this advance.
                                                           scan += kInstBytes;
+                                                          // [complete checked lookahead prefix] next ... function end
+                                                          // [safe                             ] unsafe (possibly one-past)
+                                                          //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                                                           ++const_count;
                                                       }
 
                                                       ::std::byte const* const drop_begin{scan};
                                                       ::std::byte const* drop_scan{drop_begin};
+                                                      // [checked drop opcode] next bytes ... | end
+                                                      // [safe consumed bytes]       | one-past is never dereferenced here
+                                                      // ^^ drop_scan: the while guard proves drop_scan < code_end and reads one byte before advancing.
                                                       while(drop_scan < code_end && drop_scan[0] == static_cast<::std::byte>(wasm1_code::drop)) { ++drop_scan; }
                                                       ::std::size_t const drop_count{static_cast<::std::size_t>(drop_scan - drop_begin)};
                                                       if(drop_count < const_count) { return false; }
 
+                                                      // constant/drop fusion ... code_end
+                                                      // [safe consumed bytes] unsafe (could be code_end)
+                                                      // ^^ drop_begin + const_count: preceding bounded scan/lookahead proved a position in this code slice.
+                                                      // fused constant/compare operation ... code_end
+                                                      // [safe consumed bytes] unsafe (could be code_end)
+                                                      // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                                                       code_curr = drop_begin + const_count;
+                                                      // constant/drop fusion ... code_end
+                                                      // [safe consumed bytes] unsafe (could be code_end)
+                                                      //                       ^^ code_curr may be one-past; no read occurs here.
                                                       return true;
                                                   }};
 
@@ -420,6 +517,9 @@ case wasm1_code::f64_const:
 
     if(static_cast<::std::size_t>(code_end - code_curr) < sizeof(wasm_f64)) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.invalid_const_immediate.op_code_name = u8"f64.const";
         err.err_code = code_validation_error_code::invalid_const_immediate;
@@ -440,7 +540,12 @@ case wasm1_code::f64_const:
     auto const constant_bits{read_wasm_le_u64(code_curr)};
     if((constant_bits & 0x7fffffffffffffffull) > 0x7ff0000000000000ull)
     {
+        // wasm_f64.const eight immediate bytes ... code_end
+        // [safe eight bytes] unsafe (could be code_end)
+        // ^^ code_curr: preceding size check proved this complete constant.
         code_curr += sizeof(wasm_f64);
+        // [safe eight bytes] unsafe (could be code_end)
+        //                      ^^ code_curr may be one-past.
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
         flush_conbine_pending();
 #endif
@@ -468,17 +573,35 @@ case wasm1_code::f64_const:
                                                       while(scan < code_end && scan[0] == static_cast<::std::byte>(wasm1_code::f64_const))
                                                       {
                                                           if(static_cast<::std::size_t>(code_end - scan) < kInstBytes) { return false; }
+                                                          // [complete fixed-width constant] next bytes ... | end
+                                                          // [safe consumed bytes]       | one-past is never dereferenced here
+                                                          // ^^ scan: the preceding code_end - scan >= kInstBytes check proves this advance.
                                                           scan += kInstBytes;
+                                                          // [complete checked lookahead prefix] next ... function end
+                                                          // [safe                             ] unsafe (possibly one-past)
+                                                          //                                     ^^ scan: preceding proof bounded this move; no dereference here.
                                                           ++const_count;
                                                       }
 
                                                       ::std::byte const* const drop_begin{scan};
                                                       ::std::byte const* drop_scan{drop_begin};
+                                                      // [checked drop opcode] next bytes ... | end
+                                                      // [safe consumed bytes]       | one-past is never dereferenced here
+                                                      // ^^ drop_scan: the while guard proves drop_scan < code_end and reads one byte before advancing.
                                                       while(drop_scan < code_end && drop_scan[0] == static_cast<::std::byte>(wasm1_code::drop)) { ++drop_scan; }
                                                       ::std::size_t const drop_count{static_cast<::std::size_t>(drop_scan - drop_begin)};
                                                       if(drop_count < const_count) { return false; }
 
+                                                      // constant/drop fusion ... code_end
+                                                      // [safe consumed bytes] unsafe (could be code_end)
+                                                      // ^^ drop_begin + const_count: preceding bounded scan/lookahead proved a position in this code slice.
+                                                      // fused constant/compare operation ... code_end
+                                                      // [safe consumed bytes] unsafe (could be code_end)
+                                                      // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                                                       code_curr = drop_begin + const_count;
+                                                      // constant/drop fusion ... code_end
+                                                      // [safe consumed bytes] unsafe (could be code_end)
+                                                      //                       ^^ code_curr may be one-past; no read occurs here.
                                                       return true;
                                                   }};
 
@@ -525,7 +648,7 @@ case wasm1_code::i32_eqz:
 {
     // `eqz` is a one-input compare that normalizes any nonzero i32 to the canonical Wasm boolean
     // result (0 or 1), so the stack model changes type only logically: i32 in, i32 out.
-    validate_numeric_unary(u8"i32.eqz", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x45u>(u8"i32.eqz");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
@@ -563,7 +686,7 @@ case wasm1_code::i32_eq:
 {
     // Binary comparisons consume two typed operands and produce an i32 condition. The emission path
     // favors immediate/local fusion because compare results are commonly consumed by `br_if`.
-    validate_numeric_binary(u8"i32.eq", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x46u>(u8"i32.eq");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
     if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32)
@@ -618,7 +741,7 @@ case wasm1_code::i32_eq:
 }
 case wasm1_code::i32_ne:
 {
-    validate_numeric_binary(u8"i32.ne", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x47u>(u8"i32.ne");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
 # if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
@@ -676,7 +799,7 @@ case wasm1_code::i32_ne:
 }
 case wasm1_code::i32_lt_s:
 {
-    validate_numeric_binary(u8"i32.lt_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x48u>(u8"i32.lt_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
     if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32)
@@ -750,6 +873,9 @@ case wasm1_code::i32_lt_s:
                 if(op4 != wasm1_code::br_if) { break; }
 
                 fuse_to_ge_s = true;
+                // [checked br_if opcode] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ brif_ip: after_eqz was checked != code_end and its opcode was read before this copy.
                 brif_ip = after_eqz;  // skip const/and/eqz, re-enter at br_if
             }
             while(false);
@@ -758,7 +884,16 @@ case wasm1_code::i32_lt_s:
             {
                 fuse_kind = br_if_fuse_kind::i32_ge_s;
                 fused_fptr = translate::get_uwvmint_i32_ge_s_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple);
+                // fused br_if ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ brif_ip: preceding bounded scan/lookahead proved a position in this code slice.
+                // fused constant/compare operation ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                 code_curr = brif_ip;
+                // fused br_if ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                //                       ^^ code_curr may be one-past; no read occurs here.
             }
         }
 # endif
@@ -789,7 +924,7 @@ case wasm1_code::i32_lt_s:
 }
 case wasm1_code::i32_lt_u:
 {
-    validate_numeric_binary(u8"i32.lt_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x49u>(u8"i32.lt_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
 # if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
@@ -870,6 +1005,9 @@ case wasm1_code::i32_lt_u:
                 if(op4 != wasm1_code::br_if) { break; }
 
                 fuse_to_ge_u = true;
+                // [checked br_if opcode] next bytes ... | end
+                // [safe consumed bytes]       | one-past is never dereferenced here
+                // ^^ brif_ip: after_eqz was checked != code_end and its opcode was read before this copy.
                 brif_ip = after_eqz;
             }
             while(false);
@@ -878,7 +1016,16 @@ case wasm1_code::i32_lt_u:
             {
                 fuse_kind = br_if_fuse_kind::i32_ge_u;
                 fused_fptr = translate::get_uwvmint_i32_ge_u_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple);
+                // fused br_if ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ brif_ip: preceding bounded scan/lookahead proved a position in this code slice.
+                // fused constant/compare operation ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                 code_curr = brif_ip;
+                // fused br_if ... code_end
+                // [safe consumed bytes] unsafe (could be code_end)
+                //                       ^^ code_curr may be one-past; no read occurs here.
             }
         }
 # endif
@@ -909,7 +1056,7 @@ case wasm1_code::i32_lt_u:
 }
 case wasm1_code::i32_gt_s:
 {
-    validate_numeric_binary(u8"i32.gt_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x4au>(u8"i32.gt_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
     if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32)
@@ -951,7 +1098,7 @@ case wasm1_code::i32_gt_s:
 }
 case wasm1_code::i32_gt_u:
 {
-    validate_numeric_binary(u8"i32.gt_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x4bu>(u8"i32.gt_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
     if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32)
@@ -993,7 +1140,7 @@ case wasm1_code::i32_gt_u:
 }
 case wasm1_code::i32_le_s:
 {
-    validate_numeric_binary(u8"i32.le_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x4cu>(u8"i32.le_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
     if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32)
@@ -1035,7 +1182,7 @@ case wasm1_code::i32_le_s:
 }
 case wasm1_code::i32_le_u:
 {
-    validate_numeric_binary(u8"i32.le_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x4du>(u8"i32.le_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
     if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32)
@@ -1077,7 +1224,7 @@ case wasm1_code::i32_le_u:
 }
 case wasm1_code::i32_ge_s:
 {
-    validate_numeric_binary(u8"i32.ge_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x4eu>(u8"i32.ge_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
     if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32)
@@ -1128,7 +1275,7 @@ case wasm1_code::i32_ge_s:
 }
 case wasm1_code::i32_ge_u:
 {
-    validate_numeric_binary(u8"i32.ge_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x4fu>(u8"i32.ge_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
     if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32)
@@ -1185,7 +1332,7 @@ case wasm1_code::i64_eqz:
 {
     // i64 comparisons still produce i32 booleans, so the translator must update both the type stack
     // and any stack-top cache range from i64 input state to i32 output state.
-    validate_numeric_unary(u8"i64.eqz", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x50u>(u8"i64.eqz");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
     if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::i64)
@@ -1244,7 +1391,7 @@ case wasm1_code::i64_eqz:
 }
 case wasm1_code::i64_eq:
 {
-    validate_numeric_binary(u8"i64.eq", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x51u>(u8"i64.eq");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
     wasm1_code next_opbase{};  // init
     if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
@@ -1316,7 +1463,7 @@ case wasm1_code::i64_eq:
 }
 case wasm1_code::i64_ne:
 {
-    validate_numeric_binary(u8"i64.ne", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x52u>(u8"i64.ne");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
     wasm1_code next_opbase{};  // init
     if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
@@ -1391,7 +1538,7 @@ case wasm1_code::i64_ne:
 }
 case wasm1_code::i64_lt_s:
 {
-    validate_numeric_binary(u8"i64.lt_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x53u>(u8"i64.lt_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
     wasm1_code next_opbase{};  // init
     if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
@@ -1463,7 +1610,7 @@ case wasm1_code::i64_lt_s:
 }
 case wasm1_code::i64_lt_u:
 {
-    validate_numeric_binary(u8"i64.lt_u", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x54u>(u8"i64.lt_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
     wasm1_code next_opbase{};  // init
     if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
@@ -1538,7 +1685,7 @@ case wasm1_code::i64_lt_u:
 }
 case wasm1_code::i64_gt_s:
 {
-    validate_numeric_binary(u8"i64.gt_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x55u>(u8"i64.gt_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
     wasm1_code next_opbase{};  // init
     if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
@@ -1610,7 +1757,7 @@ case wasm1_code::i64_gt_s:
 }
 case wasm1_code::i64_gt_u:
 {
-    validate_numeric_binary(u8"i64.gt_u", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x56u>(u8"i64.gt_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
     if(conbine_pending.kind == conbine_pending_kind::local_get_const_i64)
@@ -1687,7 +1834,7 @@ case wasm1_code::i64_gt_u:
 }
 case wasm1_code::i64_le_s:
 {
-    validate_numeric_binary(u8"i64.le_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x57u>(u8"i64.le_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
     wasm1_code next_opbase{};  // init
     if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
@@ -1759,7 +1906,7 @@ case wasm1_code::i64_le_s:
 }
 case wasm1_code::i64_le_u:
 {
-    validate_numeric_binary(u8"i64.le_u", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x58u>(u8"i64.le_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
     wasm1_code next_opbase{};  // init
     if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
@@ -1831,7 +1978,7 @@ case wasm1_code::i64_le_u:
 }
 case wasm1_code::i64_ge_s:
 {
-    validate_numeric_binary(u8"i64.ge_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x59u>(u8"i64.ge_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
     wasm1_code next_opbase{};  // init
     if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
@@ -1903,7 +2050,7 @@ case wasm1_code::i64_ge_s:
 }
 case wasm1_code::i64_ge_u:
 {
-    validate_numeric_binary(u8"i64.ge_u", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
+    (void)validate_integer_compare.template operator()<0x5au>(u8"i64.ge_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
     wasm1_code next_opbase{};  // init
     if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
@@ -2563,7 +2710,16 @@ case wasm1_code::f64_lt:
                 if(op2 == wasm1_code::br_if)
                 {
                     br_if_fuse.kind = br_if_fuse_kind::f64_lt_eqz;
+                    // eqz;br_if lookahead ... code_end
+                    // [safe consumed bytes] unsafe (could be code_end)
+                    // ^^ after_eqz: preceding bounded scan/lookahead proved a position in this code slice.
+                    // fused constant/compare operation ... code_end
+                    // [safe consumed bytes] unsafe (could be code_end)
+                    // ^^ code_curr: held at the pre-commit position; the right-hand scan proved its target.
                     code_curr = after_eqz;  // skip `i32.eqz`, re-enter at br_if
+                    // eqz;br_if lookahead ... code_end
+                    // [safe consumed bytes] unsafe (could be code_end)
+                    //                       ^^ code_curr may be one-past; no read occurs here.
                 }
             }
         }

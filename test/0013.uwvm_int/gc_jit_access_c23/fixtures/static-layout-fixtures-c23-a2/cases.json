@@ -1,0 +1,805 @@
+{
+  "cases": [
+    {
+      "name": "i8-immutable-len0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len0.wasm",
+      "wasm_sha": "c4b446390d6062ca3caea2bbed28bb94ad7cd6d1797bdbdaf5991c4b04cb19c1",
+      "trap": "bounds",
+      "length": 0,
+      "mutable": false,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-mutable-len0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len0.wasm",
+      "wasm_sha": "858185caff3872d4af8f48e3ee15a3ffa00e8d12bc7e2ee6ba4253a010094908",
+      "trap": "bounds",
+      "length": 0,
+      "mutable": true,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-immutable-len1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len1.wasm",
+      "wasm_sha": "0b6597017c7be7560ea1c165d043cf3f082be929d8786c56fe27fc988868b00f",
+      "trap": null,
+      "length": 1,
+      "mutable": false,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-mutable-len1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len1.wasm",
+      "wasm_sha": "7705ea06232250c87ab633cc41c21edd4aa1502e7f8f08786d8e88e15d5b7e6f",
+      "trap": null,
+      "length": 1,
+      "mutable": true,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-immutable-len15",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len15.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len15.wasm",
+      "wasm_sha": "295a0ea86fbcb2c6cac0edc5b16426da0a576537b9db187cecb56ceeacd4c4f5",
+      "trap": null,
+      "length": 15,
+      "mutable": false,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-mutable-len15",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len15.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len15.wasm",
+      "wasm_sha": "07e429e2d43013bfe2818e20e977a89f583e3e2b4d62bef45283a9bfe51a2f71",
+      "trap": null,
+      "length": 15,
+      "mutable": true,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-immutable-len16",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len16.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len16.wasm",
+      "wasm_sha": "d3211b40cf4cbeddc385133f6f563e43706f373de29af9a38a6bee47a400c992",
+      "trap": null,
+      "length": 16,
+      "mutable": false,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-mutable-len16",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len16.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len16.wasm",
+      "wasm_sha": "b1dd3065427123a3225150ec425a0e81ab309b486d6f79eac0762900015e3a6d",
+      "trap": null,
+      "length": 16,
+      "mutable": true,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-immutable-len511",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len511.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len511.wasm",
+      "wasm_sha": "b951ef66562e8f9fc22034df9bdaca257c4bd7a5776ef38c08ce595d4b9f1719",
+      "trap": null,
+      "length": 511,
+      "mutable": false,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-mutable-len511",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len511.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len511.wasm",
+      "wasm_sha": "83ea8909e596aa83165a25b50bd2fd6956fbe6f917a7af9b1eb74092d1e56ba8",
+      "trap": null,
+      "length": 511,
+      "mutable": true,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-immutable-len512",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len512.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len512.wasm",
+      "wasm_sha": "805ff06fdaf462945f5db76bdabea2da2985a9610f4a10a9ac0349e4e7fac7e8",
+      "trap": null,
+      "length": 512,
+      "mutable": false,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-mutable-len512",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len512.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len512.wasm",
+      "wasm_sha": "62026e0f95634f30fc289288d7d8384b0ed0124a0d96b54bf246018484b87762",
+      "trap": null,
+      "length": 512,
+      "mutable": true,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-immutable-len2048",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len2048.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len2048.wasm",
+      "wasm_sha": "0e4fa9785546305c92d381140fb0544b2e043663801f8217a600363b786bc9cd",
+      "trap": null,
+      "length": 2048,
+      "mutable": false,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-mutable-len2048",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len2048.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len2048.wasm",
+      "wasm_sha": "ea6aad774c93dc9b5da84c2f1f2d038641f2a4eb58df6845d4f5839be26c4254",
+      "trap": null,
+      "length": 2048,
+      "mutable": true,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-immutable-len2049",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len2049.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len2049.wasm",
+      "wasm_sha": "7be7765a9c3cc274136741328651ec5329a700b43b2608b85c697712e0103df0",
+      "trap": null,
+      "length": 2049,
+      "mutable": false,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-mutable-len2049",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len2049.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len2049.wasm",
+      "wasm_sha": "fdc319c0812dda054cefddd09a880c98d21be8de156f80e4341265574ef2ef14",
+      "trap": null,
+      "length": 2049,
+      "mutable": true,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-immutable-len8192",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len8192.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len8192.wasm",
+      "wasm_sha": "28ea35e9d7c6533ebcf2439871e25b847a3e3e3f0a82dc5e517117eb5ef57808",
+      "trap": null,
+      "length": 8192,
+      "mutable": false,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-mutable-len8192",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len8192.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len8192.wasm",
+      "wasm_sha": "d66dec7eac01b0b6e05b928460e158a4a84e3d1532804aa557a1f03076939a27",
+      "trap": null,
+      "length": 8192,
+      "mutable": true,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-immutable-len8193",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len8193.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-immutable-len8193.wasm",
+      "wasm_sha": "4cd23f53425fc596ad779114ffc03e4d57fe7a3f566450208fcd0cdebe512e74",
+      "trap": null,
+      "length": 8193,
+      "mutable": false,
+      "element_type": "i8"
+    },
+    {
+      "name": "i8-mutable-len8193",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len8193.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i8-mutable-len8193.wasm",
+      "wasm_sha": "e7f3976630766673fb4fa6084fce843cf1e4beaeed505838c02263cc64fc91f7",
+      "trap": null,
+      "length": 8193,
+      "mutable": true,
+      "element_type": "i8"
+    },
+    {
+      "name": "i16-immutable-len0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len0.wasm",
+      "wasm_sha": "54b927617717e1a096d34419f8847d3955820691b6ec924178918f0b894f9404",
+      "trap": "bounds",
+      "length": 0,
+      "mutable": false,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-mutable-len0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len0.wasm",
+      "wasm_sha": "7b256c7cfa2705bae567c909026f60f41e8aa959325a36e9211ea362889531dd",
+      "trap": "bounds",
+      "length": 0,
+      "mutable": true,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-immutable-len1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len1.wasm",
+      "wasm_sha": "da6e422282fff154fda39440ada5c8b408292648e4fcaa2f0432ed3d8ff314bf",
+      "trap": null,
+      "length": 1,
+      "mutable": false,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-mutable-len1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len1.wasm",
+      "wasm_sha": "fed65c77816921544b23cd08191de6fac30473242e46a7f4cc0ecb5c0c240fcf",
+      "trap": null,
+      "length": 1,
+      "mutable": true,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-immutable-len15",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len15.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len15.wasm",
+      "wasm_sha": "61603a136a9c6afb333cd105c423247e1329745a81cc20920129d56b97a3e89c",
+      "trap": null,
+      "length": 15,
+      "mutable": false,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-mutable-len15",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len15.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len15.wasm",
+      "wasm_sha": "7807798f2d3a8f23b8dece351670ac05cc401fb8d596e80ba81b2aad7ef8da73",
+      "trap": null,
+      "length": 15,
+      "mutable": true,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-immutable-len16",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len16.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len16.wasm",
+      "wasm_sha": "c2e4a5d9762c42a341fd37c56fab5706ff8063e3211dbae15ac7d05c6fd45791",
+      "trap": null,
+      "length": 16,
+      "mutable": false,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-mutable-len16",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len16.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len16.wasm",
+      "wasm_sha": "8a96077525038ffe8dd7390776579e67a84c53792bda3c82e3032ae33cee9b14",
+      "trap": null,
+      "length": 16,
+      "mutable": true,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-immutable-len511",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len511.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len511.wasm",
+      "wasm_sha": "31446d377f22b5e21088919a244a7cc5364ade6ac99f3a0643ea9c556fadee86",
+      "trap": null,
+      "length": 511,
+      "mutable": false,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-mutable-len511",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len511.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len511.wasm",
+      "wasm_sha": "fb08e0fd6c5566a960a6bcecdcee5f16a1ccbf243b8bb51960e8d0d89df6c6d7",
+      "trap": null,
+      "length": 511,
+      "mutable": true,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-immutable-len512",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len512.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len512.wasm",
+      "wasm_sha": "0989620b82319004ab63185cc57d55befc27a821d74c6956d817f7d7d8e68e49",
+      "trap": null,
+      "length": 512,
+      "mutable": false,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-mutable-len512",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len512.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len512.wasm",
+      "wasm_sha": "89eb73837e1509111bdede24bc4ab62ebc5d1b13c5d9f75bb71a3d38c9baea37",
+      "trap": null,
+      "length": 512,
+      "mutable": true,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-immutable-len2048",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len2048.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len2048.wasm",
+      "wasm_sha": "ff78f433863c7a541c7a35cac4a2b59d0327cfa2f9d01c85f2a22e3595e7fd29",
+      "trap": null,
+      "length": 2048,
+      "mutable": false,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-mutable-len2048",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len2048.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len2048.wasm",
+      "wasm_sha": "a6637fd3b2928cd97a7ee5072af60d6311316b04e03b6f971f0c1c6159a4700d",
+      "trap": null,
+      "length": 2048,
+      "mutable": true,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-immutable-len2049",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len2049.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len2049.wasm",
+      "wasm_sha": "1c4557d2682327c651158658f8b744c24cfbc97311377cd41136ca540cbc3fb6",
+      "trap": null,
+      "length": 2049,
+      "mutable": false,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-mutable-len2049",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len2049.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len2049.wasm",
+      "wasm_sha": "49b9916cfb5ff2ffd16dda1fc4c6dd3b3b580b4de0abc008adbe77d46f112489",
+      "trap": null,
+      "length": 2049,
+      "mutable": true,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-immutable-len8192",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len8192.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len8192.wasm",
+      "wasm_sha": "525b6ee8371d3a6c59272a3e671e82249e88842a9a7f42a2a25bfc524f1d897e",
+      "trap": null,
+      "length": 8192,
+      "mutable": false,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-mutable-len8192",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len8192.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len8192.wasm",
+      "wasm_sha": "c5cdb574fe8ea908e22a16d9c1ac5a99fb0fe3f2e4be04220de93a5b30fd7bad",
+      "trap": null,
+      "length": 8192,
+      "mutable": true,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-immutable-len8193",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len8193.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-immutable-len8193.wasm",
+      "wasm_sha": "ca36f9094f57aaec4f84f9eed7bb20969167bfcfae99ba8c4de6e6d34fab519b",
+      "trap": null,
+      "length": 8193,
+      "mutable": false,
+      "element_type": "i16"
+    },
+    {
+      "name": "i16-mutable-len8193",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len8193.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i16-mutable-len8193.wasm",
+      "wasm_sha": "1edb4237d7008130feadcf6bcea196df4330be97546bedd6e0866dbfc9884308",
+      "trap": null,
+      "length": 8193,
+      "mutable": true,
+      "element_type": "i16"
+    },
+    {
+      "name": "i32-immutable-len0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len0.wasm",
+      "wasm_sha": "1d7e27743cba1857ec2611f5cb8cfcf45437a10bed22fe2d71a95927f4bd001d",
+      "trap": "bounds",
+      "length": 0,
+      "mutable": false,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-mutable-len0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len0.wasm",
+      "wasm_sha": "1de33b6501c7f4bc06bbe1af8dc297f6bd160bd92f6e0b7d1cd5b90de3bae366",
+      "trap": "bounds",
+      "length": 0,
+      "mutable": true,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-immutable-len1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len1.wasm",
+      "wasm_sha": "825bf130f0ef9bec53cadb66cba9fba4dfd54462cc048cbaeca279dc3ef94f35",
+      "trap": null,
+      "length": 1,
+      "mutable": false,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-mutable-len1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len1.wasm",
+      "wasm_sha": "230de367e561596f80eff39e4f13cdd810fa557d4f1e93c471759a6d78ecae9d",
+      "trap": null,
+      "length": 1,
+      "mutable": true,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-immutable-len15",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len15.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len15.wasm",
+      "wasm_sha": "bfe4c4ab9440d130e8052265ed283dd2846079ad344002459355b9143857b2dc",
+      "trap": null,
+      "length": 15,
+      "mutable": false,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-mutable-len15",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len15.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len15.wasm",
+      "wasm_sha": "ebee8bcc7ba730892f731142dea4d1dbc2a6af91062be5787691e923ae0ac979",
+      "trap": null,
+      "length": 15,
+      "mutable": true,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-immutable-len16",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len16.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len16.wasm",
+      "wasm_sha": "c16abfb42df6cbf338e688a065db897611ef5cded1905b4531e008b7fde3ddcd",
+      "trap": null,
+      "length": 16,
+      "mutable": false,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-mutable-len16",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len16.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len16.wasm",
+      "wasm_sha": "ce8b856bbe803ff3a8b8ada1403241deed79d01a28c06d6ead4274f3abc498db",
+      "trap": null,
+      "length": 16,
+      "mutable": true,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-immutable-len511",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len511.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len511.wasm",
+      "wasm_sha": "43d9ab2cd813a7bd019b8284f60d1a233d56ecb4782c91e58d752ad30bc24a73",
+      "trap": null,
+      "length": 511,
+      "mutable": false,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-mutable-len511",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len511.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len511.wasm",
+      "wasm_sha": "04522e725c7a91fe1e5646172b0987c07ce576b3d6f4549cf6dfd7fe1561ff88",
+      "trap": null,
+      "length": 511,
+      "mutable": true,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-immutable-len512",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len512.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len512.wasm",
+      "wasm_sha": "0c5c6c0675546a4286b6dcbaa2eb2ed2378b59a8cb29fe6b5da2948f8af0a27b",
+      "trap": null,
+      "length": 512,
+      "mutable": false,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-mutable-len512",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len512.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len512.wasm",
+      "wasm_sha": "9cc8f064850821629750b6e236ba6590c3ea40cb8042f4dbea1e1a6c12bf3f22",
+      "trap": null,
+      "length": 512,
+      "mutable": true,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-immutable-len2048",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len2048.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len2048.wasm",
+      "wasm_sha": "e4ea804564c36e6686672357ffc32b8f2187198c3eeeb95c174473872e0fda9c",
+      "trap": null,
+      "length": 2048,
+      "mutable": false,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-mutable-len2048",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len2048.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len2048.wasm",
+      "wasm_sha": "6930425fb999565115e9a9703714f55e4ab0827693bad504b244f3810b979edf",
+      "trap": null,
+      "length": 2048,
+      "mutable": true,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-immutable-len2049",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len2049.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len2049.wasm",
+      "wasm_sha": "0240adc9c0aa8a773b5cb4cdc387a59debad279fa7ff4b689fad9f8b89608301",
+      "trap": null,
+      "length": 2049,
+      "mutable": false,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-mutable-len2049",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len2049.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len2049.wasm",
+      "wasm_sha": "4705cc34b1b45497e299848a84278123fec0e22daa2431134664e62eaea40a39",
+      "trap": null,
+      "length": 2049,
+      "mutable": true,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-immutable-len8192",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len8192.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len8192.wasm",
+      "wasm_sha": "28f7cdd265341830d993292a2403acbf560ab94fac55e5151a4c848d766e0ed7",
+      "trap": null,
+      "length": 8192,
+      "mutable": false,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-mutable-len8192",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len8192.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len8192.wasm",
+      "wasm_sha": "7bcd4e8a2537fbde0c321faa7d8125df4338f501f5d27f436d2e518f4352509d",
+      "trap": null,
+      "length": 8192,
+      "mutable": true,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-immutable-len8193",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len8193.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-immutable-len8193.wasm",
+      "wasm_sha": "44ee1682a7ac526a46fe2002e8f4f34281a2cc7308f03cb02680e8593b104359",
+      "trap": null,
+      "length": 8193,
+      "mutable": false,
+      "element_type": "i32"
+    },
+    {
+      "name": "i32-mutable-len8193",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len8193.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/i32-mutable-len8193.wasm",
+      "wasm_sha": "8ef1fe374f2ba0f3fc36f178aa666afe6ae347bd98b837545224323418739dae",
+      "trap": null,
+      "length": 8193,
+      "mutable": true,
+      "element_type": "i32"
+    },
+    {
+      "name": "f32-immutable-len0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len0.wasm",
+      "wasm_sha": "ee0c5bbc0082c54d420635da12d6a7b257ab653ba0e737ed865c836513312853",
+      "trap": "bounds",
+      "length": 0,
+      "mutable": false,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-mutable-len0",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len0.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len0.wasm",
+      "wasm_sha": "d30243b7dbb8194657aa72312f01b3efcd6edc9e8c9af9d697ec05248e5ab84c",
+      "trap": "bounds",
+      "length": 0,
+      "mutable": true,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-immutable-len1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len1.wasm",
+      "wasm_sha": "bd247c9797b13aee920fdd93645ae52d1c0e4447ba3624656ab05b67e26a2069",
+      "trap": null,
+      "length": 1,
+      "mutable": false,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-mutable-len1",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len1.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len1.wasm",
+      "wasm_sha": "8226dd9ad903cba059ac335a0d2d1376e478bddb9a823834feed71016650a487",
+      "trap": null,
+      "length": 1,
+      "mutable": true,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-immutable-len15",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len15.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len15.wasm",
+      "wasm_sha": "d35ba85f9acebec18624555182d9e5e6b5b9694604f1c35630dabb1bcc1e2450",
+      "trap": null,
+      "length": 15,
+      "mutable": false,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-mutable-len15",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len15.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len15.wasm",
+      "wasm_sha": "97526202e75c86d06befd93048a0bb89dcf5249ef73201cf92acd26da724816b",
+      "trap": null,
+      "length": 15,
+      "mutable": true,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-immutable-len16",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len16.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len16.wasm",
+      "wasm_sha": "847a2737bee57712c341392c2fbedf4f422bf82777b7171c660a4b7642e51356",
+      "trap": null,
+      "length": 16,
+      "mutable": false,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-mutable-len16",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len16.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len16.wasm",
+      "wasm_sha": "b7fc19563193881ebaf5f7cda39c717d8314a28df0ed767c81a8081bd89e8bda",
+      "trap": null,
+      "length": 16,
+      "mutable": true,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-immutable-len511",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len511.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len511.wasm",
+      "wasm_sha": "3cd0022394eab41d2ff5152608f0447544e96bc6c8e68e220612acc55dbeb0e6",
+      "trap": null,
+      "length": 511,
+      "mutable": false,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-mutable-len511",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len511.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len511.wasm",
+      "wasm_sha": "d975219e3e6593dc76fbacc738e46af575a3bbf67fd15820bf52442a382b560e",
+      "trap": null,
+      "length": 511,
+      "mutable": true,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-immutable-len512",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len512.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len512.wasm",
+      "wasm_sha": "42a3c319c01a436dcfd620c8c8f61c5b888014411cc444477df90fc137fd2dda",
+      "trap": null,
+      "length": 512,
+      "mutable": false,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-mutable-len512",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len512.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len512.wasm",
+      "wasm_sha": "3e60674d1fd2ba14a2a1e27740e9bb6806d77fc58030bb62a376a296fe6da8b8",
+      "trap": null,
+      "length": 512,
+      "mutable": true,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-immutable-len2048",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len2048.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len2048.wasm",
+      "wasm_sha": "6ab181bf43de6660a2491b608a7bdc18c9e47c7b008c4942dd9fff0c5607940b",
+      "trap": null,
+      "length": 2048,
+      "mutable": false,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-mutable-len2048",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len2048.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len2048.wasm",
+      "wasm_sha": "6bdf37ddd3e876006d7e665b58e0744c947abbcc099a187806bc454bcc3756a6",
+      "trap": null,
+      "length": 2048,
+      "mutable": true,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-immutable-len2049",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len2049.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len2049.wasm",
+      "wasm_sha": "36c2128ca4b16ff27c146e476e2890f7fd251933a0f2caf886c325e0c967f3d2",
+      "trap": null,
+      "length": 2049,
+      "mutable": false,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-mutable-len2049",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len2049.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len2049.wasm",
+      "wasm_sha": "12c347f6fc476db2b63ae7abdfd37b0f97605d24f6d78a843835605089edd9fd",
+      "trap": null,
+      "length": 2049,
+      "mutable": true,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-immutable-len8192",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len8192.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len8192.wasm",
+      "wasm_sha": "7e085becf458594ca14e3916e9d1e55916dfe429438d9efa1629e38897c4d1e1",
+      "trap": null,
+      "length": 8192,
+      "mutable": false,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-mutable-len8192",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len8192.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len8192.wasm",
+      "wasm_sha": "d96d3b2b79114734cc9f9beae294f21f97c7ee46bf52fbf01ef1b64220557e61",
+      "trap": null,
+      "length": 8192,
+      "mutable": true,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-immutable-len8193",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len8193.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-immutable-len8193.wasm",
+      "wasm_sha": "2214708d9eed2c565918eed66f833ac77cf2fab8fa0472c5c34fbe00a3e142d0",
+      "trap": null,
+      "length": 8193,
+      "mutable": false,
+      "element_type": "f32"
+    },
+    {
+      "name": "f32-mutable-len8193",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len8193.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-fixtures-c23-a2/f32-mutable-len8193.wasm",
+      "wasm_sha": "aa8e0137ffc9279df50630d3a1a3f4d60641777b9c43d6b6067bbbc4ce065cd1",
+      "trap": null,
+      "length": 8193,
+      "mutable": true,
+      "element_type": "f32"
+    }
+  ],
+  "scope": "80 independent assertion modules: packed numeric raw bits, mutable/immutable, empty-array traps and allocator class/large-array boundary lengths. New code generation is eligible only normal full JIT."
+}

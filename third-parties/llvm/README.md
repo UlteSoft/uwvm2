@@ -4,7 +4,8 @@ ROS uses **LLVM 23.1.1**, the latest official non-prerelease at the time of
 this import (2026-09-16), plus the explicitly recorded downstream backend repairs.
 This is **not trunk**, a nightly, an RC, or a system LLVM installation.
 The exact [downstream changes relative to the official release](UPSTREAM_CHANGES.md)
-are listed separately, including seventeen compiler edits and twenty-one regression files.
+are listed separately, including fifty-five compiler edits, one exported configuration header template,
+two host build policies (Linux MIPS64EL Clang 23 scheduling and Windows helper linking), and twenty-five regression files.
 See the [maintenance rationale and upgrade checklist](../../documents/toolchain/ros-llvm-maintenance.md)
 before relaxing a version/build guard, changing cache identity or removing a workaround.
 
@@ -32,8 +33,8 @@ identical target bytes so Windows checkouts do not depend on symlink privileges.
 The repository `.gitattributes` disables newline conversion for this vendor tree.
 Omitted: all other top-level projects (Clang, LLDB, LLD, MLIR, Flang, runtimes,
 etc.), LLVM documentation/examples/benchmarks/bindings/unit tests and the large
-upstream test suite. Git attributes/ignore metadata are also omitted. Twenty-one downstream
-regression files remain under `llvm/test/CodeGen/{Mips,VE,AVR,MSP430,AArch64,RISCV}/`.
+upstream test suite. Git attributes/ignore metadata are also omitted. Twenty-five downstream
+regression files remain under `llvm/test/CodeGen/{Mips,VE,AVR,MSP430,AArch64,RISCV,SystemZ}/`.
 No `.git` repository or submodule is embedded.
 Do not remove `.td`, `.inc`, `.def`, Python or CMake files by extension: these
 are required source/build inputs, not disposable generated artifacts.
@@ -86,7 +87,7 @@ The hash distinguishes source/patch content, compiler binaries, ABI-affecting
 flags, target backends and cross configuration. LLVM archives are linked by
 absolute path even when the application's system libraries remain dynamic;
 runtime loader search paths cannot replace libLLVM with another installation.
-The version suffix `-uwvm-ros.6` separates the native-object cache from
+The version suffix `-uwvm-ros.13` separates the native-object cache from
 unpatched upstream LLVM and earlier downstream revisions. Revision 2 added
 VE/AVR/MSP430 repairs; revision 3 fixes FP-predicate inversion and MIPS R6
 strict comparison selection/exception preservation. Otherwise an old cache
@@ -106,6 +107,39 @@ at the last function. This repair changes load-time symbol resolution, not the
 generated hot-path instructions, and has before/after relocation and recursive
 execution controls. The full `.6` package/CLI build remains a separate required
 validation; `.5` build results must not be relabeled as `.6` results.
+Revision 7 prevents SystemZ load-and-trap fusion from moving a load across a
+store, call, ordering barrier or address-register definition; extends address
+register liveness and retains memory operands. The real multi-memory interpreter
+exposed a machine-verifier failure. A reduced regression also executes 999 alias
+and cursor cases under QEMU, while adjacent loads still fuse to `lgat`. A fresh
+`.7` package build remains required independently of the isolated patched tool.
+Revision 8 fixes RV64 RuntimeDyld CALL/CALL_PLT overflow. Reachable calls remain
+direct; distant calls use an aligned, full-width target stub in the same section.
+Rounded AUIPC/JALR range checks remain active in Release builds and reject
+unrepresentable calls when no stub is available. Tail-call return addresses and
+RV32 XLEN wrapping are preserved. Native relocation tests and real RV64 QEMU
+typed-EH/cached-object probes use the default MCJIT code model; the earlier Large
+workaround qualification remains recorded. These tests rebuilt only affected
+RuntimeDyld objects in a `.7` library overlay, so they do not establish that a
+complete `.8` package/CLI has already been built. See
+[the repair and evidence](../../documents/toolchain/riscv-rtdyld-call-range.md).
+Revision 10 adds an opt-in AsmPrinter DATA section carrying actual text-start
+and pre-trailer code-end relocations for all emitted MachineFunction definitions,
+plus the exact assembler entry/local-entry names (v2; no guessed mangling).
+The actual object symbols/aliases remain an independent conflict source. Neither
+the section, an IR name nor a descriptive role grants native debug permission.
+An absent module flag preserves the existing instruction/section emission. The
+owned wire parser/object probe lives at the product root; a complete `.10`
+package/CLI and loaded-owner/native-boundary qualification are still required.
+These tests are not part of the pruned upstream test inventory.
+Revision 12 makes X86 TailCC callee-pop use the same MaxStackArgAlign-rounded
+call frame as the caller before return-address-slot alignment. The native
+64-i128-reference plus scalar-seed regression exposed a 32-byte caller stack
+drift with the old incoming/outgoing size formulas. The generated header exports
+LLVM_UWVM_X86_TAILCC_ALIGNED_FRAME_FIXED; every runtime cache context records its
+fixed/unfixed state. Provider qualification must include actual rebuilt archive
+hashes, caller/callee stack evidence and native Wasm execution. A version label,
+a successful source compile or earlier .11 evidence cannot replace these checks.
 These revisions do not replace the official release base with trunk.
 A source/version mismatch fails closed.
 Source verification/Ninja checks run once per xmake process, not once per
@@ -145,3 +179,66 @@ coverage in [the ROS vendor audit](../../documents/toolchain/ros-bundled-llvm23.
 
 An official stable release and these regressions reduce known risks; they do
 not prove that LLVM or ROS is bug-free on every platform and configuration.
+
+Revision 9 repairs RISC-V C musttail outgoing stack addresses and adds the
+callee-popped TailCC ABI, including different parameter counts, genuine indirect
+tail transfers, stack argument ownership, and DWARF CFA/exception restoration.
+The independent RV64 QEMU candidate passed 23 execution cases and 28 verifier
+cases, including large argument-register overflow and typed exception landing
+pads. Genuine revision-9 package/VM qualification is tracked separately; these
+results must not relabel an old revision-8 build. See
+[the ABI repair and qualification scope](../../documents/toolchain/llvm-riscv-tail-abi.md).
+
+Revision 11 adds static ELF32 PowerPC and ELF64 SPARC V9 MCJIT relocation
+dispatch, full-address external/cross-section call stubs, and Release range
+checks. SPARC V9 alone registers native JIT support; SPARC32/LE, Thumb,
+compressed MIPS and unimplemented relocation/ABI combinations remain refused.
+The generated `llvm-config.h` exports `LLVM_UWVM_ROS_ELF_PPC32_MCJIT` and
+`LLVM_UWVM_ROS_ELF_SPARCV9_MCJIT`; ordinary UWVM accepts these two loaders only
+from such a patched SDK. Earlier backend-only QEMU evidence is not full Wasm
+JIT evidence. Fresh qualification of revision 11 is required before making
+product/platform coverage claims.
+
+The two generated capability macros additionally require the library-defined
+`RuntimeDyld::getUWVMELFLoaderCapabilities()` ABI. Mixing patched headers with
+unpatched archives fails to link; capability is never inferred solely from
+headers or an LLVM version string.
+
+The revision-11 native-debug qualification also requires exact static C `musttail`
+lowering and the independent DWARF reader's V9/SystemZ PC-relative EH relocations.
+The PPC64 TOC-tail capability query returns revision 3 only when the actual
+CodeGen archive contains SelectionDAG lowering, the O0 FastISel normal-call
+fallback, and medium-code-model TOC address slots for marked callees. These
+slots avoid unsupported cross-section TOC16 address arithmetic in RuntimeDyld;
+revision 1 and 2 archives cannot qualify the current contract.
+`llvm23-linux-systemz-dwarf-pcrel.patch` follows the V9 reader update and keeps
+valid SystemZ EH-frame PC-relative relocations from invalidating Wasm metadata.
+`test/0017.runtime/native_mcjit_musttail.cc` exercises real direct/indirect
+MCJIT tails, cross-section targets, exact numeric results, and a private
+bounded-stack witness over 4096 recursions. PPC32 includes C stack arguments;
+V9 keeps this oracle within the qualified register-only argument shape.
+This does not claim TailCC or arbitrary differing-prototype support on these
+backends. `native_owner_mapping_metadata.cc` separately checks that the actual
+Wasm JIT object retains valid pure-origin rows and typed numeric variables.
+Executed product qualification remains separate from these component checks.
+
+Native debug also marks its actual MIPS functions with
+`uwvm.native.debug.pcrel`. On static N64 pre-R6, the MIPS branch-expansion
+pass changes local `J` edges to PC-relative `B` before the unchanged range
+pass. RuntimeDyld otherwise sends even local jump edges through section-tail
+trampolines outside the exact Wasm function. The debugger continues to refuse
+those stubs; no section-wide code, register or stack permission is added.
+Unmarked functions, calls, the static C ABI, MIPS16, microMIPS and R6 retain
+their existing behavior. Ordinary uwvm2 must rebuild its external LLVM library
+with the matching repair; headers or compiler flags cannot replace it. See
+[build and actual-product checks](../../documents/toolchain/mips-native-debug-branches.md).
+
+Revision 13 packages the documented LoongArch64 and static MIPS N64EL R2
+callee-pop TailCC implementations, their asynchronous CFI prerequisites, and
+MIPS debug long-branch containment repair. See the paired
+[LoongArch ABI](../../documents/toolchain/llvm-loongarch-tail-abi.md) and
+[MIPS ABI](../../documents/toolchain/llvm-mips-n64-tailcc.md) documents.
+The source allowlist covers all 56 compiler/configuration inputs and two host
+build policies against the exact official archive. Old SDKs and native objects
+retain their original revision; a matching rebuilt dependency is required.
+Native-only builds qualify their configured backend, not every retained ISA.

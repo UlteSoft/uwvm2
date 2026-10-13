@@ -136,6 +136,26 @@ option("enable-lto", function()
     set_default(true)
 end)
 
+option("linux-native-debug", function()
+    set_description("Enable Wasm-only Linux native debugging with a qualified LLVM native-owner-table-v2 SDK; the target signal ABI and JIT loader must be supported.")
+    set_default(false)
+end)
+
+option("linux-x64-native-debug", function()
+    set_description("Enable Wasm-only Linux x86-64 native debugging with a qualified LLVM native-owner-table-v2 SDK; unavailable ownership never falls back to VM text.")
+    set_default(false)
+end)
+
+option("macos-x64-native-step", function()
+    set_description("Enable the opt-in macOS x86-64 protected Mach machine-step backend; actual native SDK/runtime qualification is still required.")
+    set_default(false)
+end)
+
+option("macos-4gib-test", function()
+    set_description("Build macOS ARM64 release semantics with O0 and no LTO for a 4 GiB product qualification run; default release stays O3.")
+    set_default(false)
+end)
+
 option("static", function()
     set_description
     (
@@ -184,6 +204,23 @@ option("build-source-id", function()
     set_default("none")
 end)
 
+option("numeric-exception-fused", function()
+    set_description("Use fused catch and direct tuple publication in the admitted numeric exception island (Linux x86-64 LLVM JIT).")
+    set_default(false)
+end)
+
+option("gc-jit-access-profile", function()
+    set_description("Select GC JIT access lowering: default, typed-array-load, typed-array-access, typed-array-access-inline or typed-array-access-private (experimental Linux x86-64 LLVM JIT; checked fallback for debug/checkpoint).")
+    set_default("default")
+    set_values("default", "typed-array-load", "typed-array-access", "typed-array-access-inline", "typed-array-access-private")
+end)
+
+option("gc-allocation-profile", function()
+    set_description("Select GC allocation policy: default or general-slab (Linux x86-64 LLVM JIT, packed arrays and serialized publication).")
+    set_default("default")
+    set_values("default", "general-slab")
+end)
+
 option("use-thread-local", function()
     set_description
     (
@@ -198,11 +235,10 @@ option("execution-int", function()
     (
         "select execution int backend",
         [[    none: disable execution int backend.]],
-        [[    default: use default execution int backend.]],
         [[    uwvm-int: use uwvm execution int backend.]]
     )
-    set_default("default")
-    set_values("none", "default", "uwvm-int")
+    set_default("uwvm-int")
+    set_values("none", "uwvm-int")
 end)
 
 option("execution-jit", function()
@@ -210,16 +246,21 @@ option("execution-jit", function()
     (
         "select the full-module LLVM AOT backend (legacy option name)",
         [[    none: disable the LLVM AOT backend.]],
-        [[    default: use the default LLVM AOT backend.]],
         [[    llvm: use the LLVM AOT backend.]]
     )
-    set_default("default")
-    set_values("none", "default", "llvm")
+    set_default("llvm")
+    set_values("none", "llvm")
+end)
+
+option("llvm-runtimes-provider", function()
+    set_default("auto")
+    set_values("auto", "bundled", "platform")
+    set_description("Paired libc++/libc++abi/libunwind provider: auto builds pinned ROS sources on supported GNU Clang ABIs; bundled requires that ABI; platform retains the explicit existing MSVC/other provider.")
 end)
 
 option("llvm-build-jobs", function()
-    set_default("2")
-    set_description("Bundled LLVM compile jobs (1..16); link jobs are always limited to one. This is not a memory limit.")
+    set_default("inherit")
+    set_description("Bundled LLVM/libc++/libunwind jobs: inherit uses xmake -j/--jobs (standalone config uses 1); a positive integer overrides it. LLVM link jobs stay at one. This is not a memory limit.")
 end)
 
 option("llvm-build-targets", function()
@@ -235,7 +276,7 @@ end)
 option("llvm-jit-env", function()
     set_default(true)
     set_showmenu(false)
-    add_deps("execution-jit", "llvm-build-jobs", "llvm-build-targets", "llvm-cmake-toolchain",
+    add_deps("execution-jit", "llvm-runtimes-provider", "llvm-build-jobs", "llvm-build-targets", "llvm-cmake-toolchain",
         "use-llvm-compiler", "stdlib", "rtlib", "unwindlib", "sysroot", "target", "llvm-target")
     after_check(function(option)
         local execution_jit = get_config("execution-jit")

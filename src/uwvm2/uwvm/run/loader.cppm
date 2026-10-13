@@ -55,6 +55,7 @@ import uwvm2.uwvm.utils.memory;
 import uwvm2.uwvm.cmdline;
 import uwvm2.uwvm.wasm;
 import uwvm2.uwvm.imported.wasi.wasip1;
+import uwvm2.uwvm.runtime.storage;
 import :retval;
 import :weak_symbol;
 

@@ -64,7 +64,15 @@ if constexpr(::std::same_as<char_type, char>)
                 UWVM_WIN32_TEXTATTR_CYAN,
                 ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                 UWVM_WIN32_TEXTATTR_WHITE,
-                ").",
+                "), Core 3 element heap/typeidx=",
+                errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_heap,
+                ", nullable=",
+                static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_nullable),
+                "; table heap/typeidx=",
+                errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_heap,
+                ", nullable=",
+                static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_nullable),
+                ".",
                 UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -100,7 +108,15 @@ if constexpr(::std::same_as<char_type, char>)
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
         ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
-        ").",
+        "), Core 3 element heap/typeidx=",
+        errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_heap,
+        ", nullable=",
+        static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_nullable),
+        "; table heap/typeidx=",
+        errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_heap,
+        ", nullable=",
+        static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_nullable),
+        ".",
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_RST_ALL));
     return;
 }
@@ -144,7 +160,15 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                 UWVM_WIN32_TEXTATTR_CYAN,
                 ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                 UWVM_WIN32_TEXTATTR_WHITE,
-                L").",
+                L"), Core 3 element heap/typeidx=",
+                errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_heap,
+                L", nullable=",
+                static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_nullable),
+                L"; table heap/typeidx=",
+                errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_heap,
+                L", nullable=",
+                static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_nullable),
+                L".",
                 UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -180,7 +204,15 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
         ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
-        L").",
+        L"), Core 3 element heap/typeidx=",
+        errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_heap,
+        L", nullable=",
+        static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_nullable),
+        L"; table heap/typeidx=",
+        errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_heap,
+        L", nullable=",
+        static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_nullable),
+        L".",
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_RST_ALL));
     return;
 }
@@ -224,7 +256,15 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                 UWVM_WIN32_TEXTATTR_CYAN,
                 ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                 UWVM_WIN32_TEXTATTR_WHITE,
-                u8").",
+                u8"), Core 3 element heap/typeidx=",
+                errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_heap,
+                u8", nullable=",
+                static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_nullable),
+                u8"; table heap/typeidx=",
+                errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_heap,
+                u8", nullable=",
+                static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_nullable),
+                u8".",
                 UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -260,7 +300,15 @@ else if constexpr(::std::same_as<char_type, char8_t>)
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_CYAN),
         ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
-        u8").",
+        u8"), Core 3 element heap/typeidx=",
+        errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_heap,
+        u8", nullable=",
+        static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_nullable),
+        u8"; table heap/typeidx=",
+        errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_heap,
+        u8", nullable=",
+        static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_nullable),
+        u8".",
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_RST_ALL));
     return;
 }
@@ -304,7 +352,15 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                 UWVM_WIN32_TEXTATTR_CYAN,
                 ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                 UWVM_WIN32_TEXTATTR_WHITE,
-                u").",
+                u"), Core 3 element heap/typeidx=",
+                errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_heap,
+                u", nullable=",
+                static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_nullable),
+                u"; table heap/typeidx=",
+                errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_heap,
+                u", nullable=",
+                static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_nullable),
+                u".",
                 UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -340,7 +396,15 @@ else if constexpr(::std::same_as<char_type, char16_t>)
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
         ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
-        u").",
+        u"), Core 3 element heap/typeidx=",
+        errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_heap,
+        u", nullable=",
+        static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_nullable),
+        u"; table heap/typeidx=",
+        errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_heap,
+        u", nullable=",
+        static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_nullable),
+        u".",
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_RST_ALL));
     return;
 }
@@ -384,7 +448,15 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                 UWVM_WIN32_TEXTATTR_CYAN,
                 ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
                 UWVM_WIN32_TEXTATTR_WHITE,
-                U").",
+                U"), Core 3 element heap/typeidx=",
+                errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_heap,
+                U", nullable=",
+                static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_nullable),
+                U"; table heap/typeidx=",
+                errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_heap,
+                U", nullable=",
+                static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_nullable),
+                U".",
                 UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -420,7 +492,15 @@ else if constexpr(::std::same_as<char_type, char32_t>)
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
         ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_type),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
-        U").",
+        U"), Core 3 element heap/typeidx=",
+        errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_heap,
+        U", nullable=",
+        static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.segment_nullable),
+        U"; table heap/typeidx=",
+        errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_heap,
+        U", nullable=",
+        static_cast<unsigned>(errout.err.err_selectable.wasm1p1_element_table_type_mismatch.table_nullable),
+        U".",
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_RST_ALL));
     return;
 }

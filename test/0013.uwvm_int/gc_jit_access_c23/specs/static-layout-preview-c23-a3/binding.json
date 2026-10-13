@@ -1,0 +1,77 @@
+{
+  "rows": [
+    {
+      "case": "i8-write-read",
+      "variant": "typed-array-access-inline",
+      "ELF_sha": "a4257fa052434d21726d8ba8fc10f08a06ba4555696602b6f90cd356cc676f32",
+      "WASM_sha": "01f93a08f2d0f396536eecfef4d587a1bed67f6d41b8ba7cfc3375201777ca6a",
+      "rx": [
+        {
+          "sha": "823e5baa8f6967c47000def9e0145a0c9edc6d96a8a33f27d5405ff36b70244b",
+          "file": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-preview-c23-a3/i8-write-read-typed-array-access-inline-0.bin",
+          "asm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-preview-c23-a3/i8-write-read-typed-array-access-inline-0.asm",
+          "lo": 138370546266112,
+          "hi": 138370546270208
+        }
+      ],
+      "elapsed": 1074764,
+      "cpu": 6,
+      "cgroup": "0::/system.slice/docker-4dd58ad4560fde2ab9b539e4ef9cab1fac531654e99ad554aff1fce8ae0eae37.scope"
+    },
+    {
+      "case": "i8-write-read",
+      "variant": "typed-array-access-inline-static32",
+      "ELF_sha": "5defd67dd0082427888911aabd74d9b2022337e2be7300249436dd301c8ede8c",
+      "WASM_sha": "01f93a08f2d0f396536eecfef4d587a1bed67f6d41b8ba7cfc3375201777ca6a",
+      "rx": [
+        {
+          "sha": "bc2d22ea7db711b1c907984e5eecce708f1e646b33613b0a83cf9c1931b4429c",
+          "file": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-preview-c23-a3/i8-write-read-typed-array-access-inline-static32-0.bin",
+          "asm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-preview-c23-a3/i8-write-read-typed-array-access-inline-static32-0.asm",
+          "lo": 137674919628800,
+          "hi": 137674919632896
+        }
+      ],
+      "elapsed": 1134123,
+      "cpu": 6,
+      "cgroup": "0::/system.slice/docker-4dd58ad4560fde2ab9b539e4ef9cab1fac531654e99ad554aff1fce8ae0eae37.scope"
+    },
+    {
+      "case": "i32-write-read",
+      "variant": "typed-array-access-inline",
+      "ELF_sha": "a4257fa052434d21726d8ba8fc10f08a06ba4555696602b6f90cd356cc676f32",
+      "WASM_sha": "37270f4e40d96cadcc86343bfb007915850d47fdb3b62f1d012ba74f23c06a51",
+      "rx": [
+        {
+          "sha": "418855a64076ebccf299c14b7d532845cb1c51aee4e067fc3cbd9a5384701280",
+          "file": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-preview-c23-a3/i32-write-read-typed-array-access-inline-0.bin",
+          "asm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-preview-c23-a3/i32-write-read-typed-array-access-inline-0.asm",
+          "lo": 131006964195328,
+          "hi": 131006964199424
+        }
+      ],
+      "elapsed": 1292555,
+      "cpu": 6,
+      "cgroup": "0::/system.slice/docker-4dd58ad4560fde2ab9b539e4ef9cab1fac531654e99ad554aff1fce8ae0eae37.scope"
+    },
+    {
+      "case": "i32-write-read",
+      "variant": "typed-array-access-inline-static32",
+      "ELF_sha": "5defd67dd0082427888911aabd74d9b2022337e2be7300249436dd301c8ede8c",
+      "WASM_sha": "37270f4e40d96cadcc86343bfb007915850d47fdb3b62f1d012ba74f23c06a51",
+      "rx": [
+        {
+          "sha": "a4350d990a9f2ecd2706b75e90d7bc47fa1ed5a650c10d92c0ee7ad12113b94f",
+          "file": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-preview-c23-a3/i32-write-read-typed-array-access-inline-static32-0.bin",
+          "asm": "/tmp/uwvm-gc-perf-20261011-r74/source/static-layout-preview-c23-a3/i32-write-read-typed-array-access-inline-static32-0.asm",
+          "lo": 131956954841088,
+          "hi": 131956954845184
+        }
+      ],
+      "elapsed": 1229477,
+      "cpu": 6,
+      "cgroup": "0::/system.slice/docker-4dd58ad4560fde2ab9b539e4ef9cab1fac531654e99ad554aff1fce8ae0eae37.scope"
+    }
+  ],
+  "scope": "Actual postJIT READY RX snapshot, non-PMU CPU6 inspection only; no performance ratios from these single repetitions."
+}

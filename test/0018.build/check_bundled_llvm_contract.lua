@@ -34,7 +34,10 @@ function main()
     local metadata = path.join(fixture, "uwvm-llvm-version.json")
     json.savefile(metadata, {version = "23.0.0", host_target = "wrong"})
     must_fail("version mismatch", read)
-    json.savefile(metadata, {version = "23.1.1-uwvm-ros.6", host_target = "x86_64-unknown-linux-gnu"})
+    json.savefile(metadata, {version = "23.1.1-uwvm-ros.13", host_target = "x86_64-unknown-linux-gnu"})
+    os.mkdir(path.join(fixture, "include/llvm/Config"))
+    io.writefile(path.join(fixture, "include/llvm/Config/llvm-config.h"),
+        '#define LLVM_VERSION_STRING "23.1.1-uwvm-ros.13"\n')
     assert(read().compile.defines[1].define == "PINNED")
     -- Directory/target compile options need not appear in CMAKE_CXX_FLAGS.
     -- Inspect CMake's resolved consumer command before any library build.

@@ -1,0 +1,1 @@
+(module (type $a (array (mut i32))) (type $s (struct (field i64)))  (func (export "_start") (local $a (ref null $a)) (local $n i32) i32.const 257 array.new_default $a local.set $a i32.const 30000 local.set $n (loop $L i64.const 42 struct.new $s drop local.get $n i32.const 1 i32.sub local.tee $n br_if $L) local.get $a array.len i32.const 257 i32.ne if unreachable end))

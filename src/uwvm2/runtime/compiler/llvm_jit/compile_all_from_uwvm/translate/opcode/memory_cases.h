@@ -1,26 +1,28 @@
-// Memory opcode validation cases.
-// Load/store instructions carry a `memarg` immediate encoded as two unsigned LEB128 values:
-// `align` is the log2 alignment hint and `offset` is the static address offset.  The validation
-// helpers consume those immediates, require memory 0 to exist for WebAssembly 1.0/MVP, enforce the
-// maximum legal alignment exponent for the access width, and validate the operand-stack contract.
-// The JIT path records the validated instruction byte range so the emit pass can reparse the same
-// memarg and generate either direct-memory IR or a runtime memory bridge call.
-//
-// WebAssembly 1.0/MVP has one default memory and i32 addresses.  Multi-memory must thread the
-// selected memory index through validation and emission; memory64 must update the address,
-// memory.size, and memory.grow stack types together with LLVM effective-address lowering.
+// Scalar memory load/store cases decode and validate memarg once. Core 3
+// memarg includes alignment flags, an optional selected-memory index and a u64
+// offset; the selected declaration supplies the i32 or i64 address type.
+// Successful typed transitions pass owned normalized DATA to the LLVM emitter,
+// which uses the existing direct-memory IR or runtime bridge without rereading
+// opcode or immediate bytes. memory.size/grow remain separate pending migration.
 
 // i32.load
-// Stack effect: (i32 address) -> (i32).  Validates a 4-byte integer load with max alignment
+// Stack effect: (selected i32/i64 address) -> (i32).  Validates a 4-byte integer load with max alignment
 // exponent 2; the actual little-endian read and bounds handling are emitted later.
 case wasm1_code::i32_load:
 {
-    validate_mem_load(u8"i32.load", 2u, curr_operand_stack_value_type::i32);
+    auto const checked_memarg{validate_mem_load(u8"i32.load", 2u, curr_operand_stack_value_type::i32)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -30,16 +32,23 @@ case wasm1_code::i32_load:
 }
 
 // i64.load
-// Stack effect: (i32 address) -> (i64).  Validates an 8-byte integer load with max alignment
+// Stack effect: (selected i32/i64 address) -> (i64).  Validates an 8-byte integer load with max alignment
 // exponent 3.
 case wasm1_code::i64_load:
 {
-    validate_mem_load(u8"i64.load", 3u, curr_operand_stack_value_type::i64);
+    auto const checked_memarg{validate_mem_load(u8"i64.load", 3u, curr_operand_stack_value_type::i64)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -49,16 +58,23 @@ case wasm1_code::i64_load:
 }
 
 // f32.load
-// Stack effect: (i32 address) -> (f32).  Validates a 4-byte floating-point load; the payload bits
+// Stack effect: (selected i32/i64 address) -> (f32).  Validates a 4-byte floating-point load; the payload bits
 // are interpreted as IEEE-754 f32 by the emit/runtime path.
 case wasm1_code::f32_load:
 {
-    validate_mem_load(u8"f32.load", 2u, curr_operand_stack_value_type::f32);
+    auto const checked_memarg{validate_mem_load(u8"f32.load", 2u, curr_operand_stack_value_type::f32)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -68,16 +84,23 @@ case wasm1_code::f32_load:
 }
 
 // f64.load
-// Stack effect: (i32 address) -> (f64).  Validates an 8-byte floating-point load from linear
+// Stack effect: (selected i32/i64 address) -> (f64).  Validates an 8-byte floating-point load from linear
 // memory.
 case wasm1_code::f64_load:
 {
-    validate_mem_load(u8"f64.load", 3u, curr_operand_stack_value_type::f64);
+    auto const checked_memarg{validate_mem_load(u8"f64.load", 3u, curr_operand_stack_value_type::f64)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -87,16 +110,23 @@ case wasm1_code::f64_load:
 }
 
 // i32.load8_s
-// Stack effect: (i32 address) -> (i32).  Validates a one-byte load whose byte is sign-extended to
+// Stack effect: (selected i32/i64 address) -> (i32).  Validates a one-byte load whose byte is sign-extended to
 // i32 by the JIT emitter or runtime bridge.
 case wasm1_code::i32_load8_s:
 {
-    validate_mem_load(u8"i32.load8_s", 0u, curr_operand_stack_value_type::i32);
+    auto const checked_memarg{validate_mem_load(u8"i32.load8_s", 0u, curr_operand_stack_value_type::i32)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -106,16 +136,23 @@ case wasm1_code::i32_load8_s:
 }
 
 // i32.load8_u
-// Stack effect: (i32 address) -> (i32).  Validates a one-byte load whose byte is zero-extended to
+// Stack effect: (selected i32/i64 address) -> (i32).  Validates a one-byte load whose byte is zero-extended to
 // i32.
 case wasm1_code::i32_load8_u:
 {
-    validate_mem_load(u8"i32.load8_u", 0u, curr_operand_stack_value_type::i32);
+    auto const checked_memarg{validate_mem_load(u8"i32.load8_u", 0u, curr_operand_stack_value_type::i32)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -125,15 +162,22 @@ case wasm1_code::i32_load8_u:
 }
 
 // i32.load16_s
-// Stack effect: (i32 address) -> (i32).  Validates a two-byte load with sign-extension to i32.
+// Stack effect: (selected i32/i64 address) -> (i32).  Validates a two-byte load with sign-extension to i32.
 case wasm1_code::i32_load16_s:
 {
-    validate_mem_load(u8"i32.load16_s", 1u, curr_operand_stack_value_type::i32);
+    auto const checked_memarg{validate_mem_load(u8"i32.load16_s", 1u, curr_operand_stack_value_type::i32)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -143,15 +187,22 @@ case wasm1_code::i32_load16_s:
 }
 
 // i32.load16_u
-// Stack effect: (i32 address) -> (i32).  Validates a two-byte load with zero-extension to i32.
+// Stack effect: (selected i32/i64 address) -> (i32).  Validates a two-byte load with zero-extension to i32.
 case wasm1_code::i32_load16_u:
 {
-    validate_mem_load(u8"i32.load16_u", 1u, curr_operand_stack_value_type::i32);
+    auto const checked_memarg{validate_mem_load(u8"i32.load16_u", 1u, curr_operand_stack_value_type::i32)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -161,15 +212,22 @@ case wasm1_code::i32_load16_u:
 }
 
 // i64.load8_s
-// Stack effect: (i32 address) -> (i64).  Validates a one-byte load with sign-extension to i64.
+// Stack effect: (selected i32/i64 address) -> (i64).  Validates a one-byte load with sign-extension to i64.
 case wasm1_code::i64_load8_s:
 {
-    validate_mem_load(u8"i64.load8_s", 0u, curr_operand_stack_value_type::i64);
+    auto const checked_memarg{validate_mem_load(u8"i64.load8_s", 0u, curr_operand_stack_value_type::i64)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -179,15 +237,22 @@ case wasm1_code::i64_load8_s:
 }
 
 // i64.load8_u
-// Stack effect: (i32 address) -> (i64).  Validates a one-byte load with zero-extension to i64.
+// Stack effect: (selected i32/i64 address) -> (i64).  Validates a one-byte load with zero-extension to i64.
 case wasm1_code::i64_load8_u:
 {
-    validate_mem_load(u8"i64.load8_u", 0u, curr_operand_stack_value_type::i64);
+    auto const checked_memarg{validate_mem_load(u8"i64.load8_u", 0u, curr_operand_stack_value_type::i64)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -197,15 +262,22 @@ case wasm1_code::i64_load8_u:
 }
 
 // i64.load16_s
-// Stack effect: (i32 address) -> (i64).  Validates a two-byte load with sign-extension to i64.
+// Stack effect: (selected i32/i64 address) -> (i64).  Validates a two-byte load with sign-extension to i64.
 case wasm1_code::i64_load16_s:
 {
-    validate_mem_load(u8"i64.load16_s", 1u, curr_operand_stack_value_type::i64);
+    auto const checked_memarg{validate_mem_load(u8"i64.load16_s", 1u, curr_operand_stack_value_type::i64)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -215,15 +287,22 @@ case wasm1_code::i64_load16_s:
 }
 
 // i64.load16_u
-// Stack effect: (i32 address) -> (i64).  Validates a two-byte load with zero-extension to i64.
+// Stack effect: (selected i32/i64 address) -> (i64).  Validates a two-byte load with zero-extension to i64.
 case wasm1_code::i64_load16_u:
 {
-    validate_mem_load(u8"i64.load16_u", 1u, curr_operand_stack_value_type::i64);
+    auto const checked_memarg{validate_mem_load(u8"i64.load16_u", 1u, curr_operand_stack_value_type::i64)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -233,15 +312,22 @@ case wasm1_code::i64_load16_u:
 }
 
 // i64.load32_s
-// Stack effect: (i32 address) -> (i64).  Validates a four-byte load with sign-extension to i64.
+// Stack effect: (selected i32/i64 address) -> (i64).  Validates a four-byte load with sign-extension to i64.
 case wasm1_code::i64_load32_s:
 {
-    validate_mem_load(u8"i64.load32_s", 2u, curr_operand_stack_value_type::i64);
+    auto const checked_memarg{validate_mem_load(u8"i64.load32_s", 2u, curr_operand_stack_value_type::i64)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -251,15 +337,22 @@ case wasm1_code::i64_load32_s:
 }
 
 // i64.load32_u
-// Stack effect: (i32 address) -> (i64).  Validates a four-byte load with zero-extension to i64.
+// Stack effect: (selected i32/i64 address) -> (i64).  Validates a four-byte load with zero-extension to i64.
 case wasm1_code::i64_load32_u:
 {
-    validate_mem_load(u8"i64.load32_u", 2u, curr_operand_stack_value_type::i64);
+    auto const checked_memarg{validate_mem_load(u8"i64.load32_u", 2u, curr_operand_stack_value_type::i64)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -272,12 +365,19 @@ case wasm1_code::i64_load32_u:
 // Stack effect: (i32 address, i32 value) -> ().  Validates a full-width 4-byte integer store.
 case wasm1_code::i32_store:
 {
-    validate_mem_store(u8"i32.store", 2u, curr_operand_stack_value_type::i32);
+    auto const checked_memarg{validate_mem_store(u8"i32.store", 2u, curr_operand_stack_value_type::i32)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -290,12 +390,19 @@ case wasm1_code::i32_store:
 // Stack effect: (i32 address, i64 value) -> ().  Validates a full-width 8-byte integer store.
 case wasm1_code::i64_store:
 {
-    validate_mem_store(u8"i64.store", 3u, curr_operand_stack_value_type::i64);
+    auto const checked_memarg{validate_mem_store(u8"i64.store", 3u, curr_operand_stack_value_type::i64)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -309,12 +416,19 @@ case wasm1_code::i64_store:
 // value's exact IEEE bit pattern is written by the emit/runtime path.
 case wasm1_code::f32_store:
 {
-    validate_mem_store(u8"f32.store", 2u, curr_operand_stack_value_type::f32);
+    auto const checked_memarg{validate_mem_store(u8"f32.store", 2u, curr_operand_stack_value_type::f32)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -327,12 +441,19 @@ case wasm1_code::f32_store:
 // Stack effect: (i32 address, f64 value) -> ().  Validates an 8-byte floating-point store.
 case wasm1_code::f64_store:
 {
-    validate_mem_store(u8"f64.store", 3u, curr_operand_stack_value_type::f64);
+    auto const checked_memarg{validate_mem_store(u8"f64.store", 3u, curr_operand_stack_value_type::f64)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -346,12 +467,19 @@ case wasm1_code::f64_store:
 // low 8 bits of the i32 value.
 case wasm1_code::i32_store8:
 {
-    validate_mem_store(u8"i32.store8", 0u, curr_operand_stack_value_type::i32);
+    auto const checked_memarg{validate_mem_store(u8"i32.store8", 0u, curr_operand_stack_value_type::i32)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -365,12 +493,19 @@ case wasm1_code::i32_store8:
 // the low 16 bits of the i32 value.
 case wasm1_code::i32_store16:
 {
-    validate_mem_store(u8"i32.store16", 1u, curr_operand_stack_value_type::i32);
+    auto const checked_memarg{validate_mem_store(u8"i32.store16", 1u, curr_operand_stack_value_type::i32)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -384,12 +519,19 @@ case wasm1_code::i32_store16:
 // the i64 value.
 case wasm1_code::i64_store8:
 {
-    validate_mem_store(u8"i64.store8", 0u, curr_operand_stack_value_type::i64);
+    auto const checked_memarg{validate_mem_store(u8"i64.store8", 0u, curr_operand_stack_value_type::i64)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -403,12 +545,19 @@ case wasm1_code::i64_store8:
 // the i64 value.
 case wasm1_code::i64_store16:
 {
-    validate_mem_store(u8"i64.store16", 1u, curr_operand_stack_value_type::i64);
+    auto const checked_memarg{validate_mem_store(u8"i64.store16", 1u, curr_operand_stack_value_type::i64)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -422,12 +571,19 @@ case wasm1_code::i64_store16:
 // of the i64 value.
 case wasm1_code::i64_store32:
 {
-    validate_mem_store(u8"i64.store32", 2u, curr_operand_stack_value_type::i64);
+    auto const checked_memarg{validate_mem_store(u8"i64.store32", 2u, curr_operand_stack_value_type::i64)};
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        ::uwvm2::validation::standard::wasm3::validated_scalar_memory_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_scalar_memory_event(
+               memory_event, static_cast<unsigned>(curr_opbase), checked_memarg,
+               static_cast<::std::size_t>(instruction_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - instruction_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_scalar_memory(llvm_jit_emit_state, memory_event)) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -437,8 +593,7 @@ case wasm1_code::i64_store32:
 }
 
 // memory.size
-// Stack effect: () -> (i32 current_pages).  WebAssembly 1.0/MVP encodes a reserved literal
-// `0x00` byte after this opcode; multi-memory will replace that byte with a real memory index.
+// The validated memory index selects the declaration and its page-count type.
 case wasm1_code::memory_size:
 {
     // memory.size memidx ...
@@ -457,66 +612,43 @@ case wasm1_code::memory_size:
     // [ safe    ] unsafe (could be the section_end)
     //             ^^ code_curr
 
-    // The MVP binary format encodes this reserved memory index as one literal byte: 0x00.
-    if(code_curr == code_end) [[unlikely]]
-    {
-        err.err_curr = op_begin;
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memory_index;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
-    }
+    // [memory.size] memidx ... (code_end); the scanner bounds-checks the entire immediate.
+    auto const memory_index{::uwvm2::validation::standard::wasm3::read_memory_index(
+        code_curr, code_end, op_begin, !wasm1p1_para.disable_multi_memory, err)};
+    // [memory.size memidx] ... unsafe (could be code_end)
+    //                      ^^ code_curr
+    ::uwvm2::validation::standard::wasm3::validate_memory_index(memory_index, all_memory_count, op_begin, err);
+    auto const address_type{memory_address_type_at(memory_index) == ::uwvm2::validation::standard::wasm3::storage_address_type::i64 ?
+        runtime_operand_stack_value_type::i64 : runtime_operand_stack_value_type::i32};
 
-    // memory.size memidx ...
-    // [ safe    ] unsafe (could be the section_end)
-    //             ^^ code_curr
+    validate_checked_memory_page(op_begin, memory_address_type_at(memory_index), false);
 
-    auto const memidx_pos{code_curr};
-    ++code_curr;
-
-    // memory.size memidx ...
-    // [ safe    ] unsafe (could be the section_end)
-    //              ^^ code_curr
-
-    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte memidx{};  // No initialization necessary
-    ::std::memcpy(::std::addressof(memidx), memidx_pos, sizeof(memidx));
-#if CHAR_BIT > 8
-    memidx = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(static_cast<::std::uint_least8_t>(memidx) & 0xFFu);
-#endif
-
-    if(memidx != 0u) [[unlikely]]
-    {
-        err.err_curr = op_begin;
-        err.err_selectable.illegal_memory_index.memory_index = memidx;
-        err.err_selectable.illegal_memory_index.all_memory_count = all_memory_count;
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memory_index;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-    }
-
-    if(all_memory_count == 0u) [[unlikely]]
-    {
-        err.err_curr = op_begin;
-        err.err_selectable.no_memory.op_code_name = u8"memory.size";
-        err.err_selectable.no_memory.align = 0u;
-        err.err_selectable.no_memory.offset = 0u;
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-    }
-
-    // Stack effect: () -> (i32)
-    operand_stack_push(runtime_operand_stack_value_type::i32);
+    operand_stack_push(address_type);
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, op_begin, code_curr)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
+        ::uwvm2::validation::standard::wasm3::validated_memory_page_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_memory_page_event(
+               memory_event, static_cast<unsigned>(curr_opbase), memory_index,
+               address_type == runtime_operand_stack_value_type::i64 ?
+                   ::uwvm2::validation::standard::wasm3::storage_address_type::i64 :
+                   ::uwvm2::validation::standard::wasm3::storage_address_type::i32,
+               static_cast<::std::size_t>(op_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - op_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_memory_page(llvm_jit_emit_state, memory_event)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
     }
 
     break;
 }
 
 // memory.grow
-// Stack effect: (i32 delta_pages) -> (i32 previous_pages_or_minus1).  The immediate follows the
-// same WebAssembly 1.0/MVP reserved zero-byte rule as `memory.size`, and the delta operand must be i32.
-// Multi-memory must select the requested memory; memory64 must revisit the delta/result types.
+// Delta and result use the selected memory address type; failure is the all-ones value.
 case wasm1_code::memory_grow:
 {
     // memory.grow memidx ...
@@ -535,67 +667,36 @@ case wasm1_code::memory_grow:
     // [ safe    ] unsafe (could be the section_end)
     //             ^^ code_curr
 
-    // The MVP binary format encodes this reserved memory index as one literal byte: 0x00.
-    if(code_curr == code_end) [[unlikely]]
-    {
-        err.err_curr = op_begin;
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memory_index;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
-    }
+    // [memory.grow] memidx ... (code_end); the scanner bounds-checks the entire immediate.
+    auto const memory_index{::uwvm2::validation::standard::wasm3::read_memory_index(
+        code_curr, code_end, op_begin, !wasm1p1_para.disable_multi_memory, err)};
+    // [memory.grow memidx] ... unsafe (could be code_end)
+    //                      ^^ code_curr
+    ::uwvm2::validation::standard::wasm3::validate_memory_index(memory_index, all_memory_count, op_begin, err);
+    auto const address_type{memory_address_type_at(memory_index) == ::uwvm2::validation::standard::wasm3::storage_address_type::i64 ?
+        runtime_operand_stack_value_type::i64 : runtime_operand_stack_value_type::i32};
 
-    // memory.grow memidx ...
-    // [ safe    ] unsafe (could be the section_end)
-    //             ^^ code_curr
+    validate_checked_memory_page(op_begin, memory_address_type_at(memory_index), true);
 
-    auto const memidx_pos{code_curr};
-    ++code_curr;
-
-    // memory.grow memidx ...
-    // [ safe    ] unsafe (could be the section_end)
-    //              ^^ code_curr
-
-    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte memidx{};  // No initialization necessary
-    ::std::memcpy(::std::addressof(memidx), memidx_pos, sizeof(memidx));
-#if CHAR_BIT > 8
-    memidx = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(static_cast<::std::uint_least8_t>(memidx) & 0xFFu);
-#endif
-
-    if(memidx != 0u) [[unlikely]]
-    {
-        err.err_curr = op_begin;
-        err.err_selectable.illegal_memory_index.memory_index = memidx;
-        err.err_selectable.illegal_memory_index.all_memory_count = all_memory_count;
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memory_index;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-    }
-
-    if(all_memory_count == 0u) [[unlikely]]
-    {
-        err.err_curr = op_begin;
-        err.err_selectable.no_memory.op_code_name = u8"memory.grow";
-        err.err_selectable.no_memory.align = 0u;
-        err.err_selectable.no_memory.offset = 0u;
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-    }
-
-    // Stack effect: (i32 delta_pages) -> (i32 previous_pages_or_minus1)
-    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"memory.grow", 1uz); }
-
-    if(auto const delta{try_pop_concrete_operand()}; delta.from_stack && delta.type != runtime_operand_stack_value_type::i32) [[unlikely]]
-    {
-        err.err_curr = op_begin;
-        err.err_selectable.memory_grow_delta_type_not_i32.delta_type = to_wasm1_diagnostic_value_type(delta.type);
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::memory_grow_delta_type_not_i32;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-    }
-
-    operand_stack_push(runtime_operand_stack_value_type::i32);
+    operand_stack_push(address_type);
 
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, op_begin, code_curr)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
+        ::uwvm2::validation::standard::wasm3::validated_memory_page_event memory_event{};
+        // [original checked opcode ... code_curr] | code_end
+        // [safe same expression allocation    ] | one-past; offsets only, no source reread.
+        if(!::uwvm2::validation::standard::wasm3::complete_memory_page_event(
+               memory_event, static_cast<unsigned>(curr_opbase), memory_index,
+               address_type == runtime_operand_stack_value_type::i64 ?
+                   ::uwvm2::validation::standard::wasm3::storage_address_type::i64 :
+                   ::uwvm2::validation::standard::wasm3::storage_address_type::i32,
+               static_cast<::std::size_t>(op_begin - code_begin),
+               static_cast<::std::size_t>(code_curr - op_begin), control_flow_stack.size(), !is_polymorphic) ||
+           !try_emit_runtime_local_func_llvm_jit_memory_page(llvm_jit_emit_state, memory_event)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
     }
 
     break;

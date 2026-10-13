@@ -1,0 +1,1 @@
+(module (func (export "_start")(local $i i32) loop $l local.get $i i8x16.splat v128.const i8x16 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 i8x16.relaxed_swizzle i8x16.extract_lane_u 7 local.get $i i32.const 255 i32.and i32.ne if unreachable end local.get $i i32.const 1 i32.add local.tee $i i32.const 10000 i32.lt_u br_if $l end))

@@ -82,6 +82,15 @@ def loongarch_probed_alloca : SDNode<"LoongArchISD::PROBED_ALLOCA",
                                      SDTypeProfile<0, 1, [SDTCisPtrTy<0>]>,
                                      [SDNPHasChain, SDNPMayStore]>;
 
+def SDT_LoongArchTailReturn : SDTypeProfile<0, -1,
+    [SDTCisVT<0, GRLenVT>, SDTCisVT<1, GRLenVT>]>;
+def loongarch_tcret : SDNode<"LoongArchISD::TC_RETURN", SDT_LoongArchTailReturn,
+    [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue, SDNPVariadic]>;
+def loongarch_tcret_medium : SDNode<"LoongArchISD::TC_RETURN_MEDIUM", SDT_LoongArchTailReturn,
+    [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue, SDNPVariadic]>;
+def loongarch_tcret_large : SDNode<"LoongArchISD::TC_RETURN_LARGE", SDT_LoongArchTailReturn,
+    [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue, SDNPVariadic]>;
+
 // Target-dependent nodes.
 def loongarch_call : SDNode<"LoongArchISD::CALL", SDT_LoongArchCall,
                             [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
@@ -1678,6 +1687,40 @@ def PseudoJIRL_CALL : Pseudo<(outs), (ins GPR:$rj, simm16_lsl2:$imm16)>,
 let isBarrier = 1, isReturn = 1, isTerminator = 1 in
 def PseudoRET : Pseudo<(outs), (ins), [(loongarch_ret)]>,
                 PseudoInstExpansion<(JIRL R0, R1, 0)>;
+
+def tailcc_delta : Operand<GRLenVT>;
+
+// TailCC keeps the signed argument-area delta until PEI emits the epilogue.
+// Convert these pseudos to ordinary no-link tail instructions only afterward.
+let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [R3] in {
+def PseudoTCRETURN_SMALL : Pseudo<(outs), (ins bare_symbol:$dst, tailcc_delta:$delta)>;
+let hasSideEffects = 0, mayStore = 0, mayLoad = 0 in
+def PseudoB_TC_RETURN : Pseudo<(outs), (ins bare_symbol:$dst, tailcc_delta:$delta)>;
+def PseudoTCRETURN_LARGE : Pseudo<(outs), (ins bare_symbol:$dst, tailcc_delta:$delta)>;
+def PseudoTCRETURNIndirect : Pseudo<(outs), (ins GPRT:$rj, tailcc_delta:$delta)>;
+}
+let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1,
+    Uses = [R3], Defs = [R20], Size = 8 in
+def PseudoTCRETURN_MEDIUM : Pseudo<(outs), (ins bare_symbol:$dst, tailcc_delta:$delta)>;
+
+def : Pat<(loongarch_tcret (iPTR tglobaladdr:$dst), timm:$delta),
+          (PseudoTCRETURN_SMALL tglobaladdr:$dst, timm:$delta)>;
+def : Pat<(loongarch_tcret (iPTR texternalsym:$dst), timm:$delta),
+          (PseudoTCRETURN_SMALL texternalsym:$dst, timm:$delta)>;
+def : Pat<(loongarch_tcret_medium (iPTR tglobaladdr:$dst), timm:$delta),
+          (PseudoTCRETURN_MEDIUM tglobaladdr:$dst, timm:$delta)>;
+def : Pat<(loongarch_tcret_medium (iPTR texternalsym:$dst), timm:$delta),
+          (PseudoTCRETURN_MEDIUM texternalsym:$dst, timm:$delta)>;
+def : Pat<(loongarch_tcret_large (iPTR tglobaladdr:$dst), timm:$delta),
+          (PseudoTCRETURN_LARGE tglobaladdr:$dst, timm:$delta)>;
+def : Pat<(loongarch_tcret_large (iPTR texternalsym:$dst), timm:$delta),
+          (PseudoTCRETURN_LARGE texternalsym:$dst, timm:$delta)>;
+def : Pat<(loongarch_tcret GPRT:$rj, timm:$delta),
+          (PseudoTCRETURNIndirect GPRT:$rj, timm:$delta)>;
+def : Pat<(loongarch_tcret_medium GPRT:$rj, timm:$delta),
+          (PseudoTCRETURNIndirect GPRT:$rj, timm:$delta)>;
+def : Pat<(loongarch_tcret_large GPRT:$rj, timm:$delta),
+          (PseudoTCRETURNIndirect GPRT:$rj, timm:$delta)>;
 
 // Tail call with 'Small' code model.
 let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [R3] in

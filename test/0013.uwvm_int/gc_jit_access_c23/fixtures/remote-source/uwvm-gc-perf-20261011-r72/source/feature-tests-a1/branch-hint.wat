@@ -1,0 +1,1 @@
+(module(func(export "_start")(local $i i32) loop $l local.get $i i32.const 10000 i32.lt_u (@metadata.code.branch_hint "\01") if local.get $i i32.const 1 i32.add local.set $i br $l end end local.get $i i32.const 10000 i32.ne if unreachable end))

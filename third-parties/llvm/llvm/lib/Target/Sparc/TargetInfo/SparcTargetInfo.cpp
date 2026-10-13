@@ -28,7 +28,7 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void
 LLVMInitializeSparcTargetInfo() {
   RegisterTarget<Triple::sparc, /*HasJIT=*/false> X(getTheSparcTarget(),
                                                     "sparc", "Sparc", "Sparc");
-  RegisterTarget<Triple::sparcv9, /*HasJIT=*/false> Y(
+  RegisterTarget<Triple::sparcv9, /*HasJIT=*/true> Y(
       getTheSparcV9Target(), "sparcv9", "Sparc V9", "Sparc");
   RegisterTarget<Triple::sparcel, /*HasJIT=*/false> Z(
       getTheSparcelTarget(), "sparcel", "Sparc LE", "Sparc");

@@ -1,0 +1,80 @@
+{
+  "Mac_native_execution_permitted": false,
+  "all_compilation_and_vm_commands_require_same_64GiB_swap0_original_PIDFD_guardian": true,
+  "authority_must_be_freshly_revalidated_before_each_slot": true,
+  "execution_requires_keeper_explicit_exact_suite_release": true,
+  "existing_actual_evidence_preserved": [
+    "checkpoint_s390x_clang22_r1_actual_20261003.json",
+    "windows_raii_cold_r1_actual_failure_20261003.json",
+    "windows_raii_cold_r2_actual_failure_20261003.json",
+    "windows_raii_cold_r3_actual_failure_20261003.json",
+    "freebsd_sdk_r2_actual_failure_20261003.json"
+  ],
+  "items": [
+    {
+      "actual_executed": false,
+      "commands_sha256": "bf08b4b2a0cd560beb336635f7dc12bdb96485d5a60b5270574334e27123464e",
+      "guardian_sha256": "6475e8f294b86c55eb23f07080cc3b31ae9378b098e31b8abbd9b4e0c83e8d88",
+      "id": "freebsd-sdk-link-census-r1",
+      "scope": "Read-only exact official base.txz link inventory; no extraction/compiler/guest",
+      "source_review_approved": true
+    },
+    {
+      "actual_executed": false,
+      "commands_sha256": "5165070318caba42685a4f25a9fdb77e92d0b77d0ffa7bb99cd62808a10cbf44",
+      "guardian_sha256": "54c4d1077b9edd7ad5ab315d08242750f173c1293f775b16c348601fa7938a95",
+      "id": "windows-raii-static-llvm-r4",
+      "scope": "Four SDK ABI1 standalone EH/noEH PE objects and static LLVM runtime bindings; no guest or whole ROS",
+      "source_review_approved": true
+    },
+    {
+      "actual_executed": false,
+      "commands_sha256": "f3cce57a8efbdad9c5533bf13d27236282ebb8017e5dfd7a5151939c7e256f6c",
+      "guardian_sha256": "449fd6f522fcb1ffb79391e49c53d20700e56df218bf655d8dc21402f944f175",
+      "id": "freebsd-clean-image-r1",
+      "scope": "One bounded exact QCOW2 materialization from checksum-pinned official XZ; no qemu-img/VM/compiler",
+      "source_review_approved": true
+    },
+    {
+      "actual_executed": false,
+      "id": "freebsd-serial-controller-r1",
+      "scope": "Fixed 4GiB/4E KVM/noNIC inner controller source; provider/ISO/overlay/original outer guardian qualification remains pending",
+      "source_archive_sha256": "845fd8411ddc0e606dc3165cd719369b73b309da407cba2f78623c967d347236",
+      "source_manifest_sha256": "cc11514658a1127426627f1355d6271c20b0fe2f29fad955681490136f42befa",
+      "source_review_approved": false
+    },
+    {
+      "actual_executed": false,
+      "id": "windows-regular-launcher-r1",
+      "scope": "Fresh independent regular-file fast_io/NT RAII launcher, same target SDK staticLLVM recipe; source-only 1516 providers",
+      "source_archive_sha256": "bf9a6f95d4709255cb2fcb004726016841e156d4c0948598b3b2c683a0ea002e",
+      "source_manifest_sha256": "3fc0506765f8a2b5f13e5b0efc9983ae659ba2b0453e17a7386a2ef571b6f339",
+      "source_review_approved": false
+    },
+    {
+      "actual_executed": false,
+      "id": "nt-standard-info-layout-before",
+      "scope": "Actual Windows SDK FILE_STANDARD_INFO field-width/offset before-counterexample; no BOOLEAN proposal applied",
+      "source_archive_sha256": "97e0c791c4514eb6e7de938382b185a8d9ce3e118b7487c99b8f3b3bf9ae40aa",
+      "source_manifest_sha256": "c058c6d133b3cbeb72a7af7ecc3360775cab8667384c59aca0ee91e56408672d",
+      "source_review_approved": false
+    },
+    {
+      "actual_executed": false,
+      "id": "checkpoint-caller-return-projection-BE",
+      "owner_source_archive_sha256": "28156a43f4d99d4ce458d17644163fbf2a0ff1ec303676e993339fcace2083bf",
+      "scope": "New runtime-free native i64/v128/i31/uninitialized/saved-parameter projection component; no whole-instance continuation",
+      "source_review_approved": false
+    },
+    {
+      "actual_executed": false,
+      "id": "readdir-canonical-padding-BE",
+      "owner_source_archive_sha256_prefix": "477f924a",
+      "scope": "New actual Linux SDK WASIp1 readdir 24-byte record/endian/padding sentinel fixture; old codec or other provider qualification does not cover it",
+      "source_review_approved": false
+    }
+  ],
+  "kind": "source-only-plan",
+  "native_launch_enabled": false,
+  "schema": "uwvm-qemu-platform-source-queue-r3"
+}

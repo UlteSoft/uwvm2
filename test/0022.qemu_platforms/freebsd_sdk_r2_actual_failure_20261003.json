@@ -1,0 +1,37 @@
+{
+  "ROS_LLVM23_product_qualified": false,
+  "actual_compiler_or_guest_executed": false,
+  "actual_failure": "SDK link points outside the selected provider subset",
+  "actual_remaining_roster": [
+    10154
+  ],
+  "actual_sdk_qualified": false,
+  "actual_stage_returncode": 1,
+  "all_known_original_pidfds_readable": true,
+  "kernel_memory_max_bytes": 68719476736,
+  "max_actual_owned_rss_bytes": 56426496,
+  "memory_events_after": {
+    "high": 0,
+    "low": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_group_kill": 0,
+    "oom_kill": 0
+  },
+  "original_root_pidfd": {
+    "actual_reaped_returncode": 1,
+    "pid": 330183,
+    "pidfd_readable": true
+  },
+  "preserved_failure": true,
+  "raw_archive_sha256": "a798b02b5e356481088ddd06523821b086c906dab43e3a7802fd7319c0599fae",
+  "raw_evidence_local": "/tmp/uwvm-qemu-freebsd-sdk-r2-attempt1-small-evidence",
+  "raw_manifest_sha256": "15b4e06bfb4fa7acd441784f05bd66141553728564c56c445193106320eb101c",
+  "schema": "uwvm-qemu-freebsd-sdk-r2-actual-failure-v1",
+  "source_manifest_sha256": "dc62ed97f9bf56caca5d600e7d145aabbf4c8f8e92ef191cef118be1a036473d",
+  "swap_max_bytes": 0,
+  "ticket_id": "09e7fa2678204a3981516c09e44132da",
+  "ticket_state": "retired",
+  "verified_raw_members": 9,
+  "wall_seconds": 56.58643641000526
+}

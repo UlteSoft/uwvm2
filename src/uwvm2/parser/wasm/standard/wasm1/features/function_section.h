@@ -8647,6 +8647,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
 
+        if(!typesec.core3_type_kinds.empty())
+        {
+            // The SIMD/zero-copy scanners above proved all stored type indices are in `typesec.types`.
+            // A Core 3 aggregate occupies a flat index but is not a legal function signature.
+            for(::std::size_t index{}; index != static_cast<::std::size_t>(func_count); ++index)
+            {
+                auto const type_index{static_cast<::std::size_t>(functionsec.funcs.index_unchecked(index))};
+                if(type_index >= typesec.core3_type_kinds.size() ||
+                   typesec.core3_type_kinds.index_unchecked(type_index) !=
+                       ::uwvm2::parser::wasm::standard::wasm3::type::composite_kind::function) [[unlikely]]
+                {
+                    // [section_begin ... checked type-index vector ... section_end]
+                    // [safe                                          ] unsafe (section_end is one-past)
+                    // ^^ err_curr: the section begin is diagnostic only; no byte is dereferenced.
+                    err.err_curr = section_begin;
+                    err.err_selectable.u32 = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(type_index);
+                    err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::illegal_type_index;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+            }
+        }
+
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
         // Since simd handles so much, you have to do a content check again in the usual way in debug mode
         check_function_section(sec_adl, module_storage, section_begin, section_end);

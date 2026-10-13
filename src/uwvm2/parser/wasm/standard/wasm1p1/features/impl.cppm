@@ -13,6 +13,7 @@ export import :def;
 export import :feature_def;
 export import :types;
 export import :data_count_section;
+export import :tag_section;
 export import :data_section;
 export import :element_section;
 export import :sequence;

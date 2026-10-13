@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "name": "erased-to-typed-invalid",
+      "input": "erased-to-typed-invalid.wat",
+      "kind": "wat",
+      "valid": false,
+      "tier": "tiny",
+      "features": [
+        "-WFE-reference-types",
+        "-WFE-function-references",
+        "-WFD-gc",
+        "-WFE-bulk-memory",
+        "-WFE-table-instructions",
+        "-WFD-exceptions",
+        "-WFD-threads"
+      ],
+      "disable_feature": null,
+      "wasmtime": [
+        "-W",
+        "function-references=y",
+        "-W",
+        "gc=n"
+      ],
+      "provenance": {
+        "kind": "new finite exact mixed-witness table.copy boundary"
+      },
+      "standard": "https://webassembly.github.io/spec/core/valid/instructions.html#valid-table-copy",
+      "requires_mandatory_lazy_admission": false,
+      "sha256": "ff23c9654cb7ee02f323770b8eaae75c6ea3623a30bae3532463e49e39a13753",
+      "bytes": 283
+    },
+    {
+      "name": "erased-to-struct-invalid",
+      "input": "erased-to-struct-invalid.wat",
+      "kind": "wat",
+      "valid": false,
+      "tier": "tiny",
+      "features": [
+        "-WFE-reference-types",
+        "-WFE-function-references",
+        "-WFE-gc",
+        "-WFE-bulk-memory",
+        "-WFE-table-instructions",
+        "-WFD-exceptions",
+        "-WFD-threads"
+      ],
+      "disable_feature": null,
+      "wasmtime": [
+        "-W",
+        "function-references=y",
+        "-W",
+        "gc=y"
+      ],
+      "provenance": {
+        "kind": "new finite exact mixed-witness table.copy boundary"
+      },
+      "standard": "https://webassembly.github.io/spec/core/valid/instructions.html#valid-table-copy",
+      "requires_mandatory_lazy_admission": false,
+      "sha256": "f0149c095565d24e9044e4571b0970a7b625d6e8e8c055573a7dbdf47ed59134",
+      "bytes": 273
+    },
+    {
+      "name": "typed-to-erased-valid",
+      "input": "typed-to-erased-valid.wat",
+      "kind": "wat",
+      "valid": true,
+      "tier": "tiny",
+      "features": [
+        "-WFE-reference-types",
+        "-WFE-function-references",
+        "-WFD-gc",
+        "-WFE-bulk-memory",
+        "-WFE-table-instructions",
+        "-WFD-exceptions",
+        "-WFD-threads"
+      ],
+      "disable_feature": null,
+      "wasmtime": [
+        "-W",
+        "function-references=y",
+        "-W",
+        "gc=n"
+      ],
+      "provenance": {
+        "kind": "new finite exact mixed-witness table.copy boundary"
+      },
+      "standard": "https://webassembly.github.io/spec/core/valid/instructions.html#valid-table-copy",
+      "requires_mandatory_lazy_admission": false,
+      "sha256": "6de8c448bb1c4d5c0ce02419b052a01d99b522c7a363b1c9f83746c13b0afec7",
+      "bytes": 433
+    },
+    {
+      "name": "erased-to-erased-valid",
+      "input": "erased-to-erased-valid.wat",
+      "kind": "wat",
+      "valid": true,
+      "tier": "tiny",
+      "features": [
+        "-WFE-reference-types",
+        "-WFE-function-references",
+        "-WFD-gc",
+        "-WFE-bulk-memory",
+        "-WFE-table-instructions",
+        "-WFD-exceptions",
+        "-WFD-threads"
+      ],
+      "disable_feature": null,
+      "wasmtime": [
+        "-W",
+        "function-references=y",
+        "-W",
+        "gc=n"
+      ],
+      "provenance": {
+        "kind": "new finite exact mixed-witness table.copy boundary"
+      },
+      "standard": "https://webassembly.github.io/spec/core/valid/instructions.html#valid-table-copy",
+      "requires_mandatory_lazy_admission": false,
+      "sha256": "2b31277ef1598ceb691bdb1729eceba98b16aa31cae536758d70a41cfb8bf033",
+      "bytes": 439
+    }
+  ],
+  "all_native_oracle_assembly_execution_performance_qualifications": false,
+  "source_scope": "four finite mixed legacy/rich table.copy witness cases"
+}

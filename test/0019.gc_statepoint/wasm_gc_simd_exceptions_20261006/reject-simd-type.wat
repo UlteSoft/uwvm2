@@ -1,0 +1,1 @@
+(module (tag (param v128)) (func (export "_start") i32.const 1 i8x16.abs drop))

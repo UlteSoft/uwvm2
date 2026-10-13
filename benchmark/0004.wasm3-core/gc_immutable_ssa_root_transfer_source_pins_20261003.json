@@ -1,0 +1,142 @@
+{
+  "actual_new_jit_assembly_available": false,
+  "design_document": {
+    "bytes": 10654,
+    "path": "benchmark/0004.wasm3-core/GC_IMMUTABLE_SSA_ROOT_TRANSFER_DESIGN_20261003.md",
+    "sha256": "18660de071f57a3a51f89cbeb1dcc862e056c7df4b519b85b39388b9bedea0a5"
+  },
+  "execute_ready": false,
+  "limitations": [
+    "Selected live leaves only, not a full compiler/SDK/MD closure",
+    "Existing empty-root-frame deletion is not a new candidate",
+    "No measured duplicated walk/SSA root cost inferred from source",
+    "GC31 declarations-after native qualification pending"
+  ],
+  "native_execution_performed": false,
+  "production_modified": false,
+  "schema": "uwvm-gc-immutable-ssa-root-transfer-source-observation-v1",
+  "selected_production_bytes_unchanged_during_document_write": true,
+  "source_after": {
+    "uwvm2": {
+      "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h": {
+        "bytes": 914120,
+        "sha256": "87388083c3bc3387634c4ab2f0b29ccc57899f5e59824f34c4397d2abce8e067"
+      },
+      "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h": {
+        "bytes": 77577,
+        "sha256": "c83a2540769cb8028a6174228f73b304d5fa92337b0da714913923cc36eec465"
+      },
+      "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_roots_emit.h": {
+        "bytes": 16104,
+        "sha256": "cb1d2dd535d01522228022bbb8e9e116aca9d76d0c933ddb6df95c686c0796da"
+      },
+      "src/uwvm2/runtime/gc/frame_roots.h": {
+        "bytes": 13733,
+        "sha256": "6139cee2d7efe102028af8f6b4d594ad45a60d8c5132ea1339d871408a814fa5"
+      },
+      "src/uwvm2/runtime/gc/managed_collection.h": {
+        "bytes": 22908,
+        "sha256": "132f8edea238cc92036e13a87078f1891d9b55b8d84f728aaf6f4e3a85063bf8"
+      },
+      "src/uwvm2/uwvm/runtime/storage/gc_object.h": {
+        "bytes": 298999,
+        "sha256": "18c617171c0debe088ef88fc4e17515f50fbc3a47424d0cd4a87652a6dc7a0f6"
+      }
+    },
+    "uwvm2-ros": {
+      "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h": {
+        "bytes": 852741,
+        "sha256": "413c85742929c9f978232569eaf654fb6b6ee33fae4f5e2b69f89a41cba361fb"
+      },
+      "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h": {
+        "bytes": 77577,
+        "sha256": "c83a2540769cb8028a6174228f73b304d5fa92337b0da714913923cc36eec465"
+      },
+      "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_roots_emit.h": {
+        "bytes": 16104,
+        "sha256": "cb1d2dd535d01522228022bbb8e9e116aca9d76d0c933ddb6df95c686c0796da"
+      },
+      "src/uwvm2/runtime/gc/frame_roots.h": {
+        "bytes": 13733,
+        "sha256": "6139cee2d7efe102028af8f6b4d594ad45a60d8c5132ea1339d871408a814fa5"
+      },
+      "src/uwvm2/runtime/gc/managed_collection.h": {
+        "bytes": 22908,
+        "sha256": "132f8edea238cc92036e13a87078f1891d9b55b8d84f728aaf6f4e3a85063bf8"
+      },
+      "src/uwvm2/uwvm/runtime/storage/gc_object.h": {
+        "bytes": 298999,
+        "sha256": "18c617171c0debe088ef88fc4e17515f50fbc3a47424d0cd4a87652a6dc7a0f6"
+      }
+    }
+  },
+  "source_before": {
+    "uwvm2": {
+      "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h": {
+        "bytes": 914120,
+        "sha256": "87388083c3bc3387634c4ab2f0b29ccc57899f5e59824f34c4397d2abce8e067"
+      },
+      "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h": {
+        "bytes": 77577,
+        "sha256": "c83a2540769cb8028a6174228f73b304d5fa92337b0da714913923cc36eec465"
+      },
+      "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_roots_emit.h": {
+        "bytes": 16104,
+        "sha256": "cb1d2dd535d01522228022bbb8e9e116aca9d76d0c933ddb6df95c686c0796da"
+      },
+      "src/uwvm2/runtime/gc/frame_roots.h": {
+        "bytes": 13733,
+        "sha256": "6139cee2d7efe102028af8f6b4d594ad45a60d8c5132ea1339d871408a814fa5"
+      },
+      "src/uwvm2/runtime/gc/managed_collection.h": {
+        "bytes": 22908,
+        "sha256": "132f8edea238cc92036e13a87078f1891d9b55b8d84f728aaf6f4e3a85063bf8"
+      },
+      "src/uwvm2/uwvm/runtime/storage/gc_object.h": {
+        "bytes": 298999,
+        "sha256": "18c617171c0debe088ef88fc4e17515f50fbc3a47424d0cd4a87652a6dc7a0f6"
+      }
+    },
+    "uwvm2-ros": {
+      "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h": {
+        "bytes": 852741,
+        "sha256": "413c85742929c9f978232569eaf654fb6b6ee33fae4f5e2b69f89a41cba361fb"
+      },
+      "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h": {
+        "bytes": 77577,
+        "sha256": "c83a2540769cb8028a6174228f73b304d5fa92337b0da714913923cc36eec465"
+      },
+      "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_roots_emit.h": {
+        "bytes": 16104,
+        "sha256": "cb1d2dd535d01522228022bbb8e9e116aca9d76d0c933ddb6df95c686c0796da"
+      },
+      "src/uwvm2/runtime/gc/frame_roots.h": {
+        "bytes": 13733,
+        "sha256": "6139cee2d7efe102028af8f6b4d594ad45a60d8c5132ea1339d871408a814fa5"
+      },
+      "src/uwvm2/runtime/gc/managed_collection.h": {
+        "bytes": 22908,
+        "sha256": "132f8edea238cc92036e13a87078f1891d9b55b8d84f728aaf6f4e3a85063bf8"
+      },
+      "src/uwvm2/uwvm/runtime/storage/gc_object.h": {
+        "bytes": 298999,
+        "sha256": "18c617171c0debe088ef88fc4e17515f50fbc3a47424d0cd4a87652a6dc7a0f6"
+      }
+    }
+  },
+  "status": "design-only",
+  "upstream": [
+    {
+      "bytes": 17475,
+      "read_only": true,
+      "sha256": "a6ac6f742b68c1390d78c973b6e31809e2ad1a84366684b09e9dfd84b231b733",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/func_environ/gc/copying.rs"
+    },
+    {
+      "bytes": 46826,
+      "read_only": true,
+      "sha256": "2f014aa49e4380c586f95edbfa900a78538c41724cbc7f81193fc1327313fc29",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/wasmtime/src/runtime/vm/gc/enabled/copying.rs"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+(module (type $p (sub (array (mut i32)))) (type $c (sub $p (array (mut i32))))  (func (export "_start") (local $a (ref null $p)) i32.const 42 i32.const 19 array.new $c local.set $a local.get $a ref.cast (ref $p) array.len i32.const 19 i32.ne if unreachable end local.get $a local.get $a i32.const 1 select array.len i32.const 19 i32.ne if unreachable end))

@@ -1547,6 +1547,20 @@ bool PPCFastISel::fastLowerCall(CallLoweringInfo &CLI) {
   if (!Callee && !Symbol)
     return false;
 
+  // The private MCJIT TOC-tail ABI requires explicit global-entry transfers
+  // and caller TOC restores for ordinary calls too. FastISel's direct BL/NOP
+  // path bypasses that SelectionDAG contract at O0. Decline these exact
+  // opt-in callers/callees before creating any call instructions.
+  const Function &Caller = FuncInfo.MF->getFunction();
+  const auto HasTOCTailABI = [](const Function *F) {
+    return F && !F->isVarArg() && F->getCallingConv() == CallingConv::C &&
+           F->getFnAttribute("uwvm-ppc64-toc-tail").getValueAsString() == "1";
+  };
+  if (Subtarget->is64BitELFABI() &&
+      (HasTOCTailABI(&Caller) ||
+       HasTOCTailABI(dyn_cast_or_null<Function>(Callee))))
+    return false;
+
   // Allow SelectionDAG isel to handle tail calls and long calls.
   if (IsTailCall || Subtarget->useLongCalls())
     return false;

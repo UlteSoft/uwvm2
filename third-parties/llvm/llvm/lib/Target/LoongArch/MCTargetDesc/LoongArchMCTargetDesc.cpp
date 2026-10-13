@@ -69,6 +69,19 @@ static MCAsmInfo *createLoongArchMCAsmInfo(const MCRegisterInfo &MRI,
   MCCFIInstruction Inst = MCCFIInstruction::cfiDefCfa(nullptr, SP, 0);
   MAI->addInitialFrameState(Inst);
 
+  // Make the C ABI's initial GPR preservation explicit in the CIE. Missing
+  // rows are not evidence of same-value to a strict stopped-frame reader.
+  // Prologue offsets and epilogue same-value rows override these rules at
+  // the actual spill/restore PCs. No volatile, TP or FP/vector rule is added.
+  MAI->addInitialFrameState(MCCFIInstruction::createSameValue(
+      nullptr, MRI.getDwarfRegNum(LoongArch::R1, true)));
+  for (unsigned Reg : {LoongArch::R22, LoongArch::R23, LoongArch::R24,
+                       LoongArch::R25, LoongArch::R26, LoongArch::R27,
+                       LoongArch::R28, LoongArch::R29, LoongArch::R30,
+                       LoongArch::R31})
+    MAI->addInitialFrameState(MCCFIInstruction::createSameValue(
+        nullptr, MRI.getDwarfRegNum(Reg, true)));
+
   return MAI;
 }
 

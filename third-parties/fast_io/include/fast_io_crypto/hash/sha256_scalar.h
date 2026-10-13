@@ -17,7 +17,7 @@ inline constexpr auto k256scalar{create_k256scalar()};
 inline ::std::uint_least32_t sha256_load_be32_unaligned(::std::byte const *p) noexcept
 {
 	::std::uint_least32_t word{};
-	::std::memcpy(__builtin_addressof(word), p, sizeof(word));
+	::fast_io::details::my_memcpy(__builtin_addressof(word), p, sizeof(word));
 	return ::fast_io::big_endian(word);
 }
 

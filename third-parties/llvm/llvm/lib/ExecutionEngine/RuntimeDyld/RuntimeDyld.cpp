@@ -971,6 +971,9 @@ void RuntimeDyldImpl::addRelocationForSymbol(const RelocationEntry &RE,
   }
 }
 
+// The public downstream capability query is tied to this compiled library.
+unsigned RuntimeDyld::getUWVMELFLoaderCapabilities() noexcept { return 3u; }
+
 uint8_t *RuntimeDyldImpl::createStubFunction(uint8_t *Addr,
                                              unsigned AbiVariant) {
   if (Arch == Triple::aarch64 || Arch == Triple::aarch64_be ||
@@ -1048,6 +1051,27 @@ uint8_t *RuntimeDyldImpl::createStubFunction(uint8_t *Addr,
     writeBytesUnaligned(DaddiuATInstr, Addr + 20, 4);
     writeBytesUnaligned(JrATInstr, Addr + 24, 4);
     writeBytesUnaligned(NopInstr, Addr + 28, 4);
+    return Addr;
+  } else if (Arch == Triple::ppc || Arch == Triple::ppcle) {
+    // ELF32 uses direct code pointers. Tail jump preserves the original LR;
+    // r12 is ABI scratch and no native stack or VM context is exposed.
+    writeInt32BE(Addr,      0x3d800000); // lis r12,hi(addr)
+    writeInt32BE(Addr + 4,  0x618c0000); // ori r12,r12,lo(addr)
+    writeInt32BE(Addr + 8,  0x7d8903a6); // mtctr r12
+    writeInt32BE(Addr + 12, 0x4e800420); // bctr
+    return Addr;
+  } else if (Arch == Triple::sparcv9) {
+    // V9 ABI g1/g5 are volatile scratch. Build all 64 address bits without
+    // touching o7, sp, or rotating a register window; jmpl writes g0 so the
+    // original call's return address survives. The delay slot is a nop.
+    writeInt32BE(Addr,      0x03000000); // sethi %hh(addr),g1
+    writeInt32BE(Addr + 4,  0x82106000); // or g1,%hm(addr),g1
+    writeInt32BE(Addr + 8,  0x83287020); // sllx g1,32,g1
+    writeInt32BE(Addr + 12, 0x0b000000); // sethi %lm(addr),g5
+    writeInt32BE(Addr + 16, 0x8a116000); // or g5,%lo(addr),g5
+    writeInt32BE(Addr + 20, 0x82104005); // or g1,g5,g1
+    writeInt32BE(Addr + 24, 0x81c06000); // jmpl g1,g0
+    writeInt32BE(Addr + 28, 0x01000000); // nop
     return Addr;
   } else if (Arch == Triple::ppc64 || Arch == Triple::ppc64le) {
     // Depending on which version of the ELF ABI is in use, we need to

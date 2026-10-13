@@ -40,8 +40,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     struct wasm1p1_sequence_storage_t
     {
         // Index is the section id; value is the canonical order. 0 keeps custom sections free-positioned.
-        // WebAssembly 1.1 inserts data count (id 12) between element and code.
-        inline static constexpr ::uwvm2::utils::container::array<::uwvm2::parser::wasm::binfmt::ver1::wasm_order_t, 13uz> section_id_sequential_mapping_table{
+        // Data count precedes code; Core 3 tag (id 13) follows memory and precedes global.
+        inline static constexpr ::uwvm2::utils::container::array<::uwvm2::parser::wasm::binfmt::ver1::wasm_order_t, 14uz> section_id_sequential_mapping_table{
             {
              0u,   // custom
                 1u,   // type
@@ -49,18 +49,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
                 3u,   // function
                 4u,   // table
                 5u,   // memory
-                6u,   // global
-                7u,   // export
-                8u,   // start
-                9u,   // element
-                11u,  // code
-                12u,  // data
-                10u   // data count
+                7u,   // global
+                8u,   // export
+                9u,   // start
+                10u,  // element
+                12u,  // code
+                13u,  // data
+                11u,  // data count
+                6u    // Core 3 tag
             }
         };
 
         inline static constexpr ::uwvm2::parser::wasm::binfmt::ver1::wasm_order_t custom_name_order{
-            ::uwvm2::parser::wasm::binfmt::ver1::wasm_order_add_or_overflow_die_chain(12u, 1u)};
+            ::uwvm2::parser::wasm::binfmt::ver1::wasm_order_add_or_overflow_die_chain(13u, 1u)};
 
         inline static constexpr ::std::initializer_list<::uwvm2::parser::wasm::binfmt::ver1::details::mapping_entry>
             custom_section_sequential_mapping_table_entries{

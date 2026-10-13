@@ -1,0 +1,38 @@
+;; Checkpoint runtime integration fixture: Core 3 + threads, with state that a
+;; linear-memory-only dump cannot preserve. The schema/codec component test is
+;; separate; this fixture requires the actual private runtime checkpoint bridge.
+(module
+  (rec
+    (type $node (struct (field (mut (ref null $node))) (field (mut i8))))
+    (type $nodes (array (mut (ref null $node)))))
+  (tag $exception (param (ref null $node) i64))
+  (memory (export "memory") i64 1 1 shared)
+  (table (export "nodes") i64 2 4 (ref null $node))
+  (global $root (mut (ref null $node)) (ref.null $node))
+  (data $passive "\01\02\ff\00")
+  (elem $passive_refs (ref null $node) (ref.null $node) (ref.null $node))
+  (func (export "run") (result i64)
+    (local $node (ref null $node))
+    (local $nodes (ref null $nodes))
+    (local $small (ref null i31))
+    (local $vector v128)
+    (local.set $node (struct.new $node (ref.null $node) (i32.const 255)))
+    (global.set $root (local.get $node))
+    ;; Cycle and alias must restore as the same object, not copied objects.
+    (struct.set $node 0 (local.get $node) (local.get $node))
+    (local.set $nodes (array.new $nodes (local.get $node) (i32.const 3)))
+    (local.set $small (ref.i31 (i32.const -1)))
+    (local.set $vector (v128.const i32x4 1 2 3 4))
+    (table.set (i64.const 1) (local.get $node))
+    (memory.init $passive (i64.const 16) (i32.const 0) (i32.const 4))
+    (data.drop $passive)
+    (elem.drop $passive_refs)
+    (drop (i32.atomic.rmw.add (i64.const 0) (i32.const 1)))
+    (block $caught (result (ref null $node) i64)
+      (try_table (catch $exception $caught)
+        (throw $exception (local.get $node) (i64.const 77)))
+      (ref.null $node)
+      (i64.const 0))
+    (drop)
+    (drop)
+    (i64.const 42)))

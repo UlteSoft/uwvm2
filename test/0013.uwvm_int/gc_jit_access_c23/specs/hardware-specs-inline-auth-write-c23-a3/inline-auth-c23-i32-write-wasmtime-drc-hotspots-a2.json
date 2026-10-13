@@ -1,0 +1,33 @@
+{
+  "label": "inline-auth-c23-i32-write-wasmtime-drc-hotspots-a2",
+  "case": "i32-write",
+  "kind": "typed-numeric-store",
+  "dir": "/tmp/uwvm-gc-perf-20261011-r74/profiles/inline-auth-c23-i32-write-wasmtime-drc-hotspots-a2",
+  "analysis": "hotspots",
+  "interval": 25,
+  "reps": 9344,
+  "configuration_only": false,
+  "elf": "/tmp/uwvm-gc-perf-20261011-r73/build/wasmtime-bench",
+  "elf_sha": "28d8f798aafea8020b877cb9de888684744fe538475402de034f664725f7ef6d",
+  "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i32-write.wasm",
+  "wasm_sha": "71c7b69cc0238e3e6151b362f73f82f7691ecf35365b75b4bfa7c4d142f515a0",
+  "cmd": [
+    "/tmp/uwvm-gc-perf-20261011-r73/build/wasmtime-bench",
+    "/tmp/uwvm-gc-perf-20261011-r74/source/typed-array-store-bench-c21/i32-write.wasm"
+  ],
+  "passthru": [
+    "-run-pass-thru=--perf-threads=none",
+    "-run-pass-thru=-user-mode-only",
+    "-run-pass-thru=-no-system-wide",
+    "-run-pass-thru=-no-stack",
+    "-run-pass-thru=-cpu-mask=2,16"
+  ],
+  "minimum_elapsed_ns": 500000000,
+  "boot": "e000195b-afa2-4a53-93ba-1fb8e28eac03",
+  "native_experiment_env": {},
+  "variant": "wasmtime-drc",
+  "worker_sha_expected": "642ebb93249990766bf1c4da5ccb6c853a9105e8c84ef4c062f375fbc7bd5ffd",
+  "parent_spec_sha": "b8a520e5d9fe8f71b57b62f4109e159cf231f5bac7f0f11e83d959c7a9de6b36",
+  "source_clock_sha": "a906f1d55e5a38bc66399451ea86e5e1847adb9d11b24cb8db6ac477f05f5313",
+  "scope": "Same Wasm numeric store; reps separately calibrated>=1.2s. No raw total crossVMcounter ratio claim."
+}

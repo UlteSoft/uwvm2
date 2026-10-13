@@ -1,0 +1,42 @@
+{
+  "status": "SOURCE_ONLY_UNAPPLIED",
+  "precondition": "companion full-prepare patch; no all-view rebuild after live preload starts",
+  "repositories": {
+    "uwvm2": {
+      "src/uwvm2/uwvm/runtime/storage/wasm_module.h": {
+        "original_bytes_sha256": "f8d8843c57696ef2390e8380e4370b05645e32574c48bad8f1fc0ab134c83138",
+        "candidate_text_sha256": "7c7a86262ba3539d062a8d5d147e7d8a6c4b1182a077c8aecf553bfbf41500c0"
+      },
+      "src/uwvm2/runtime/compiler/uwvm_int/optable/wasm1p1.h": {
+        "original_bytes_sha256": "3fa523807f66ea0db6fde2b972786357da857863e8d172a665134fa836221653",
+        "candidate_text_sha256": "d3d5d4657bed67f5dbd1bf3952a215710b4767d8dcae18b9ff5a9157a7f1a3b0"
+      },
+      "src/uwvm2/runtime/lib/uwvm_runtime.default.cpp": {
+        "original_bytes_sha256": "085e44168ad0ef7f413e971b1a5d513a2b7ace24909e9e520831e95ec1bcde99",
+        "candidate_text_sha256": "18df3f68d6e2d89e916322892aa87f689fc047a25c3bf4cf9b5cf54695c38e45"
+      },
+      "src/uwvm2/uwvm/runtime/initializer/init.h": {
+        "original_bytes_sha256": "4377c19758ab6c1caefe2a52dfea63c00925e089ee4f196f74a3b2e0e7816c7c",
+        "candidate_text_sha256": "13d89760fb2071f95a9b06a79cf64e2d8d77992dbc2d4010ad575cee19493fd1"
+      }
+    },
+    "uwvm2-ros": {
+      "src/uwvm2/uwvm/runtime/storage/wasm_module.h": {
+        "original_bytes_sha256": "f8d8843c57696ef2390e8380e4370b05645e32574c48bad8f1fc0ab134c83138",
+        "candidate_text_sha256": "7c7a86262ba3539d062a8d5d147e7d8a6c4b1182a077c8aecf553bfbf41500c0"
+      },
+      "src/uwvm2/runtime/compiler/uwvm_int/optable/wasm1p1.h": {
+        "original_bytes_sha256": "0beb90af48b9275f9e558b9bb8aff489504d3d8d6471c130524652dba76277a4",
+        "candidate_text_sha256": "b415153344bcb7a6fe8d74a03b00fdb059bc8fa98ecd795a3ecc2f7e797c9085"
+      },
+      "src/uwvm2/runtime/lib/uwvm_runtime.default.cpp": {
+        "original_bytes_sha256": "fd6b1f3c8f737c959ed0293ff2e1e8d3938264dee4d48f23c98a8a3f1b183c9b",
+        "candidate_text_sha256": "42e66c45f10555273ae7f04a1a9aebf71693e2cf5ca989089ded926b2689aca1"
+      },
+      "src/uwvm2/uwvm/runtime/initializer/init.h": {
+        "original_bytes_sha256": "26aab1c918b41421ddbf9f9ce8c9f659d97dd2c3189b390ebb9b0d982168ab47",
+        "candidate_text_sha256": "1bb4b58c910c8e102dd10fea7851c3ba0f56285c4f5ae503e9ca78eb7562934f"
+      }
+    }
+  }
+}

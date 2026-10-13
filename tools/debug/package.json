@@ -1,0 +1,95 @@
+{
+  "name": "uwvm-llvm-full-debug",
+  "displayName": "UWVM LLVM Full Debug",
+  "publisher": "uwvm",
+  "version": "0.1.0",
+  "description": "Attach VS Code to a host-authorized UWVM LLVM-full debugger broker",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": ["Debuggers"],
+  "main": "./extension.js",
+  "activationEvents": ["onDebug:uwvm-llvm-full"],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    }
+  },
+  "contributes": {
+    "breakpoints": [
+      {"language": "c"},
+      {"language": "cpp"},
+      {"language": "rust"},
+      {"language": "wat"}
+    ],
+    "debuggers": [
+      {
+        "type": "uwvm-llvm-full",
+        "label": "UWVM LLVM Full",
+        "languages": ["c", "cpp", "rust", "wat"],
+        "configurationAttributes": {
+          "attach": {
+            "required": [],
+            "properties": {
+              "socketDir": {
+                "type": "string",
+                "description": "Host-owned Unix broker directory (Linux/macOS)."
+              },
+              "pipeName": {
+                "type": "string",
+                "description": "Host-owned Windows broker named pipe."
+              },
+              "capability": {
+                "type": "string",
+                "description": "Windows broker capability. Use a prompted input; never commit it."
+              },
+              "moduleId": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Defined Wasm module for source breakpoints; defaults to 0."
+              },
+              "pythonPath": {
+                "type": "string",
+                "description": "Host Python 3 executable for the DAP adapter."
+              },
+              "stepLevel": {
+                "type": "string",
+                "enum": ["source", "wasm", "native"],
+                "default": "source",
+                "description": "Default statement stepping level. Source requires embedded -g DWARF; wasm/native stepIn executes exactly one Wasm/native instruction. Explicit line/instruction requests remain source/native. Native enables bounded current-function disassembly display after a real owned-code query; source/wasm references do not grant native code access."
+              }
+            }
+          }
+        },
+        "configurationSnippets": [
+          {
+            "label": "UWVM LLVM Full: attach to Unix broker",
+            "description": "Attach after an owner-authorized Linux/macOS broker has launched the VM.",
+            "body": {
+              "type": "uwvm-llvm-full",
+              "request": "attach",
+              "name": "UWVM LLVM Full (Unix)",
+              "socketDir": "${1:/path/to/private/broker}",
+              "moduleId": 0,
+              "stepLevel": "source"
+            }
+          },
+          {
+            "label": "UWVM LLVM Full: attach to Windows broker",
+            "description": "Attach to an owner-authorized named pipe with a prompted capability.",
+            "body": {
+              "type": "uwvm-llvm-full",
+              "request": "attach",
+              "name": "UWVM LLVM Full (Windows)",
+              "pipeName": "${1:\\\\.\\pipe\\uwvm-debug-host-...}",
+              "capability": "${input:uwvmDebugCapability}",
+              "moduleId": 0,
+              "stepLevel": "source"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,1 @@
+(module (type $A (array (mut f32))) (func $factory (result (ref $A)) i32.const 99 f32.reinterpret_i32 i32.const 31 array.new $A ) (func (export "_start") (local $a (ref null $A)) (local $b (ref null $A)) (local $n i32) call $factory local.set $a local.get $a i32.const 30 array.get $A i32.reinterpret_f32 i32.const 99 i32.ne if unreachable end ))

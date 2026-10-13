@@ -1,0 +1,263 @@
+#pragma once
+
+// Error-returning reads of factory-created, synchronous, readonly NT files.
+// Include through the hosted filesystem umbrella, after the native provider.
+// Arbitrary/asynchronous handles cannot be adopted through this interface.
+#if defined(_WIN32) && !defined(_WIN32_WINDOWS) && !defined(__CYGWIN__) && !defined(__WINE__) && !defined(__BIONIC__)
+namespace fast_io
+{
+class nt_readonly_sync_file;
+struct nt_readonly_sync_open_result;
+struct nt_readonly_sync_status_result;
+struct nt_readonly_sync_read_result;
+struct nt_readonly_sync_operation_result;
+
+inline nt_readonly_sync_open_result nt_open_readonly_sync_nothrow(char16_t const*) noexcept;
+inline nt_readonly_sync_status_result nt_readonly_sync_status_nothrow(nt_readonly_sync_file const&) noexcept;
+inline nt_readonly_sync_read_result nt_readonly_sync_read_nothrow(nt_readonly_sync_file&, void*, ::std::size_t) noexcept;
+inline nt_readonly_sync_operation_result nt_readonly_sync_close_nothrow(nt_readonly_sync_file&) noexcept;
+
+class nt_readonly_sync_file
+{
+private:
+	// The native_file owners alone close their handles. The factory supplies no
+	// FILE_FLAG_OVERLAPPED, and the private event is never a guest capability.
+	native_file file_{};
+	native_file event_{};
+	friend nt_readonly_sync_open_result nt_open_readonly_sync_nothrow(char16_t const*) noexcept;
+	friend nt_readonly_sync_status_result nt_readonly_sync_status_nothrow(nt_readonly_sync_file const&) noexcept;
+	friend nt_readonly_sync_read_result nt_readonly_sync_read_nothrow(nt_readonly_sync_file&, void*, ::std::size_t) noexcept;
+	friend nt_readonly_sync_operation_result nt_readonly_sync_close_nothrow(nt_readonly_sync_file&) noexcept;
+public:
+	inline constexpr nt_readonly_sync_file() noexcept = default;
+	nt_readonly_sync_file(nt_readonly_sync_file const&) = delete;
+	nt_readonly_sync_file& operator=(nt_readonly_sync_file const&) = delete;
+	nt_readonly_sync_file(nt_readonly_sync_file&&) noexcept = default;
+	nt_readonly_sync_file& operator=(nt_readonly_sync_file&&) noexcept = default;
+	inline explicit constexpr operator bool() const noexcept { return static_cast<bool>(file_); }
+};
+
+struct nt_readonly_sync_operation_result
+{
+	::fast_io::error error{};
+	inline explicit constexpr operator bool() const noexcept { return error.code == 0; }
+};
+struct nt_readonly_sync_status_result
+{
+	posix_file_status value{};
+	::fast_io::error error{};
+	inline explicit constexpr operator bool() const noexcept { return error.code == 0; }
+};
+struct nt_readonly_sync_read_result
+{
+	::std::size_t transferred{};
+	::fast_io::error error{};
+	inline explicit constexpr operator bool() const noexcept { return error.code == 0; }
+};
+struct nt_readonly_sync_open_result
+{
+	nt_readonly_sync_file file{};
+	::fast_io::error error{};
+	inline nt_readonly_sync_open_result(nt_readonly_sync_file&& owner, ::fast_io::error native_error) noexcept
+		: file(static_cast<nt_readonly_sync_file&&>(owner)), error(native_error) {}
+	nt_readonly_sync_open_result(nt_readonly_sync_open_result const&) = delete;
+	nt_readonly_sync_open_result& operator=(nt_readonly_sync_open_result const&) = delete;
+	nt_readonly_sync_open_result(nt_readonly_sync_open_result&&) noexcept = default;
+	nt_readonly_sync_open_result& operator=(nt_readonly_sync_open_result&&) noexcept = default;
+	inline explicit constexpr operator bool() const noexcept { return error.code == 0 && static_cast<bool>(file); }
+};
+
+inline nt_readonly_sync_status_result nt_readonly_sync_status_nothrow(nt_readonly_sync_file const& owner) noexcept
+{
+	if (!owner.file_) [[unlikely]]
+	{
+		return {{}, {::fast_io::nt_domain_value, 0xc0000008u}}; // STATUS_INVALID_HANDLE
+	}
+	auto const handle{owner.file_.native_handle()};
+	// Reject every non-disk type (including FILE_TYPE_UNKNOWN) as an explicit
+	// factory policy, before a disk-information query touches a device or pipe.
+	// This does not interpret an old last-error as a native type-query failure.
+	if (::fast_io::win32::GetFileType(handle) != 1u) [[unlikely]]
+	{
+		return {{}, {::fast_io::win32_domain_value, 5u}}; // ERROR_ACCESS_DENIED: non-disk policy
+	}
+	::fast_io::win32::by_handle_file_information information{};
+	// Native APIs write only the complete owned object, with its SDK extent.
+	// [safe information sizeof(information)] unsafe
+	//       ^^ output buffer
+	if (!::fast_io::win32::GetFileInformationByHandle(handle, __builtin_addressof(information))) [[unlikely]]
+	{
+		auto const native_error{::fast_io::win32::GetLastError()};
+		return {{}, {::fast_io::win32_domain_value, native_error}};
+	}
+	::fast_io::win32::nt::io_status_block block{};
+	::fast_io::win32::nt::file_basic_information basic{};
+	// A factory-created synchronous file completes this query before return.
+	// [safe basic sizeof(basic)] unsafe
+	//       ^^ output buffer
+	auto const status{::fast_io::win32::nt::nt_query_information_file<false>(handle,
+		__builtin_addressof(block), __builtin_addressof(basic),
+		static_cast<::std::uint_least32_t>(sizeof(basic)),
+		::fast_io::win32::nt::file_information_class::FileBasicInformation)};
+	if (status == 0x103u) [[unlikely]]
+	{
+		// STATUS_PENDING cannot release a still kernel-referenced stack object.
+		// This is a synchronous-provider contract failure, not an ordinary IO
+		// error. QueryInformationFile has no completion-event argument; fail
+		// stopped rather than returning a dangling IOSB/information buffer.
+		::fast_io::fast_terminate();
+	}
+	if (status != 0) [[unlikely]]
+	{
+		return {{}, {::fast_io::nt_domain_value, status}};
+	}
+	if (block.Information < sizeof(basic)) [[unlikely]]
+	{
+		return {{}, {::fast_io::nt_domain_value, 0xc0000004u}}; // STATUS_INFO_LENGTH_MISMATCH
+	}
+	auto const attributes{information.dwFileAttributes | basic.FileAttributes};
+	auto type{::fast_io::file_type::regular};
+	if ((attributes & 0x400u) != 0u) { type = ::fast_io::file_type::symlink; }
+	else if ((attributes & 0x10u) != 0u) { type = ::fast_io::file_type::directory; }
+	::std::underlying_type_t<::fast_io::perms> permissions{0444};
+	if ((attributes & 1u) == 0u) { permissions |= 0222; }
+	// These are SDK integer fields, not a byte-stream endian decoder.
+	auto const size{(static_cast<::std::uint_least64_t>(information.nFileSizeHigh) << 32u) | information.nFileSizeLow};
+	auto const inode{(static_cast<::std::uint_least64_t>(information.nFileIndexHigh) << 32u) | information.nFileIndexLow};
+	return {{static_cast<::std::uintmax_t>(information.dwVolumeSerialNumber), static_cast<::std::uintmax_t>(inode),
+		static_cast<::fast_io::perms>(permissions), type, static_cast<::std::uintmax_t>(information.nNumberOfLinks),
+		0, 0, 0, static_cast<::std::uintmax_t>(size), 131072, static_cast<::std::uintmax_t>(size >> 9u),
+		::fast_io::win32::nt::details::to_unix_timestamp(basic.LastAccessTime),
+		::fast_io::win32::nt::details::to_unix_timestamp(basic.LastWriteTime),
+		::fast_io::win32::nt::details::to_unix_timestamp(basic.ChangeTime),
+		::fast_io::win32::nt::details::to_unix_timestamp(basic.CreationTime), 0, 0}, {}};
+}
+
+inline nt_readonly_sync_open_result nt_open_readonly_sync_nothrow(char16_t const* validated_nul_path) noexcept
+{
+	if (validated_nul_path == nullptr) [[unlikely]]
+	{
+		return {{}, {::fast_io::win32_domain_value, 87u}}; // ERROR_INVALID_PARAMETER
+	}
+	// The caller/converter provides a live NUL-terminated UTF-16 path. No path
+	// pointer is advanced here. OPEN_EXISTING does not create/truncate. Omitting
+	// FILE_FLAG_OVERLAPPED establishes the factory's synchronous-file contract;
+	// READ-only sharing rejects incompatible write/delete opens. It does not
+	// prove that no older writable mapping exists after its write handle closed;
+	// callers still compare metadata, validate their OWNED copy, and check ABI.
+	// OPEN_REPARSE_POINT makes the final reparse object inspectable.
+	auto const handle{::fast_io::win32::CreateFileW(validated_nul_path, 0x80000000u, 1u,
+		nullptr, 3u, 0x00200000u | 0x08000000u, nullptr)};
+	if (handle == reinterpret_cast<void*>(static_cast<::std::intptr_t>(-1))) [[unlikely]]
+	{
+		auto const native_error{::fast_io::win32::GetLastError()};
+		return {{}, {::fast_io::win32_domain_value, native_error}};
+	}
+	nt_readonly_sync_file owner{};
+	owner.file_ = native_file{handle}; // immediate single-owner adoption
+	auto const metadata{nt_readonly_sync_status_nothrow(owner)};
+	if (!metadata) [[unlikely]] { return {{}, metadata.error}; }
+	if (metadata.value.type != ::fast_io::file_type::regular) [[unlikely]]
+	{
+		return {{}, {::fast_io::win32_domain_value, 5u}}; // reparse/directory policy
+	}
+	void* event_handle{};
+	auto const event_status{::fast_io::win32::nt::nt_create_event<false>(__builtin_addressof(event_handle),
+		0x00100002u, static_cast<::fast_io::win32::nt::object_attributes*>(nullptr),
+		::fast_io::win32::nt::event_type::SynchronizationEvent, static_cast<::std::uint_least8_t>(0))};
+	if (event_handle != nullptr) { owner.event_ = native_file{event_handle}; }
+	if (event_status != 0u) [[unlikely]] { return {{}, {::fast_io::nt_domain_value, event_status}}; }
+	if (!owner.event_) [[unlikely]] { return {{}, {::fast_io::nt_domain_value, 0xc0000008u}}; }
+	return {static_cast<nt_readonly_sync_file&&>(owner), {}};
+}
+
+template <::fast_io::constructible_to_os_c_str T>
+inline nt_readonly_sync_open_result nt_open_readonly_sync_nothrow(T const& path)
+{
+	// Reuse fast_io's OS encoding/conversion and terminated owned path lifetime.
+	// Native filesystem failures return domain+code identically in EH/noEH.
+	return ::fast_io::nt_api_common(path, [](char16_t const* native_path) noexcept
+	{
+		return ::fast_io::nt_open_readonly_sync_nothrow(native_path);
+	});
+}
+
+inline nt_readonly_sync_read_result nt_readonly_sync_read_nothrow(nt_readonly_sync_file& owner, void* buffer, ::std::size_t count) noexcept
+{
+	// One exclusive host operation at a time; external synchronization is the
+	// same precondition as native_file. No arbitrary HANDLE can reach this API.
+	if (!owner.file_ || !owner.event_) [[unlikely]]
+	{
+		return {0, {::fast_io::nt_domain_value, 0xc0000008u}};
+	}
+	if (count > 0xffffffffu || (count != 0 && buffer == nullptr)) [[unlikely]]
+	{
+		return {0, {::fast_io::win32_domain_value, 87u}};
+	}
+	if (count == 0) { return {}; }
+	auto const reset_status{::fast_io::win32::nt::nt_reset_event<false>(owner.event_.native_handle(),
+		static_cast<::std::uint_least32_t*>(nullptr))};
+	if (reset_status != 0u) [[unlikely]] { return {0, {::fast_io::nt_domain_value, reset_status}}; }
+	::fast_io::win32::nt::io_status_block block{};
+	block.Status = 0x103u;
+	// The caller owns at least count writable bytes. count has been narrowed
+	// before the native call; this function never forms buffer+count or advances
+	// the pointer, and block/buffer remain live through any pending completion.
+	// [safe buffer count] unsafe
+	//       ^^ native write cursor
+	auto status{::fast_io::win32::nt::nt_read_file<false>(owner.file_.native_handle(), owner.event_.native_handle(),
+		static_cast<::fast_io::win32::nt::pio_apc_routine>(nullptr), nullptr, __builtin_addressof(block), buffer,
+		static_cast<::std::uint_least32_t>(count), static_cast<::std::int_least64_t*>(nullptr),
+		static_cast<::std::uint_least32_t*>(nullptr))};
+	if (status == 0x103u) [[unlikely]]
+	{
+		// Wait on the private event, never on a synchronous file handle. The
+		// non-alertable, infinite wait keeps the kernel's IOSB/buffer references
+		// alive until completion; no retry creates a second read request.
+		auto const wait_status{::fast_io::win32::nt::nt_wait_for_single_object<false>(owner.event_.native_handle(), 0,
+			static_cast<::std::uint_least64_t*>(nullptr))};
+		if (wait_status != 0u) [[unlikely]]
+		{
+			// A failed wait cannot return while the outstanding request may still
+			// reference buffer/IOSB. Fail stopped without stack unwinding/freeing.
+			::fast_io::fast_terminate();
+		}
+		status = block.Status;
+	}
+	else if (status == 0u) { status = block.Status; }
+	if (status == 0x103u) [[unlikely]] { ::fast_io::fast_terminate(); }
+	if (status == 0xc0000011u) { return {}; } // STATUS_END_OF_FILE
+	if (status != 0u) [[unlikely]] { return {0, {::fast_io::nt_domain_value, status}}; }
+	if (block.Information > count) [[unlikely]]
+	{
+		return {0, {::fast_io::nt_domain_value, 0xc0000004u}};
+	}
+	return {block.Information, {}};
+}
+
+inline nt_readonly_sync_operation_result nt_readonly_sync_close_nothrow(nt_readonly_sync_file& owner) noexcept
+{
+	if (!owner.file_ && !owner.event_) [[unlikely]]
+	{
+		return {{::fast_io::nt_domain_value, 0xc0000008u}}; // STATUS_INVALID_HANDLE
+	}
+	// No pending operation may reach this function. Release both owners before
+	// their respective one-shot close, so error paths/destructors never retry a
+	// recycled handle. Keep the first real NT status without errno conversion.
+	::fast_io::error first_error{};
+	auto const file_handle{owner.file_.release()};
+	if (file_handle != nullptr)
+	{
+		auto const status{::fast_io::win32::nt::nt_close<false>(file_handle)};
+		if (status != 0u) { first_error = {::fast_io::nt_domain_value, status}; }
+	}
+	auto const event_handle{owner.event_.release()};
+	if (event_handle != nullptr)
+	{
+		auto const status{::fast_io::win32::nt::nt_close<false>(event_handle)};
+		if (status != 0u && first_error.code == 0) { first_error = {::fast_io::nt_domain_value, status}; }
+	}
+	return {first_error};
+}
+} // namespace fast_io
+#endif

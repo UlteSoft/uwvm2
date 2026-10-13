@@ -1,0 +1,274 @@
+{
+  "schema": "uwvm-eh-two-phase-source-v1",
+  "source_only": true,
+  "native_execution_passed": false,
+  "production_changed_paths": [],
+  "component": "two_phase_policy.cc",
+  "provider": "fixtures/provider.wat",
+  "cli_triples": [
+    "accept|reject",
+    "none|table|global|element|function|local",
+    "actual.official.wasm"
+  ],
+  "features_parse_init": "all enabled; especially GC/function-references/exceptions/reference-types",
+  "validation_changes": [
+    "disable_exceptions only"
+  ],
+  "gc_must_remain_enabled": true,
+  "first_before_fixture": "table_exn",
+  "expected_first_before": "strict EH policy must reject; current accepting observation is a failing regression, never qualification PASS",
+  "lazy_scope": "ordinary actual compile-unit materialization; ROS full only",
+  "llvm_checks": "optional LLVM full/lazy emits actual IR and full verifies it",
+  "fixtures": [
+    {
+      "name": "table_exn",
+      "wat": "fixtures/table_exn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "table",
+      "provider": null,
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "global_exn",
+      "wat": "fixtures/global_exn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "global",
+      "provider": null,
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "element_exn",
+      "wat": "fixtures/element_exn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "element",
+      "provider": null,
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "import_table_exn",
+      "wat": "fixtures/import_table_exn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "table",
+      "provider": "fixtures/provider.wat",
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "import_global_exn",
+      "wat": "fixtures/import_global_exn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "global",
+      "provider": "fixtures/provider.wat",
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "unused_type_exn",
+      "wat": "fixtures/unused_type_exn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "function",
+      "provider": null,
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "unused_import_func_exn",
+      "wat": "fixtures/unused_import_func_exn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "function",
+      "provider": "fixtures/provider.wat",
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "unused_type_nonnull_exn",
+      "wat": "fixtures/unused_type_nonnull_exn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "function",
+      "provider": null,
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "unused_local_nonnull_exn",
+      "wat": "fixtures/unused_local_nonnull_exn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "local",
+      "provider": null,
+      "before_source_prediction": "source prediction: existing local carrier gate rejects correctly"
+    },
+    {
+      "name": "used_global_exn",
+      "wat": "fixtures/used_global_exn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "global",
+      "provider": null,
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "table_noexn",
+      "wat": "fixtures/table_noexn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "table",
+      "provider": null,
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "global_noexn",
+      "wat": "fixtures/global_noexn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "global",
+      "provider": null,
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "element_noexn",
+      "wat": "fixtures/element_noexn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "element",
+      "provider": null,
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "import_table_noexn",
+      "wat": "fixtures/import_table_noexn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "table",
+      "provider": "fixtures/provider.wat",
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "import_global_noexn",
+      "wat": "fixtures/import_global_noexn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "global",
+      "provider": "fixtures/provider.wat",
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "unused_type_noexn",
+      "wat": "fixtures/unused_type_noexn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "function",
+      "provider": null,
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "unused_import_func_noexn",
+      "wat": "fixtures/unused_import_func_noexn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "function",
+      "provider": "fixtures/provider.wat",
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "unused_type_nonnull_noexn",
+      "wat": "fixtures/unused_type_nonnull_noexn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "function",
+      "provider": null,
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "unused_local_nonnull_noexn",
+      "wat": "fixtures/unused_local_nonnull_noexn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "local",
+      "provider": null,
+      "before_source_prediction": "source prediction: existing local carrier gate rejects correctly"
+    },
+    {
+      "name": "used_global_noexn",
+      "wat": "fixtures/used_global_noexn.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "global",
+      "provider": null,
+      "before_source_prediction": "source prediction: strict EH rejection missing"
+    },
+    {
+      "name": "baseline",
+      "wat": "fixtures/baseline.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: accepted"
+    },
+    {
+      "name": "legacy_external",
+      "wat": "fixtures/legacy_external.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: accepted"
+    },
+    {
+      "name": "gc_abstract",
+      "wat": "fixtures/gc_abstract.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: accepted; disabling EH must not disable GC"
+    },
+    {
+      "name": "defined_function",
+      "wat": "fixtures/defined_function.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: accepted; a defined heap is not an exception heap"
+    },
+    {
+      "name": "defined_gc",
+      "wat": "fixtures/defined_gc.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: accepted; a defined GC heap is not an exception heap"
+    },
+    {
+      "name": "nonnull_gc_local",
+      "wat": "fixtures/nonnull_gc_local.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: accepted; nullability does not make a GC heap an exception heap"
+    },
+    {
+      "name": "nonnull_function_local",
+      "wat": "fixtures/nonnull_function_local.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_exceptions": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: accepted; nullability does not make a function heap an exception heap"
+    }
+  ],
+  "exact_binary_source": "binary_zero_locals.json",
+  "requirements": {
+    "memory_max_bytes": 68719476736,
+    "swap_max_bytes": 0,
+    "native_run_location": "SSH linux managed shared cgroup; no local native run",
+    "production_apply_allowed": false
+  }
+}

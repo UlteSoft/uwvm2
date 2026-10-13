@@ -1,0 +1,69 @@
+diff --git a/llvm/lib/Target/LoongArch/LoongArchFrameLowering.cpp b/llvm/lib/Target/LoongArch/LoongArchFrameLowering.cpp
+--- a/llvm/lib/Target/LoongArch/LoongArchFrameLowering.cpp
++++ b/llvm/lib/Target/LoongArch/LoongArchFrameLowering.cpp
+@@ -455,8 +455,41 @@
+     StackSize = FirstSPAdjustAmount;
+   }
+ 
+-  // Deallocate stack
++  // Asynchronous rows must remain true after FP/RA and SP are restored.
++  // A prologue-only FP row describes the caller's FP after its load and
++  // cannot authenticate a stopped return instruction. Keep synchronous
++  // call-site unwinding unchanged; emit these rows only for async tables.
++  bool AsyncCFI = MF.getFunction().getUWTableKind() == UWTableKind::Async;
++  CFIInstBuilder CFIBuilder(MBB, LastFrameDestroy,
++                            MachineInstr::FrameDestroy);
++  if (AsyncCFI)
++    CFIBuilder.buildDefCFA(SPReg, StackSize);
++
++  // The existing epilogue layout has one load per callee-saved register.
++  // Describe each register only after its actual restoring instruction.
++  // Explicit same-value is intentional: an omitted initial CIE rule must
++  // not leave the restored RA unavailable to a strict private CFI reader.
++  for (auto I = LastFrameDestroy; AsyncCFI && I != MBBI; ++I) {
++    if (!I->mayLoad() || I->getNumOperands() == 0 ||
++        !I->getOperand(0).isReg())
++      continue;
++    MCRegister Reg = I->getOperand(0).getReg().asMCReg();
++    bool Saved = false;
++    for (const CalleeSavedInfo &CS : CSI)
++      Saved |= CS.getReg() == Reg;
++    if (!Saved)
++      continue;
++    CFIBuilder.setInsertPoint(std::next(I));
++    CFIBuilder.buildSameValue(Reg);
++  }
++
++  // Deallocate stack. The new row follows the actual SP adjustment, never
++  // a constant-materialization instruction preceding that adjustment.
+   adjustReg(MBB, MBBI, DL, SPReg, SPReg, StackSize, MachineInstr::FrameDestroy);
++  if (AsyncCFI) {
++    CFIBuilder.setInsertPoint(MBBI);
++    CFIBuilder.buildDefCFA(SPReg, 0);
++  }
+ }
+ 
+ // Synthesize the probe loop.
+diff --git a/llvm/lib/Target/LoongArch/MCTargetDesc/LoongArchMCTargetDesc.cpp b/llvm/lib/Target/LoongArch/MCTargetDesc/LoongArchMCTargetDesc.cpp
+--- a/llvm/lib/Target/LoongArch/MCTargetDesc/LoongArchMCTargetDesc.cpp
++++ b/llvm/lib/Target/LoongArch/MCTargetDesc/LoongArchMCTargetDesc.cpp
+@@ -69,6 +69,19 @@
+   MCCFIInstruction Inst = MCCFIInstruction::cfiDefCfa(nullptr, SP, 0);
+   MAI->addInitialFrameState(Inst);
+ 
++  // Make the C ABI's initial GPR preservation explicit in the CIE. Missing
++  // rows are not evidence of same-value to a strict stopped-frame reader.
++  // Prologue offsets and epilogue same-value rows override these rules at
++  // the actual spill/restore PCs. No volatile, TP or FP/vector rule is added.
++  MAI->addInitialFrameState(MCCFIInstruction::createSameValue(
++      nullptr, MRI.getDwarfRegNum(LoongArch::R1, true)));
++  for (unsigned Reg : {LoongArch::R22, LoongArch::R23, LoongArch::R24,
++                       LoongArch::R25, LoongArch::R26, LoongArch::R27,
++                       LoongArch::R28, LoongArch::R29, LoongArch::R30,
++                       LoongArch::R31})
++    MAI->addInitialFrameState(MCCFIInstruction::createSameValue(
++        nullptr, MRI.getDwarfRegNum(Reg, true)));
++
+   return MAI;
+ }
+ 

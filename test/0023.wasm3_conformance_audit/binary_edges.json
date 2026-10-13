@@ -1,0 +1,89 @@
+{
+  "format": "uwvm2-core3-audit-binary-v1",
+  "spec_commit": "2e44bf79e68cc4fe689f43eea8e7d25b6fdfbce1",
+  "status": "not executed by source auditor",
+  "offset_origin": "zero-based absolute byte offset from module header",
+  "cases": [
+    {
+      "name": "reference_bottom_throw_ref",
+      "expected": "valid_trap_unreachable",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a0701050000d40a0b",
+      "instruction_offset": 37,
+      "edge_offset": 37,
+      "semantic": "Ref(Bot,false) from dead ref.as_non_null is a subtype of nullable exn.",
+      "entry": "_start"
+    },
+    {
+      "name": "reference_bottom_numeric_rejection",
+      "expected": "invalid",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a0a01080000d441006a1a0b",
+      "instruction_offset": 39,
+      "edge_offset": 39,
+      "semantic": "Reference-only bottom cannot match i32 even when the current control frame is unreachable.",
+      "entry": "_start"
+    },
+    {
+      "name": "memory32_core3_padded_u64_zero",
+      "expected": "valid_return_i32_0",
+      "hex": "0061736d010000000105016000017f030201000503010001070a01065f737461727400000a0e010c00410028028080808080000b",
+      "instruction_offset": 43,
+      "edge_offset": 45,
+      "semantic": "Core 3 memarg.offset is u64 even for memory32; nonminimal six-byte zero is valid.",
+      "entry": "_start"
+    },
+    {
+      "name": "memory32_offset_2pow32",
+      "expected": "invalid",
+      "hex": "0061736d010000000105016000017f030201000503010001070a01065f737461727400000a0d010b004100280280808080100b",
+      "instruction_offset": 43,
+      "edge_offset": 45,
+      "semantic": "u64 encoding succeeds, but offset 2^32 is outside the selected i32 memory address width.",
+      "entry": "_start"
+    },
+    {
+      "name": "truncated_gc_subopcode",
+      "expected": "malformed",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a05010300fb80",
+      "instruction_offset": 35,
+      "edge_offset": 36,
+      "semantic": "The FB subopcode LEB reaches the bounded body end without a terminating byte.",
+      "entry": "_start"
+    },
+    {
+      "name": "try_table_catch_kind_not_leb",
+      "expected": "malformed",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a0a0108001f400180000b0b",
+      "instruction_offset": 35,
+      "edge_offset": 38,
+      "semantic": "Catch kind is one literal byte in 0..3; 0x80 must not be decoded as a padded LEB.",
+      "entry": "_start"
+    },
+    {
+      "name": "br_on_cast_reserved_flags",
+      "expected": "malformed",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a0c010a0000fb1804006e6e1a0b",
+      "instruction_offset": 36,
+      "edge_offset": 38,
+      "semantic": "Cast branch flags are one literal byte in 0..3; bit 2 is reserved.",
+      "entry": "_start"
+    },
+    {
+      "name": "padded_abstract_exn_heap",
+      "expected": "malformed",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a08010600d0e97f1a0b",
+      "instruction_offset": 35,
+      "edge_offset": 36,
+      "semantic": "Abstract exn heap is a single-byte production 0x69, not a padded negative s33.",
+      "entry": "_start"
+    },
+    {
+      "name": "zero_count_local_unknown_heap",
+      "expected": "invalid",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a08010601006301000b",
+      "instruction_offset": 38,
+      "edge_offset": 37,
+      "semantic": "A zero-count local run still validates its declared (ref null typeidx); typeidx 1 is absent.",
+      "entry": "_start"
+    }
+  ]
+}

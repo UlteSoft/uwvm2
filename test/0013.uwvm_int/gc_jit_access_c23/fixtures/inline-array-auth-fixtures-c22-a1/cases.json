@@ -1,0 +1,293 @@
+{
+  "cases": [
+    {
+      "name": "i8-head",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-head.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-head.wasm",
+      "wasm_sha": "b434db23436acc4e429d43284262f5138f0cb46d66ef3cc10e7b9e2ce5cafaea",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i8-non-head",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-non-head.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-non-head.wasm",
+      "wasm_sha": "aa4da091a27757ed78db090c14417a79f5f297cac16005fc6db9bc874e3d12f1",
+      "trap": null,
+      "churn": 65537,
+      "actual_gc": false
+    },
+    {
+      "name": "i8-deep-fallback",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-deep-fallback.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-deep-fallback.wasm",
+      "wasm_sha": "e9a7fa4a8d2ea9a913efb5842750b94ba74f4e5f2e8a173eab62c5e642f9665d",
+      "trap": null,
+      "churn": 786433,
+      "actual_gc": false
+    },
+    {
+      "name": "i8-collection-domain",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-collection-domain.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-collection-domain.wasm",
+      "wasm_sha": "984f2ae1333fe47e9fd75a17adcd46a2889c0630349c1997df6994bc506801e5",
+      "trap": null,
+      "churn": 200000,
+      "actual_gc": true
+    },
+    {
+      "name": "i8-nested-activation",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-nested-activation.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-nested-activation.wasm",
+      "wasm_sha": "e3bb474c0a75bc7c1fdcf5a8336e7f8bd82582109aa3f7f83adf069d221c9671",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i8-first-auth-untaken-branch",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-first-auth-untaken-branch.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-first-auth-untaken-branch.wasm",
+      "wasm_sha": "d1865ddbe3b4d440eeb56839b8cf68aa3ab435bf07666bb98511e99ab3fa8f2c",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i8-merged-reference",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-merged-reference.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-merged-reference.wasm",
+      "wasm_sha": "75a07926662c6b97e354391e4da9e1c5cbb6cd2b1219787e7bbc43cf8d8da90f",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i8-exact-and-subtype-in-loop",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-exact-and-subtype-in-loop.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i8-exact-and-subtype-in-loop.wasm",
+      "wasm_sha": "df0479f846fef19b336bc312dd9e42e7e27944b2817565894118bb44a52bf6e2",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i16-head",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-head.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-head.wasm",
+      "wasm_sha": "db1fc31e821d22545cf4c4834fe3193f05618afb628294d1e00eca8e834016c8",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i16-non-head",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-non-head.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-non-head.wasm",
+      "wasm_sha": "9d8463ccd03cbf98896377bfae8e2de44f1c6be09e6bc8bc8872633ed82bd092",
+      "trap": null,
+      "churn": 65537,
+      "actual_gc": false
+    },
+    {
+      "name": "i16-deep-fallback",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-deep-fallback.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-deep-fallback.wasm",
+      "wasm_sha": "bb6ac72ffce8b402741d733b22f71849941e64c2ca5d2662c19370b9bfca52e2",
+      "trap": null,
+      "churn": 786433,
+      "actual_gc": false
+    },
+    {
+      "name": "i16-collection-domain",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-collection-domain.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-collection-domain.wasm",
+      "wasm_sha": "1d48dde839858551cfd66e1bfb857cb88cf5745f8efc79c79dc423acf4c0ca84",
+      "trap": null,
+      "churn": 200000,
+      "actual_gc": true
+    },
+    {
+      "name": "i16-nested-activation",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-nested-activation.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-nested-activation.wasm",
+      "wasm_sha": "ed9950781378f64352194411848fcc52822e7f8d41c997f027720fdcd9a3415e",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i16-first-auth-untaken-branch",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-first-auth-untaken-branch.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-first-auth-untaken-branch.wasm",
+      "wasm_sha": "39fa0eaeabd944df46a39a58866cfe35e8b93b61ed67d8e95d8962d20d67b8eb",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i16-merged-reference",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-merged-reference.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-merged-reference.wasm",
+      "wasm_sha": "94c2245e4d7b2da881989df9fd35a6fca73c24003f38afbc24567235b1400055",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i16-exact-and-subtype-in-loop",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-exact-and-subtype-in-loop.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i16-exact-and-subtype-in-loop.wasm",
+      "wasm_sha": "d5e4e5d21dd5f46dcfcbbae812185db6a0c38ec9e38286ab68d49d2269d4ea96",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i32-head",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-head.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-head.wasm",
+      "wasm_sha": "e18141d8e4274c0dd81dcb8efd9ed5eca2b3326200210d81d7b7a50c921d8383",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i32-non-head",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-non-head.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-non-head.wasm",
+      "wasm_sha": "072781ca6762a1ea5b7db788defb231579e49ca2a3baa3d2a38211d40233dd80",
+      "trap": null,
+      "churn": 65537,
+      "actual_gc": false
+    },
+    {
+      "name": "i32-deep-fallback",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-deep-fallback.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-deep-fallback.wasm",
+      "wasm_sha": "8913243d675a7af610239ba814ef081a0ed0092c03d0c698d5fae77235414eab",
+      "trap": null,
+      "churn": 786433,
+      "actual_gc": false
+    },
+    {
+      "name": "i32-collection-domain",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-collection-domain.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-collection-domain.wasm",
+      "wasm_sha": "691015f19ed26ea5fcbad1da308e65172e0479944598b18fc09fcfb6b71adf10",
+      "trap": null,
+      "churn": 200000,
+      "actual_gc": true
+    },
+    {
+      "name": "i32-nested-activation",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-nested-activation.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-nested-activation.wasm",
+      "wasm_sha": "0aaf8c7a035bc676375c04cc163b007c62e3e8190645abfe6f9687e9e870da5c",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i32-first-auth-untaken-branch",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-first-auth-untaken-branch.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-first-auth-untaken-branch.wasm",
+      "wasm_sha": "c76146e286368a30dba398ee327013b67515826e2f96a46aead6180c4f53eda8",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i32-merged-reference",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-merged-reference.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-merged-reference.wasm",
+      "wasm_sha": "0e485ce5f5dfc6e8170d56cce27b0279caba802d2fbbe01e48b9cc3fc040645c",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "i32-exact-and-subtype-in-loop",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-exact-and-subtype-in-loop.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/i32-exact-and-subtype-in-loop.wasm",
+      "wasm_sha": "a9409cd3c4a4a474ec81b5c3d2811a845a7987749efbb2532ca6a1e939814a99",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "f32-head",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-head.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-head.wasm",
+      "wasm_sha": "dab4f95fdad82051393dc701bfc6dd59c9c2e6c62904c3b28d0ed396894f6f9e",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "f32-non-head",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-non-head.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-non-head.wasm",
+      "wasm_sha": "13364978df86cb1b7f7698aa92cf6fe7fb3fc839fbb200ef8eae56e6767ea8ad",
+      "trap": null,
+      "churn": 65537,
+      "actual_gc": false
+    },
+    {
+      "name": "f32-deep-fallback",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-deep-fallback.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-deep-fallback.wasm",
+      "wasm_sha": "7f20d8a15041505feb3852f0be24ae78c1d42c6c66482c52e904a3d45bb6d2d9",
+      "trap": null,
+      "churn": 786433,
+      "actual_gc": false
+    },
+    {
+      "name": "f32-collection-domain",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-collection-domain.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-collection-domain.wasm",
+      "wasm_sha": "3e166191fb447a09ad13dda19e447ed05425f4e54f8a2df387d63fc5222775e7",
+      "trap": null,
+      "churn": 200000,
+      "actual_gc": true
+    },
+    {
+      "name": "f32-nested-activation",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-nested-activation.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-nested-activation.wasm",
+      "wasm_sha": "22505a4550d73d57e22237bc7b0d842ca89715ec599258ee4e712c579a64d25f",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "f32-first-auth-untaken-branch",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-first-auth-untaken-branch.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-first-auth-untaken-branch.wasm",
+      "wasm_sha": "2cef3df7edcdbfdf7f5fbbb13eff2ecde283cd7c2d7bd5a3a318732be0b16ba1",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "f32-merged-reference",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-merged-reference.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-merged-reference.wasm",
+      "wasm_sha": "4e4793a11171a470b181214e0b968db4ac15dec1bade80385fe600d7b8a8e0d2",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    },
+    {
+      "name": "f32-exact-and-subtype-in-loop",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-exact-and-subtype-in-loop.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/inline-array-auth-fixtures-c22-a1/f32-exact-and-subtype-in-loop.wasm",
+      "wasm_sha": "3a0982142a34db1000954c005ec348f54aa5a8abdfe93f47f60d6fa92661f93a",
+      "trap": null,
+      "churn": 0,
+      "actual_gc": false
+    }
+  ],
+  "scope": "32 Wasm asserts: exact bucket head/non-head/deep>8 fallback, no-tag actual GC, nested activation, first access in untaken branch, reference PHI, mixed exact/subtype. Unused tag intentionally disables collection only in collision fixtures; never counted as collection proof."
+}

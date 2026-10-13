@@ -21,6 +21,15 @@ xmake
 xmake i -o C:/uwvm2
 ```
 
+For MinGW x64 LLVM-full debugging, the default build and install also produce
+`uwvm-debug-server.exe`. Build just the host broker with
+`xmake b uwvm-debug-server`; see its [secure late-attach instructions](../../tools/debug/README.windows.md).
+
+For a Windows x64 cross-build of ROS's bundled LLVM, select
+`--llvm-cmake-toolchain=tools/ci/windows_llvm_x64_toolchain.cmake` during
+`xmake f`. The build enforces the ASM target independently of C/C++, so its
+BLAKE3 assembly objects cannot silently be archived as host ELF files.
+
 ## Use GCC
 1. Install [[xmake]](https://github.com/xmake-io/xmake/)
 2. Install [[GCC]](https://sourceforge.net/projects/mingw-w64/)

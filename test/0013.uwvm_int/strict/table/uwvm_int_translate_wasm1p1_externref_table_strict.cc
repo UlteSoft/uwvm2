@@ -211,11 +211,12 @@ namespace
 
         UWVM2TEST_REQUIRE(rt.local_defined_element_vec_storage.size() == 2uz);
         auto const& active{rt.local_defined_element_vec_storage.index_unchecked(0uz).element};
-        UWVM2TEST_REQUIRE(active.dropped);
-        UWVM2TEST_REQUIRE(active.funcidx_begin == nullptr && active.funcidx_end == nullptr);
-        UWVM2TEST_REQUIRE(active.externref_begin == nullptr && active.externref_end == nullptr);
+        UWVM2TEST_REQUIRE(::uwvm2::uwvm::runtime::storage::wasm_element_segment_is_dropped(active));
+        auto const active_payload{::uwvm2::uwvm::runtime::storage::load_wasm_element_segment_payload(active)};
+        UWVM2TEST_REQUIRE(active_payload.funcidx_begin == nullptr && active_payload.funcidx_end == nullptr);
+        UWVM2TEST_REQUIRE(active_payload.externref_begin == nullptr && active_payload.externref_end == nullptr);
         auto& passive{rt.local_defined_element_vec_storage.index_unchecked(1uz).element};
-        UWVM2TEST_REQUIRE(!passive.dropped);
+        UWVM2TEST_REQUIRE(!::uwvm2::uwvm::runtime::storage::wasm_element_segment_is_dropped(passive));
         UWVM2TEST_REQUIRE(passive.externref_begin != nullptr);
         UWVM2TEST_REQUIRE(passive.externref_end == passive.externref_begin + 1);
         UWVM2TEST_REQUIRE(passive.externref_begin[0] == nullptr);
@@ -249,8 +250,9 @@ namespace
         using Runner = interpreter_runner<Opt>;
         auto rr{Runner::run(lf, rt.local_defined_function_vec_storage.front_unchecked(), packed, nullptr, nullptr)};
         UWVM2TEST_REQUIRE(load_i32(rr.results) == 20);
-        UWVM2TEST_REQUIRE(passive.dropped);
-        UWVM2TEST_REQUIRE(passive.externref_begin == nullptr && passive.externref_end == nullptr);
+        UWVM2TEST_REQUIRE(::uwvm2::uwvm::runtime::storage::wasm_element_segment_is_dropped(passive));
+        auto const passive_payload{::uwvm2::uwvm::runtime::storage::load_wasm_element_segment_payload(passive)};
+        UWVM2TEST_REQUIRE(passive_payload.externref_begin == nullptr && passive_payload.externref_end == nullptr);
         UWVM2TEST_REQUIRE(table.elems.size() == 7uz);
         UWVM2TEST_REQUIRE(table.elems.index_unchecked(0uz).storage.extern_ptr == ::std::addressof(host_value));
         UWVM2TEST_REQUIRE(table.elems.index_unchecked(3uz).storage.extern_ptr == ::std::addressof(host_value));

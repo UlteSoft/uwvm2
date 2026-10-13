@@ -166,6 +166,8 @@ bool LoongArchPreRAExpandPseudo::expandMI(
     return expandFunctionCALL(MBB, MBBI, NextMBBI, /*IsTailCall=*/false);
   case LoongArch::PseudoTAIL_SMALL:
   case LoongArch::PseudoTAIL_LARGE:
+  case LoongArch::PseudoTCRETURN_SMALL:
+  case LoongArch::PseudoTCRETURN_LARGE:
     return expandFunctionCALL(MBB, MBBI, NextMBBI, /*IsTailCall=*/true);
   case LoongArch::PseudoBRIND:
     // If the PseudoBRIND is used to table jump, then emit a label to annotate
@@ -663,6 +665,8 @@ bool LoongArchPreRAExpandPseudo::expandFunctionCALL(
   MachineInstr &MI = *MBBI;
   DebugLoc DL = MI.getDebugLoc();
   const MachineOperand &Func = MI.getOperand(0);
+  bool IsTailCC = MI.getOpcode() == LoongArch::PseudoTCRETURN_SMALL ||
+                  MI.getOpcode() == LoongArch::PseudoTCRETURN_LARGE;
   MachineInstrBuilder CALL;
   unsigned Opcode;
 
@@ -675,8 +679,12 @@ bool LoongArchPreRAExpandPseudo::expandFunctionCALL(
     // bl func
     // TAIL:
     // b func
-    Opcode = IsTailCall ? LoongArch::PseudoB_TAIL : LoongArch::BL;
+    Opcode = IsTailCall ? (IsTailCC ? LoongArch::PseudoB_TC_RETURN
+                                   : LoongArch::PseudoB_TAIL)
+                        : LoongArch::BL;
     CALL = BuildMI(MBB, MBBI, DL, TII->get(Opcode)).add(Func);
+    if (IsTailCC)
+      CALL.add(MI.getOperand(1));
     break;
   }
   case CodeModel::Large: {
@@ -684,7 +692,9 @@ bool LoongArchPreRAExpandPseudo::expandFunctionCALL(
     // indirectly in case of going through the GOT, then JIRL_TAIL or
     // JIRL_CALL to $addr.
     Opcode =
-        IsTailCall ? LoongArch::PseudoJIRL_TAIL : LoongArch::PseudoJIRL_CALL;
+        IsTailCall ? (IsTailCC ? LoongArch::PseudoTCRETURNIndirect
+                              : LoongArch::PseudoJIRL_TAIL)
+                   : LoongArch::PseudoJIRL_CALL;
     Register AddrReg =
         IsTailCall
             ? MF->getRegInfo().createVirtualRegister(&LoongArch::GPRRegClass)
@@ -695,7 +705,11 @@ bool LoongArchPreRAExpandPseudo::expandFunctionCALL(
     unsigned LAOpcode = UseGOT ? LoongArch::LDX_D : LoongArch::ADD_D;
     expandLargeAddressLoad(MBB, MBBI, NextMBBI, LAOpcode, MO, Func, AddrReg,
                            false);
-    CALL = BuildMI(MBB, MBBI, DL, TII->get(Opcode)).addReg(AddrReg).addImm(0);
+    CALL = BuildMI(MBB, MBBI, DL, TII->get(Opcode)).addReg(AddrReg);
+    if (IsTailCC)
+      CALL.add(MI.getOperand(1));
+    else
+      CALL.addImm(0);
     break;
   }
   }

@@ -55,6 +55,11 @@ public:
 
   unsigned getIncomingArgSize() const { return IncomingArgSize; }
 
+  unsigned getArgumentStackToRestore() const { return ArgumentStackToRestore; }
+  void setArgumentStackToRestore(unsigned Size) { ArgumentStackToRestore = Size; }
+  bool hasTailCCStackCall() const { return HasTailCCStackCall; }
+  void setHasTailCCStackCall() { HasTailCCStackCall = true; }
+
   bool callsEhReturn() const { return CallsEhReturn; }
   void setCallsEhReturn() { CallsEhReturn = true; }
 
@@ -107,6 +112,11 @@ private:
 
   /// Size of incoming argument area.
   unsigned IncomingArgSize;
+
+  // Static N64 TailCC is callee-popped. This is aligned independently of the
+  // physical frame indices, which remain relative to the function entry SP.
+  unsigned ArgumentStackToRestore = 0;
+  bool HasTailCCStackCall = false;
 
   /// CallsEhReturn - Whether the function calls llvm.eh.return.
   bool CallsEhReturn = false;

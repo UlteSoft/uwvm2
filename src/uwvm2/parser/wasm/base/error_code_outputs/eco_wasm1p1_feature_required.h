@@ -76,6 +76,94 @@ constexpr auto get_wasm1p1_feature_name{[]<::std::integral char_type2>(::uwvm2::
                                                     else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"simd"}; }
                                                     else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"simd"}; }
                                                 }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::relaxed_simd:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"--wasm-feature-enable-relaxed-simd"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"--wasm-feature-enable-relaxed-simd"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"--wasm-feature-enable-relaxed-simd"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"--wasm-feature-enable-relaxed-simd"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"--wasm-feature-enable-relaxed-simd"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::multi_memory:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"--wasm-feature-enable-multi-memory"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"--wasm-feature-enable-multi-memory"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"--wasm-feature-enable-multi-memory"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"--wasm-feature-enable-multi-memory"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"--wasm-feature-enable-multi-memory"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::threads:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"--wasm-feature-enable-threads"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"--wasm-feature-enable-threads"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"--wasm-feature-enable-threads"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"--wasm-feature-enable-threads"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"--wasm-feature-enable-threads"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::tail_call:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"--wasm-feature-enable-tail-call"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"--wasm-feature-enable-tail-call"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"--wasm-feature-enable-tail-call"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"--wasm-feature-enable-tail-call"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"--wasm-feature-enable-tail-call"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::memory64:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"--wasm-feature-enable-memory64"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"--wasm-feature-enable-memory64"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"--wasm-feature-enable-memory64"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"--wasm-feature-enable-memory64"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"--wasm-feature-enable-memory64"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table64:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"--wasm-feature-enable-table64"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"--wasm-feature-enable-table64"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"--wasm-feature-enable-table64"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"--wasm-feature-enable-table64"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"--wasm-feature-enable-table64"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::function_references:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"--wasm-feature-enable-function-references"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"--wasm-feature-enable-function-references"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"--wasm-feature-enable-function-references"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"--wasm-feature-enable-function-references"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"--wasm-feature-enable-function-references"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::exceptions:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"--wasm-feature-enable-exceptions"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"--wasm-feature-enable-exceptions"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"--wasm-feature-enable-exceptions"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"--wasm-feature-enable-exceptions"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"--wasm-feature-enable-exceptions"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"--wasm-feature-enable-gc"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"--wasm-feature-enable-gc"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"--wasm-feature-enable-gc"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"--wasm-feature-enable-gc"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"--wasm-feature-enable-gc"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::extended_const:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"--wasm-feature-enable-extended-const"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"--wasm-feature-enable-extended-const"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"--wasm-feature-enable-extended-const"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"--wasm-feature-enable-extended-const"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"--wasm-feature-enable-extended-const"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table_initializer:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"--wasm-feature-enable-table-initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"--wasm-feature-enable-table-initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"--wasm-feature-enable-table-initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"--wasm-feature-enable-table-initializer"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"--wasm-feature-enable-table-initializer"}; }
+                                                }
                                                 [[unlikely]] default:
                                                 {
             /// @warning Extension point: reaching "unknown" here usually means a new wasm1p1 feature flag lacks ECO output.
@@ -143,6 +231,46 @@ constexpr auto get_wasm1p1_subject_name{[]<::std::integral char_type2>(::uwvm2::
                                                     else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"table type"}; }
                                                     else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"table type"}; }
                                                     else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"table type"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::memory_type:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"memory type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"memory type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"memory type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"memory type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"memory type"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::function_type:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"function type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"function type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"function type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"function type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"function type"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::local_type:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"local type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"local type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"local type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"local type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"local type"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::global_type:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"global type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"global type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"global type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"global type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"global type"}; }
+                                                }
+                                                case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::tag_type:
+                                                {
+                                                    if constexpr(::std::same_as<char_type2, char>) { return {"tag type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, wchar_t>) { return {L"tag type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char8_t>) { return {u8"tag type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char16_t>) { return {u"tag type"}; }
+                                                    else if constexpr(::std::same_as<char_type2, char32_t>) { return {U"tag type"}; }
                                                 }
                                                 case ::uwvm2::parser::wasm::base::wasm1p1_error_subject::instruction:
                                                 {
@@ -212,7 +340,7 @@ if constexpr(::std::same_as<char_type, char>)
                 "(offset=",
                 ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                 ") ",
-                "WebAssembly 1.1 ",
+                ::fast_io::mnp::cond(errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::threads, "WebAssembly threads ", ((errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::memory64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::function_references || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::exceptions || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::extended_const || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table_initializer) ? "WebAssembly 3.0 " : "WebAssembly 1.1 ")),
                 UWVM_WIN32_TEXTATTR_CYAN,
                 get_wasm1p1_subject_name.template operator()<char>(errout.err.err_selectable.wasm1p1_feature_required.subject),
                 UWVM_WIN32_TEXTATTR_WHITE,
@@ -240,7 +368,7 @@ if constexpr(::std::same_as<char_type, char>)
         "(offset=",
         ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
         ") ",
-        "WebAssembly 1.1 ",
+        ::fast_io::mnp::cond(errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::threads, "WebAssembly threads ", ((errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::memory64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::function_references || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::exceptions || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::extended_const || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table_initializer) ? "WebAssembly 3.0 " : "WebAssembly 1.1 ")),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
         get_wasm1p1_subject_name.template operator()<char>(errout.err.err_selectable.wasm1p1_feature_required.subject),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
@@ -276,7 +404,7 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                 L"(offset=",
                 ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                 L") ",
-                L"WebAssembly 1.1 ",
+                ::fast_io::mnp::cond(errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::threads, L"WebAssembly threads ", ((errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::memory64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::function_references || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::exceptions || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::extended_const || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table_initializer) ? L"WebAssembly 3.0 " : L"WebAssembly 1.1 ")),
                 UWVM_WIN32_TEXTATTR_CYAN,
                 get_wasm1p1_subject_name.template operator()<wchar_t>(errout.err.err_selectable.wasm1p1_feature_required.subject),
                 UWVM_WIN32_TEXTATTR_WHITE,
@@ -304,7 +432,7 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
         L"(offset=",
         ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
         L") ",
-        L"WebAssembly 1.1 ",
+        ::fast_io::mnp::cond(errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::threads, L"WebAssembly threads ", ((errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::memory64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::function_references || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::exceptions || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::extended_const || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table_initializer) ? L"WebAssembly 3.0 " : L"WebAssembly 1.1 ")),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
         get_wasm1p1_subject_name.template operator()<wchar_t>(errout.err.err_selectable.wasm1p1_feature_required.subject),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
@@ -340,7 +468,7 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                 u8"(offset=",
                 ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                 u8") ",
-                u8"WebAssembly 1.1 ",
+                ::fast_io::mnp::cond(errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::threads, u8"WebAssembly threads ", ((errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::memory64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::function_references || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::exceptions || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::extended_const || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table_initializer) ? u8"WebAssembly 3.0 " : u8"WebAssembly 1.1 ")),
                 UWVM_WIN32_TEXTATTR_CYAN,
                 get_wasm1p1_subject_name.template operator()<char8_t>(errout.err.err_selectable.wasm1p1_feature_required.subject),
                 UWVM_WIN32_TEXTATTR_WHITE,
@@ -368,7 +496,7 @@ else if constexpr(::std::same_as<char_type, char8_t>)
         u8"(offset=",
         ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
         u8") ",
-        u8"WebAssembly 1.1 ",
+        ::fast_io::mnp::cond(errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::threads, u8"WebAssembly threads ", ((errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::memory64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::function_references || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::exceptions || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::extended_const || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table_initializer) ? u8"WebAssembly 3.0 " : u8"WebAssembly 1.1 ")),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_CYAN),
         get_wasm1p1_subject_name.template operator()<char8_t>(errout.err.err_selectable.wasm1p1_feature_required.subject),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
@@ -404,7 +532,7 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                 u"(offset=",
                 ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                 u") ",
-                u"WebAssembly 1.1 ",
+                ::fast_io::mnp::cond(errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::threads, u"WebAssembly threads ", ((errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::memory64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::function_references || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::exceptions || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::extended_const || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table_initializer) ? u"WebAssembly 3.0 " : u"WebAssembly 1.1 ")),
                 UWVM_WIN32_TEXTATTR_CYAN,
                 get_wasm1p1_subject_name.template operator()<char16_t>(errout.err.err_selectable.wasm1p1_feature_required.subject),
                 UWVM_WIN32_TEXTATTR_WHITE,
@@ -432,7 +560,7 @@ else if constexpr(::std::same_as<char_type, char16_t>)
         u"(offset=",
         ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
         u") ",
-        u"WebAssembly 1.1 ",
+        ::fast_io::mnp::cond(errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::threads, u"WebAssembly threads ", ((errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::memory64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::function_references || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::exceptions || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::extended_const || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table_initializer) ? u"WebAssembly 3.0 " : u"WebAssembly 1.1 ")),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
         get_wasm1p1_subject_name.template operator()<char16_t>(errout.err.err_selectable.wasm1p1_feature_required.subject),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
@@ -468,7 +596,7 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                 U"(offset=",
                 ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                 U") ",
-                U"WebAssembly 1.1 ",
+                ::fast_io::mnp::cond(errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::threads, U"WebAssembly threads ", ((errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::memory64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::function_references || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::exceptions || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::extended_const || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table_initializer) ? U"WebAssembly 3.0 " : U"WebAssembly 1.1 ")),
                 UWVM_WIN32_TEXTATTR_CYAN,
                 get_wasm1p1_subject_name.template operator()<char32_t>(errout.err.err_selectable.wasm1p1_feature_required.subject),
                 UWVM_WIN32_TEXTATTR_WHITE,
@@ -496,7 +624,7 @@ else if constexpr(::std::same_as<char_type, char32_t>)
         U"(offset=",
         ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
         U") ",
-        U"WebAssembly 1.1 ",
+        ::fast_io::mnp::cond(errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::threads, U"WebAssembly threads ", ((errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::memory64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table64 || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::function_references || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::exceptions || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::gc || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::extended_const || errout.err.err_selectable.wasm1p1_feature_required.feature == ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::table_initializer) ? U"WebAssembly 3.0 " : U"WebAssembly 1.1 ")),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
         get_wasm1p1_subject_name.template operator()<char32_t>(errout.err.err_selectable.wasm1p1_feature_required.subject),
         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),

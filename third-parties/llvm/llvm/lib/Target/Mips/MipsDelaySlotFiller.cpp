@@ -1163,7 +1163,8 @@ bool MipsDelaySlotFiller::delayHasHazard(const MipsSubtarget &STI,
 
 bool MipsDelaySlotFiller::terminateSearch(const MachineInstr &Candidate) const {
   return (Candidate.isTerminator() || Candidate.isCall() ||
-          Candidate.isPosition() || Candidate.isInlineAsm() ||
+          Candidate.isPosition() || Candidate.isCFIInstruction() ||
+          Candidate.isInlineAsm() ||
           Candidate.hasUnmodeledSideEffects());
 }
 

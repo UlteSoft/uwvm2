@@ -33,6 +33,10 @@ private:
   /// Size of stack frame to save callee saved registers
   unsigned CalleeSavedStackSize = 0;
 
+  // TailCC owns a callee-popped, aligned incoming argument area.
+  unsigned ArgumentStackToRestore = 0;
+  bool HasTailCCStackCall = false;
+
   /// Incoming indirect argument pointers saved as virtual registers, keyed by
   /// formal parameter index. Used for musttail forwarding of indirect args.
   /// Virtual registers (not SDValues) are used because the SelectionDAG is
@@ -72,6 +76,11 @@ public:
 
   unsigned getCalleeSavedStackSize() const { return CalleeSavedStackSize; }
   void setCalleeSavedStackSize(unsigned Size) { CalleeSavedStackSize = Size; }
+
+  unsigned getArgumentStackToRestore() const { return ArgumentStackToRestore; }
+  void setArgumentStackToRestore(unsigned Bytes) { ArgumentStackToRestore = Bytes; }
+  bool hasTailCCStackCall() const { return HasTailCCStackCall; }
+  void setHasTailCCStackCall() { HasTailCCStackCall = true; }
 
   void setIncomingIndirectArg(unsigned ArgIndex, Register Reg) {
     IncomingIndirectArgs[ArgIndex] = Reg;

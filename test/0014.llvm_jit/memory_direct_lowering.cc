@@ -1,4 +1,4 @@
-// Exercise address decisions for memory32/ISA32, memory32/ISA64, and the future memory64/ISA64 helper.
+// Execute production address decisions for memory32 and memory64 on ISA32/ISA64.
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
@@ -19,6 +19,7 @@ struct test_case
 {
     llvm::Function* function;
     unsigned address_bits;
+    unsigned pointer_bits;
     std::uint64_t offset;
     unsigned width;
     protection mode;
@@ -51,6 +52,7 @@ struct reference_outcome
 
 [[nodiscard]] reference_outcome reference_result(test_case const& test, std::uint64_t address, std::uint64_t length)
 {
+    if(test.pointer_bits == 32u) { length &= 0xffffffffull; }
     auto const effective{mathematical_address(test, address)};
     bool const checked{test.mode == protection::software ||
         (test.mode == protection::partial_guard && (effective.overflow || effective.offset >= test.partial))};
@@ -102,7 +104,6 @@ int main(int argc, char** argv)
     std::size_t full_guard_configurations{};
     for(unsigned pointer_bits: {32u, 64u}) for(unsigned address_bits: {32u, 64u})
     {
-        if(address_bits > pointer_bits) { continue; }
         module->setDataLayout(pointer_bits == 32 ? "e-p:32:32" : "e-p:64:64");
         for(auto mode: {protection::software, protection::partial_guard, protection::full_wasm32_guard})
         for(unsigned width: {1u, 2u, 4u, 8u, 16u, 64u, 65u})
@@ -118,7 +119,7 @@ int main(int argc, char** argv)
             std::uint64_t partial{pointer_bits == 32 ? 1ull << 28 : 1ull << 40};
             auto pointer{d::emit_llvm_jit_memory_address(b, llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(context)),
                 b.CreateZExtOrTrunc(fn->getArg(0), b.getIntNTy(address_bits)), offset, width, mode, partial,
-                [&]() -> llvm::Value* { ++length_reads; return fn->getArg(1); })};
+                [&]() -> llvm::Value* { ++length_reads; return b.CreateZExtOrTrunc(fn->getArg(1), b.getIntNTy(pointer_bits)); })};
             auto gep{llvm::dyn_cast_or_null<llvm::GetElementPtrInst>(pointer)};
             if(!gep || gep->isInBounds()) { return 1; }
             b.CreateRet(b.CreateZExtOrTrunc(gep->getOperand(1), b.getInt64Ty()));
@@ -141,7 +142,7 @@ int main(int argc, char** argv)
                 while(!block.empty()) { block.back().eraseFromParent(); }
                 b.SetInsertPoint(&block); b.CreateStore(b.getInt8(1), fn->getArg(2)); b.CreateRet(b.getInt64(~0ull));
             }
-            cases.push_back({fn, address_bits, offset, width, actual, partial});
+            cases.push_back({fn, address_bits, pointer_bits, offset, width, actual, partial});
         }
     }
     if(llvm::verifyModule(*module, &llvm::errs())) { return 4; }

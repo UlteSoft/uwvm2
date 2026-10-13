@@ -1,0 +1,123 @@
+{
+  "schema": "uwvm-core3-address-declaration-audit-source-plan-r1",
+  "source_only": true,
+  "guest_execution": 0,
+  "official_oracle_passed": false,
+  "native_compiled": false,
+  "native_executed": false,
+  "before_dependency": "Stage3 applied b8ffcdcd (fresh matching whole R11 tree for BEFORE; fresh Stage4 whole tree for AFTER)",
+  "cli": "[--provider provider.wasm] (memory64|table64|threads|multi-memory accept|reject independent_mask file.wasm)...",
+  "bits": {
+    "memory64": 1,
+    "table64": 2,
+    "threads": 4,
+    "multi_memory": 8
+  },
+  "cases": [
+    {
+      "wat": "memory64.wat",
+      "mask": 1,
+      "controls": [
+        "memory64"
+      ]
+    },
+    {
+      "wat": "table64.wat",
+      "mask": 2,
+      "controls": [
+        "table64"
+      ]
+    },
+    {
+      "wat": "shared_memory.wat",
+      "mask": 4,
+      "controls": [
+        "threads"
+      ]
+    },
+    {
+      "wat": "shared_memory64.wat",
+      "mask": 5,
+      "controls": [
+        "memory64",
+        "threads"
+      ]
+    },
+    {
+      "wat": "two_local_memories.wat",
+      "mask": 8,
+      "controls": [
+        "multi-memory"
+      ]
+    },
+    {
+      "wat": "empty.wat",
+      "mask": 0,
+      "controls": [
+        "memory64",
+        "table64",
+        "threads",
+        "multi-memory"
+      ]
+    },
+    {
+      "wat": "mvp_storage.wat",
+      "mask": 0,
+      "controls": [
+        "memory64",
+        "table64",
+        "threads",
+        "multi-memory"
+      ]
+    },
+    {
+      "wat": "import_memory64.wat",
+      "mask": 1,
+      "controls": [
+        "memory64"
+      ]
+    },
+    {
+      "wat": "import_table64.wat",
+      "mask": 2,
+      "controls": [
+        "table64"
+      ]
+    },
+    {
+      "wat": "import_shared.wat",
+      "mask": 4,
+      "controls": [
+        "threads"
+      ]
+    },
+    {
+      "wat": "two_imported_memories.wat",
+      "mask": 8,
+      "controls": [
+        "multi-memory"
+      ]
+    },
+    {
+      "wat": "mixed_memories.wat",
+      "mask": 8,
+      "controls": [
+        "multi-memory"
+      ]
+    }
+  ],
+  "provider_cases": [
+    "import_memory64.wat",
+    "import_table64.wat",
+    "import_shared.wat",
+    "two_imported_memories.wat",
+    "mixed_memories.wat"
+  ],
+  "observations_per_case": {
+    "ordinary_combined": 16,
+    "ros_combined": 12,
+    "ordinary_int_only": 6,
+    "ros_int_only": 4
+  },
+  "qualification": "Each compiled/run profile emits ADDRESS_DECLARATION_PROFILE llvm_roles_enabled; no macro=0 row qualifies LLVM. All products are empty zero-code admission, not verifyModule/machine-code/guest/crossarch proof."
+}

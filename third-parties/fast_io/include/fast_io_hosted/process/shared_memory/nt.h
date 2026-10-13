@@ -103,15 +103,12 @@ inline nt_shared_memory_state nt_family_create_shared_memory_impl(
 		throw_nt_error(status);
 	}
 
-	try
-	{
-		return nt_map_shared_memory_impl<family>(handle, mode);
-	}
-	catch (...)
-	{
-		::fast_io::win32::nt::nt_close<family == nt_family::zw>(handle);
-		throw;
-	}
+	// Retain the original Nt/Zw close family and adopt exactly once before
+	// mapping. The existing no-throw file destructor preserves EH cleanup.
+	::fast_io::basic_nt_family_file<family, char> owner{handle};
+	auto const state{nt_map_shared_memory_impl<family>(owner.native_handle(), mode)};
+	(void)owner.release(); // Success transfers this handle to the returned state.
+	return state;
 }
 
 inline nt_shared_memory_internal_tlc_str nt_shared_memory_path(
@@ -181,15 +178,12 @@ template <nt_family family>
 inline nt_shared_memory_state nt_duplicate_shared_memory_impl(void *handle, ipc_mode mode)
 {
 	auto const duplicated_handle{::fast_io::win32::nt::details::nt_dup_impl<family == nt_family::zw>(handle)};
-	try
-	{
-		return nt_map_shared_memory_impl<family>(duplicated_handle, mode);
-	}
-	catch (...)
-	{
-		::fast_io::win32::nt::nt_close<family == nt_family::zw>(duplicated_handle);
-		throw;
-	}
+	// Retain the original Nt/Zw close family and adopt exactly once before
+	// mapping. The existing no-throw file destructor preserves EH cleanup.
+	::fast_io::basic_nt_family_file<family, char> owner{duplicated_handle};
+	auto const state{nt_map_shared_memory_impl<family>(owner.native_handle(), mode)};
+	(void)owner.release(); // Success transfers this handle to the returned state.
+	return state;
 }
 
 } // namespace win32::nt::details
@@ -239,18 +233,10 @@ public:
 		native_handle_type section_handle, ipc_mode mode = ipc_mode::in | ipc_mode::out)
 	{
 		::fast_io::win32::nt::details::nt_shared_memory_validate_mode(mode);
-		try
-		{
-			assign(::fast_io::win32::nt::details::nt_map_shared_memory_impl<family>(section_handle, mode), mode);
-		}
-		catch (...)
-		{
-			if (section_handle != nullptr) [[likely]]
-			{
-				::fast_io::win32::nt::nt_close<family == nt_family::zw>(section_handle);
-			}
-			throw;
-		}
+		// Mode validation above preserves the original pre-adoption behavior.
+		::fast_io::basic_nt_family_file<family, char> owner{section_handle};
+		assign(::fast_io::win32::nt::details::nt_map_shared_memory_impl<family>(owner.native_handle(), mode), mode);
+		(void)owner.release(); // assign is noexcept; this object now owns the handle.
 	}
 
 	inline basic_nt_family_shared_memory(basic_nt_family_shared_memory const &other)

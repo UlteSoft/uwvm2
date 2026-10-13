@@ -1,0 +1,1 @@
+(module (type $s (struct (field i64))) (type $t (func (result i32))) (func $f (type $t) i32.const 42) (elem declare func $f) (type $a (array (mut (ref null $s))))  (func (export "_start") i32.const 0 array.new_default $a array.len i32.const 0 i32.ne if unreachable end))

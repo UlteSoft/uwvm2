@@ -1,0 +1,32 @@
+--- a/libunwind/src/EHHeaderParser.hpp
++++ b/libunwind/src/EHHeaderParser.hpp
+@@ -127,6 +127,29 @@
+     return false;
+ 
+   if (hdrInfo.fde_count == 0) return false;
++
++  // The usual ELF table contains pairs of signed 32-bit header-relative offsets.
++  // Validate the complete fixed-stride extent once, then search without invoking
++  // the generic variable-encoding decoder at every binary-search probe.
++  if (hdrInfo.table_enc == (DW_EH_PE_datarel | DW_EH_PE_sdata4) &&
++      hdrInfo.table <= ehHdrEnd &&
++      hdrInfo.fde_count <= (ehHdrEnd - hdrInfo.table) / 8) {
++    size_t low = 0;
++    for (size_t len = hdrInfo.fde_count; len > 1;) {
++      const size_t mid = low + len / 2;
++      const pint_t entry = hdrInfo.table + mid * 8;
++      const pint_t start = ehHdrStart +
++          static_cast<typename A::sint_t>(static_cast<int32_t>(addressSpace.get32(entry)));
++      if (start == pc) { low = mid; break; }
++      if (start < pc) { low = mid; len -= len / 2; }
++      else { len /= 2; }
++    }
++    const pint_t entry = hdrInfo.table + low * 8;
++    const pint_t fde = ehHdrStart +
++        static_cast<typename A::sint_t>(static_cast<int32_t>(addressSpace.get32(entry + 4)));
++    const char *message = CFI_Parser<A>::decodeFDE(addressSpace, fde, fdeInfo, cieInfo);
++    return message == NULL && pc >= fdeInfo->pcStart && pc < fdeInfo->pcEnd;
++  }
+ 
+   size_t tableEntrySize = getTableEntrySize(hdrInfo.table_enc);
+   pint_t tableEntry;

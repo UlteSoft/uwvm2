@@ -1,0 +1,149 @@
+{
+  "schema": "uwvm-ref-null-actual-development-smoke-plan-r3",
+  "source_only": true,
+  "native_compiled": false,
+  "native_executed": false,
+  "official_oracle_passed": false,
+  "production_dependency_manifest": "3bafb962ed91725243cfe392876e1e80e289cf8fcc2bb0d4a0d62155494eaf68",
+  "products": "first R12 BEFORE or fresh matching R13 AFTER only; after source headers must never be mixed with old compiled runtime/main/host. Only ordinary has lazy/tiered; ROS only intfull+jitfull",
+  "limits": "sole keeper Linux <=64GiB cgroup; no native Mac or separate SSH lane; short untimed semantic probes first",
+  "oracle_argv": [
+    [
+      "{official_wasm_tools}",
+      "parse",
+      "{wat}",
+      "-o",
+      "{wasm}"
+    ],
+    [
+      "{official_wasm_tools}",
+      "validate",
+      "--features",
+      "all",
+      "{wasm}"
+    ]
+  ],
+  "oracle_rule": "parse must succeed on all9; validate success for7 valid and nonzero for2 invalid; record actual pinned tool/version/SHA/raw status. Invalid WAT is intentionally emitted as invalid bytes, never repair it or treat parse alone as validation",
+  "first_short_round": [
+    "gc_abstract_bottoms",
+    "indexed_function_130",
+    "eh_noexn_without_gc"
+  ],
+  "default_native_argv": [
+    "{matching_product}",
+    "-m",
+    "run",
+    "--runtime-custom-compiler",
+    "{int|jit}",
+    "--runtime-custom-mode",
+    "{full|lazy|lazy+verification}",
+    "--runtime-compile-threads",
+    "0",
+    "--runtime-scheduling-policy",
+    "func_count",
+    "1",
+    "--wasm-feature-enable-reference-types",
+    "{enable_or_disable_gc}",
+    "{enable_or_disable_function_references}",
+    "{enable_or_disable_exceptions}",
+    "{wasm}"
+  ],
+  "cli_gate_rule": "Exactly one enable/disable flag perfeature. Forfeature-off replace only that flag, keep every other flag equal to positive. Require matching feature diagnostic, not unrelated crash. Runtime plainlazy feature-disabled unused instructions may expose separate unresolved allbody admission gap; do not reinterpret as emitter validation success",
+  "modes": [
+    "Ord intfull",
+    "Ord intlazy function-body reached by _start",
+    "Ord jitfull",
+    "Ord jitlazy function-body reached by _start",
+    "ROS intfull",
+    "ROS jitfull"
+  ],
+  "tiered_scope": "after ordinary fourmode short results, run actual tiered entry using matching explicit tiered compiler and declared thresholds; no promotion claim from a zero-work _start",
+  "thread_count_rule": "zero explicit compile workers leaves scheduling deterministic for unused-invalid boundary; verify actual CLI resolves this value by existing output/config; unavailable mode or flag is NOT PASS",
+  "cases": [
+    {
+      "name": "gc_abstract_bottoms",
+      "oracle_valid": true,
+      "gc": true,
+      "function_references": true,
+      "exceptions": true,
+      "runtime": "exit0; all eight ref.null+ref.is_null pairs actually executed",
+      "negative_feature": "gc"
+    },
+    {
+      "name": "indexed_function_130",
+      "oracle_valid": true,
+      "gc": false,
+      "function_references": true,
+      "exceptions": false,
+      "runtime": "exit0; _start uses explicitly declared function heap $t130",
+      "negative_feature": "function-references",
+      "binary_requirement": "actual official output must retain explicit type index130 and signed-33 heap bytes d0 82 01; record actual offset and exact code slice. If tool remaps types do not call this long-immediate test passed"
+    },
+    {
+      "name": "eh_noexn_without_gc",
+      "oracle_valid": true,
+      "gc": false,
+      "function_references": false,
+      "exceptions": true,
+      "runtime": "exit0; noexn and exn null checks both actually executed; GC-off positive must not be conflated with EH-off",
+      "negative_feature": "exceptions"
+    },
+    {
+      "name": "indexed_struct_null",
+      "oracle_valid": true,
+      "gc": true,
+      "function_references": false,
+      "exceptions": true,
+      "runtime": "exit0; exact struct heap projects to GC carrier rather than exact function index",
+      "negative_feature": "gc"
+    },
+    {
+      "name": "legacy_func_extern",
+      "oracle_valid": true,
+      "gc": false,
+      "function_references": false,
+      "exceptions": false,
+      "runtime": "exit0; existing func/extern null ABI unchanged",
+      "negative_feature": "reference-types"
+    },
+    {
+      "name": "dead_gc_heap",
+      "oracle_valid": true,
+      "gc": true,
+      "function_references": false,
+      "exceptions": false,
+      "runtime": "exit0; br skips null at execution, so this is dead-region typed/emitter admission only, not an executed ref.null probe",
+      "negative_feature": "gc"
+    },
+    {
+      "name": "adjacent_null_throw",
+      "oracle_valid": true,
+      "gc": false,
+      "function_references": false,
+      "exceptions": true,
+      "runtime": "reject with native null-reference trap, no SIGSEGV/timeout accepted; exact existing fatal trap diagnostic; preserves int adjacent-null-throw optimization",
+      "negative_feature": "exceptions"
+    },
+    {
+      "name": "unused_invalid_nondefaultable",
+      "oracle_valid": false,
+      "gc": true,
+      "function_references": true,
+      "exceptions": true,
+      "runtime": "reject allbody admission before _start: unused function31 local.get reads unset nondefaultable (ref $box); 32functions avoidLLVM16 adjacent warmup hiding the missing admission gate. Record actual plainlazy acceptance as a failing correctness regression, not PASS"
+    },
+    {
+      "name": "invalid_cross_heap_bottom",
+      "oracle_valid": false,
+      "gc": true,
+      "function_references": true,
+      "exceptions": true,
+      "runtime": "reject admission: nofunc bottom is not an extern hierarchy value"
+    }
+  ],
+  "direct_event_component_not_included": "These are original real WAT/native entry probes; source-only event/POD assertions cannot replace running _start. No generic raw decode fallback/lazy complete claim",
+  "ir_asm_recipe": "Use actual native LLVM emitted IR/ASM option from product and pin raw IR: reference zero constant+existing null-check behavior must retain no extra guest memory guard. Compare R12 BEFORE and R13 AFTER same module/mode/config; metadata source inspection is not assembly or performance evidence",
+  "results_contract": "Save raw argv/stdout/stderr/status, exact tool/product/source/header pins, oracle outcome and feature match. Each dynamic valid _start must actually enter/exercise indicated ref.null. Expected-invalid and trap outcomes are separate roles; unavailable LLVM/lazy, unintended signal, swallowed error or unused lazy functions do not count as passed",
+  "source_family_refusal": "R3 refuses legacy raw ref.null emission explicitly, successful lowering requires first typed-walk event",
+  "unused_invalid_boundary": "Exactly32 defined functions: _start0, 30 unused valid fillers1..30, invalid nondefaultable local31. Explicit compilethreads0 + func_count1 prevents int CU allfunction batching; existing LLVM adjacent materialization const16 cannot reach31 from entry0. No actual acceptance/rejection outcome is inferred from source."
+}

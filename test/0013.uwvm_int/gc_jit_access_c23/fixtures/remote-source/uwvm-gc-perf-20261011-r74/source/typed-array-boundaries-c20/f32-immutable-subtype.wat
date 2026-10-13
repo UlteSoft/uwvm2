@@ -1,0 +1,1 @@
+(module (type $p (sub (array f32))) (type $c (sub $p (array f32)))  (func (export "_start") (local $a (ref null $p)) i32.const 2139095041 f32.reinterpret_i32 i32.const 11 array.new $c local.set $a local.get $a i32.const 10 array.get $p i32.reinterpret_f32 i32.const 2139095041 i32.ne if unreachable end ))

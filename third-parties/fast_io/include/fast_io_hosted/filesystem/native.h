@@ -6,6 +6,14 @@
 #if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && !defined(__MSDOS__) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
 #include "posix.h"
 #include "posix_at.h"
+#if defined(__linux__) || (defined(__APPLE__) && defined(__MACH__)) || defined(__FreeBSD__)
+#include "posix_nothrow.h"
+#endif
+#if defined(__linux__) || (defined(__APPLE__) && defined(__MACH__))
+#include "posix_timestamps_nothrow.h"
+#include "posix_readlink_nothrow.h"
+#include "posix_timestamp_options_nothrow.h"
+#endif
 #endif
 
 #if (defined(_WIN32) || defined(__CYGWIN__))
@@ -15,6 +23,9 @@
 #else
 #include "nt.h"
 #include "nt_at.h"
+#if defined(_WIN32) && !defined(_WIN32_WINDOWS) && !defined(__CYGWIN__) && !defined(__WINE__) && !defined(__BIONIC__)
+#include "nt_readonly_sync_nothrow.h"
+#endif
 #endif
 #endif
 

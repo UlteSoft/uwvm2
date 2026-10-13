@@ -1,0 +1,342 @@
+{
+  "schema": "uwvm-declaration-two-phase-source-v1",
+  "source_only": true,
+  "native_execution_passed": false,
+  "production_changed_paths": [],
+  "component": "two_phase_policy.cc",
+  "provider": "fixtures/provider.wat",
+  "cli_quads": [
+    "simd|reference-types|multi-value|function-references",
+    "accept|reject",
+    "none|table|global|element|function|local",
+    "actual.official.wasm"
+  ],
+  "features_parse_init": "all enabled",
+  "validation_changes": "only the named feature disable bit",
+  "other_features_remain_enabled": true,
+  "first_before_fixture": "unused_v128_type",
+  "first_source_prediction": "strict SIMD must reject; false acceptance is a failing regression, never qualification PASS",
+  "fixtures": [
+    {
+      "name": "unused_v128_type",
+      "feature": "simd",
+      "wat": "fixtures/unused_v128_type.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "function",
+      "provider": null,
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "unused_v128_field",
+      "feature": "simd",
+      "wat": "fixtures/unused_v128_field.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "function",
+      "provider": null,
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "unused_v128_global",
+      "feature": "simd",
+      "wat": "fixtures/unused_v128_global.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "global",
+      "provider": null,
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "unused_v128_import_func",
+      "feature": "simd",
+      "wat": "fixtures/unused_v128_import_func.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "function",
+      "provider": "fixtures/provider.wat",
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "unused_v128_import_global",
+      "feature": "simd",
+      "wat": "fixtures/unused_v128_import_global.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "global",
+      "provider": "fixtures/provider.wat",
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "local_v128",
+      "feature": "simd",
+      "wat": "fixtures/local_v128.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "local",
+      "provider": null,
+      "before_source_prediction": "source prediction: current local carrier gate rejects"
+    },
+    {
+      "name": "unused_externref_type",
+      "feature": "reference-types",
+      "wat": "fixtures/unused_externref_type.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "function",
+      "provider": null,
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "unused_nonnull_extern_type",
+      "feature": "reference-types",
+      "wat": "fixtures/unused_nonnull_extern_type.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "function",
+      "provider": null,
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "unused_externref_field",
+      "feature": "reference-types",
+      "wat": "fixtures/unused_externref_field.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "function",
+      "provider": null,
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "unused_externref_global",
+      "feature": "reference-types",
+      "wat": "fixtures/unused_externref_global.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "global",
+      "provider": null,
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "unused_externref_table",
+      "feature": "reference-types",
+      "wat": "fixtures/unused_externref_table.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "table",
+      "provider": null,
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "unused_externref_element",
+      "feature": "reference-types",
+      "wat": "fixtures/unused_externref_element.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "element",
+      "provider": null,
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "unused_externref_import_func",
+      "feature": "reference-types",
+      "wat": "fixtures/unused_externref_import_func.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "function",
+      "provider": "fixtures/provider.wat",
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "unused_externref_import_table",
+      "feature": "reference-types",
+      "wat": "fixtures/unused_externref_import_table.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "table",
+      "provider": "fixtures/provider.wat",
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "unused_externref_import_global",
+      "feature": "reference-types",
+      "wat": "fixtures/unused_externref_import_global.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "global",
+      "provider": "fixtures/provider.wat",
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "legacy_funcref_table",
+      "feature": "reference-types",
+      "wat": "fixtures/legacy_funcref_table.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: MVP funcref table remains valid"
+    },
+    {
+      "name": "unused_multiresult_type",
+      "feature": "multi-value",
+      "wat": "fixtures/unused_multiresult_type.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "function",
+      "provider": null,
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "unused_multiresult_import",
+      "feature": "multi-value",
+      "wat": "fixtures/unused_multiresult_import.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "function",
+      "provider": "fixtures/provider.wat",
+      "before_source_prediction": "source prediction: missing unused/declaration aggregate gate"
+    },
+    {
+      "name": "multiple_params_control",
+      "feature": "multi-value",
+      "wat": "fixtures/multiple_params_control.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: multiple function parameters are valid in MVP"
+    },
+    {
+      "name": "single_result_control",
+      "feature": "multi-value",
+      "wat": "fixtures/single_result_control.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: one result requires no multi-value feature"
+    },
+    {
+      "name": "typed_nullable_func_type",
+      "feature": "function-references",
+      "wat": "fixtures/typed_nullable_func_type.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "function",
+      "provider": null,
+      "before_source_prediction": "source prediction: existing type function-reference aggregate rejects"
+    },
+    {
+      "name": "nonnull_func_type",
+      "feature": "function-references",
+      "wat": "fixtures/nonnull_func_type.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "reject",
+      "expected_subject": "function",
+      "provider": null,
+      "before_source_prediction": "source prediction: existing function-reference aggregate rejects"
+    },
+    {
+      "name": "nullable_func_type",
+      "feature": "function-references",
+      "wat": "fixtures/nullable_func_type.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: legacy nullable funcref retains only reference-types requirement"
+    },
+    {
+      "name": "nullable_external_type",
+      "feature": "function-references",
+      "wat": "fixtures/nullable_external_type.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: nullable external heap requires no function-references feature"
+    },
+    {
+      "name": "typed_gc_heap_control",
+      "feature": "function-references",
+      "wat": "fixtures/typed_gc_heap_control.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: exact defined GC heap is not a function heap"
+    },
+    {
+      "name": "nonnull_any_local",
+      "feature": "function-references",
+      "wat": "fixtures/nonnull_any_local.wat",
+      "official_oracle_expected": "valid",
+      "expected_without_feature": "accept",
+      "expected_subject": "none",
+      "provider": null,
+      "before_source_prediction": "source prediction: nonnull GC local requires GC/reference-types, not function-references"
+    }
+  ],
+  "exact_binary_source": "binary_controls.json",
+  "lazy_admission_fixtures": [
+    {
+      "name": "unused_invalid_nondefault_local",
+      "wat": "lazy/unused_invalid_nondefault_local.wat",
+      "official_oracle_expected": "invalid",
+      "expected_all_modes": "reject module before any start/entry side effect",
+      "reason": "uninitialized nondefaultable local in an uncalled body",
+      "native_execution_passed": false
+    },
+    {
+      "name": "unused_invalid_gc_packed_get",
+      "wat": "lazy/unused_invalid_gc_packed_get.wat",
+      "official_oracle_expected": "invalid",
+      "expected_all_modes": "reject module before any start/entry side effect",
+      "reason": "packed get_s on an unpacked i32 field in an uncalled body",
+      "native_execution_passed": false
+    },
+    {
+      "name": "unused_invalid_try_table_label",
+      "wat": "lazy/unused_invalid_try_table_label.wat",
+      "official_oracle_expected": "invalid",
+      "expected_all_modes": "reject module before any start/entry side effect",
+      "reason": "catch target label does not exist in outer context",
+      "native_execution_passed": false
+    },
+    {
+      "name": "legal_nondefault_local",
+      "wat": "lazy/legal_nondefault_local.wat",
+      "official_oracle_expected": "valid",
+      "expected_all_modes": "execute _start without trap",
+      "reason": "nondefaultable GC local initialized at function scope; _start calls probe",
+      "native_execution_passed": false
+    },
+    {
+      "name": "legal_recursive_gc",
+      "wat": "lazy/legal_recursive_gc.wat",
+      "official_oracle_expected": "valid",
+      "expected_all_modes": "execute _start without trap",
+      "reason": "recursive aggregate heap; _start calls actual aggregate code",
+      "native_execution_passed": false
+    },
+    {
+      "name": "legal_try_table",
+      "wat": "lazy/legal_try_table.wat",
+      "official_oracle_expected": "valid",
+      "expected_all_modes": "execute _start without trap",
+      "reason": "tag payload lands on outer label; _start actually throws/catches",
+      "native_execution_passed": false
+    },
+    {
+      "name": "legal_mem64_table64",
+      "wat": "lazy/legal_mem64_table64.wat",
+      "official_oracle_expected": "valid",
+      "expected_all_modes": "execute _start without trap",
+      "reason": "64-bit memory/table indices consumed in actual accesses; _start calls probe",
+      "native_execution_passed": false
+    }
+  ],
+  "native_execution": "managed keeper SSH Linux only, shared64GiB cgroup; official parse+validate first; compile actual int component then LLVM4mode; no Mac native",
+  "proposal_applied": false
+}

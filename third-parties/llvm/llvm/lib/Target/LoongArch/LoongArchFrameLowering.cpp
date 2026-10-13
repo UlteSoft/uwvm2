@@ -29,6 +29,25 @@ using namespace llvm;
 
 #define DEBUG_TYPE "loongarch-frame-lowering"
 
+// Keep physical frame indices relative to entry SP. TailCC's CFA instead
+// names the caller's SP before its callee-popped incoming argument area.
+class LoongArchTailCFIBuilder : public CFIInstBuilder {
+  int64_t IncomingArgs;
+public:
+  LoongArchTailCFIBuilder(MachineBasicBlock &MBB,
+                         MachineBasicBlock::iterator Insert,
+                         MachineInstr::MIFlag Flag)
+      : CFIInstBuilder(MBB, Insert, Flag),
+        IncomingArgs(MBB.getParent()->getInfo<LoongArchMachineFunctionInfo>()
+                         ->getArgumentStackToRestore()) {}
+  void buildDefCFA(MCRegister Reg, int64_t Offset) const {
+    CFIInstBuilder::buildDefCFA(Reg, Offset + IncomingArgs);
+  }
+  void buildDefCFAOffset(int64_t Offset, MCSymbol *Label = nullptr) const {
+    CFIInstBuilder::buildDefCFAOffset(Offset + IncomingArgs, Label);
+  }
+};
+
 // Return true if the specified function should have a dedicated frame
 // pointer register.  This is true if frame pointer elimination is
 // disabled, if it needs dynamic stack realignment, if the function has
@@ -37,7 +56,8 @@ bool LoongArchFrameLowering::hasFPImpl(const MachineFunction &MF) const {
   const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
 
   const MachineFrameInfo &MFI = MF.getFrameInfo();
-  return MF.getTarget().Options.DisableFramePointerElim(MF) ||
+  return MF.getInfo<LoongArchMachineFunctionInfo>()->hasTailCCStackCall() ||
+         MF.getTarget().Options.DisableFramePointerElim(MF) ||
          RegInfo->hasStackRealignment(MF) || MFI.hasVarSizedObjects() ||
          MFI.isFrameAddressTaken();
 }
@@ -196,7 +216,7 @@ void LoongArchFrameLowering::allocateStack(MachineBasicBlock &MBB,
   const LoongArchInstrInfo *TII = STI.getInstrInfo();
   const bool IsLA64 = STI.is64Bit();
   const Register SPReg = LoongArch::R3;
-  CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameSetup);
+  LoongArchTailCFIBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameSetup);
 
   // Simply allocate the stack if it's not big enough to require a probe.
   if (!NeedProbe || Offset <= ProbeSize) {
@@ -315,6 +335,9 @@ void LoongArchFrameLowering::emitPrologue(MachineFunction &MF,
   // prologue/epilogue.
   if (MF.getFunction().getCallingConv() == CallingConv::GHC)
     return;
+  if (LoongArchFI->getArgumentStackToRestore() && MF.needsFrameMoves())
+    LoongArchTailCFIBuilder(MBB, MBBI, MachineInstr::FrameSetup)
+        .buildDefCFAOffset(0);
   // Determine the correct frame layout
   determineFrameLayout(MF);
 
@@ -353,7 +376,8 @@ void LoongArchFrameLowering::emitPrologue(MachineFunction &MF,
   // Iterate over list of callee-saved registers and emit .cfi_offset
   // directives.
   for (const auto &Entry : CSI) {
-    int64_t Offset = MFI.getObjectOffset(Entry.getFrameIdx());
+    int64_t Offset = MFI.getObjectOffset(Entry.getFrameIdx()) -
+                     LoongArchFI->getArgumentStackToRestore();
     unsigned CFIIndex = MF.addFrameInst(MCCFIInstruction::createOffset(
         nullptr, RI->getDwarfRegNum(Entry.getReg(), true), Offset));
     BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
@@ -370,7 +394,8 @@ void LoongArchFrameLowering::emitPrologue(MachineFunction &MF,
     // Emit ".cfi_def_cfa $fp, LoongArchFI->getVarArgsSaveSize()"
     unsigned CFIIndex = MF.addFrameInst(
         MCCFIInstruction::cfiDefCfa(nullptr, RI->getDwarfRegNum(FPReg, true),
-                                    LoongArchFI->getVarArgsSaveSize()));
+                                    LoongArchFI->getVarArgsSaveSize() +
+                                    LoongArchFI->getArgumentStackToRestore()));
     BuildMI(MBB, MBBI, DL, TII->get(TargetOpcode::CFI_INSTRUCTION))
         .addCFIIndex(CFIIndex)
         .setMIFlag(MachineInstr::FrameSetup);
@@ -427,6 +452,23 @@ void LoongArchFrameLowering::emitEpilogue(MachineFunction &MF,
   MachineBasicBlock::iterator MBBI = MBB.getFirstTerminator();
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
 
+  int64_t ArgumentPop = LoongArchFI->getArgumentStackToRestore();
+  if (MBBI != MBB.end()) {
+    unsigned TailOpcode = 0;
+    switch (MBBI->getOpcode()) {
+    case LoongArch::PseudoB_TC_RETURN: TailOpcode = LoongArch::PseudoB_TAIL; break;
+    case LoongArch::PseudoTCRETURN_SMALL: TailOpcode = LoongArch::PseudoTAIL_SMALL; break;
+    case LoongArch::PseudoTCRETURN_MEDIUM: TailOpcode = LoongArch::PseudoTAIL_MEDIUM; break;
+    case LoongArch::PseudoTCRETURN_LARGE: TailOpcode = LoongArch::PseudoTAIL_LARGE; break;
+    case LoongArch::PseudoTCRETURNIndirect: TailOpcode = LoongArch::PseudoTAILIndirect; break;
+    }
+    if (TailOpcode) {
+      ArgumentPop = MBBI->getOperand(1).getImm();
+      MBBI->removeOperand(1);
+      MBBI->setDesc(STI.getInstrInfo()->get(TailOpcode));
+    }
+  }
+
   const auto &CSI = MFI.getCalleeSavedInfo();
   // Skip to before the restores of callee-saved registers.
   auto LastFrameDestroy = MBBI;
@@ -455,8 +497,42 @@ void LoongArchFrameLowering::emitEpilogue(MachineFunction &MF,
     StackSize = FirstSPAdjustAmount;
   }
 
-  // Deallocate stack
-  adjustReg(MBB, MBBI, DL, SPReg, SPReg, StackSize, MachineInstr::FrameDestroy);
+  // Asynchronous rows must remain true after FP/RA and SP are restored.
+  // A prologue-only FP row describes the caller's FP after its load and
+  // cannot authenticate a stopped return instruction. Keep synchronous
+  // call-site unwinding unchanged; emit these rows only for async tables.
+  bool AsyncCFI = MF.getFunction().getUWTableKind() == UWTableKind::Async;
+  LoongArchTailCFIBuilder CFIBuilder(MBB, LastFrameDestroy,
+                            MachineInstr::FrameDestroy);
+  if (AsyncCFI)
+    CFIBuilder.buildDefCFA(SPReg, StackSize);
+
+  // The existing epilogue layout has one load per callee-saved register.
+  // Describe each register only after its actual restoring instruction.
+  // Explicit same-value is intentional: an omitted initial CIE rule must
+  // not leave the restored RA unavailable to a strict private CFI reader.
+  for (auto I = LastFrameDestroy; AsyncCFI && I != MBBI; ++I) {
+    if (!I->mayLoad() || I->getNumOperands() == 0 ||
+        !I->getOperand(0).isReg())
+      continue;
+    MCRegister Reg = I->getOperand(0).getReg().asMCReg();
+    bool Saved = false;
+    for (const CalleeSavedInfo &CS : CSI)
+      Saved |= CS.getReg() == Reg;
+    if (!Saved)
+      continue;
+    CFIBuilder.setInsertPoint(std::next(I));
+    CFIBuilder.buildSameValue(Reg);
+  }
+
+  // Deallocate stack. The new row follows the actual SP adjustment, never
+  // a constant-materialization instruction preceding that adjustment.
+  adjustReg(MBB, MBBI, DL, SPReg, SPReg, int64_t(StackSize) + ArgumentPop,
+            MachineInstr::FrameDestroy);
+  if (AsyncCFI) {
+    CFIBuilder.setInsertPoint(MBBI);
+    CFIBuilder.buildDefCFA(SPReg, -ArgumentPop);
+  }
 }
 
 // Synthesize the probe loop.
@@ -588,7 +664,8 @@ void LoongArchFrameLowering::determineCalleeSaves(MachineFunction &MF,
 // Let eliminateCallFramePseudoInstr preserve stack space for it.
 bool LoongArchFrameLowering::hasReservedCallFrame(
     const MachineFunction &MF) const {
-  return !MF.getFrameInfo().hasVarSizedObjects();
+  return !MF.getInfo<LoongArchMachineFunctionInfo>()->hasTailCCStackCall() &&
+         !MF.getFrameInfo().hasVarSizedObjects();
 }
 
 // Eliminate ADJCALLSTACKDOWN, ADJCALLSTACKUP pseudo instructions.
@@ -606,6 +683,8 @@ LoongArchFrameLowering::eliminateCallFramePseudoInstr(
     // allocation (e.g. alloca), which means it's not possible to allocate
     // space for outgoing arguments from within the function prologue.
     int64_t Amount = MI->getOperand(0).getImm();
+    if (MI->getOpcode() == LoongArch::ADJCALLSTACKUP)
+      Amount -= MI->getOperand(1).getImm(); // TailCC callee already popped it.
 
     if (Amount != 0) {
       // Ensure the stack remains aligned after adjustment.
@@ -709,6 +788,9 @@ StackOffset LoongArchFrameLowering::getFrameIndexReference(
 
 bool LoongArchFrameLowering::enableShrinkWrapping(
     const MachineFunction &MF) const {
+  if (MF.getFunction().getCallingConv() == CallingConv::Tail ||
+      MF.getInfo<LoongArchMachineFunctionInfo>()->hasTailCCStackCall())
+    return false;
   // Keep the conventional code flow when not optimizing.
   if (MF.getFunction().hasOptNone())
     return false;

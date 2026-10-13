@@ -1,0 +1,20 @@
+(module
+(global $seed (mut i32) (i32.const 71))
+(global $checksum (export "checksum") (mut i32) (i32.const 0))
+(func $step (param $x i32) (result i32)
+ local.get $x local.get $x i32.const 13 i32.shr_u i32.xor
+ i32.const 1664525 i32.mul i32.const 1013904223 i32.add)
+(memory $a (export "a") 1)(memory $b (export "b") 1)
+(func (export "_start") (local $x i32) (local $i i32) (local $p i32) (local $wide i64) (local $e exnref) 
+ global.get $seed local.set $x 
+ loop $loop
+ local.get $x call $step local.tee $x i32.const 255 i32.and i32.const 2 i32.shl local.set $p
+local.get $p local.get $x i32.store $a
+local.get $p local.get $p i32.const 4 memory.copy $b $a
+local.get $p i32.load $b
+ local.set $x
+ local.get $i i32.const 1 i32.add local.tee $i i32.const 16384 i32.lt_u br_if $loop
+ end
+ local.get $x global.set $checksum
+ local.get $x i32.const 551227849 i32.ne if unreachable end
+))

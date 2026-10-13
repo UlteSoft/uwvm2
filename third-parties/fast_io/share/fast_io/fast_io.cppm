@@ -18,6 +18,11 @@
 #endif
 #endif
 
+#ifndef FAST_IO_FREESTANDING
+#include <string>
+#include <fast_io_unit/string.h>
+#endif
+
 export module fast_io;
 
 #include "fast_io_inc/core.inc"

@@ -1,0 +1,29 @@
+# ROS paired source runtimes
+
+The LLVM backend now has `--llvm-runtimes-provider=auto|bundled|platform`. `auto` selects the source-owned provider when `--use-llvm-compiler=y` uses a supported GNU Clang Linux, Darwin, MinGW or BSD ABI. `bundled` requires that provider and rejects MSVC/ARM64EC, a conflicting stdlib/unwinder, and a legacy prebuilt-LLVM certificate. `platform` explicitly retains the existing bootstrap-runtime contract. Other compilers/ABIs are not silently replaced by the Itanium runtime. Selecting a supported platform in source is not native qualification.
+
+The source is `third-parties/llvm-runtimes/upstream/runtimes`, official LLVM 23.1.1. `paired-static.cmake` supplies reviewable defaults. The consumer also supplies and checks the resolved Release/static/ABI1 `__1`/threads/exceptions configuration. ABI/unwinder assertions and optional libc++ hardening are OFF; VM validation, memory checks, exception algorithms and CFI synchronization remain intact. The libraries use RTTI as required by their real exception types; LLVM and application keep their existing compiler RTTI policies.
+
+`xmake/utility/bundled_runtimes.lua` builds only `cxx_static`, `cxxabi_static` and `unwind_static` (their dependencies include generated headers). A metadata-only CMake consumer exports their actual ordered link closure. It is never compiled or executed. The libraries remain three separate static archives; no hand-maintained library-name graph replaces CMake. Configure/build/metadata publication use the existing per-build lock and canonical build directory. Ninja still checks deleted or changed outputs even when a completion stamp exists.
+
+The runtime build identity includes its verified source manifest, profile and contract recipes, bootstrap compiler paths/hashes, target, C/C++/ASM toolchain, flags, libc sysroot and Darwin deployment environment. Its generated `__config_site` and three archive hashes also enter the LLVM build identity. The LLVM host tools and application/runtime translation units then use the same generated headers with `-nostdinc++`, the same absolute archives with `-nostdlib++ --unwindlib=none`, and no bootstrap libc++/ABI/unwind directory search. Compiler builtins and target OS libc remain external dependencies. This does not build a new compiler or sysroot.
+
+LLVM's EH registration tests are C link probes. Their actual required-library closure is the paired provider, and prior `HAVE_*` cache answers are cleared before the probes. Supported DWARF targets must really link `__register_frame`, `__deregister_frame` and `__unw_add_dynamic_fde`; no macro is forced to pretend these symbols exist. Windows SEH and ARM32 EHABI retain their current native-EH qualification boundaries. No global export-dynamic workaround is used to find a different unwinder. Darwin's libSystem and BSD/provider ABI interactions still require actual target testing.
+
+Only the sole Linux keeper may execute the following configure/build shape in the existing 64GiB no-swap sandbox, with its actual compiler/sysroot/OpenSSL inputs and serial test lane. Use a fresh private output; this document does not authorize a global install:
+
+```sh
+xmake f -o "$task_output" -p linux -a x86_64 -m release \
+  --use-llvm-compiler=y --execution-jit=llvm --llvm-runtimes-provider=bundled \
+  --cc="$task_clang" --cxx="$task_clangxx" --stdlib=libc++ \
+  --llvm-build-targets=X86 --llvm-build-jobs=2
+xmake build uwvm
+```
+
+Cross builds must use the same `--llvm-cmake-toolchain` for runtimes and LLVM, with identical explicit C/C++/ASM compiler targets, the real target sysroot and `LLVM_HOST_TRIPLE`. The contract rejects MSVC frontends, ARM64EC and non-GNU Windows targets. Existing Windows prebuilt certificates describe another runtime and are usable only through explicit `platform`, until a new paired certificate actually qualifies the entire closure. The small debugger broker is a separate process and retains its standalone platform runtime; it does not share C++ objects or EH state with the VM.
+
+Qualification is pending. Record actual CMake cache/file-API/compile and ordered link argv, generated config/header hashes and every archive/object/ELF/PE/Mach-O hash. Inspect final loader imports and symbol providers: Linux must not import external libc++, libc++abi or libunwind DSOs, and no competing libgcc EH provider may enter through driver defaults. Bootstrap compiler DSOs do not qualify the output. Compile and run the existing `native_exception_host.cc` and actual product-managed guest EH fixtures against this same fresh closure; do not reuse their old llvm-config runner unchanged or mix an old runtime object. Check dynamically registered JIT FDEs, cross-function typed catch/rethrow/foreign cleanup and both instruction/unwind traces before measuring performance. Then exercise debugger/current-GC fixtures and inspect actual generated assembly. Configuration or a source hash alone is not an ABI, unwind or performance PASS.
+
+Ordinary uwvm2 has the same-source reviewable `tools/ci/llvm-runtimes-23.1.1/paired-static.cmake` configuration. It deliberately does not copy LLVM into the ordinary tree or automatically mix these new archives with an existing external LLVM SDK. Rebuild/qualify that SDK and all consumers with the same generated headers/ABI and ordered static closure first.
+
+Primary references: [LLVM 23.1.1 standalone runtimes](https://github.com/llvm/llvm-project/blob/llvmorg-23.1.1/runtimes/CMakeLists.txt), [libc++ ABI configuration](https://github.com/llvm/llvm-project/blob/llvmorg-23.1.1/libcxx/CMakeLists.txt), [libc++abi static unwinder binding](https://github.com/llvm/llvm-project/blob/llvmorg-23.1.1/libcxxabi/src/CMakeLists.txt), and [libunwind static target](https://github.com/llvm/llvm-project/blob/llvmorg-23.1.1/libunwind/src/CMakeLists.txt).

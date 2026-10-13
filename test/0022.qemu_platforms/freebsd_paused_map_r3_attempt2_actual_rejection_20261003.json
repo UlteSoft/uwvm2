@@ -1,0 +1,252 @@
+{
+  "QMP_cont_issued": false,
+  "ROS_bundled_product_qualified": false,
+  "actual_KVM": {
+    "enabled": true,
+    "present": true
+  },
+  "actual_OOM_events_all_zero": true,
+  "actual_guest_executed": false,
+  "actual_host_kernel_readonly_metadata": "6.17.0-29-generic",
+  "actual_platform_qualified": false,
+  "actual_remaining_CG_pids": [
+    10154
+  ],
+  "commands_sha256": "7428295f5665e92d03e0d7b7d80f454811504bbdff454f0306261d7b77fb39cb",
+  "controller_sha256": "2bc15739a65c9cc60e67626f12586c9e9a464eb89f484f28c702615f75cf0cca",
+  "deleted_mapping": {
+    "all_observed_FD_rows": 28,
+    "backing_type_proved": false,
+    "classification": "not admitted; compatible with kernel internal shared-anonymous shmem",
+    "device_major": 0,
+    "device_minor": 1,
+    "end": 135081962369024,
+    "executable": false,
+    "extent_bytes": 4096,
+    "guest_RAM_owner_proved": false,
+    "inode": 244378,
+    "matching_open_FD_rows": [],
+    "memfd_proved": false,
+    "offset": 0,
+    "pathname": "/dev/zero (deleted)",
+    "permissions": "rw-s",
+    "provider_or_library_identity_proved": false,
+    "raw_line": "7adb3861e000-7adb3861f000 rw-s 00000000 00:01 244378                     /dev/zero (deleted)",
+    "start": 135081962364928
+  },
+  "error": "RuntimeError: paused mapping diagnostic complete; guest execution intentionally refused",
+  "full_maps_bytes": 42021,
+  "full_maps_sha256": "3e9785fe164f444bfd1a43e7d6ca425233b929c09fbdffe1eefe58321d8cfac7",
+  "guard_exit": 1,
+  "guardian_sha256": "c1463aa0986ca5f8f581b67c12ae690b253d02e3b23d7e304daef778e02f3161",
+  "kernel_snapshot_original_PIDFD_live_before_and_after": true,
+  "lane_retirement_sha256": "3619a5b2a682cf36b67b81714ce4798b56be4e968faa670a4f40c1a9ca446d0a",
+  "lane_ticket": "033246a1bc404b4bbf209a3df265bebd",
+  "lane_ticket_sha256": "5dfba28318f8ebe1c263a4554813a10ca3a1d03744d01fc3b67b0c184652cdb4",
+  "launcher_sha256": "43d168eeba1302fc16b86f99d59c91ea83039830bfd6ea79855a90541ce469a5",
+  "memory_max_bytes": 68719476736,
+  "next_action": "Source-only narrow full-field pseudo-anonymous nonexec classification proposal; no automatic retry",
+  "original_QEMU_identity": {
+    "affinity": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "argv": [
+      "/home/macromodel/.local/opt/qemu-10.2.1/usr/bin/qemu-system-x86_64",
+      "-name",
+      "uwvm-freebsd151-cold",
+      "-machine",
+      "q35,dump-guest-core=off,mem-merge=off",
+      "-accel",
+      "kvm",
+      "-cpu",
+      "host",
+      "-smp",
+      "4",
+      "-m",
+      "4096",
+      "-no-user-config",
+      "-nodefaults",
+      "-display",
+      "none",
+      "-vga",
+      "none",
+      "-nic",
+      "none",
+      "-monitor",
+      "none",
+      "-parallel",
+      "none",
+      "-L",
+      "/home/macromodel/.local/opt/qemu-10.2.1/usr/share/qemu",
+      "-bios",
+      "/home/macromodel/.local/opt/qemu-10.2.1/usr/share/seabios/bios-256k.bin",
+      "-device",
+      "virtio-scsi-pci,id=scsi0,addr=0xa",
+      "-drive",
+      "if=none,id=osdisk,format=qcow2,file=/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-paused-map-20261003-r3/disk.qcow2",
+      "-device",
+      "scsi-hd,drive=osdisk,bus=scsi0.0,bootindex=1",
+      "-drive",
+      "if=none,id=seed,media=cdrom,format=raw,readonly=on,file=/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-paused-map-20261003-r3/inputs.iso",
+      "-device",
+      "scsi-cd,drive=seed,bus=scsi0.0",
+      "-serial",
+      "file:/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-paused-map-20261003-r3/serial.log",
+      "-qmp",
+      "unix:/tmp/uwvm-bsd151-e72f9b9c60b9689ce31be11a/qmp.sock,server=on,wait=off",
+      "-S"
+    ],
+    "birth": 5813073,
+    "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope",
+    "exe": "/home/macromodel/.local/opt/qemu-10.2.1/usr/bin/qemu-system-x86_64",
+    "pid": 404227,
+    "ppid": 404122,
+    "uid": [
+      1000,
+      1000,
+      1000,
+      1000
+    ]
+  },
+  "original_QEMU_retirement": [
+    {
+      "actual_wait_returncode": -9,
+      "birth": 5813073,
+      "original_pidfd_ready": true,
+      "pid": 404227
+    }
+  ],
+  "original_root_original_PIDFD_ready_and_wait4_rc": {
+    "ready": true,
+    "returncode": 1
+  },
+  "primary_sources": [
+    {
+      "scope": "shmem_zero_setup uses internal shmem backing named dev/zero; inference only, not direct proof of this VMA",
+      "url": "https://raw.githubusercontent.com/torvalds/linux/v6.17/mm/shmem.c"
+    },
+    {
+      "scope": "shared anonymous mmap can use kernel internal tmpfs",
+      "url": "https://docs.kernel.org/admin-guide/mm/transhuge.html#shmem-internal-tmpfs"
+    },
+    {
+      "scope": "maps fields and ambiguous deleted pathname suffix",
+      "url": "https://man7.org/linux/man-pages/man5/proc_pid_maps.5.html"
+    }
+  ],
+  "raw_files": [
+    {
+      "bytes": 189,
+      "local": "00-bind-guest-manifest.log",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-paused-map-r3-attempt2/bind-guest-manifest.log",
+      "sha256": "79a19ec94b95e51a6eaf337c26bda78180a659504420d8dea07bc62e402d4a84"
+    },
+    {
+      "bytes": 528,
+      "local": "01-lane-retirement.json",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-paused-map-r3-attempt2/lane-retirement.json",
+      "sha256": "3619a5b2a682cf36b67b81714ce4798b56be4e968faa670a4f40c1a9ca446d0a"
+    },
+    {
+      "bytes": 0,
+      "local": "02-owned-cidata.log",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-paused-map-r3-attempt2/owned-cidata.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 458,
+      "local": "03-owned-overlay.log",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-paused-map-r3-attempt2/owned-overlay.log",
+      "sha256": "c335b0eba42fc73f2db023a2f7213e781e5cb8226e93e3ec803e2d6ca1fc971f"
+    },
+    {
+      "bytes": 0,
+      "local": "04-paused-map-diagnostic.log",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-paused-map-r3-attempt2/paused-map-diagnostic.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 342,
+      "local": "05-prepare-seed.log",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-paused-map-r3-attempt2/prepare-seed.log",
+      "sha256": "eb5c69be54a1b9e54cacf1e82da64df26b969ce279932f243ddff1dd0969f260"
+    },
+    {
+      "bytes": 42486,
+      "local": "06-receipts.json",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-paused-map-r3-attempt2/receipts.json",
+      "sha256": "150b14059bf212f5a487ca1ba7b4bee42898bbe3a7bd1210a9d42c1f4409bb39"
+    },
+    {
+      "bytes": 0,
+      "local": "07-qemu.log",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-paused-map-20261003-r3/qemu.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 92006,
+      "local": "08-controller-receipt.json",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-paused-map-20261003-r3/controller-receipt.json",
+      "sha256": "02a6dd9013a038ee682aaffa62b52361e518d7178082789a520ebafb6110feb3"
+    },
+    {
+      "bytes": 9935,
+      "local": "09-cold-qualified.json",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-paused-map-20261003-r3/cold-qualified.json",
+      "sha256": "e6a0f31823819ca265eab8b206e7778fae77627198ac93d1146e6ef145f92d97"
+    },
+    {
+      "bytes": 30908,
+      "local": "10-prepared-before.json",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-paused-map-20261003-r3/prepared-before.json",
+      "sha256": "abd66404f2f732200343937306034c6fbb3edb80c45a049293cecf47b2f1da26"
+    },
+    {
+      "bytes": 3679,
+      "local": "11-serial-seed-prepared.json",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-paused-map-20261003-r3/serial-seed-prepared.json",
+      "sha256": "3f459d0b830113bb25b322b77b1a50bea6c1c6d1d3e4170a564da5583143cc74"
+    },
+    {
+      "bytes": 0,
+      "local": "12-serial.log",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-paused-map-20261003-r3/serial.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 33278,
+      "local": "13-vm-manifest.json",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/qemu-freebsd151-sdk-oracle-paused-map-20261003-r3/vm-manifest.json",
+      "sha256": "beffb63e575fa500cf1603333e8e8e7825fc41f9c9ae86162152d77fd77de487"
+    },
+    {
+      "bytes": 3741,
+      "local": "14-033246a1bc404b4bbf209a3df265bebd.json",
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/authority/033246a1bc404b4bbf209a3df265bebd.json",
+      "sha256": "5dfba28318f8ebe1c263a4554813a10ca3a1d03744d01fc3b67b0c184652cdb4"
+    }
+  ],
+  "raw_manifest_sha256": "5386694a5b89a8a42f311ec3d9f2a3ad3a73cc38f5362c6ef83a825a751b854b",
+  "schema": "uwvm-freebsd-paused-map-r3-attempt2-actual-rejection-v1",
+  "source_manifest_sha256": "28e688fc380fe98ea690db9b9bfa63272e021b56c26641dd2f55b3ed21d89608",
+  "stages_completed": 5,
+  "stages_successful": 4,
+  "status": "ACTUAL_EXPECTED_DIAGNOSTIC_REJECTION_NOT_PLATFORM_PASS",
+  "swap_max_bytes": 0,
+  "whole_VM_restore_qualified": false
+}

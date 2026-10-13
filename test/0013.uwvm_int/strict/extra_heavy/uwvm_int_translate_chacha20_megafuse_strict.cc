@@ -72,7 +72,7 @@ namespace
 
     [[nodiscard]] int test_translate_chacha20_megafuse(char const* argv0) noexcept
     {
-        // This mega-fuse exists only in extra-heavy builds (hash-guarded).
+        // This mega-fuse exists only in extra-heavy builds with exact expression and ABI matching.
 #if !defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) || !defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
         (void)argv0;
         return 0;
@@ -122,6 +122,53 @@ namespace
         // Postcondition: the mega-fused body is tiny (single mega-op + immediates + return).
         UWVM2TEST_REQUIRE(cm.local_funcs.index_unchecked(hit_idx).op.operands.size() < 128uz);
 
+        // Use the original parser-owned reference bytes, not a production matcher result, to isolate ABI/content variants.
+        auto const& original_function{rt.local_defined_function_vec_storage.index_unchecked(hit_idx)};
+        UWVM2TEST_REQUIRE(original_function.wasm_code_ptr != nullptr);
+        auto const* const begin{reinterpret_cast<::std::byte const*>(original_function.wasm_code_ptr->body.expr_begin)};
+        auto const* const end{reinterpret_cast<::std::byte const*>(original_function.wasm_code_ptr->body.code_end)};
+        UWVM2TEST_REQUIRE(begin != nullptr && end != nullptr && begin < end);
+        UWVM2TEST_REQUIRE(static_cast<::std::size_t>(end - begin) == 770uz);
+        // [exact parser-owned 770-byte expression] | end
+        // [safe: proved complete range           ] | exclusive end
+        // ^^ begin/end are copied into an owned test vector before preparing another module; no pointer advances.
+        byte_vec const reference{begin, end};
+        module_builder variants{};
+        variants.has_memory = true;
+        variants.memory_min = 1u;
+        variants.memory_has_max = true;
+        variants.memory_max = 1u;
+        for(unsigned index{}; index != 5u; ++index)
+        {
+            func_type signature{{k_val_i32, k_val_i32}, {}};
+            if(index == 1u || index == 2u) { signature.params.push_back(k_val_i32); }
+            func_body body{};
+            body.locals.push_back({index == 2u ? 19u : index == 3u ? 21u : 20u, k_val_i32});
+            body.code = reference;
+            if(index == 4u)
+            {
+                UWVM2TEST_REQUIRE(body.code.size() == 770uz && body.code[0uz] == ::std::byte{0x41u});
+                // [i32.const][bounded multi-byte immediate ...] | 770
+                // [safe: index 1 < proved owned extent        ] | no cursor advances
+                // Change only a low immediate payload bit, retaining a valid same-width i32 constant.
+                body.code[1uz] ^= ::std::byte{0x01u};
+            }
+            (void)variants.add_func(::std::move(signature), ::std::move(body));
+        }
+        auto variant_bytes{variants.build()};
+        auto variant_prepared{prepare_runtime_from_wasm(variant_bytes, u8"uwvm2test_chacha20_exact_abi")};
+        UWVM2TEST_REQUIRE(variant_prepared.mod != nullptr);
+        ::uwvm2::validation::error::code_validation_error_impl variant_error{};
+        auto variant_compiled{compiler::compile_all_from_uwvm_single_func<opt>(*variant_prepared.mod, cop, variant_error)};
+        UWVM2TEST_REQUIRE(variant_error.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+        UWVM2TEST_REQUIRE(variant_compiled.local_funcs.size() == 5uz);
+        for(::std::size_t index{}; index != 5uz; ++index)
+        {
+            auto const& bytecode{variant_compiled.local_funcs.index_unchecked(index).op.operands};
+            // Only exact two-i32/void/twenty-i32-locals may be replaced. Index 2 retains total local count22 while changing parameter ABI.
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(bytecode, exp_mega) == (index == 0uz));
+            UWVM2TEST_REQUIRE(index == 0uz ? bytecode.size() < 128uz : bytecode.size() >= 128uz);
+        }
         return 0;
 #endif
     }

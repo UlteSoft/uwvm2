@@ -596,6 +596,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
     }
 
+
+    // Dot/parent terminal components select an existing directory, but a new
+    // WASI open needs its own native description and requested open flags.
+    inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t path_open_independent_directory(
+        ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_t& chain,
+        ::fast_io::open_mode mode) noexcept
+    {
+        if(chain.empty() || chain.dir_stack.back_unchecked().ptr == nullptr)
+        { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+# ifdef UWVM_CPP_EXCEPTIONS
+        try
+# endif
+        {
+            auto const& original{chain.dir_stack.back_unchecked().ptr->dir_stack};
+            ::fast_io::dir_io_observer directory{};
+            if(original.is_observer) { directory = original.storage.observer; }
+            else { directory = original.storage.file; }
+# if defined(_WIN32) && !defined(__CYGWIN__) && !defined(_WIN32_WINDOWS)
+            // An empty NT relative name reopens the supplied directory itself.
+            // NT does not interpret the POSIX dot component in this operation.
+            ::fast_io::dir_file opened{at(directory), u8"", mode};
+# else
+            ::fast_io::dir_file opened{at(directory), u8".", mode};
+# endif
+            ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t replacement{};
+            replacement.ptr->dir_stack.name = original.name;
+            replacement.ptr->dir_stack.storage.file = ::std::move(opened);
+            // The new native root still belongs to the authentic configured mnt.
+            // Descendants propagate this owner through ordinary chain copies.
+            if(chain.dir_stack.size() == 1uz && !chain.checkpoint_mount_origin)
+            { chain.checkpoint_mount_origin = chain.dir_stack.front_unchecked(); }
+            chain.dir_stack.back_unchecked() = ::std::move(replacement);
+        }
+# ifdef UWVM_CPP_EXCEPTIONS
+        catch(::fast_io::error e) { return path_errno_from_fast_io_error(e); }
+# endif
+        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+    }
+
     inline constexpr ::std::size_t max_symlink_depth{40uz};
 
     inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t path_symlink_iterative_impl(

@@ -1,0 +1,94 @@
+{
+  "schema": "uwvm-industry-gc-candidates-source-audit-v1",
+  "observed_date": "2026-10-02",
+  "executed": false,
+  "formal_acceptance": false,
+  "candidates": [
+    {
+      "id": "wasmtime-copying",
+      "version": "49.0.1",
+      "release_date": "2026-09-24",
+      "release": "https://github.com/bytecodealliance/wasmtime/releases/tag/v49.0.1",
+      "source_commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b",
+      "asset": "https://github.com/bytecodealliance/wasmtime/releases/download/v49.0.1/wasmtime-v49.0.1-x86_64-linux.tar.xz",
+      "asset_digest_algorithm": "sha256",
+      "asset_digest": "c71f7e0d30a92e418f0d17db7c6d8f6664c1ad764340a1278678f4209deab534",
+      "role": "same exact Wasm bytes; copying collector",
+      "actual_executable_sha256": null
+    },
+    {
+      "id": "temurin-hotspot",
+      "version": "27+35",
+      "release_date": "2026-09-21",
+      "release": "https://github.com/adoptium/temurin27-binaries/releases/tag/jdk-27%2B35",
+      "asset": "https://github.com/adoptium/temurin27-binaries/releases/download/jdk-27%2B35/OpenJDK27U-jdk_x64_linux_hotspot_27_35.tar.gz",
+      "asset_digest_algorithm": "sha256",
+      "asset_digest": "1cf69a4848ffb728b3b260dfd45206a51566ab571a02a30092271d4c580bccbc",
+      "role": "Java source-equivalent; first G1, optional Serial/Parallel/ZGC independently",
+      "actual_executable_sha256": null
+    },
+    {
+      "id": "graalvm-ce-java",
+      "version": "25.4.4.1.1",
+      "release_date": "2026-09-22",
+      "release": "https://github.com/graalvm/graalvm-ce-builds/releases/tag/graal-25.4.4.1.1",
+      "release_notes": "https://www.graalvm.org/release-notes/25.4/",
+      "base_jdk_release_notes": "25.0.4.1",
+      "base_jdk_asset_label": "25.0.4.1.1",
+      "asset": "https://github.com/graalvm/graalvm-ce-builds/releases/download/graal-25.4.4.1.1/graalvm-community-jdk-25i4-25.0.4.1.1_linux-x64_bin.tar.gz",
+      "asset_digest_algorithm": "sha256",
+      "asset_digest": "05ccbbe783210b6886ff7b08fcd0b061c5dce4852b05db87284fc0e24abb08e2",
+      "role": "same Java class bytes as Temurin; HotSpot G1 plus Graal compiler; not Native Image or GraalWasm",
+      "actual_executable_sha256": null
+    },
+    {
+      "id": "dotnet",
+      "version": "10.0.12",
+      "sdk_version": "10.0.401",
+      "release_date": "2026-09-08",
+      "release": "https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json",
+      "asset": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.401/dotnet-sdk-10.0.401-linux-x64.tar.gz",
+      "asset_digest_algorithm": "sha512",
+      "asset_digest": "51c8b999af9e8dd9998c9edc5944e19a90788862068acd38694e098889054ce8c23d4f0c5cccfa16bf187d044562359e5ee69a9f8ad0bbe913ba90311fbce25b",
+      "role": "C# source-equivalent; workstation GC/TieredPGO, actual runtimeconfig/env receipt required",
+      "actual_executable_sha256": null
+    },
+    {
+      "id": "wasmer",
+      "version": "7.5.0",
+      "release_date": "2026-10-01",
+      "release": "https://github.com/wasmerio/wasmer/releases/tag/v7.5.0",
+      "source_feature_audit": "https://raw.githubusercontent.com/wasmerio/wasmer/v7.5.0/lib/types/src/features.rs",
+      "asset": "https://github.com/wasmerio/wasmer/releases/download/v7.5.0/wasmer-linux-amd64.tar.gz",
+      "asset_digest_algorithm": "sha256",
+      "asset_digest": "23f99818deaad93859f8bb8292af81f0c39f25aea19eaccfb72fc7c9e8a3fae9",
+      "role": "new exact-module feature preflight mandatory; current feature struct has no GC field, runtime support not assumed",
+      "actual_executable_sha256": null
+    },
+    {
+      "id": "wasmedge",
+      "version": "0.17.1",
+      "release_date": "2026-07-03",
+      "release_published_date": "2026-07-06",
+      "release": "https://github.com/WasmEdge/WasmEdge/releases/tag/0.17.1",
+      "source_allocation_audit": "https://raw.githubusercontent.com/WasmEdge/WasmEdge/0.17.1/include/runtime/instance/module.h",
+      "asset": "https://github.com/WasmEdge/WasmEdge/releases/download/0.17.1/WasmEdge-0.17.1-debian11_x86_64_static.tar.gz",
+      "asset_digest_algorithm": "sha256",
+      "asset_digest": "0d99d3c3d71ec020cfc287215c2234d8be799970d03857f037d7015979f0749d",
+      "role": "same bytes syntax/semantic control; reclamation and bounded RSS mandatory for collector qualification",
+      "actual_executable_sha256": null
+    },
+    {
+      "id": "wavm",
+      "version": "nightly/2026-04-05",
+      "release_date": "2026-04-05",
+      "release": "https://github.com/WAVM/WAVM/releases/tag/nightly%2F2026-04-05",
+      "source_commit_short": "4e82bb9",
+      "asset": null,
+      "role": "official listed prerelease; exact current module feature preflight, unsupported cases retained, no current GC support assertion",
+      "actual_executable_sha256": null
+    }
+  ],
+  "resource_contract": "keeper only; exact current64GiB/swap0/allowed4P+16E, E compilation outside measurements, P0 guests, each actual TID verified, temperature observation only",
+  "pending": "actual Linux inventory/assets/executables/DSO and compile closure, exact new module semantics, warmed/cold group qualification"
+}

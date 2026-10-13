@@ -1,0 +1,1 @@
+(module (type $a (array i32)) (table 1 anyref) (func (export "_start") i32.const 0 i32.const 55 i32.const 1 array.new $a table.set 0 i32.const 0 table.get 0 ref.cast (ref $a) i32.const 0 array.get $a i32.const 55 i32.ne if unreachable end))

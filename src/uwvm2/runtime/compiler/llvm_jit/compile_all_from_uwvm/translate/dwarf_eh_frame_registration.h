@@ -12,7 +12,7 @@
 
 #pragma once
 
-#if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && !defined(__arm__) && !defined(__thumb__) && __has_include(<unwind.h>)
-extern "C" void __register_frame(void const*);
-extern "C" void __deregister_frame(void const*);
+#if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && \
+    (!(defined(__arm__) || defined(__thumb__)) || defined(__ARM_DWARF_EH__)) && __has_include(<unwind.h>)
+# include <uwvm2/runtime/compiler/llvm_jit/native_unwind_abi.h>
 #endif

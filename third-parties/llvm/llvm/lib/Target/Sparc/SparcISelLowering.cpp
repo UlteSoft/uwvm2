@@ -809,8 +809,11 @@ bool SparcTargetLowering::IsEligibleForTailCallOptimization(
   auto &Outs = CLI.Outs;
   auto &Caller = MF.getFunction();
 
-  // Do not tail call opt functions with "disable-tail-calls" attribute.
-  if (Caller.getFnAttribute("disable-tail-calls").getValueAsString() == "true")
+  // The attribute disables optional sibling-call optimization, not an IR
+  // musttail contract. UWVM requires physical retirement for return_call;
+  // all ordinary calls retain the attribute and the existing ABI checks below.
+  if (Caller.getFnAttribute("disable-tail-calls").getValueAsString() == "true" &&
+      !(CLI.CB && CLI.CB->isMustTailCall()))
     return false;
 
   // Do not tail call opt if the stack is used to pass parameters.

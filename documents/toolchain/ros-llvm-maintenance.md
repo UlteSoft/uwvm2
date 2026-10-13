@@ -34,6 +34,15 @@ llvm-config 可执行程序。不能因为名称相似而删除它。
 
 ## 三类配置／缓存不要混淆
 
+`llvm-build-jobs` 默认为 `inherit`：`xmake -jN`（或 `xmake build --jobs=N`）
+把同一个 N 传给 LLVM 及配套 libc++／libc++abi／libunwind 的
+`cmake --build --parallel N`。构建触发的自动配置也继承该值；独立
+`xmake f` 没有外层构建并发，使用 1。显式
+`xmake f --llvm-build-jobs=N` 优先于外层 `-j`；已有配置若保存了旧的
+数值，可用 `xmake f --llvm-build-jobs=inherit` 切回继承模式。
+LLVM 链接池仍限制为 1；编译池不缓存固定数量，因此在同一缓存上更改
+`-j` 不会受到上次并发数的限制，也不会仅因并发数不同创建一份新 LLVM 缓存。
+
 | 项目 | 原因和不可省略的约束 |
 | --- | --- |
 | 编译 LLVM 库的 Release 模式 | 优化宿主编译器实现；不是把所有 Wasm 强制设为 O3。CMake 工具链不能偷偷覆盖为 Debug，特别是 Windows CRT／迭代器 ABI。ROS 自身的 debug 模式与此独立。 |
@@ -77,6 +86,14 @@ MDd／MT／MTd 与 LLVM 默认 MD 混用。现在显式映射到
 GNU 风格 `clang++ --target=...-windows-msvc` 同样使用此 ABI，但 CMake 的
 `MSVC` frontend 标志可能为假；必须同时识别 `CMAKE_CXX_SIMULATE_ID=MSVC`。
 不能因此拒绝合法 Clang，也不能把 Windows GNU/MinGW 误认为同一个 CRT 模型。
+
+Windows x64 交叉编译还必须给 CMake 的独立 ASM 语言指定
+`CMAKE_ASM_COMPILER_TARGET=x86_64-w64-windows-gnu`。只配置 C/C++ target 时，
+BLAKE3 的四个 Windows 命名 `.S` 对象会被宿主 Clang 输出成 ELF，混入其余
+COFF 对象的 `libLLVMSupport.a`。`bundled_llvm.lua` 在 MinGW x64 配置时显式
+传入并检查该变量；独立构建可使用
+`tools/ci/windows_llvm_x64_toolchain.cmake`。资格证明还必须逐成员检查最终
+链接闭包中的 LLVM 归档为 x64 COFF，不能只看文件名或 CMake cache。
 `check_bundled_llvm_crt.py` 使用真实 CMake、Clang 和 COFF 对象检查四种选择的
 `_DEBUG`／`_DLL` 宏及 defaultlib，并保留旧选项失效、目标属性覆盖的负对照。
 它替换了 LLVM 库依赖图为一个无 SDK 的小型 fixture，没有链接 CRT 或运行 Windows。
@@ -223,6 +240,26 @@ xmake 的 `public = true` 在 Release 中也必须设置；它使依赖目标能
 当前 Linux Clang 22.1.8、macOS Clang 20.1.8 通过该探针；已知坏的 Clang 23
 snapshot 被正确拒绝。版本号相同的其他编译器仍必须实际检查。
 
+Windows GNU x64 的 Clang 22.1.8 还有独立的 LLVM 23 named-module 问题：
+`native_exception_landingpad.cppm` 和 `compile_all_from_uwvm/translate.cppm`
+的 global module fragment 都包含 `llvm/IR/IRBuilder.h`。原头文件中三处
+`CreateIntrinsic` 默认回调 `[](CallInst *) {}` 会让 Clang 给
+`function_ref<void(CallInst *)>::callback_fn` 的不同模块实例生成相同的
+mangled name；编译 `translate.cppm` 对象时在 `STLFunctionalExtras.h:45`
+报告重复定义。用同一套 PCM 和精确命令分别改为 `-O3`、`-O0` 都重现，
+cgroup OOM／OOM kill 均为零，因此不能用局部降优化解决。
+
+随 ROS 配套 LLVM 源码的最小修正是在 `IRBuilderBase` 内定义具名静态空回调
+`noopIntrinsicSetFn(CallInst *)`，并以它替换三个默认 lambda；函数签名、
+已编译 LLVM 库 ABI 和有回调的调用路径不变。修正前后 `IRBuilder.h` SHA-256
+分别为 `45b957e68916e45dce547c992f7565194e244ae5eb4a6ad85fb71261b3232abb`
+和 `97c0745bca383dc6302e6a01a4a3c0b66ad61ca543d20a2c6df0edf808d8687b`。
+隔离 Win64 Clang 22 探针使用原产品命令、仅覆盖该头，重建 landingpad PCM、
+translate PCM、translate 对象均通过。正式发布必须用修正后的头**重建所有
+依赖它的 PCM 和对象**，重新校验源码指纹、PE 哈希并在 Windows 实机运行；
+不得混用旧 PCM。早期 v7 历史诊断曾把三份隔离产物装入旧 xmake 缓存以继续
+定位后续构建，它额外依赖覆盖头 SHA，**不是**纯 v7 源码绑定的验收产物。
+
 对象归属测试的编译器选择也必须与测试目标一致：xmake 内建 `clang` toolchain
 会另行探测 PATH 上无版本号的 `clang`，即使传入了可用的 `--cc=/usr/bin/clang-23`
 也可能在开始编译前失败。该小型夹具现在直接用指定路径定义自己的 toolchain，
@@ -284,3 +321,24 @@ Linux 栈缓存／信号转发／状态重置辅助回归可使用
 和 non-tail 翻译器，沿用 xmake **仅用于测试目标**的 `undefined-inline` 例外，
 不能把该例外加到生产目标。这个检查不链接、不执行，不代表所有模板参数、
 所有 ISA 或完整模块 CLI 的全部组合；运行测试和实际汇编检查仍须单独完成。
+
+Revision 9 的 RISC-V TailCC 与 C musttail 栈参数修复必须另外执行
+`test/0014.llvm_jit/riscv_tail_abi/` 的真实 QEMU 回归，包含栈参数重排、
+不同参数数量的深尾递归，以及直接/尾调用后真实 typed landingpad 和调用者栈。
+新 ABI 同时改变 TableGen 指令与节点枚举，不能把少数新目标文件混入旧枚举的
+RISC-V 库；完整目标库须与生成头一致。旧 .8 证据保持原版本，新 .9 包必须
+由真实 CMake 配置、依赖重建、源码清单与消费者链接闭包单独核验。
+
+Revision 12 的 X86 guaranteed-tail frame 修复须单独验证 i128/v128 栈参数后
+跟奇数个标量栈槽的边界，包含寄存器到栈的转换、64 引用参数倒序尾调用、
+不同参数数量的深尾递归、直接/间接调用、正常返回和真实异常展开，以及缓存回放。
+需从真实 caller/callee 汇编核对 callee-pop 与调用者预期一致，并验证返回后 RSP
+和完整引用载体。新 LLVM_UWVM_X86_TAILCC_ALIGNED_FRAME_FIXED 能力宏和 fixed/unfixed
+缓存键必须与实际源码/归档校验绑定；版本号、头文件宏或旧 .11 证据都不能代替
+修复后的 native Wasm 正确性。单 TU 替换归档须逐成员证明其余内容未改变；完整
+.12 包及非 X86 平台的构建/运行覆盖仍需分别记录，不能冒用 x86 耗时。
+
+Revision 13 将 LoongArch64/MIPS N64EL R2 TailCC、异步 CFI 和 MIPS 调试长跳转
+补丁纳入完整 SDK 清单与 provenance allowlist。依赖修订号、generated headers、
+CMake 和消费者版本检查必须一起更新；旧 .9/.11/.12 库不能改标签后复用。
+完整 SDK 构建与各 ISA 原生执行须分别记录，既有组件回执保持原样。

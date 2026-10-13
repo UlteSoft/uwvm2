@@ -125,15 +125,12 @@ inline win32_shared_memory_state win32_family_create_shared_memory_impl(
 		throw_win32_error();
 	}
 
-	try
-	{
-		return win32_map_shared_memory_impl(handle, bytes, mode);
-	}
-	catch (...)
-	{
-		::fast_io::win32::CloseHandle(handle);
-		throw;
-	}
+	// Adopt exactly once before mapping. An EH mapping failure closes through
+	// the existing no-throw file destructor; noEH retains throw_error fail-stop.
+	::fast_io::basic_win32_family_file<family, char> owner{handle};
+	auto const state{win32_map_shared_memory_impl(owner.native_handle(), bytes, mode)};
+	(void)owner.release(); // Success transfers this handle to the returned state.
+	return state;
 }
 
 template <win32_family family>
@@ -196,15 +193,12 @@ inline win32_shared_memory_state win32_duplicate_shared_memory_impl(
 	void *handle, ::std::size_t bytes, ipc_mode mode)
 {
 	auto const duplicated_handle{::fast_io::win32::details::win32_dup_impl(handle)};
-	try
-	{
-		return win32_map_shared_memory_impl(duplicated_handle, bytes, mode);
-	}
-	catch (...)
-	{
-		::fast_io::win32::CloseHandle(duplicated_handle);
-		throw;
-	}
+	// Adopt exactly once before mapping. An EH mapping failure closes through
+	// the existing no-throw file destructor; noEH retains throw_error fail-stop.
+	::fast_io::basic_win32_family_file<win32_family::native, char> owner{duplicated_handle};
+	auto const state{win32_map_shared_memory_impl(owner.native_handle(), bytes, mode)};
+	(void)owner.release(); // Success transfers this handle to the returned state.
+	return state;
 }
 
 } // namespace win32::details
@@ -242,18 +236,10 @@ public:
 		native_handle_type section_handle, size_type size, ipc_mode mode = ipc_mode::in | ipc_mode::out)
 	{
 		::fast_io::win32::details::win32_shared_memory_validate_mode(mode);
-		try
-		{
-			assign(::fast_io::win32::details::win32_map_shared_memory_impl(section_handle, size, mode), mode);
-		}
-		catch (...)
-		{
-			if (section_handle != nullptr) [[likely]]
-			{
-				::fast_io::win32::CloseHandle(section_handle);
-			}
-			throw;
-		}
+		// Mode validation above preserves the original pre-adoption behavior.
+		::fast_io::basic_win32_family_file<family, char> owner{section_handle};
+		assign(::fast_io::win32::details::win32_map_shared_memory_impl(owner.native_handle(), size, mode), mode);
+		(void)owner.release(); // assign is noexcept; this object now owns the handle.
 	}
 
 	inline basic_win32_family_shared_memory(basic_win32_family_shared_memory const &other)

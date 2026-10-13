@@ -1,0 +1,232 @@
+[
+  {
+    "name": "scalar-numeric",
+    "family": "Core1 scalar, conversions, sign extension, saturating conversion",
+    "features": [],
+    "wat": "(module (memory 1) (global $g (mut i64) (i64.const 9)) (func (export \"_start\") (local i32 i64 f32 f64) i32.const -1 i32.extend8_s local.set 0 i64.const 4294967295 i64.extend32_s local.set 1 f32.const nan:0x412345 local.set 2 f64.const -0 local.set 3 f64.const nan i64.trunc_sat_f64_s drop i32.const 0 i64.const 123 i64.store global.get $g drop))"
+  },
+  {
+    "name": "multi-value",
+    "family": "multi value, blocks, loops, branch labels, typed select",
+    "features": [],
+    "wat": "(module (type $pair (func (param i32 i64) (result i32 i64))) (func (export \"_start\") i32.const 3 i64.const 4 block (type $pair) end drop drop i32.const 7 i32.const 9 i32.const 1 select (result i32) drop))"
+  },
+  {
+    "name": "bulk-memory",
+    "family": "passive/active data, memory fill/copy/init/drop",
+    "features": [
+      "bulk-memory"
+    ],
+    "wat": "(module (memory 1) (data $d \"ABCD\") (func (export \"_start\") i32.const 0 i32.const 0 i32.const 4 memory.init $d data.drop $d i32.const 8 i32.const 0 i32.const 4 memory.copy i32.const 12 i32.const 255 i32.const 4 memory.fill i32.const 8 i32.load8_u i32.const 65 i32.ne if unreachable end))"
+  },
+  {
+    "name": "tables-references",
+    "family": "multiple tables, passive elements, table init/copy/fill/grow, ref null/function",
+    "features": [
+      "bulk-memory",
+      "reference-types"
+    ],
+    "wat": "(module (type $f (func (result i32))) (table $a 2 8 funcref) (table $b 2 8 funcref) (func $v (type $f) i32.const 42) (elem $e func $v) (func (export \"_start\") i32.const 0 i32.const 0 i32.const 1 table.init $a $e i32.const 0 i32.const 0 i32.const 1 table.copy $b $a i32.const 1 ref.func $v i32.const 1 table.fill $b ref.null func i32.const 1 table.grow $a drop table.size $b drop i32.const 0 call_indirect $b (type $f) i32.const 42 i32.ne if unreachable end elem.drop $e))"
+  },
+  {
+    "name": "simd",
+    "family": "v128 scalar lanes, load/store, arithmetic, shuffle",
+    "features": [
+      "simd"
+    ],
+    "wat": "(module (memory 1) (func (export \"_start\") (local v128) v128.const i32x4 1 2 3 4 local.set 0 i32.const 0 local.get 0 v128.store i32.const 0 v128.load local.get 0 i32x4.add i32x4.extract_lane 2 i32.const 6 i32.ne if unreachable end))"
+  },
+  {
+    "name": "extended-const",
+    "family": "numeric extended const and previous immutable globals",
+    "features": [
+      "extended-const"
+    ],
+    "wat": "(module (global $a i32 (i32.const 3)) (global $b i32 (i32.add (global.get $a) (i32.mul (i32.const 4) (i32.const 5)))) (memory 1) (data (i32.add (global.get $a) (i32.const 1)) \"X\") (func (export \"_start\") global.get $b i32.const 23 i32.ne if unreachable end))"
+  },
+  {
+    "name": "tail-direct",
+    "family": "return_call, self tail recursion",
+    "features": [
+      "tail-call"
+    ],
+    "wat": "(module (func $tail (param i32) (result i32) local.get 0 i32.eqz if (result i32) i32.const 42 else local.get 0 i32.const 1 i32.sub return_call $tail end) (func (export \"_start\") i32.const 8 call $tail i32.const 42 i32.ne if unreachable end))"
+  },
+  {
+    "name": "tail-indirect",
+    "family": "return_call_indirect, table dispatch",
+    "features": [
+      "tail-call",
+      "reference-types"
+    ],
+    "wat": "(module (type $f (func (param i32) (result i32))) (table 1 funcref) (func $leaf (type $f) local.get 0 i32.const 1 i32.add) (elem (i32.const 0) $leaf) (func $tail (type $f) local.get 0 i32.const 0 return_call_indirect (type $f)) (func (export \"_start\") i32.const 41 call $tail i32.const 42 i32.ne if unreachable end))"
+  },
+  {
+    "name": "tail-ref",
+    "family": "return_call_ref and precise function refs",
+    "features": [
+      "tail-call",
+      "function-references"
+    ],
+    "wat": "(module (type $f (func (param i32) (result i32))) (func $leaf (type $f) local.get 0 i32.const 1 i32.add) (elem declare func $leaf) (func $tail (type $f) local.get 0 ref.func $leaf return_call_ref $f) (func (export \"_start\") i32.const 41 call $tail i32.const 42 i32.ne if unreachable end))"
+  },
+  {
+    "name": "exception",
+    "family": "tags, try_table catch/catch_ref, throw_ref",
+    "features": [
+      "exceptions"
+    ],
+    "wat": "(module (tag $e (param i32)) (func $throw i32.const 42 throw $e) (func (export \"_start\") block $caught (result i32) try_table (catch $e $caught) block $ref (result i32 exnref) try_table (catch_ref $e $ref) call $throw end unreachable end throw_ref end unreachable end i32.const 42 i32.ne if unreachable end))"
+  },
+  {
+    "name": "multi-memory",
+    "family": "multiple memories and cross memory copy",
+    "features": [
+      "multi-memory",
+      "bulk-memory"
+    ],
+    "wat": "(module (memory $a 1) (memory $b 1) (data (memory $a) (i32.const 0) \"M\") (func (export \"_start\") i32.const 0 i32.const 0 i32.const 1 memory.copy $b $a i32.const 0 i32.load8_u $b i32.const 77 i32.ne if unreachable end))"
+  },
+  {
+    "name": "memory64",
+    "family": "i64 memory addresses, active segment and grow",
+    "features": [
+      "memory64"
+    ],
+    "wat": "(module (memory $m i64 1 2) (data (i64.const 8) \"Q\") (func (export \"_start\") i64.const 8 i32.load8_u i32.const 81 i32.ne if unreachable end i64.const 16 i64.const 123 i64.store i64.const 16 i64.load i64.const 123 i64.ne if unreachable end i64.const 0 memory.grow drop memory.size drop))"
+  },
+  {
+    "name": "table64",
+    "family": "i64 table indices and grow",
+    "features": [
+      "table64",
+      "reference-types"
+    ],
+    "wat": "(module (type $f (func (result i32))) (table $t i64 1 3 funcref) (func $v (type $f) i32.const 42) (elem (table $t) (i64.const 0) func $v) (func (export \"_start\") i64.const 0 table.get $t ref.is_null if unreachable end i64.const 0 call_indirect $t (type $f) i32.const 42 i32.ne if unreachable end ref.null func i64.const 1 table.grow $t drop table.size $t drop))"
+  },
+  {
+    "name": "typed-refs",
+    "family": "nondefaultable locals, call_ref, ref.as_non_null, br_on_null",
+    "features": [
+      "function-references"
+    ],
+    "wat": "(module (type $f (func (param i32) (result i32))) (func $leaf (type $f) local.get 0) (elem declare func $leaf) (func (export \"_start\") (local $p (ref $f)) ref.func $leaf local.set $p i32.const 42 local.get $p call_ref $f i32.const 42 i32.ne if unreachable end local.get $p ref.as_non_null drop))"
+  },
+  {
+    "name": "gc-struct-i31",
+    "family": "struct packed mutable fields, recursive types, i31 signed/unsigned",
+    "features": [
+      "gc",
+      "function-references"
+    ],
+    "wat": "(module (rec (type $s (struct (field (mut i8)) (field (mut (ref null $s)))))) (func (export \"_start\") (local $p (ref null $s)) i32.const 255 ref.null $s struct.new $s local.set $p local.get $p struct.get_u $s 0 i32.const 255 i32.ne if unreachable end local.get $p i32.const 7 struct.set $s 0 local.get $p local.get $p struct.set $s 1 i32.const -1 ref.i31 i31.get_s i32.const -1 i32.ne if unreachable end))"
+  },
+  {
+    "name": "gc-arrays",
+    "family": "array fixed/data/elem/init/fill/copy/length",
+    "features": [
+      "gc",
+      "function-references",
+      "bulk-memory"
+    ],
+    "wat": "(module (type $a (array (mut i8))) (data $d \"\\01\\02\\03\\04\") (func (export \"_start\") (local $p (ref null $a)) i32.const 0 i32.const 4 array.new_data $a $d local.set $p local.get $p i32.const 2 array.get_u $a i32.const 3 i32.ne if unreachable end local.get $p i32.const 1 i32.const 9 i32.const 2 array.fill $a local.get $p array.len i32.const 4 i32.ne if unreachable end))"
+  },
+  {
+    "name": "gc-casts-extern",
+    "family": "ref test/cast/eq, extern conversion, declared subtype",
+    "features": [
+      "gc"
+    ],
+    "wat": "(module (type $s (struct (field i32))) (func (export \"_start\") (local $p (ref null eq)) i32.const 42 struct.new $s local.set $p local.get $p ref.test (ref $s) i32.eqz if unreachable end local.get $p ref.cast (ref $s) struct.get $s 0 drop local.get $p extern.convert_any any.convert_extern ref.cast (ref eq) local.get $p ref.eq i32.eqz if unreachable end))"
+  },
+  {
+    "name": "gc-const",
+    "family": "GC constant expressions",
+    "features": [
+      "gc"
+    ],
+    "wat": "(module (type $s (struct (field i32))) (global $p (ref $s) (struct.new $s (i32.const 42))) (func (export \"_start\") global.get $p struct.get $s 0 i32.const 42 i32.ne if unreachable end))"
+  },
+  {
+    "name": "atomic-rmw",
+    "family": "threads shared memory, atomic load/store/RMW/cmpxchg/fence",
+    "features": [
+      "threads"
+    ],
+    "wat": "(module (memory 1 1 shared) (func (export \"_start\") i32.const 0 i32.const 1 i32.atomic.store i32.const 0 i32.const 2 i32.atomic.rmw.add drop i32.const 0 i32.const 3 i32.const 4 i32.atomic.rmw.cmpxchg drop i32.const 0 i32.atomic.load i32.const 4 i32.ne if unreachable end atomic.fence))"
+  },
+  {
+    "name": "atomic-wait32",
+    "family": "threads wait32 mismatch/timeout/notify",
+    "features": [
+      "threads"
+    ],
+    "wat": "(module (memory 1 1 shared) (func (export \"_start\") i32.const 0 i32.const 1 i64.const 0 memory.atomic.wait32 i32.const 1 i32.ne if unreachable end i32.const 0 i32.const 0 i64.const 0 memory.atomic.wait32 i32.const 2 i32.ne if unreachable end i32.const 0 i32.const 1 memory.atomic.notify drop))"
+  },
+  {
+    "name": "atomic-wait64",
+    "family": "threads wait64 mismatch/timeout",
+    "features": [
+      "threads"
+    ],
+    "wat": "(module (memory 1 1 shared) (func (export \"_start\") i32.const 8 i64.const 1 i64.const 0 memory.atomic.wait64 i32.const 1 i32.ne if unreachable end i32.const 8 i64.const 0 i64.const 0 memory.atomic.wait64 i32.const 2 i32.ne if unreachable end))"
+  },
+  {
+    "name": "annotations",
+    "family": "text annotations, names and custom sections",
+    "features": [],
+    "wat": "(module (@name \"wasm-debug\") (@custom \"review\" \"bounded-data\") (func $f (@name \"named-function\") (export \"_start\") i32.const 42 drop))"
+  },
+  {
+    "name": "relaxed-simd",
+    "family": "all 20 relaxed SIMD instructions",
+    "features": [
+      "simd",
+      "relaxed-simd"
+    ],
+    "wat": "(module (func (export \"_start\") v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 i8x16.relaxed_swizzle drop v128.const i32x4 0 0 0 0 i32x4.relaxed_trunc_f32x4_s drop v128.const i32x4 0 0 0 0 i32x4.relaxed_trunc_f32x4_u drop v128.const i32x4 0 0 0 0 i32x4.relaxed_trunc_f64x2_s_zero drop v128.const i32x4 0 0 0 0 i32x4.relaxed_trunc_f64x2_u_zero drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 f32x4.relaxed_madd drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 f32x4.relaxed_nmadd drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 f64x2.relaxed_madd drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 f64x2.relaxed_nmadd drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 i8x16.relaxed_laneselect drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 i16x8.relaxed_laneselect drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 i32x4.relaxed_laneselect drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 i64x2.relaxed_laneselect drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 f32x4.relaxed_min drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 f32x4.relaxed_max drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 f64x2.relaxed_min drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 f64x2.relaxed_max drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 i16x8.relaxed_q15mulr_s drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 i16x8.relaxed_dot_i8x16_i7x16_s drop v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 v128.const i32x4 0 0 0 0 i32x4.relaxed_dot_i8x16_i7x16_add_s drop))"
+  },
+  {
+    "name": "exception-all",
+    "family": "try_table catch_all and catch_all_ref",
+    "features": [
+      "exceptions"
+    ],
+    "wat": "(module (tag $e (param i32)) (func $throw i32.const 42 throw $e) (func (export \"_start\") block $caught try_table (catch_all $caught) call $throw end unreachable end block $ref (result exnref) try_table (catch_all_ref $ref) call $throw end unreachable end drop))"
+  },
+  {
+    "name": "typed-ref-branches",
+    "family": "br_on_null and br_on_non_null",
+    "features": [
+      "function-references"
+    ],
+    "wat": "(module (type $f (func)) (func $leaf (type $f)) (elem declare func $leaf) (func (export \"_start\") block $n ref.null $f br_on_null $n drop end block $p (result (ref $f)) ref.func $leaf br_on_non_null $p unreachable end drop))"
+  },
+  {
+    "name": "gc-cast-branches",
+    "family": "br_on_cast and br_on_cast_fail, declared subtype",
+    "features": [
+      "gc"
+    ],
+    "wat": "(module (type $s (sub (struct (field i32)))) (type $t (sub $s (struct (field i32) (field i64)))) (func (export \"_start\") (local $p (ref null any)) i32.const 42 i64.const 7 struct.new $t local.set $p block $yes (result (ref $s)) local.get $p br_on_cast $yes (ref null any) (ref $s) drop unreachable end drop block $no (result (ref null any)) ref.null any br_on_cast_fail $no (ref null any) (ref $s) drop unreachable end drop))"
+  },
+  {
+    "name": "gc-array-elements",
+    "family": "array new_elem/init_elem and array copy/set/get",
+    "features": [
+      "gc",
+      "function-references",
+      "bulk-memory"
+    ],
+    "wat": "(module (type $f (func)) (type $a (array (mut (ref null $f)))) (func $f (type $f)) (elem $e (ref $f) (ref.func $f)) (func (export \"_start\") (local $p (ref null $a)) i32.const 0 i32.const 1 array.new_elem $a $e local.set $p local.get $p i32.const 0 array.get $a ref.is_null if unreachable end local.get $p i32.const 0 ref.null $f array.set $a local.get $p i32.const 0 i32.const 0 i32.const 1 array.init_elem $a $e local.get $p i32.const 0 local.get $p i32.const 0 i32.const 1 array.copy $a $a))"
+  },
+  {
+    "name": "atomic-memory64",
+    "family": "memory64 combined with threads and narrow atomic carriers",
+    "features": [
+      "threads",
+      "memory64"
+    ],
+    "wat": "(module (memory i64 1 1 shared) (func (export \"_start\") i64.const 8 i64.const 7 i64.atomic.store i64.const 8 i64.const 2 i64.atomic.rmw.add drop i64.const 8 i64.atomic.load i64.const 9 i64.ne if unreachable end i64.const 0 i32.const 255 i32.atomic.store8 i64.const 0 i32.atomic.load8_u drop))"
+  }
+]

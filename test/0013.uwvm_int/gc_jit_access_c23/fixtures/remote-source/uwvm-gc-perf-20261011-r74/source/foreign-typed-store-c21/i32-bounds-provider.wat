@@ -1,0 +1,1 @@
+(module (type $A (sub (array (mut i32)))) (type $B (sub $A (array (mut i32)))) (func (export "get") (result (ref null $A)) i32.const 0 i32.const 257 array.new $B))

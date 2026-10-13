@@ -1,0 +1,1 @@
+(module(memory 1 1 shared)(func(export "_start")(local $i i32) i32.const 0 i32.const 0 i32.atomic.store loop $l i32.const 0 i32.const 1 i32.atomic.rmw.add local.get $i i32.ne if unreachable end local.get $i i32.const 1 i32.add local.tee $i i32.const 10000 i32.lt_u br_if $l end atomic.fence i32.const 0 i32.atomic.load i32.const 10000 i32.ne if unreachable end))

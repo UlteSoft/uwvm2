@@ -1,0 +1,1 @@
+(module (type $p (sub (array (mut i8)))) (type $c (sub $p (array (mut i8))))  (func (export "_start") (local $a (ref null $p)) i32.const -127 i32.const 11 array.new $c local.set $a local.get $a i32.const 10 array.get_u $p i32.const 129 i32.ne if unreachable end ))

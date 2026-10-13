@@ -1,0 +1,6 @@
+# The stub uses t3, preserves ra/sp, and loads an aligned full-width address.
+# rtdyld-check: *{4}(stub_addr(riscv-call-range.o/.text, external_target) + 0) = 0x00000e17
+# rtdyld-check: *{4}(stub_addr(riscv-call-range.o/.text, external_target) + 4) = 0x010e3e03
+# rtdyld-check: *{4}(stub_addr(riscv-call-range.o/.text, external_target) + 8) = 0x000e0067
+# rtdyld-check: *{4}(stub_addr(riscv-call-range.o/.text, external_target) + 12) = 0x00000013
+# rtdyld-check: (*{4}(tail_target + 4)) & 0xfffff = 0x30067

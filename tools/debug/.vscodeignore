@@ -1,0 +1,3 @@
+**/__pycache__/**
+**/*.pyc
+secure_server_windows.cpp

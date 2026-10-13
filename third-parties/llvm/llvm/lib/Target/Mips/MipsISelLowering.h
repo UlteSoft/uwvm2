@@ -421,7 +421,7 @@ using TargetRegisterClass = MCRegisterClass;
                          const SDLoc &dl, SelectionDAG &DAG,
                          SmallVectorImpl<SDValue> &InVals) const override;
 
-    SDValue passArgOnStack(SDValue StackPtr, unsigned Offset, SDValue Chain,
+    SDValue passArgOnStack(SDValue StackPtr, int64_t Offset, SDValue Chain,
                            SDValue Arg, const SDLoc &DL, bool IsTailCall,
                            SelectionDAG &DAG) const;
 

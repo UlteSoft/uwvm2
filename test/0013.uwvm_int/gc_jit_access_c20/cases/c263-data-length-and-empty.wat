@@ -1,0 +1,1 @@
+(module (type $a (array (mut i16))) (data "abcdefgh") (func (export "_start") i32.const 0 i32.const 4 array.new_data $a 0 array.len i32.const 4 i32.ne if unreachable end i32.const 8 i32.const 0 array.new_data $a 0 array.len i32.const 0 i32.ne if unreachable end))

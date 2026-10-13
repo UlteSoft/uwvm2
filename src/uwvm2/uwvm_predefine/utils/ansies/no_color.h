@@ -40,6 +40,7 @@
 # include <concepts>
 # include <cstdlib>
 # include <memory>
+# include <utility>
 // import
 # include <fast_io.h>
 #endif
@@ -101,12 +102,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::utils::ansies
     }
 
     /// @brief Process-wide switch controlling whether UWVM diagnostics emit color sequences.
-    /// @details The flag is initialized once from `check_has_no_color()`.  Diagnostic sites wrap color tokens with
-    ///          `fast_io::mnp::cond(put_color, ...)`, so setting `NO_COLOR` disables color output while preserving the
-    ///          same message text.  `--log-color` may later force this flag on or off for the current process.
+    /// @details The flag is initialized once from `check_has_no_color()`. Diagnostic sites use `diagnostic_color`;
+    ///          ANSI literals become empty scatter views when disabled, while other manipulators use fast_io's
+    ///          conditional formatter. `NO_COLOR` preserves the message text; `--log-color` can override this flag.
     /// @see check_has_no_color
     /// @see UWVM_COLOR_U8_RST_ALL
     inline bool put_color{!check_has_no_color()};  // [global] No global variable dependencies from other translation units
+
+    // ANSI literals use one scatter type for every on/off color. Separate
+    // conditional formatter alternatives multiply across a wide diagnostic
+    // call and can exhaust the compiler on Linux too. The literal owns its
+    // complete bytes; the empty view preserves the same message atomically.
+    template<::std::size_t Extent>
+    [[nodiscard]] inline constexpr ::fast_io::basic_io_scatter_t<char8_t>
+        diagnostic_color(char8_t const (&color)[Extent]) noexcept
+    {
+        static_assert(Extent != 0u);
+        return {color, put_color ? Extent - 1u : 0u};
+    }
+    // Nonliteral manipulators retain their original formatting semantics,
+    // including legacy Win32 console attributes and runtime ANSI selection.
+    template<typename Color>
+    [[nodiscard]] inline constexpr auto diagnostic_color(Color&& color) noexcept
+    {
+        return ::fast_io::mnp::cond(put_color, ::std::forward<Color>(color));
+    }
 
 # if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
     /// @brief Selects ANSI escape output instead of Win32 text attributes on old Windows console targets.

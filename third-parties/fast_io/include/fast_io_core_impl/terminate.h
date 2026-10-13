@@ -15,7 +15,13 @@ namespace fast_io
 fast_terminate() noexcept
 {
 // https://llvm.org/doxygen/Compiler_8h_source.html
-#if FAST_IO_HAS_BUILTIN(__builtin_trap)
+#if defined(__loongarch__) && (defined(__GNUC__) || defined(__clang__))
+	// Clang may lower __builtin_trap to an atomic store at address zero on
+	// LoongArch. Use the ISA's breakpoint so intentional termination does
+	// not masquerade as an invalid memory access on Linux.
+	__asm__ __volatile__("break 0");
+	__builtin_unreachable();
+#elif FAST_IO_HAS_BUILTIN(__builtin_trap)
 	__builtin_trap();
 #elif FAST_IO_HAS_BUILTIN(__builtin_abort)
 	__builtin_abort();

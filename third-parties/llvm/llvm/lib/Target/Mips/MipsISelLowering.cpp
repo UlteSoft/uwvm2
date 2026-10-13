@@ -3153,7 +3153,7 @@ static bool CC_MipsO32_FP64(unsigned ValNo, MVT ValVT, MVT LocVT,
 //                  Call Calling Convention Implementation
 //===----------------------------------------------------------------------===//
 
-SDValue MipsTargetLowering::passArgOnStack(SDValue StackPtr, unsigned Offset,
+SDValue MipsTargetLowering::passArgOnStack(SDValue StackPtr, int64_t Offset,
                                            SDValue Chain, SDValue Arg,
                                            const SDLoc &DL, bool IsTailCall,
                                            SelectionDAG &DAG) const {
@@ -3308,6 +3308,15 @@ MipsTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   const TargetFrameLowering *TFL = Subtarget.getFrameLowering();
   MipsFunctionInfo *FuncInfo = MF.getInfo<MipsFunctionInfo>();
   bool IsPIC = isPositionIndependent();
+  const bool IsTailCC = CallConv == CallingConv::Tail;
+  if (IsTailCC && (!ABI.IsN64() || !Subtarget.hasMips64r2() ||
+                   Subtarget.hasMips64r6() || Subtarget.inMips16Mode() ||
+                   Subtarget.inMicroMipsMode() || IsPIC || IsVarArg))
+    report_fatal_error("MIPS TailCC requires non-variadic static N64 R2");
+  if (IsTailCC && llvm::any_of(Outs, [](const ISD::OutputArg &Arg) {
+        return Arg.Flags.isByVal();
+      }))
+    report_fatal_error("MIPS TailCC does not support byval arguments");
 
   // Analyze operands of the call, assigning locations to each operand.
   SmallVector<CCValAssign, 16> ArgLocs;
@@ -3379,15 +3388,29 @@ MipsTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
       CalleeIsLocal = GV->isDSOLocal();
   }
 
+  // Optional sibling-call policy must not disable the exact static N64 C
+  // musttail ABI used by the native Wasm engine. Keep PIC, differing/variadic
+  // prototypes and other ABIs on the existing opt-in path. The ordinary
+  // byval/incoming-area/local-callee checks below remain authoritative.
+  bool MandatoryStaticN64 =
+      IsMustTail && ABI.IsN64() && !IsPIC && CallConv == CallingConv::C &&
+      MF.getFunction().getCallingConv() == CallingConv::C && !IsVarArg &&
+      !MF.getFunction().isVarArg() &&
+      CB->getFunctionType() == MF.getFunction().getFunctionType();
+
   if (IsTailCall) {
-    if (!UseMipsTailCalls) {
+    if (!UseMipsTailCalls && !MandatoryStaticN64 && !IsTailCC) {
       IsTailCall = false;
       if (IsMustTail)
         report_fatal_error("failed to perform tail call elimination on a call "
                            "site marked musttail");
     } else {
-      bool Eligible = isEligibleForTailCallOptimization(
-          CCInfo, StackSize, *MF.getInfo<MipsFunctionInfo>());
+      bool Eligible = IsTailCC
+          ? MF.getFunction().getCallingConv() == CallingConv::Tail &&
+                !MF.getFunction().isVarArg() && !FuncInfo->hasByvalArg() &&
+                !MF.getFunction().hasFnAttribute("interrupt") &&
+                !FuncInfo->callsEhReturn()
+          : isEligibleForTailCallOptimization(CCInfo, StackSize, *FuncInfo);
       if (!Eligible || !CalleeIsLocal) {
         IsTailCall = false;
         if (IsMustTail)
@@ -3406,6 +3429,17 @@ MipsTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   // byval arguments to the stack.
   unsigned StackAlignment = TFL->getStackAlignment();
   StackSize = alignTo(StackSize, StackAlignment);
+  int64_t TailSPDelta = 0;
+  if (IsTailCall && IsTailCC) {
+    TailSPDelta = int64_t(FuncInfo->getArgumentStackToRestore()) - StackSize;
+    // PEI must put spills below the expanded outgoing argument area.
+    if (TailSPDelta < 0)
+      MFI.CreateFixedObject(-TailSPDelta, TailSPDelta, false);
+    // Do not overwrite overlapping incoming slots before all their loads.
+    Chain = DAG.getStackArgumentTokenFactor(Chain);
+  } else if (IsTailCC && StackSize) {
+    FuncInfo->setHasTailCCStackCall();
+  }
 
   if (!(IsTailCall || MemcpyInByVal))
     Chain = DAG.getCALLSEQ_START(Chain, StackSize, 0, DL);
@@ -3526,7 +3560,7 @@ MipsTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
 
     // emit ISD::STORE whichs stores the
     // parameter value to a stack Location
-    MemOpChains.push_back(passArgOnStack(StackPtr, VA.getLocMemOffset(),
+    MemOpChains.push_back(passArgOnStack(StackPtr, VA.getLocMemOffset() + TailSPDelta,
                                          Chain, Arg, DL, IsTailCall, DAG));
   }
 
@@ -3630,7 +3664,11 @@ MipsTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
 
   if (IsTailCall) {
     MF.getFrameInfo().setHasTailCall();
-    SDValue Ret = DAG.getNode(MipsISD::TailCall, DL, MVT::Other, Ops);
+    if (IsTailCC)
+      Ops.insert(Ops.begin() + 2,
+                 DAG.getTargetConstant(TailSPDelta, DL, MVT::i64));
+    SDValue Ret = DAG.getNode(IsTailCC ? MipsISD::TailReturn : MipsISD::TailCall,
+                              DL, MVT::Other, Ops);
     DAG.addCallSiteInfo(Ret.getNode(), std::move(CSInfo));
     return Ret;
   }
@@ -3643,7 +3681,7 @@ MipsTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   // Create the CALLSEQ_END node in the case of where it is not a call to
   // memcpy.
   if (!(MemcpyInByVal)) {
-    Chain = DAG.getCALLSEQ_END(Chain, StackSize, 0, InGlue, DL);
+    Chain = DAG.getCALLSEQ_END(Chain, StackSize, IsTailCC ? StackSize : 0, InGlue, DL);
     InGlue = Chain.getValue(1);
   }
 
@@ -3805,8 +3843,18 @@ SDValue MipsTargetLowering::LowerFormalArguments(
         "Functions with the interrupt attribute cannot have arguments!");
 
   CCInfo.AnalyzeFormalArguments(Ins, CC_Mips_FixedArg);
-  MipsFI->setFormalArgInfo(CCInfo.getStackSize(),
-                           CCInfo.getInRegsParamsCount() > 0);
+  unsigned IncomingBytes = CCInfo.getStackSize();
+  if (CallConv == CallingConv::Tail) {
+    if (!ABI.IsN64() || !Subtarget.hasMips64r2() || Subtarget.hasMips64r6() ||
+        Subtarget.inMips16Mode() || Subtarget.inMicroMipsMode() ||
+        isPositionIndependent() || IsVarArg ||
+        Func.hasFnAttribute("interrupt") || CCInfo.getInRegsParamsCount())
+      report_fatal_error("MIPS TailCC requires non-variadic static N64 R2 without byval");
+    IncomingBytes = alignTo(IncomingBytes,
+                            Subtarget.getFrameLowering()->getStackAlignment());
+    MipsFI->setArgumentStackToRestore(IncomingBytes);
+  }
+  MipsFI->setFormalArgInfo(IncomingBytes, CCInfo.getInRegsParamsCount() > 0);
 
   unsigned CurArgIdx = 0;
   CCInfo.rewindByValRegsInfo();

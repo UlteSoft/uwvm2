@@ -1,0 +1,65 @@
+{
+  "execution_requires_shared_ticket_and_original_pidfd_guard": true,
+  "executor": "/root/qemu_platform_tests",
+  "kind": "source-only",
+  "linux_keeper_retains_pcore_bench_and_vtune": true,
+  "mac_native_execution": false,
+  "outer_cgroup_memory_max": 68719476736,
+  "schema": "uwvm-qemu-source-queue-20261003-r1",
+  "source_queue": [
+    {
+      "artifact": "/tmp/uwvm-debug-checkpoint-source-frozen-20261003-r4/source-candidate.tar.gz",
+      "artifact_bytes": 59940,
+      "artifact_sha256": "faca23801eda3d71d3862feb6a870d81a833001dbe88880f392b95a7c498a2f5",
+      "name": "checkpoint-schema3-formatter-fixed",
+      "native_execution_accepted": false,
+      "scope": "codec4cells",
+      "state": "queued-awaiting-fastio-SHA-scalar-fix"
+    },
+    {
+      "artifact": "/tmp/uwvm-gc-single-cas-publication-source-20261003-r1/source.tar.gz",
+      "artifact_bytes": 149804,
+      "artifact_sha256": "ac8da47452985f24cc47827f0cc738af54d1faf43a4857fd6ddb5d388fc13ec5",
+      "name": "gc-single-cas-publication",
+      "native_execution_accepted": false,
+      "scope": "publicationmacrooff-on",
+      "state": "source-only"
+    },
+    {
+      "artifact": "/tmp/uwvm-gc-data-fastio-source-20261003-r3/source.tar.gz",
+      "artifact_bytes": 296702,
+      "artifact_sha256": "d0f23f66cd4fc463f39d2c3e076f93d212afd3d77ba2b604bbaa459393c3232c",
+      "name": "gc-packed-data-fastio-big-endian",
+      "native_execution_accepted": false,
+      "scope": "scalar-packed-v128-nativeBE",
+      "state": "source-only"
+    },
+    {
+      "artifact": "/tmp/uwvm-gc-native-dense-source-20261003-r2/source.tar.gz",
+      "artifact_bytes": 170394,
+      "artifact_sha256": "328ae09b4f1809da1cbcb6c94ef834dbf8f59a865137cd29946d25504912ca67",
+      "name": "gc-dense64-65",
+      "native_execution_accepted": false,
+      "scope": "inline-metadata-correctness",
+      "state": "source-only"
+    },
+    {
+      "artifact": "/tmp/uwvm-native-windows-raii-source-frozen-20261003-r1.tar.gz",
+      "artifact_bytes": 44121,
+      "artifact_sha256": "dcd5ed14e1ad2b217634c3aa26cede22588c239fe2879755bcc9d900418d55b9",
+      "name": "native-windows-raii",
+      "native_execution_accepted": false,
+      "scope": "standalone-VEH-GPR-cancel-death",
+      "state": "source-only"
+    },
+    {
+      "artifact": "/tmp/uwvm-native-loaded-provenance-source-frozen-20261003-r1.tar.gz",
+      "artifact_bytes": 450835,
+      "artifact_sha256": "c0f6e2a524669327b463093d431d0e192ddf3f6dd78efaf744d105f11db6e0a5",
+      "name": "native-loaded-provenance",
+      "native_execution_accepted": false,
+      "scope": "ELF-COFF-MachO-object-data",
+      "state": "source-only"
+    }
+  ]
+}

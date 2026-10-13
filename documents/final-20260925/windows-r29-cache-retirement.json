@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "reason": "superseded r29 diagnostic XMake-generated BMI cache; r33 exact source must start with at least 40 GiB free",
+  "old_source_id": "sha256:824d1fccdbe9553322ca166df784df94d9008003208ac16dee7efbc6bb52e8ec",
+  "preserved_source_root": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/windows-r29-ros-source",
+  "preserved_product_root": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/windows-r29-ros-product",
+  "retired_cache": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/windows-r29-ros-product/xmake-build/.gens",
+  "before_disk": {
+    "total": 526185201664,
+    "used": 471010471936,
+    "free": 28370767872
+  },
+  "cache_bytes_du": 22644264387,
+  "cache_files": 2627,
+  "preserved_logs_sha256": {
+    "uwvm-build.log": "b051d3ca207a4920ff7a4b86ffe9f0b968a07976b7f421775cfbba1412074e48",
+    "configure.log": "292ff2c6c63c511eca967cafa8053f8af6987841acd751a5b2eaccc5624aa114",
+    "source-before.json": "d9f206e6db7ec8d950a78efa35ee395a320ce35b15c7c73085132fa316f9040e",
+    "source-after-configure.json": "d9f206e6db7ec8d950a78efa35ee395a320ce35b15c7c73085132fa316f9040e"
+  },
+  "selected_bmi": [
+    {
+      "relative_path": "uwvm/mingw/x86_64/release/rules/bmi/cache/interfaces/be6873fc1e140f4b/uwvm2.uwvm.cmdline.params_PARTITION_runtime_llvm_jit_call_stack.pcm",
+      "bytes": 4688524,
+      "sha256": "411453812b60f3384bf2baee25a17f1dc259638e73af5b12b27685b5887e9b69",
+      "archive_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/windows-r29-ros-cache-retirement/selected-bmi/uwvm/mingw/x86_64/release/rules/bmi/cache/interfaces/be6873fc1e140f4b/uwvm2.uwvm.cmdline.params_PARTITION_runtime_llvm_jit_call_stack.pcm"
+    },
+    {
+      "relative_path": "uwvm/mingw/x86_64/release/rules/bmi/cache/interfaces/dc9c238febe82713/uwvm2.uwvm.cmdline.callback_PARTITION_runtime_llvm_jit_call_stack.pcm",
+      "bytes": 34263088,
+      "sha256": "6291765beee9d7ad2db873123b48d3ed4964516f87ca23f37063a1b7edd7c51e",
+      "archive_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/windows-r29-ros-cache-retirement/selected-bmi/uwvm/mingw/x86_64/release/rules/bmi/cache/interfaces/dc9c238febe82713/uwvm2.uwvm.cmdline.callback_PARTITION_runtime_llvm_jit_call_stack.pcm"
+    },
+    {
+      "relative_path": "uwvm_runtime/mingw/x86_64/release/rules/bmi/cache/interfaces/be6873fc1e140f4b/uwvm2.uwvm.cmdline.params_PARTITION_runtime_llvm_jit_call_stack.pcm",
+      "bytes": 4690848,
+      "sha256": "0c0becec693b0cc1f4bb6ea00d2bd7ed318333aa5af2831b0b3423fa8c36f6e5",
+      "archive_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/windows-r29-ros-cache-retirement/selected-bmi/uwvm_runtime/mingw/x86_64/release/rules/bmi/cache/interfaces/be6873fc1e140f4b/uwvm2.uwvm.cmdline.params_PARTITION_runtime_llvm_jit_call_stack.pcm"
+    },
+    {
+      "relative_path": "uwvm_runtime/mingw/x86_64/release/rules/bmi/cache/interfaces/dc9c238febe82713/uwvm2.uwvm.cmdline.callback_PARTITION_runtime_llvm_jit_call_stack.pcm",
+      "bytes": 34263460,
+      "sha256": "d89a5cefc41b5a8c6591db8b7d139ef2a8cd8b0c83fd18d9761a19d9e3a20217",
+      "archive_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/windows-r29-ros-cache-retirement/selected-bmi/uwvm_runtime/mingw/x86_64/release/rules/bmi/cache/interfaces/dc9c238febe82713/uwvm2.uwvm.cmdline.callback_PARTITION_runtime_llvm_jit_call_stack.pcm"
+    },
+    {
+      "relative_path": "uwvm/mingw/x86_64/release/rules/bmi/cache/interfaces/d046c072ea8df0f9/uwvm2.uwvm.cmdline.callback_PARTITION_mode.pcm",
+      "bytes": 30000312,
+      "sha256": "921d332edfc1771e5fdafc447a5feb9e923748e6b291a0e30fcfe92d6a5f239a",
+      "archive_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/windows-r29-ros-cache-retirement/selected-bmi/uwvm/mingw/x86_64/release/rules/bmi/cache/interfaces/d046c072ea8df0f9/uwvm2.uwvm.cmdline.callback_PARTITION_mode.pcm"
+    },
+    {
+      "relative_path": "uwvm_runtime/mingw/x86_64/release/rules/bmi/cache/interfaces/d046c072ea8df0f9/uwvm2.uwvm.cmdline.callback_PARTITION_mode.pcm",
+      "bytes": 30002644,
+      "sha256": "e6097ed03290eb0db0c040b8cb9f19ebc9e695358b49978c8b8e5de45b096f80",
+      "archive_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/windows-r29-ros-cache-retirement/selected-bmi/uwvm_runtime/mingw/x86_64/release/rules/bmi/cache/interfaces/d046c072ea8df0f9/uwvm2.uwvm.cmdline.callback_PARTITION_mode.pcm"
+    }
+  ],
+  "after_disk": {
+    "total": 526185201664,
+    "used": 448486084608,
+    "free": 50895155200
+  },
+  "reclaimed_free_bytes": 22524387328,
+  "completed_at_unix": 1790285509.2030187
+}

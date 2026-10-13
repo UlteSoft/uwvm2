@@ -1,0 +1,149 @@
+{
+  "cases": [
+    {
+      "name": "local-rotation-direct",
+      "actual_gc": true,
+      "detail": "Local reference changes on each backedge; allocation occurs in callee and caller local is the only owning root.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/local-rotation-direct.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/local-rotation-direct.wasm",
+      "wasm_sha": "62e72a4258914a030adc7bc7a246a857f4034cc16eefff94ed2380f56e4dc444"
+    },
+    {
+      "name": "local-rotation-indirect",
+      "actual_gc": true,
+      "detail": "Local reference changes on each backedge; allocation occurs in callee and caller local is the only owning root.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/local-rotation-indirect.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/local-rotation-indirect.wasm",
+      "wasm_sha": "27b7d00765d5b44fc20a84b724673489276870eeaf65116a24db015850b7275d"
+    },
+    {
+      "name": "local-rotation-ref",
+      "actual_gc": true,
+      "detail": "Local reference changes on each backedge; allocation occurs in callee and caller local is the only owning root.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/local-rotation-ref.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/local-rotation-ref.wasm",
+      "wasm_sha": "a12b8c2766e3181de8464046c557a64937caad8f1f967bbb48ac6fb6b2e3e4ba"
+    },
+    {
+      "name": "loop-phi-with-operand-prefix",
+      "actual_gc": true,
+      "detail": "Different loop-PHI reference each backedge; a second array is live only in the outer operand prefix across callee collection.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/loop-phi-with-operand-prefix.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/loop-phi-with-operand-prefix.wasm",
+      "wasm_sha": "bb85e39238983000087314e33c5d9db34f9a6748e450da6591f65acda4c31081"
+    },
+    {
+      "name": "wide-operand-prefix",
+      "actual_gc": true,
+      "detail": "Twelve distinct references held only in the operand prefix across every allocation/call in the loop.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/wide-operand-prefix.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/wide-operand-prefix.wasm",
+      "wasm_sha": "7ee09a8ff0f576ae5c747135157c25ecf55cc921de584f8769a88ae4bec981f8"
+    },
+    {
+      "name": "local-clear-and-replace",
+      "actual_gc": true,
+      "detail": "Reference carriers move between nullable locals; each safepoint must publish current locals, including explicit nulls.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/local-clear-and-replace.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/local-clear-and-replace.wasm",
+      "wasm_sha": "9469437508aec718c60e69e76dbe76c36954e6b67477d05d7453e4d89a79b0fb"
+    },
+    {
+      "name": "nested-loops-current-local",
+      "actual_gc": true,
+      "detail": "Nested loop joins and repeated safepoints with outer current local.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/nested-loops-current-local.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/nested-loops-current-local.wasm",
+      "wasm_sha": "bd0604e88471ef9bda196b8a60d01f0908aadb706afb5a5a82ae7ccbf2489952"
+    },
+    {
+      "name": "loop-phi-with-v128",
+      "actual_gc": true,
+      "detail": "Mixed reference/v128 block and loop parameters: numeric SIMD bits must not become roots.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/loop-phi-with-v128.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/loop-phi-with-v128.wasm",
+      "wasm_sha": "1ccfbdb0a17a1717243ec674df70c90f366dbfac27e7e8758d117eaa30503e39"
+    },
+    {
+      "name": "tail-transfer-direct",
+      "actual_gc": true,
+      "detail": "Live loop-created reference transfers through actual return_call variant into allocating callee.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/tail-transfer-direct.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/tail-transfer-direct.wasm",
+      "wasm_sha": "73e5e253cd04edcd59536818f8f38c5772f0719b7e82db7826305bdec29534ea"
+    },
+    {
+      "name": "tail-transfer-ref",
+      "actual_gc": true,
+      "detail": "Live loop-created reference transfers through actual return_call variant into allocating callee.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/tail-transfer-ref.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/tail-transfer-ref.wasm",
+      "wasm_sha": "c7e225ef83b6c656d388964d9c4a921cdb6653d02d01abaa56007726b62efaba"
+    },
+    {
+      "name": "tail-transfer-indirect",
+      "actual_gc": true,
+      "detail": "Live loop-created reference transfers through actual return_call variant into allocating callee.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/tail-transfer-indirect.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/tail-transfer-indirect.wasm",
+      "wasm_sha": "3f7c6827a99aaeb1653ac715ef2d38869eb493556ee494959f2d6cbd92ed61e7"
+    },
+    {
+      "name": "cyclic-struct-replacement",
+      "actual_gc": true,
+      "detail": "Old unreachable cycles are collected; latest self-cycle must survive through a root local and trace edge.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/cyclic-struct-replacement.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/cyclic-struct-replacement.wasm",
+      "wasm_sha": "30802335db3a891a0b074666456008f9291e5461deb61d2b0ba3e2ce7712be96"
+    },
+    {
+      "name": "reference-array-child-rotation",
+      "actual_gc": true,
+      "detail": "Child array survives only through a mutable reference array edge after its local is cleared.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/reference-array-child-rotation.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/reference-array-child-rotation.wasm",
+      "wasm_sha": "d2f8ff7c6e69e97674ead1d3f6b05aef99d0d1019e285f595f38fb3a64e3ea63"
+    },
+    {
+      "name": "linked-struct-graph",
+      "actual_gc": true,
+      "detail": "All 32 graph ancestors retained transitively and walked after repeated actual collections.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/linked-struct-graph.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/linked-struct-graph.wasm",
+      "wasm_sha": "1710ea73cc33eb57b83d7f2c3300a6ad0db02ad869cc4401d54eb8ffd7b058d3"
+    },
+    {
+      "name": "exception-payload-catch",
+      "actual_gc": false,
+      "detail": "Throw/catch payload carries loop-created GC array; existing native EH collection gate9 remains unchanged, so this proves EH semantics, not active collection.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/exception-payload-catch.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/exception-payload-catch.wasm",
+      "wasm_sha": "711859cef4fbf739e637d5a2fbf3e965cb0718f22a2d0c061c02e1e85139d535"
+    },
+    {
+      "name": "exception-payload-catch_ref",
+      "actual_gc": false,
+      "detail": "Throw/catch payload carries loop-created GC array; existing native EH collection gate9 remains unchanged, so this proves EH semantics, not active collection.",
+      "trap": null,
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/exception-payload-catch_ref.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/loop-root-fixtures-c24-a2/exception-payload-catch_ref.wasm",
+      "wasm_sha": "eef74eb46940a4c9dd988bf09be954abf1665509ebd9086d76e4dd29b7e3bf8b"
+    }
+  ],
+  "scope": "16 independent self-checking modules for changing loop roots and actual allocation in callees; EH gate9 fixtures explicitly separated. No imports, each no-tag module executes at least32768 ephemeral allocations per invocation."
+}

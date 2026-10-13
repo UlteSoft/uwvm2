@@ -1,0 +1,1 @@
+(module (type $a (array i32)) (func (export "get") (result (ref null $a)) ref.null $a))

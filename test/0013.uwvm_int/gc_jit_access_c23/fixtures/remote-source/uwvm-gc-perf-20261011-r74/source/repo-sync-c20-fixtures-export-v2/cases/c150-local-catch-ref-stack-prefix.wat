@@ -1,0 +1,1 @@
+(module (tag $t (param i32)) (func (export "_start") (local $e exnref) i64.const 0x123456789abcdef block $c (result i32 exnref) try_table (result i32 exnref) (catch_ref $t $c) i32.const 99 throw $t unreachable end end local.set $e i32.const 99 i32.ne if unreachable end i64.const 0x123456789abcdef i64.ne if unreachable end local.get $e ref.is_null if unreachable end))

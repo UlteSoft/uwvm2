@@ -1,0 +1,490 @@
+{
+  "schema": "uwvm-all-LLVM-full-debugger-platform-source-matrix-v1",
+  "scope": "resident correctness queue; exact OS/ISA/libc closure and actual three levels required, not a blanket platform PASS",
+  "source_only": true,
+  "native_started_by_this_matrix": false,
+  "repositories": [
+    "uwvm2-ros",
+    "uwvm2"
+  ],
+  "priority": [
+    "Windows current four-profile standalone TF/GPR/ownedJob real guest",
+    "i386 actual GNU direct IA32compat kernel trap and current fresh full3TU Core3",
+    "AArch64 exact matching target MC13 build then fresh full3TU Core3/source/Wasm/ownedASM",
+    "RISC-V64 exact missing MC provider closure then fresh full3TU Core3/source/Wasm/ownedASM",
+    "FreeBSD actual target LLVM/stdlib/provider full3TU plus genuine process and trap adapters",
+    "other exact OS/ISA/libc cells incrementally under one original guardian lane"
+  ],
+  "source_observations": [
+    {
+      "path": "src/uwvm2/uwvm/debugger/native_step.h",
+      "bytes": 25403,
+      "sha256": "3477a48b4b72efe5e7b6a8be98324359074d742404306cb200eac80072e33f14",
+      "scope": "read-only live SOURCE observation; not immutable root product qualification"
+    },
+    {
+      "path": "src/uwvm2/uwvm/debugger/native_registers.h",
+      "bytes": 5105,
+      "sha256": "99cad69fb9593a3eed4e548793f5727b798a2d77a13ace3992eb5b306c303e6c",
+      "scope": "read-only live SOURCE observation; not immutable root product qualification"
+    },
+    {
+      "path": "src/uwvm2/uwvm/debugger/native_disassembly.h",
+      "bytes": 9908,
+      "sha256": "10291bb065acedf7e1ea99ba755acb1320a10e85710d427552d671420a62956f",
+      "scope": "read-only live SOURCE observation; not immutable root product qualification"
+    },
+    {
+      "path": "test/0017.runtime/debug_wasm_events_runtime.cc",
+      "bytes": 17384,
+      "sha256": "5aa28d35fa6a291b8ae4212c134dbbddc5e727aab2257a8e59d366f929036494",
+      "scope": "read-only live SOURCE observation; not immutable root product qualification"
+    },
+    {
+      "path": "test/0017.runtime/debug_native_next_runtime.cc",
+      "bytes": 17945,
+      "sha256": "c3a16040f19589fc1270f890e6ac714fc27dc81b3c75b38b0fbe6fdf0ec05f68",
+      "scope": "read-only live SOURCE observation; not immutable root product qualification"
+    },
+    {
+      "path": "test/0017.runtime/debug_controller_closed_domain_runtime.cc",
+      "bytes": 15206,
+      "sha256": "33ede049391fcdba6c03ebaf228f7a6994a8a207c4bdc17675d6f10a5a137ca3",
+      "scope": "read-only live SOURCE observation; not immutable root product qualification"
+    }
+  ],
+  "known_source_gaps": [
+    "Linux hardware step gate currently only x86_64; other listed Linux ISAs currently fall through unavailable implementation branch",
+    "owned cold disassembly currently inherits hardware step gates and hardcodes Linux x86_64 triple; needs target-correct MC path independent of trap capability",
+    "native_registers architecture currently only x86_64/aarch64; target-width/name/context layouts must be implemented from actual SDK",
+    "portable actual Core3 event fixture process adapter excludes FreeBSD and returns77; this is an implementation gap even after old SDK component guest PASS"
+  ],
+  "acceptance_levels": {
+    "fresh_full_product": [
+      "all runtime/main/host producers use one immutable source image, selected ABI/profile/feature/macros and actual target SDK",
+      "every MD/static member/link read/CRT/loader/DT_NEEDED/provider candidate bound before and after",
+      "actual run binary/global source image identity and returncode; old frozen artifact never qualifies new source"
+    ],
+    "portable_Wasm_level": [
+      "real stopped full-JIT participants and immutable generation/stop ownership",
+      "current typedref/GC/memory64/table64/EH/tailcall/SIMD/atomics events, actual catches and trace pagination",
+      "Wasm scripts/breakpoints/memory/locals plus reject foreign/stale/closed state",
+      "instruction and true unwind stack policies tested distinctly"
+    ],
+    "language_level": [
+      "actual -g custom debug sections plus C/C++/Rust source row/type/scope/locals",
+      "real current source stepping and bounded owned value/selector reads; unsupported locations explicitly recorded",
+      "target loader/object format/DWARF source mapping provenance, not merely an LLVM object parser PASS"
+    ],
+    "assembly_view": [
+      "owned current code/private byte page and actual target triple/ISA features/byte order",
+      "real LLVM MC target closure/decode/render with bounds and stable generation",
+      "PC is metadata, never an unchecked host pointer"
+    ],
+    "assembly_step_and_registers": [
+      "real OS SDK context/target ABI and owned kernel trap or W^X-safe stop mechanism",
+      "true first PC, zero/one/two executed instructions, current owned GPR/control register snapshots",
+      "nexti refusal and semantics, current source-to-Wasm-to-native provenance",
+      "cancel/release/reset/close/unknown thread and 256 ownership races plus exact retire",
+      "QEMU-user translated trap, Linux IA32compat actual kernel trap and full QEMU guest trap are separate claims"
+    ],
+    "hot_replace_and_checkpoint": [
+      "same complete Wasm ABI/API and paused ownership gates",
+      "function replacement exact state/epoch/retirement and feature state",
+      "checkpoint component codec BE/LE is separate from full VM state restore/reverse/replay"
+    ]
+  },
+  "resources": {
+    "Linux_original_shared_CG_hard_memory_bytes": 68719476736,
+    "swap_bytes": 0,
+    "allowed_CPUs": [
+      0,
+      2,
+      4,
+      6,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "compiler_and_QEMU_Ecore_pool": [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "Pcore_timing_keeper_exclusive": true,
+    "source_review_and_exact_keeper_release_before_native": true,
+    "Mac_native_allowed_now": false
+  },
+  "target_cells": [
+    {
+      "os": "linux",
+      "architecture": "x86_64",
+      "libc": "glibc",
+      "endian": "little",
+      "status": "keeper owns native current paired external-libc++ development full3TU and P0; bundled product/debug acceptance distinct",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "i386",
+      "libc": "glibc",
+      "endian": "little",
+      "status": "current GNU target SDK/LLVM source candidate metadata; actual MD/member/provider/full3TU/run pending",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "aarch64",
+      "libc": "glibc",
+      "endian": "little",
+      "status": "current GNU target SDK/LLVM source candidate metadata; actual MD/member/provider/full3TU/run pending",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "riscv64",
+      "libc": "glibc",
+      "endian": "little",
+      "status": "current GNU target SDK/LLVM source candidate metadata; actual MD/member/provider/full3TU/run pending",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "ppc64",
+      "libc": "glibc",
+      "endian": "big",
+      "status": "actual BE GNU SDK scalar header source metadata; target LLVM full provider pending",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "ppc64le",
+      "libc": "glibc",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "mips64",
+      "libc": "glibc",
+      "endian": "big",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "loongarch64",
+      "libc": "glibc",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "sparc64",
+      "libc": "glibc",
+      "endian": "big",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "s390x",
+      "libc": "glibc",
+      "endian": "big",
+      "status": "four actual Clang22 standalone BE format3 codec cells; LLVM23 full product pending",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "x86_64",
+      "libc": "musl",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "i386",
+      "libc": "musl",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "aarch64",
+      "libc": "musl",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "riscv64",
+      "libc": "musl",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "ppc64",
+      "libc": "musl",
+      "endian": "big",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "ppc64le",
+      "libc": "musl",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "mips64",
+      "libc": "musl",
+      "endian": "big",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "loongarch64",
+      "libc": "musl",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "sparc64",
+      "libc": "musl",
+      "endian": "big",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "s390x",
+      "libc": "musl",
+      "endian": "big",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "x86_64",
+      "libc": "uclibc",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "i386",
+      "libc": "uclibc",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "aarch64",
+      "libc": "uclibc",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "riscv64",
+      "libc": "uclibc",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "ppc64",
+      "libc": "uclibc",
+      "endian": "big",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "ppc64le",
+      "libc": "uclibc",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "mips64",
+      "libc": "uclibc",
+      "endian": "big",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "loongarch64",
+      "libc": "uclibc",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "sparc64",
+      "libc": "uclibc",
+      "endian": "big",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "linux",
+      "architecture": "s390x",
+      "libc": "uclibc",
+      "endian": "big",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "freebsd",
+      "architecture": "x86_64",
+      "libc": "native-libc",
+      "endian": "little",
+      "status": "actual four LLVM cross-SDK C++ EH/noEH guest components; full product and new public debugger providers pending",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "freebsd",
+      "architecture": "aarch64",
+      "libc": "native-libc",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "freebsd",
+      "architecture": "riscv64",
+      "libc": "native-libc",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "freebsd",
+      "architecture": "ppc64",
+      "libc": "native-libc",
+      "endian": "big",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "windows",
+      "architecture": "x86_64",
+      "libc": "UCRT",
+      "endian": "little",
+      "status": "four native-step fixtures and four regular launchers actual static SDK LLVM-runtime builds; original base full hash and real guest TF/GPR/ownedJob pending",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "windows",
+      "architecture": "aarch64",
+      "libc": "UCRT",
+      "endian": "little",
+      "status": "not yet inventoried exact target SDK/LLVM/CRT/OpenSSL closure",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "macos",
+      "architecture": "aarch64",
+      "libc": "libSystem",
+      "endian": "little",
+      "status": "no native allowed until matching Linux stage measured memory <=4GiB and actual protective admission; no native executed",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    },
+    {
+      "os": "macos",
+      "architecture": "x86_64",
+      "libc": "libSystem",
+      "endian": "little",
+      "status": "no native allowed until matching Linux stage measured memory <=4GiB and actual protective admission; no native executed",
+      "whole_current_debugger_qualified": false,
+      "unsupported_is_PASS": false
+    }
+  ],
+  "no_unknown_or77_as_pass": true,
+  "prior_failures_preserved": true
+}

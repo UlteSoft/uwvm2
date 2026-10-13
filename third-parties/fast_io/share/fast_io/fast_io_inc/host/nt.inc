@@ -3,6 +3,19 @@ export namespace fast_io
 
     using ::fast_io::nt_domain_value;
 
+#if defined(_WIN32) && !defined(_WIN32_WINDOWS) && !defined(__CYGWIN__) && !defined(__WINE__) && !defined(__BIONIC__)
+    using ::fast_io::nt_readonly_sync_file;
+    using ::fast_io::nt_readonly_sync_open_result;
+    using ::fast_io::nt_readonly_sync_status_result;
+    using ::fast_io::nt_readonly_sync_read_result;
+    using ::fast_io::nt_readonly_sync_operation_result;
+    using ::fast_io::nt_open_readonly_sync_nothrow;
+    using ::fast_io::nt_readonly_sync_status_nothrow;
+    using ::fast_io::nt_readonly_sync_read_nothrow;
+    using ::fast_io::nt_readonly_sync_close_nothrow;
+#endif
+
+
     namespace win32::nt
     {
         using ::fast_io::win32::nt::nt_get_current_peb;

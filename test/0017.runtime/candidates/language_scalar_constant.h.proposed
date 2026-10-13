@@ -1,0 +1,90 @@
+#pragma once
+// REVIEW CANDIDATE ONLY: not included or exported by the product. The caller
+// supplies a bounded LLVM-parsed, DIRECT DW_AT_const_value and resolved scalar
+// type. Abstract/specification inheritance, concrete scope and source-owner
+// proof must be reviewed separately before integrating with variable_record.
+#include <uwvm2/uwvm/debugger/source_dwarf_variants.h>
+#include <llvm/BinaryFormat/Dwarf.h>
+#include <llvm/DebugInfo/DWARF/DWARFFormValue.h>
+namespace uwvm2::uwvm::debugger::language_constant_candidate
+{
+    namespace dwarf = ::uwvm2::uwvm::debugger::source_dwarf;
+    enum class error { none, unavailable, malformed, ambiguous, value_too_large };
+    // No expression evaluation or pointers. This copies an INTEGER scalar
+    // already extracted by LLVM; metadata integers never become guest addresses
+    // or host pointers. Floats, block/string constants and aggregate constants
+    // remain unavailable until their bounded target representation is supported.
+    [[nodiscard]] inline error decode(::llvm::DWARFFormValue const& value, dwarf::type_record const& type,
+        ::std::uint8_t address_bytes, dwarf::location_plan& out) noexcept
+    {
+        out = {};
+        if((address_bytes != 4u && address_bytes != 8u) || type.kind != dwarf::type_kind::scalar ||
+           !type.size_known || !dwarf::variant_integer_width(type.byte_count) || type.byte_size != type.byte_count)
+        { return error::unavailable; }
+        bool const signed_type{type.encoding == ::llvm::dwarf::DW_ATE_signed || type.encoding == ::llvm::dwarf::DW_ATE_signed_char};
+        bool const unsigned_type{type.encoding == ::llvm::dwarf::DW_ATE_unsigned || type.encoding == ::llvm::dwarf::DW_ATE_unsigned_char};
+        bool const boolean_type{type.encoding == ::llvm::dwarf::DW_ATE_boolean};
+        if(!signed_type && !unsigned_type && !boolean_type) { return error::unavailable; }
+        if(!value.isFormClass(::llvm::DWARFFormValue::FC_Constant)) { return error::unavailable; }
+        auto const form{value.getForm()};
+        ::std::uint8_t fixed_bytes{};
+        switch(form)
+        {
+            case ::llvm::dwarf::DW_FORM_data1: fixed_bytes = 1u; break;
+            case ::llvm::dwarf::DW_FORM_data2: fixed_bytes = 2u; break;
+            case ::llvm::dwarf::DW_FORM_data4: fixed_bytes = 4u; break;
+            case ::llvm::dwarf::DW_FORM_data8: fixed_bytes = 8u; break;
+            case ::llvm::dwarf::DW_FORM_sdata:
+            case ::llvm::dwarf::DW_FORM_udata:
+            case ::llvm::dwarf::DW_FORM_implicit_const: break;
+            default: return error::unavailable;
+        }
+        ::std::uint64_t bits{};
+        bool const signed_form{form == ::llvm::dwarf::DW_FORM_sdata || form == ::llvm::dwarf::DW_FORM_implicit_const};
+        if(signed_form)
+        {
+            auto const number{value.getAsSignedConstant()};
+            if(!number) { return error::malformed; }
+            if(!signed_type && *number < 0) { return error::value_too_large; }
+            bits = static_cast<::std::uint64_t>(*number);
+        }
+        else
+        {
+            auto const number{value.getAsUnsignedConstant()};
+            if(!number) { return error::malformed; }
+            bits = *number;
+            if(signed_type && fixed_bytes != 0u)
+            {
+                // DWARF5 7.5.4 leaves fixed-width constants context dependent.
+                // Exact type-width bytes are unambiguous target integer bits.
+                // A shorter signed representation with its top bit set admits
+                // both zero/sign extension (DWARF issue 260921.1 remains open).
+                // Never guess a negative constant from that ambiguous input.
+                if(fixed_bytes < type.byte_count)
+                {
+                    if((bits & (::std::uint64_t{1u} << (fixed_bytes * 8u - 1u))) != 0u) { return error::ambiguous; }
+                }
+                else if(fixed_bytes == type.byte_count)
+                { bits = dwarf::canonical_variant_bits(bits, type.byte_count, true); }
+                else
+                {
+                    auto const signed_number{value.getAsSignedConstant()};
+                    if(!signed_number) { return error::malformed; }
+                    bits = static_cast<::std::uint64_t>(*signed_number);
+                }
+            }
+            // An unsigned LEB constant denotes a nonnegative number; a signed
+            // destination must represent it exactly, not reinterpret its sign.
+            if(signed_type && form == ::llvm::dwarf::DW_FORM_udata &&
+               bits > dwarf::variant_integer_mask(type.byte_count) / 2u) { return error::value_too_large; }
+        }
+        if(dwarf::canonical_variant_bits(bits, type.byte_count, signed_type) != bits || (boolean_type && bits > 1u))
+        { return error::value_too_large; }
+        dwarf::location_plan pending{};
+        pending.kind = dwarf::plan_kind::constant_value; pending.reason = dwarf::unavailable_reason::none;
+        pending.constant_bits = bits; pending.signed_constant = signed_type;
+        pending.byte_count = type.byte_count; pending.address_bytes = address_bytes;
+        out = ::std::move(pending);
+        return error::none;
+    }
+}

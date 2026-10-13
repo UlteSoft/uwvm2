@@ -1,0 +1,42 @@
+{
+  "status": "SOURCE_ONLY_UNAPPLIED",
+  "base": "current GC31 v4 stable source 2026-10-03",
+  "repositories": {
+    "uwvm2": {
+      "src/uwvm2/runtime/lib/uwvm_runtime.h": {
+        "original_bytes_sha256": "53a75df8b130465accc1bea2661128f4a2da4010b63198cd6cab49de4dfa93e9",
+        "candidate_text_sha256": "d2382b7ded3e2963c3574729475e88eb65e19bf133c9f0f6722e848934cfbc22"
+      },
+      "src/uwvm2/runtime/lib/uwvm_runtime.default.cpp": {
+        "original_bytes_sha256": "085e44168ad0ef7f413e971b1a5d513a2b7ace24909e9e520831e95ec1bcde99",
+        "candidate_text_sha256": "02d8ea603b32e7c0d8f1799b17e6607298444699ace2708339f171519bea599a"
+      },
+      "src/uwvm2/runtime/lib/uwvm_stub_runtime.default.cpp": {
+        "original_bytes_sha256": "7616f890145f6c269cc2f06f576fc03e055ab8bbc68246f10a4d6a3765c19104",
+        "candidate_text_sha256": "3baa4a187ae3bb854ae2b4689cfbbf445de5f931cd07cb8af963c6fffa9dee26"
+      },
+      "src/uwvm2/uwvm/run/run.h": {
+        "original_bytes_sha256": "6cc33c11cb317df501bfc101a9c2d67b41fae43406a746b8d75dcbc74f79e15d",
+        "candidate_text_sha256": "328e60f974c5a523d98ff81add97f53ef3b9dc5eb6a1a6ca09ad87c90cbc19c0"
+      }
+    },
+    "uwvm2-ros": {
+      "src/uwvm2/runtime/lib/uwvm_runtime.h": {
+        "original_bytes_sha256": "d508b79f327bb31f7ff91a89dd531bdace1301dfdf643327033366d8bbaa4498",
+        "candidate_text_sha256": "959ffb347afde19ec5627ff4f2f0b1277186c3481410e83972cc12aef9d01868"
+      },
+      "src/uwvm2/runtime/lib/uwvm_runtime.default.cpp": {
+        "original_bytes_sha256": "fd6b1f3c8f737c959ed0293ff2e1e8d3938264dee4d48f23c98a8a3f1b183c9b",
+        "candidate_text_sha256": "df9a33f41a26b91d93b992255f1df3147ba6758ed48ea8a65ba45830fd64b36a"
+      },
+      "src/uwvm2/runtime/lib/uwvm_stub_runtime.default.cpp": {
+        "original_bytes_sha256": "69b3259fb1ddbc44961d770f5074946dbb0fad708ce00151280cf74cd50f6089",
+        "candidate_text_sha256": "8f0e79ce181402dcca63ad630118f0719030747dc08ee0f8c98f53f0681b6481"
+      },
+      "src/uwvm2/uwvm/run/run.h": {
+        "original_bytes_sha256": "4c9d6ac10320d4240a1ad50b6e8783793f5a964be2d121bb9416de9a9384319f",
+        "candidate_text_sha256": "5536eb53695a42399fd303fec1dc95d95e71eb635d2707496adcb950274fbbaa"
+      }
+    }
+  }
+}

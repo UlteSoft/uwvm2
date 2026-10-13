@@ -33,6 +33,29 @@
 
 using namespace llvm;
 
+// TailCC's CFA is the caller's SP before its callee-popped argument area.
+// Keep physical frame offsets relative to incoming SP, but describe register
+// saves relative to that CFA. All other calling conventions have a zero bias.
+class RISCVCFIInstBuilder : public CFIInstBuilder {
+  int64_t IncomingArgs;
+public:
+  RISCVCFIInstBuilder(MachineBasicBlock &MBB,
+                     MachineBasicBlock::iterator InsertPt,
+                     MachineInstr::MIFlag Flag)
+      : CFIInstBuilder(MBB, InsertPt, Flag),
+        IncomingArgs(MBB.getParent()->getInfo<RISCVMachineFunctionInfo>()
+                         ->getArgumentStackToRestore()) {}
+  void buildDefCFA(MCRegister Reg, int64_t Offset) const {
+    CFIInstBuilder::buildDefCFA(Reg, Offset + IncomingArgs);
+  }
+  void buildDefCFAOffset(int64_t Offset, MCSymbol *Label = nullptr) const {
+    CFIInstBuilder::buildDefCFAOffset(Offset + IncomingArgs, Label);
+  }
+  void buildOffset(MCRegister Reg, int64_t Offset) const {
+    CFIInstBuilder::buildOffset(Reg, Offset - IncomingArgs);
+  }
+};
+
 static Align getABIStackAlignment(RISCVABI::ABI ABI) {
   if (ABI == RISCVABI::ABI_ILP32E)
     return Align(4);
@@ -172,7 +195,7 @@ static void emitSCSPrologue(MachineFunction &MF, MachineBasicBlock &MBB,
       Offset, // addend (sleb128)
   };
 
-  CFIInstBuilder(MBB, MI, MachineInstr::FrameSetup)
+  RISCVCFIInstBuilder(MBB, MI, MachineInstr::FrameSetup)
       .buildEscape(StringRef(CFIInst, sizeof(CFIInst)));
 }
 
@@ -220,7 +243,7 @@ static void emitSCSEpilogue(MachineFunction &MF, MachineBasicBlock &MBB,
       .setMIFlag(MachineInstr::FrameDestroy);
   if (needsDwarfCFI(MF)) {
     // Restore the SCS pointer
-    CFIInstBuilder(MBB, MI, MachineInstr::FrameDestroy).buildRestore(SCSPReg);
+    RISCVCFIInstBuilder(MBB, MI, MachineInstr::FrameDestroy).buildRestore(SCSPReg);
   }
 }
 
@@ -486,7 +509,8 @@ bool RISCVFrameLowering::hasFPImpl(const MachineFunction &MF) const {
   const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
 
   const MachineFrameInfo &MFI = MF.getFrameInfo();
-  if (MF.getTarget().Options.DisableFramePointerElim(MF) ||
+  if (MF.getInfo<RISCVMachineFunctionInfo>()->hasTailCCStackCall() ||
+      MF.getTarget().Options.DisableFramePointerElim(MF) ||
       RegInfo->hasStackRealignment(MF) || MFI.hasVarSizedObjects() ||
       MFI.isFrameAddressTaken())
     return true;
@@ -663,7 +687,7 @@ void RISCVFrameLowering::allocateAndProbeStackForRVV(
       .setMIFlag(Flag);
   TII->mulImm(MF, MBB, MBBI, DL, TargetReg, NumOfVReg, Flag);
 
-  CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameSetup);
+  RISCVCFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameSetup);
   if (EmitCFI) {
     // Set the CFA register to TargetReg.
     CFIBuilder.buildDefCFA(TargetReg, -Amount);
@@ -783,7 +807,7 @@ void RISCVFrameLowering::allocateStack(MachineBasicBlock &MBB,
   const RISCVRegisterInfo *RI = STI.getRegisterInfo();
   const RISCVInstrInfo *TII = STI.getInstrInfo();
   bool IsRV64 = STI.is64Bit();
-  CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameSetup);
+  RISCVCFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameSetup);
 
   // Simply allocate the stack if it's not big enough to require a probe.
   if (!NeedProbe || Offset <= ProbeSize) {
@@ -848,6 +872,9 @@ void RISCVFrameLowering::allocateStack(MachineBasicBlock &MBB,
   // Emit a variable-length allocation probing loop.
   uint64_t RoundedSize = alignDown(Offset, ProbeSize);
   uint64_t Residual = Offset - RoundedSize;
+  // Offset is only this allocation. A split prologue may already have
+  // allocated the CSR-save area, so the CFA must include that earlier part.
+  uint64_t CFAAdjust = RealStackSize - Offset;
 
   Register TargetReg = RISCV::X6;
   // SUB TargetReg, SP, RoundedSize
@@ -856,7 +883,7 @@ void RISCVFrameLowering::allocateStack(MachineBasicBlock &MBB,
 
   if (EmitCFI) {
     // Set the CFA register to TargetReg.
-    CFIBuilder.buildDefCFA(TargetReg, RoundedSize);
+    CFIBuilder.buildDefCFA(TargetReg, RoundedSize + CFAAdjust);
   }
 
   // It will be expanded to a probe loop in `inlineStackProbe`.
@@ -881,7 +908,7 @@ void RISCVFrameLowering::allocateStack(MachineBasicBlock &MBB,
   }
 
   if (EmitCFI)
-    CFIBuilder.buildDefCFAOffset(Offset);
+    CFIBuilder.buildDefCFAOffset(RealStackSize);
 }
 
 static bool isPush(unsigned Opcode) {
@@ -951,6 +978,10 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
   if (MF.getFunction().getCallingConv() == CallingConv::GHC)
     return;
 
+  if (RVFI->getArgumentStackToRestore() && needsDwarfCFI(MF))
+    RISCVCFIInstBuilder(MBB, MBBI, MachineInstr::FrameSetup)
+        .buildDefCFAOffset(0);
+
   // SiFive CLIC needs to swap `sp` into `sf.mscratchcsw`
   emitSiFiveCLICStackSwap(MF, MBB, MBBI, DL);
 
@@ -977,7 +1008,7 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
   MBBI =
       std::prev(MBBI, getRVVCalleeSavedInfo(MF, CSI).size() +
                           getUnmanagedCSI(MF, CSI, PreferAscendingLS).size());
-  CFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameSetup);
+  RISCVCFIInstBuilder CFIBuilder(MBB, MBBI, MachineInstr::FrameSetup);
   bool NeedsDwarfCFI = needsDwarfCFI(MF);
 
   // If libcalls are used to spill and restore callee-saved registers, the frame
@@ -1046,7 +1077,7 @@ void RISCVFrameLowering::emitPrologue(MachineFunction &MF,
       // Insert the CFI metadata before where we think the `(QC.)CM.PUSH(FP)`
       // could be. The PUSH will also get its own CFI metadata for its own
       // modifications, which should come after the PUSH.
-      CFIInstBuilder PushCFIBuilder(MBB, PossiblePush,
+      RISCVCFIInstBuilder PushCFIBuilder(MBB, PossiblePush,
                                     MachineInstr::FrameSetup);
       PushCFIBuilder.buildDefCFAOffset(QCIInterruptPushAmount);
       for (const CalleeSavedInfo &CS : getQCISavedInfo(MF, CSI))
@@ -1242,7 +1273,7 @@ void RISCVFrameLowering::deallocateStack(MachineFunction &MF,
   StackSize = 0;
 
   if (needsDwarfCFI(MF))
-    CFIInstBuilder(MBB, MBBI, MachineInstr::FrameDestroy)
+    RISCVCFIInstBuilder(MBB, MBBI, MachineInstr::FrameDestroy)
         .buildDefCFAOffset(CFAOffset);
 }
 
@@ -1275,6 +1306,24 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
       --MBBI;
   }
 
+  int64_t ArgumentPopSize = RVFI->getArgumentStackToRestore();
+  auto TailReturn = MBB.getFirstTerminator();
+  if (TailReturn != MBB.end()) {
+    unsigned TailOpcode = 0;
+    switch (TailReturn->getOpcode()) {
+    case RISCV::PseudoTCRETURN: TailOpcode = RISCV::PseudoTAIL; break;
+    case RISCV::PseudoTCRETURNIndirect:
+      TailOpcode = RISCV::PseudoTAILIndirect; break;
+    case RISCV::PseudoTCRETURNIndirectX7:
+      TailOpcode = RISCV::PseudoTAILIndirectX7; break;
+    }
+    if (TailOpcode) {
+      ArgumentPopSize = TailReturn->getOperand(1).getImm();
+      TailReturn->removeOperand(1);
+      TailReturn->setDesc(STI.getInstrInfo()->get(TailOpcode));
+    }
+  }
+
   const auto &CSI = MFI.getCalleeSavedInfo();
 
   // Skip to before the restores of scalar callee-saved registers
@@ -1282,7 +1331,7 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
   // callee-saved register.
   auto FirstScalarCSRRestoreInsn =
       std::next(MBBI, getRVVCalleeSavedInfo(MF, CSI).size());
-  CFIInstBuilder CFIBuilder(MBB, FirstScalarCSRRestoreInsn,
+  RISCVCFIInstBuilder CFIBuilder(MBB, FirstScalarCSRRestoreInsn,
                             MachineInstr::FrameDestroy);
   bool NeedsDwarfCFI = needsDwarfCFI(MF);
 
@@ -1422,9 +1471,25 @@ void RISCVFrameLowering::emitEpilogue(MachineFunction &MF,
   // Deallocate stack if StackSize isn't a zero yet. If this is a QCI interrupt
   // function, there will be a leftover offset which is deallocated by
   // `QC.C.MILEAVERET`, otherwise getQCIInterruptStackSize() will be 0.
-  if (StackSize != 0)
+  if (ArgumentPopSize) {
+    assert(!RVFI->getReservedSpillsSize() &&
+           "TailCC argument pop cannot use opaque spill frames");
+    // All scalar/vector restores are complete. Combine the final frame
+    // deallocation with the signed argument-area delta: a growing tail can
+    // retain its outgoing area without an add-SP/sub-SP pair. Large split
+    // frames can legitimately leave a negative final adjustment here.
+    int64_t FinalAdjustment = int64_t(StackSize) + ArgumentPopSize;
+    RI->adjustReg(MBB, MBBI, DL, SPReg, SPReg,
+                  StackOffset::getFixed(FinalAdjustment),
+                  MachineInstr::FrameDestroy, getStackAlign());
+    StackSize = 0;
+    if (NeedsDwarfCFI)
+      RISCVCFIInstBuilder(MBB, MBBI, MachineInstr::FrameDestroy)
+          .buildDefCFAOffset(-ArgumentPopSize);
+  } else if (StackSize != 0) {
     deallocateStack(MF, MBB, MBBI, DL, StackSize,
                     RVFI->getQCIInterruptStackSize());
+  }
 
   // Emit epilogue for shadow call stack.
   emitSCSEpilogue(MF, MBB, MBBI, DL);
@@ -2081,7 +2146,8 @@ void RISCVFrameLowering::processFunctionBeforeFrameFinalized(
 // by the frame pointer.
 // Let eliminateCallFramePseudoInstr preserve stack space for it.
 bool RISCVFrameLowering::hasReservedCallFrame(const MachineFunction &MF) const {
-  return !MF.getFrameInfo().hasVarSizedObjects() &&
+  return !MF.getInfo<RISCVMachineFunctionInfo>()->hasTailCCStackCall() &&
+         !MF.getFrameInfo().hasVarSizedObjects() &&
          !(hasFP(MF) && hasRVVFrameObject(MF));
 }
 
@@ -2090,6 +2156,8 @@ MachineBasicBlock::iterator RISCVFrameLowering::eliminateCallFramePseudoInstr(
     MachineFunction &MF, MachineBasicBlock &MBB,
     MachineBasicBlock::iterator MI) const {
   DebugLoc DL = MI->getDebugLoc();
+  bool IsDestroy = MI->getOpcode() == RISCV::ADJCALLSTACKUP;
+  int64_t CalleePopAmount = IsDestroy ? MI->getOperand(1).getImm() : 0;
 
   if (!hasReservedCallFrame(MF)) {
     // If space has not been reserved for a call frame, ADJCALLSTACKDOWN and
@@ -2097,13 +2165,15 @@ MachineBasicBlock::iterator RISCVFrameLowering::eliminateCallFramePseudoInstr(
     // pointer. This is necessary when there is a variable length stack
     // allocation (e.g. alloca), which means it's not possible to allocate
     // space for outgoing arguments from within the function prologue.
-    int64_t Amount = MI->getOperand(0).getImm();
+    int64_t Amount = alignSPAdjust(MI->getOperand(0).getImm());
+    if (IsDestroy)
+      Amount -= CalleePopAmount;
 
     if (Amount != 0) {
       // Ensure the stack remains aligned after adjustment.
       Amount = alignSPAdjust(Amount);
 
-      if (MI->getOpcode() == RISCV::ADJCALLSTACKDOWN)
+      if (!IsDestroy)
         Amount = -Amount;
 
       const RISCVTargetLowering *TLI =
@@ -2128,6 +2198,8 @@ MachineBasicBlock::iterator RISCVFrameLowering::eliminateCallFramePseudoInstr(
     }
   }
 
+  assert((!CalleePopAmount || !hasReservedCallFrame(MF)) &&
+         "TailCC stack calls must use dynamic call frames");
   return MBB.erase(MI);
 }
 
@@ -2431,7 +2503,8 @@ void RISCVFrameLowering::emitCalleeSavedRVVPrologCFI(
   if (RVVCSI.empty())
     return;
 
-  uint64_t FixedSize = getStackSizeWithRVVPadding(*MF);
+  uint64_t FixedSize = getStackSizeWithRVVPadding(*MF) +
+                       RVFI->getArgumentStackToRestore();
   if (!HasFP) {
     uint64_t ScalarLocalVarSize =
         MFI.getStackSize() - RVFI->getCalleeSavedStackSize() -
@@ -2439,7 +2512,7 @@ void RISCVFrameLowering::emitCalleeSavedRVVPrologCFI(
     FixedSize -= ScalarLocalVarSize;
   }
 
-  CFIInstBuilder CFIBuilder(MBB, MI, MachineInstr::FrameSetup);
+  RISCVCFIInstBuilder CFIBuilder(MBB, MI, MachineInstr::FrameSetup);
   for (auto &CS : RVVCSI) {
     // Insert the spill to the stack frame.
     int FI = CS.getFrameIdx();
@@ -2459,7 +2532,7 @@ void RISCVFrameLowering::emitCalleeSavedRVVEpilogCFI(
   const MachineFrameInfo &MFI = MF->getFrameInfo();
   const RISCVRegisterInfo &TRI = *STI.getRegisterInfo();
 
-  CFIInstBuilder CFIHelper(MBB, MI, MachineInstr::FrameDestroy);
+  RISCVCFIInstBuilder CFIHelper(MBB, MI, MachineInstr::FrameDestroy);
   const auto &RVVCSI = getRVVCalleeSavedInfo(*MF, MFI.getCalleeSavedInfo());
   for (auto &CS : RVVCSI) {
     MCRegister BaseReg = getRVVBaseRegister(TRI, CS.getReg());
@@ -2551,6 +2624,13 @@ bool RISCVFrameLowering::restoreCalleeSavedRegisters(
 }
 
 bool RISCVFrameLowering::enableShrinkWrapping(const MachineFunction &MF) const {
+  // TailCC argument ownership changes at each actual return/tail transfer.
+  // Moving an epilogue to a common predecessor could pop an argument area
+  // before a different-arity tail, or leave TC_RETURN's delta unconsumed.
+  // Its biased initial CFA must also cover every entry path.
+  if (MF.getFunction().getCallingConv() == CallingConv::Tail)
+    return false;
+
   // Keep the conventional code flow when not optimizing.
   if (MF.getFunction().hasOptNone())
     return false;

@@ -1,0 +1,1070 @@
+{
+  "source_only": true,
+  "native_executed": false,
+  "all_FE67_on_selected_memory32_and_memory64": true,
+  "assert_return_count": 263,
+  "assert_invalid_count": 8,
+  "memory_pages_each": 1,
+  "wait_timeout_ns": 0,
+  "independent_integer_bit_oracle": [
+    {
+      "address": "i32",
+      "variant": 0,
+      "operation": "load",
+      "returned_bits": 2289526357,
+      "new_bits": 2289526357,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 0,
+      "operation": "store",
+      "returned_bits": 2289526357,
+      "new_bits": 2289526357,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 0,
+      "operation": "add",
+      "returned_bits": 4294967294,
+      "new_bits": 1,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 0,
+      "operation": "sub",
+      "returned_bits": 4294967294,
+      "new_bits": 4294967291,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 0,
+      "operation": "and",
+      "returned_bits": 4294967294,
+      "new_bits": 2,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 0,
+      "operation": "or",
+      "returned_bits": 4294967294,
+      "new_bits": 4294967295,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 0,
+      "operation": "xor",
+      "returned_bits": 4294967294,
+      "new_bits": 4294967293,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 0,
+      "operation": "xchg",
+      "returned_bits": 4294967294,
+      "new_bits": 3,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 0,
+      "operation": "cmpxchg",
+      "returned_bits": 4294967294,
+      "new_bits": 3,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 1,
+      "operation": "load",
+      "returned_bits": 9833440827789222417,
+      "new_bits": 9833440827789222417,
+      "width": 8
+    },
+    {
+      "address": "i32",
+      "variant": 1,
+      "operation": "store",
+      "returned_bits": 9833440827789222417,
+      "new_bits": 9833440827789222417,
+      "width": 8
+    },
+    {
+      "address": "i32",
+      "variant": 1,
+      "operation": "add",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 1,
+      "width": 8
+    },
+    {
+      "address": "i32",
+      "variant": 1,
+      "operation": "sub",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 18446744073709551611,
+      "width": 8
+    },
+    {
+      "address": "i32",
+      "variant": 1,
+      "operation": "and",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 2,
+      "width": 8
+    },
+    {
+      "address": "i32",
+      "variant": 1,
+      "operation": "or",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 18446744073709551615,
+      "width": 8
+    },
+    {
+      "address": "i32",
+      "variant": 1,
+      "operation": "xor",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 18446744073709551613,
+      "width": 8
+    },
+    {
+      "address": "i32",
+      "variant": 1,
+      "operation": "xchg",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 3,
+      "width": 8
+    },
+    {
+      "address": "i32",
+      "variant": 1,
+      "operation": "cmpxchg",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 3,
+      "width": 8
+    },
+    {
+      "address": "i32",
+      "variant": 2,
+      "operation": "load",
+      "returned_bits": 85,
+      "new_bits": 85,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 2,
+      "operation": "store",
+      "returned_bits": 85,
+      "new_bits": 85,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 2,
+      "operation": "add",
+      "returned_bits": 254,
+      "new_bits": 1,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 2,
+      "operation": "sub",
+      "returned_bits": 254,
+      "new_bits": 251,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 2,
+      "operation": "and",
+      "returned_bits": 254,
+      "new_bits": 2,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 2,
+      "operation": "or",
+      "returned_bits": 254,
+      "new_bits": 255,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 2,
+      "operation": "xor",
+      "returned_bits": 254,
+      "new_bits": 253,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 2,
+      "operation": "xchg",
+      "returned_bits": 254,
+      "new_bits": 3,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 2,
+      "operation": "cmpxchg",
+      "returned_bits": 254,
+      "new_bits": 3,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 3,
+      "operation": "load",
+      "returned_bits": 26197,
+      "new_bits": 26197,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 3,
+      "operation": "store",
+      "returned_bits": 26197,
+      "new_bits": 26197,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 3,
+      "operation": "add",
+      "returned_bits": 65534,
+      "new_bits": 1,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 3,
+      "operation": "sub",
+      "returned_bits": 65534,
+      "new_bits": 65531,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 3,
+      "operation": "and",
+      "returned_bits": 65534,
+      "new_bits": 2,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 3,
+      "operation": "or",
+      "returned_bits": 65534,
+      "new_bits": 65535,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 3,
+      "operation": "xor",
+      "returned_bits": 65534,
+      "new_bits": 65533,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 3,
+      "operation": "xchg",
+      "returned_bits": 65534,
+      "new_bits": 3,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 3,
+      "operation": "cmpxchg",
+      "returned_bits": 65534,
+      "new_bits": 3,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 4,
+      "operation": "load",
+      "returned_bits": 17,
+      "new_bits": 17,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 4,
+      "operation": "store",
+      "returned_bits": 17,
+      "new_bits": 17,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 4,
+      "operation": "add",
+      "returned_bits": 254,
+      "new_bits": 1,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 4,
+      "operation": "sub",
+      "returned_bits": 254,
+      "new_bits": 251,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 4,
+      "operation": "and",
+      "returned_bits": 254,
+      "new_bits": 2,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 4,
+      "operation": "or",
+      "returned_bits": 254,
+      "new_bits": 255,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 4,
+      "operation": "xor",
+      "returned_bits": 254,
+      "new_bits": 253,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 4,
+      "operation": "xchg",
+      "returned_bits": 254,
+      "new_bits": 3,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 4,
+      "operation": "cmpxchg",
+      "returned_bits": 254,
+      "new_bits": 3,
+      "width": 1
+    },
+    {
+      "address": "i32",
+      "variant": 5,
+      "operation": "load",
+      "returned_bits": 8721,
+      "new_bits": 8721,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 5,
+      "operation": "store",
+      "returned_bits": 8721,
+      "new_bits": 8721,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 5,
+      "operation": "add",
+      "returned_bits": 65534,
+      "new_bits": 1,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 5,
+      "operation": "sub",
+      "returned_bits": 65534,
+      "new_bits": 65531,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 5,
+      "operation": "and",
+      "returned_bits": 65534,
+      "new_bits": 2,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 5,
+      "operation": "or",
+      "returned_bits": 65534,
+      "new_bits": 65535,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 5,
+      "operation": "xor",
+      "returned_bits": 65534,
+      "new_bits": 65533,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 5,
+      "operation": "xchg",
+      "returned_bits": 65534,
+      "new_bits": 3,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 5,
+      "operation": "cmpxchg",
+      "returned_bits": 65534,
+      "new_bits": 3,
+      "width": 2
+    },
+    {
+      "address": "i32",
+      "variant": 6,
+      "operation": "load",
+      "returned_bits": 1144201745,
+      "new_bits": 1144201745,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 6,
+      "operation": "store",
+      "returned_bits": 1144201745,
+      "new_bits": 1144201745,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 6,
+      "operation": "add",
+      "returned_bits": 4294967294,
+      "new_bits": 1,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 6,
+      "operation": "sub",
+      "returned_bits": 4294967294,
+      "new_bits": 4294967291,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 6,
+      "operation": "and",
+      "returned_bits": 4294967294,
+      "new_bits": 2,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 6,
+      "operation": "or",
+      "returned_bits": 4294967294,
+      "new_bits": 4294967295,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 6,
+      "operation": "xor",
+      "returned_bits": 4294967294,
+      "new_bits": 4294967293,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 6,
+      "operation": "xchg",
+      "returned_bits": 4294967294,
+      "new_bits": 3,
+      "width": 4
+    },
+    {
+      "address": "i32",
+      "variant": 6,
+      "operation": "cmpxchg",
+      "returned_bits": 4294967294,
+      "new_bits": 3,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 0,
+      "operation": "load",
+      "returned_bits": 2289526357,
+      "new_bits": 2289526357,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 0,
+      "operation": "store",
+      "returned_bits": 2289526357,
+      "new_bits": 2289526357,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 0,
+      "operation": "add",
+      "returned_bits": 4294967294,
+      "new_bits": 1,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 0,
+      "operation": "sub",
+      "returned_bits": 4294967294,
+      "new_bits": 4294967291,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 0,
+      "operation": "and",
+      "returned_bits": 4294967294,
+      "new_bits": 2,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 0,
+      "operation": "or",
+      "returned_bits": 4294967294,
+      "new_bits": 4294967295,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 0,
+      "operation": "xor",
+      "returned_bits": 4294967294,
+      "new_bits": 4294967293,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 0,
+      "operation": "xchg",
+      "returned_bits": 4294967294,
+      "new_bits": 3,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 0,
+      "operation": "cmpxchg",
+      "returned_bits": 4294967294,
+      "new_bits": 3,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 1,
+      "operation": "load",
+      "returned_bits": 9833440827789222417,
+      "new_bits": 9833440827789222417,
+      "width": 8
+    },
+    {
+      "address": "i64",
+      "variant": 1,
+      "operation": "store",
+      "returned_bits": 9833440827789222417,
+      "new_bits": 9833440827789222417,
+      "width": 8
+    },
+    {
+      "address": "i64",
+      "variant": 1,
+      "operation": "add",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 1,
+      "width": 8
+    },
+    {
+      "address": "i64",
+      "variant": 1,
+      "operation": "sub",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 18446744073709551611,
+      "width": 8
+    },
+    {
+      "address": "i64",
+      "variant": 1,
+      "operation": "and",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 2,
+      "width": 8
+    },
+    {
+      "address": "i64",
+      "variant": 1,
+      "operation": "or",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 18446744073709551615,
+      "width": 8
+    },
+    {
+      "address": "i64",
+      "variant": 1,
+      "operation": "xor",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 18446744073709551613,
+      "width": 8
+    },
+    {
+      "address": "i64",
+      "variant": 1,
+      "operation": "xchg",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 3,
+      "width": 8
+    },
+    {
+      "address": "i64",
+      "variant": 1,
+      "operation": "cmpxchg",
+      "returned_bits": 18446744073709551614,
+      "new_bits": 3,
+      "width": 8
+    },
+    {
+      "address": "i64",
+      "variant": 2,
+      "operation": "load",
+      "returned_bits": 85,
+      "new_bits": 85,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 2,
+      "operation": "store",
+      "returned_bits": 85,
+      "new_bits": 85,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 2,
+      "operation": "add",
+      "returned_bits": 254,
+      "new_bits": 1,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 2,
+      "operation": "sub",
+      "returned_bits": 254,
+      "new_bits": 251,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 2,
+      "operation": "and",
+      "returned_bits": 254,
+      "new_bits": 2,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 2,
+      "operation": "or",
+      "returned_bits": 254,
+      "new_bits": 255,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 2,
+      "operation": "xor",
+      "returned_bits": 254,
+      "new_bits": 253,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 2,
+      "operation": "xchg",
+      "returned_bits": 254,
+      "new_bits": 3,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 2,
+      "operation": "cmpxchg",
+      "returned_bits": 254,
+      "new_bits": 3,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 3,
+      "operation": "load",
+      "returned_bits": 26197,
+      "new_bits": 26197,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 3,
+      "operation": "store",
+      "returned_bits": 26197,
+      "new_bits": 26197,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 3,
+      "operation": "add",
+      "returned_bits": 65534,
+      "new_bits": 1,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 3,
+      "operation": "sub",
+      "returned_bits": 65534,
+      "new_bits": 65531,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 3,
+      "operation": "and",
+      "returned_bits": 65534,
+      "new_bits": 2,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 3,
+      "operation": "or",
+      "returned_bits": 65534,
+      "new_bits": 65535,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 3,
+      "operation": "xor",
+      "returned_bits": 65534,
+      "new_bits": 65533,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 3,
+      "operation": "xchg",
+      "returned_bits": 65534,
+      "new_bits": 3,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 3,
+      "operation": "cmpxchg",
+      "returned_bits": 65534,
+      "new_bits": 3,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 4,
+      "operation": "load",
+      "returned_bits": 17,
+      "new_bits": 17,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 4,
+      "operation": "store",
+      "returned_bits": 17,
+      "new_bits": 17,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 4,
+      "operation": "add",
+      "returned_bits": 254,
+      "new_bits": 1,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 4,
+      "operation": "sub",
+      "returned_bits": 254,
+      "new_bits": 251,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 4,
+      "operation": "and",
+      "returned_bits": 254,
+      "new_bits": 2,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 4,
+      "operation": "or",
+      "returned_bits": 254,
+      "new_bits": 255,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 4,
+      "operation": "xor",
+      "returned_bits": 254,
+      "new_bits": 253,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 4,
+      "operation": "xchg",
+      "returned_bits": 254,
+      "new_bits": 3,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 4,
+      "operation": "cmpxchg",
+      "returned_bits": 254,
+      "new_bits": 3,
+      "width": 1
+    },
+    {
+      "address": "i64",
+      "variant": 5,
+      "operation": "load",
+      "returned_bits": 8721,
+      "new_bits": 8721,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 5,
+      "operation": "store",
+      "returned_bits": 8721,
+      "new_bits": 8721,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 5,
+      "operation": "add",
+      "returned_bits": 65534,
+      "new_bits": 1,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 5,
+      "operation": "sub",
+      "returned_bits": 65534,
+      "new_bits": 65531,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 5,
+      "operation": "and",
+      "returned_bits": 65534,
+      "new_bits": 2,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 5,
+      "operation": "or",
+      "returned_bits": 65534,
+      "new_bits": 65535,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 5,
+      "operation": "xor",
+      "returned_bits": 65534,
+      "new_bits": 65533,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 5,
+      "operation": "xchg",
+      "returned_bits": 65534,
+      "new_bits": 3,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 5,
+      "operation": "cmpxchg",
+      "returned_bits": 65534,
+      "new_bits": 3,
+      "width": 2
+    },
+    {
+      "address": "i64",
+      "variant": 6,
+      "operation": "load",
+      "returned_bits": 1144201745,
+      "new_bits": 1144201745,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 6,
+      "operation": "store",
+      "returned_bits": 1144201745,
+      "new_bits": 1144201745,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 6,
+      "operation": "add",
+      "returned_bits": 4294967294,
+      "new_bits": 1,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 6,
+      "operation": "sub",
+      "returned_bits": 4294967294,
+      "new_bits": 4294967291,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 6,
+      "operation": "and",
+      "returned_bits": 4294967294,
+      "new_bits": 2,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 6,
+      "operation": "or",
+      "returned_bits": 4294967294,
+      "new_bits": 4294967295,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 6,
+      "operation": "xor",
+      "returned_bits": 4294967294,
+      "new_bits": 4294967293,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 6,
+      "operation": "xchg",
+      "returned_bits": 4294967294,
+      "new_bits": 3,
+      "width": 4
+    },
+    {
+      "address": "i64",
+      "variant": 6,
+      "operation": "cmpxchg",
+      "returned_bits": 4294967294,
+      "new_bits": 3,
+      "width": 4
+    }
+  ],
+  "malformed_binary": [
+    {
+      "path": "atomic_fence_reserved.wasm",
+      "size": 34,
+      "sha256": "894a716e90628df7fe00a4a058ee660bc86724ffca999c022425f67bdb378fca",
+      "reason": "fence reserved literal must be zero",
+      "expected": "invalid"
+    },
+    {
+      "path": "atomic_unknown_subopcode.wasm",
+      "size": 33,
+      "sha256": "76ea8433028b36b9521afe1559c2bd3b56af3b5e7401fad54f27789ef3668d4a",
+      "reason": "FE reserved opcode",
+      "expected": "invalid"
+    },
+    {
+      "path": "atomic_alignment_under.wasm",
+      "size": 35,
+      "sha256": "e54198b78f95709f8e1f8ed42873c0f8c8e5a2232c9ef01204997c2f5cf16360",
+      "reason": "alignment must equal natural 4 bytes",
+      "expected": "invalid"
+    },
+    {
+      "path": "atomic_alignment_over.wasm",
+      "size": 35,
+      "sha256": "8d497d065392a6369e4a424c90e86f8f07f80e512de48f3ad9ed654a43601b60",
+      "reason": "alignment must equal natural 4 bytes",
+      "expected": "invalid"
+    },
+    {
+      "path": "atomic_bad_memory_index.wasm",
+      "size": 36,
+      "sha256": "833b48fafabd7318ea562502d3c2e47b7aaec5b9455d0ecd05bcb77afd5ff29a",
+      "reason": "memory1 unavailable",
+      "expected": "invalid"
+    },
+    {
+      "path": "atomic_u64_offset_overflow.wasm",
+      "size": 44,
+      "sha256": "af40e9b18dbde7bcb36e662e245228acb95b40c73d98ec9927cef0f91ee17471",
+      "reason": "offset exceeds u64",
+      "expected": "invalid"
+    }
+  ],
+  "unused_invalid32": "original function31 has wrong memory64 address width; reject even if never called",
+  "required_features": [
+    "threads",
+    "memory64",
+    "multi-memory"
+  ],
+  "actual_tool_product_qualification_pending": true
+}

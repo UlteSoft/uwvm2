@@ -1,0 +1,1 @@
+(module (type $t (func (result i32))) (type $a (array (ref null $t))) (func $f (type $t) i32.const 42) (func $g (type $t) i32.const 43) (elem func $f $g) (func (export "_start") i32.const 0 i32.const 2 array.new_elem $a 0 array.len i32.const 2 i32.ne if unreachable end i32.const 2 i32.const 0 array.new_elem $a 0 array.len i32.const 0 i32.ne if unreachable end))

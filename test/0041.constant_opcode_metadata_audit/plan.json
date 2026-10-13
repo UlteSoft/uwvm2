@@ -1,0 +1,172 @@
+{
+  "schema": "uwvm-core3-constant-opcode-native-plan-r1",
+  "source_only": true,
+  "native_oracle_results": null,
+  "official_core3_url": "https://webassembly.github.io/spec/core/valid/instructions.html#constant-expressions",
+  "official_oracle_steps": [
+    "actual pinned wasm-tools version/help and SHA record",
+    "parse each WAT to owned actual WASM",
+    "validate each generated WASM with all Core3 features enabled",
+    "record emitted D0 heap/FB conversion/SIMD prefix from official tool dump, not infer physical encoding from WAT text"
+  ],
+  "controls": [
+    [
+      "gc",
+      "reject",
+      1,
+      "global",
+      251,
+      "gc_erased.wat"
+    ],
+    [
+      "reference-types",
+      "reject",
+      8,
+      "table",
+      208,
+      "explicit_table_ref_null.wat"
+    ],
+    [
+      "function-references",
+      "reject",
+      12,
+      "table",
+      208,
+      "indexed_ref_null.wat"
+    ],
+    [
+      "gc",
+      "reject",
+      9,
+      "global",
+      208,
+      "gc_null_erased.wat"
+    ],
+    [
+      "simd",
+      "reject",
+      16,
+      "global",
+      123,
+      "simd_global.wat"
+    ],
+    [
+      "exceptions",
+      "reject",
+      10,
+      "global",
+      105,
+      "exn_null.wat"
+    ],
+    [
+      "gc",
+      "accept",
+      0,
+      "global",
+      0,
+      "empty.wat"
+    ],
+    [
+      "gc",
+      "accept",
+      0,
+      "global",
+      0,
+      "mvp_numeric.wat"
+    ],
+    [
+      "reference-types",
+      "accept",
+      0,
+      "global",
+      0,
+      "mvp_implicit_table.wat"
+    ],
+    [
+      "function-references",
+      "accept",
+      1,
+      "global",
+      0,
+      "numeric_packed_struct.wat"
+    ],
+    [
+      "function-references",
+      "accept",
+      1,
+      "global",
+      0,
+      "numeric_packed_array.wat"
+    ],
+    [
+      "reference-types",
+      "reject",
+      0,
+      "global",
+      112,
+      "explicit_table_imported_global.wat"
+    ],
+    [
+      "function-references",
+      "accept",
+      8,
+      "global",
+      0,
+      "explicit_table_ref_func.wat"
+    ],
+    [
+      "reference-types",
+      "reject",
+      8,
+      "table",
+      210,
+      "explicit_table_ref_func.wat"
+    ]
+  ],
+  "first_short_controls": [
+    [
+      "gc",
+      "reject",
+      1,
+      "global",
+      251,
+      "gc_erased.wat"
+    ],
+    [
+      "reference-types",
+      "reject",
+      8,
+      "table",
+      208,
+      "explicit_table_ref_null.wat"
+    ],
+    [
+      "function-references",
+      "reject",
+      12,
+      "table",
+      208,
+      "indexed_ref_null.wat"
+    ]
+  ],
+  "actual_provider_module_name": "stage6_provider",
+  "observations_per_control_tuple": {
+    "Ord_combined": 18,
+    "ROS_combined": 14,
+    "Ord_int_only": 8,
+    "ROS_int_only": 6
+  },
+  "role_contract": "Two FIRST pure parsed-module observations before any instance/provider effects, then all-enabled real parse/init plus independently stricter policy through each true module/validation/full/lazy/convenience entrance. No local consumer body exists; imported ref.func provider control is genuinely linked, never invoked. All observations qualify admission only, not guest execution or LLVM codegen.",
+  "metadata_mask": {
+    "gc": 1,
+    "exceptions": 2,
+    "function_references": 4,
+    "reference_types": 8,
+    "simd": 16
+  },
+  "before_contract": "Same CC supports absence of new metadata; actual public strict admission should reject first three. BEFORE acceptance is a normative mismatch, never a pass.",
+  "profile_contract": "Combined mode requires llvm_roles_enabled=1 and every LLVM role line. Int-only cannot qualify LLVM. Provider-prefixed runs must receive the real provider file; no fake import/source.",
+  "fresh_layout": "Stage6 AFTER needs fresh matching headers/BMI/runtime main+host and actual profile TUs. Immutable old runtime with new headers forbidden.",
+  "old_frozen_fixture_preserved": "0038 Stage5 source unchanged",
+  "CLI_tuple": "[--provider provider.wasm] (feature accept|reject opcode_mask diagnostic_site diagnostic_value file.wasm)..."
+}

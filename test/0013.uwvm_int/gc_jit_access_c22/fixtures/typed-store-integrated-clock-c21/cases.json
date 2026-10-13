@@ -1,0 +1,69 @@
+{
+  "cases": [
+    {
+      "name": "i8-write",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/i8-write.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/i8-write.wasm",
+      "wasm_sha": "4648feb045a070dfadf8e60a339da780a5b2439e0770125335f795cc133d6ac8",
+      "reps": 32,
+      "samples": 5
+    },
+    {
+      "name": "i8-write-read",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/i8-write-read.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/i8-write-read.wasm",
+      "wasm_sha": "f1324d0f269db4dbd478c4c6b20877dc303f4f14ef49d788185f37761ae3f112",
+      "reps": 32,
+      "samples": 5
+    },
+    {
+      "name": "i16-write",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/i16-write.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/i16-write.wasm",
+      "wasm_sha": "f954992f98cffbf2d8bb8a5592a11bd697343d44b8ac2b91c2bbb9812c85ea91",
+      "reps": 32,
+      "samples": 5
+    },
+    {
+      "name": "i16-write-read",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/i16-write-read.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/i16-write-read.wasm",
+      "wasm_sha": "5627a2c7e27887bb2dc419d45646e49a8c9849849c82f4ac60c49f41ef2a9e08",
+      "reps": 32,
+      "samples": 5
+    },
+    {
+      "name": "i32-write",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/i32-write.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/i32-write.wasm",
+      "wasm_sha": "00bec53ee12b850568e5f3f23eadbd57f6222a0ce456e7e44bd1028e4702c277",
+      "reps": 32,
+      "samples": 5
+    },
+    {
+      "name": "i32-write-read",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/i32-write-read.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/i32-write-read.wasm",
+      "wasm_sha": "e3a11b213e4a6b9f2b71b6949bbd5e6e82959110dbf0db1b30847808c4227f86",
+      "reps": 32,
+      "samples": 5
+    },
+    {
+      "name": "f32-write",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/f32-write.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/f32-write.wasm",
+      "wasm_sha": "58631b83e60db597187207a8b8df1835f9acaf5f7056353a77bc1d0b9cb39583",
+      "reps": 32,
+      "samples": 5
+    },
+    {
+      "name": "f32-write-read",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/f32-write-read.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-integrated-clock-c21/f32-write-read.wasm",
+      "wasm_sha": "fd62294aedff93bd906abd6555c2f4d1b89987003e0ecf0e2a4b7a0271f94bdf",
+      "reps": 32,
+      "samples": 5
+    }
+  ],
+  "scope": "Production normal CLI: guest WASI clock_time_get(MONOTONIC) deltas around32calls to identical work fixture. Two warm batches excluded,5samples hex ns. JIT andWASI fdwrite output excluded; clocks/importtransition overhead included. No private native benchmark driver."
+}

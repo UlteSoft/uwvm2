@@ -25393,6 +25393,7 @@ SDValue RISCVTargetLowering::LowerFormalArguments(
     reportFatalUsageError("Unsupported calling convention");
   case CallingConv::C:
   case CallingConv::Fast:
+  case CallingConv::Tail:
   case CallingConv::PreserveMost:
   case CallingConv::GRAAL:
   case CallingConv::RISCV_VectorCall:
@@ -25481,6 +25482,13 @@ SDValue RISCVTargetLowering::LowerFormalArguments(
   CCState CCInfo(CallConv, IsVarArg, MF, ArgLocs, *DAG.getContext());
 
   CCInfo.AnalyzeFormalArguments(Ins, CC_RISCV);
+  if (CallConv == CallingConv::Tail) {
+    if (IsVarArg)
+      reportFatalUsageError("RISC-V tailcc does not support variadic functions");
+    unsigned StackBytes = alignTo(CCInfo.getStackSize(),
+                                  Subtarget.getFrameLowering()->getStackAlign());
+    MF.getInfo<RISCVMachineFunctionInfo>()->setArgumentStackToRestore(StackBytes);
+  }
 
   for (unsigned i = 0, e = ArgLocs.size(), InsIdx = 0; i != e; ++i, ++InsIdx) {
     CCValAssign &VA = ArgLocs[i];
@@ -25637,6 +25645,11 @@ bool RISCVTargetLowering::isEligibleForTailCallOptimization(
     if (Arg.Flags.isByVal())
       return false;
 
+  // The callee-pop TailCC ABI only tail-transfers to itself. Other calling
+  // conventions have a different ownership contract for stack arguments.
+  if (CalleeCC == CallingConv::Tail || CallerCC == CallingConv::Tail)
+    return CalleeCC == CallerCC && !CLI.IsVarArg;
+
   // musttail bypasses the remaining checks: the checks either reject cases
   // we handle specially (indirect args are forwarded via incoming pointers,
   // stack-passed args reuse the matching incoming layout, sret is forwarded
@@ -25731,6 +25744,24 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
 
   // Get a count of how many bytes are to be pushed on the stack.
   unsigned NumBytes = ArgCCInfo.getStackSize();
+  bool IsTailCC = CallConv == CallingConv::Tail;
+  int64_t TailSPDelta = 0;
+  if (IsTailCC) {
+    if (IsVarArg)
+      reportFatalUsageError("RISC-V tailcc does not support variadic calls");
+    NumBytes = alignTo(NumBytes, Subtarget.getFrameLowering()->getStackAlign());
+    auto *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
+    if (IsTailCall) {
+      TailSPDelta = int64_t(RVFI->getArgumentStackToRestore()) - NumBytes;
+      if (TailSPDelta < 0)
+        // Reserve the growing tail argument area before any callee-saved
+        // spills are laid out. PEI allocates ordinary frame objects below all
+        // negative fixed objects, so outgoing arguments cannot clobber them.
+        MF.getFrameInfo().CreateFixedObject(-TailSPDelta, TailSPDelta, false);
+    } else if (NumBytes) {
+      RVFI->setHasTailCCStackCall();
+    }
+  }
 
   // Create local copies for byval args
   SmallVector<SDValue, 8> ByValArgs;
@@ -25757,11 +25788,38 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
 
   if (!IsTailCall)
     Chain = DAG.getCALLSEQ_START(Chain, NumBytes, 0, CLI.DL);
+  else
+    // A tail call writes into the incoming argument area. Finish reading all
+    // incoming stack arguments before any potentially overlapping outgoing
+    // store; independent data dependencies alone do not protect permutations.
+    Chain = DAG.getStackArgumentTokenFactor(Chain);
 
   // Copy argument values to their designated locations.
   SmallVector<std::pair<Register, SDValue>, 8> RegsToPass;
   SmallVector<SDValue, 8> MemOpChains;
   SDValue StackPtr;
+  auto StoreStackArgument = [&](SDValue Value, int64_t Offset) {
+    if (IsTailCall) {
+      // Tail-call arguments must be relative to the incoming SP. The current
+      // SP still includes this function's frame: storing there can overwrite
+      // callee-saved spills and leaves the actual incoming argument unchanged
+      // after the epilogue restores SP. Fixed objects retain the incoming-SP
+      // coordinate system through frame-index elimination.
+      int FI = MF.getFrameInfo().CreateFixedObject(
+          Value.getValueType().getStoreSize().getFixedValue(),
+          Offset + TailSPDelta,
+          /*IsImmutable=*/false);
+      SDValue Address = DAG.getFrameIndex(FI, PtrVT);
+      return DAG.getStore(Chain, DL, Value, Address,
+                          MachinePointerInfo::getFixedStack(MF, FI));
+    }
+    if (!StackPtr.getNode())
+      StackPtr = DAG.getCopyFromReg(Chain, DL, RISCV::X2, PtrVT);
+    SDValue Address = DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
+                                  DAG.getIntPtrConstant(Offset, DL));
+    return DAG.getStore(Chain, DL, Value, Address,
+                        MachinePointerInfo::getStack(MF, Offset));
+  };
   for (unsigned i = 0, j = 0, e = ArgLocs.size(), OutIdx = 0; i != e;
        ++i, ++OutIdx) {
     CCValAssign &VA = ArgLocs[i];
@@ -25789,15 +25847,7 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
 
       if (HiVA.isMemLoc()) {
         // Second half of f64 is passed on the stack.
-        if (!StackPtr.getNode())
-          StackPtr = DAG.getCopyFromReg(Chain, DL, RISCV::X2, PtrVT);
-        SDValue Address =
-            DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
-                        DAG.getIntPtrConstant(HiVA.getLocMemOffset(), DL));
-        // Emit the store.
-        MemOpChains.push_back(DAG.getStore(
-            Chain, DL, Hi, Address,
-            MachinePointerInfo::getStack(MF, HiVA.getLocMemOffset())));
+        MemOpChains.push_back(StoreStackArgument(Hi, HiVA.getLocMemOffset()));
       } else {
         // Second half of f64 is passed in another GPR.
         Register RegHigh = HiVA.getLocReg();
@@ -25826,15 +25876,7 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
 
       if (HiVA.isMemLoc()) {
         // Second half of vector is passed on the stack.
-        if (!StackPtr.getNode())
-          StackPtr = DAG.getCopyFromReg(Chain, DL, RISCV::X2, PtrVT);
-        SDValue Address =
-            DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
-                        DAG.getIntPtrConstant(HiVA.getLocMemOffset(), DL));
-        // Emit the store.
-        MemOpChains.push_back(DAG.getStore(
-            Chain, DL, Hi, Address,
-            MachinePointerInfo::getStack(MF, HiVA.getLocMemOffset())));
+        MemOpChains.push_back(StoreStackArgument(Hi, HiVA.getLocMemOffset()));
       } else {
         // Second half of vector is passed in another GPR.
         Register RegHigh = HiVA.getLocReg();
@@ -25849,6 +25891,9 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
       // For musttail calls, reuse incoming indirect pointers instead of
       // creating new stack temporaries. The incoming pointers point to the
       // caller's caller's frame, which remains valid after a tail call.
+      if (IsTailCC)
+        reportFatalUsageError("RISC-V tailcc cannot use indirect argument "
+                              "storage tied to a caller prototype");
       if (IsTailCall && CLI.CB && CLI.CB->isMustTailCall()) {
         RISCVMachineFunctionInfo *RVFI = MF.getInfo<RISCVMachineFunctionInfo>();
         unsigned CallArgIdx = Outs[OutIdx].OrigArgIndex;
@@ -26015,20 +26060,11 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
         CSInfo.ArgRegPairs.emplace_back(VA.getLocReg(), i);
     } else {
       assert(VA.isMemLoc() && "Argument not register or memory");
-      assert((!IsTailCall || (CLI.CB && CLI.CB->isMustTailCall())) &&
+      assert((!IsTailCall || IsTailCC || (CLI.CB && CLI.CB->isMustTailCall())) &&
              "Tail call not allowed if stack is used for passing parameters");
 
-      // Work out the address of the stack slot.
-      if (!StackPtr.getNode())
-        StackPtr = DAG.getCopyFromReg(Chain, DL, RISCV::X2, PtrVT);
-      SDValue Address =
-          DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
-                      DAG.getIntPtrConstant(VA.getLocMemOffset(), DL));
-
-      // Emit the store.
       MemOpChains.push_back(
-          DAG.getStore(Chain, DL, ArgValue, Address,
-                       MachinePointerInfo::getStack(MF, VA.getLocMemOffset())));
+          StoreStackArgument(ArgValue, VA.getLocMemOffset()));
     }
   }
 
@@ -26075,6 +26111,8 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
   SmallVector<SDValue, 8> Ops;
   Ops.push_back(Chain);
   Ops.push_back(Callee);
+  if (IsTailCall && IsTailCC)
+    Ops.push_back(DAG.getTargetConstant(TailSPDelta, DL, XLenVT));
 
   // Add argument registers to the end of the list so that they are
   // known live into the call.
@@ -26114,8 +26152,11 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
 
   if (IsTailCall) {
     MF.getFrameInfo().setHasTailCall();
-    unsigned CallOpc =
-        NeedSWGuarded ? RISCVISD::SW_GUARDED_TAIL : RISCVISD::TAIL;
+    unsigned CallOpc = IsTailCC
+                           ? (NeedSWGuarded ? RISCVISD::SW_GUARDED_TC_RETURN
+                                            : RISCVISD::TC_RETURN)
+                           : (NeedSWGuarded ? RISCVISD::SW_GUARDED_TAIL
+                                            : RISCVISD::TAIL);
     SDValue Ret = DAG.getNode(CallOpc, DL, NodeTys, Ops);
     if (CLI.CFIType)
       Ret.getNode()->setCFIType(CLI.CFIType->getZExtValue());
@@ -26144,7 +26185,7 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
   Glue = Chain.getValue(1);
 
   // Mark the end of the call, which is glued to the call itself.
-  Chain = DAG.getCALLSEQ_END(Chain, NumBytes, 0, Glue, DL);
+  Chain = DAG.getCALLSEQ_END(Chain, NumBytes, IsTailCC ? NumBytes : 0, Glue, DL);
   Glue = Chain.getValue(1);
 
   // Assign locations to each value returned by this call.
@@ -27587,7 +27628,8 @@ RISCVTargetLowering::EmitKCFICheck(MachineBasicBlock &MBB,
                                    const TargetInstrInfo *TII) const {
   assert(MBBI->isCall() && MBBI->getCFIType() &&
          "Invalid call instruction for a KCFI check");
-  assert(is_contained({RISCV::PseudoCALLIndirect, RISCV::PseudoTAILIndirect},
+  assert(is_contained({RISCV::PseudoCALLIndirect, RISCV::PseudoTAILIndirect,
+                       RISCV::PseudoTCRETURNIndirect},
                       MBBI->getOpcode()));
 
   MachineOperand &Target = MBBI->getOperand(0);

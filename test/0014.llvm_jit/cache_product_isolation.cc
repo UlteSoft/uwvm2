@@ -58,9 +58,34 @@ int main(int argc, char** argv)
         return 0;
     }
     if(argc < 4) { return 2; }
-    bool const signed_blob{std::string_view{argv[3]} == "signed"};
+    auto const mode{std::string_view{argv[3]}};
+    bool const signed_blob{mode == "signed" || mode == "native-signed"};
     auto ctx{context(argv[2], signed_blob)};
+    if(mode == "native-signed" || mode == "native-unsigned")
+    {
+        ctx.uwvm_abi = cache::uwvm_runtime_abi_fingerprint();
+        ctx.signature_seed = cache::collect_signature_seed(ctx);
+    }
     bool const old_call_policy{std::string_view{argv[1]} == "policy-v1"};
+    bool const old_table_policy{std::string_view{argv[1]} == "table-layout-v12"};
+    bool const old_memory_policy{std::string_view{argv[1]} == "memory-layout-v13"};
+    bool const old_owner_policy{std::string_view{argv[1]} == "memory-layout-v15"};
+    bool const old_shared_type_policy{std::string_view{argv[1]} == "memory-layout-v16"};
+    bool const old_atomic_bridge_policy{std::string_view{argv[1]} == "memory-layout-v18"};
+    bool const old_wide_table_policy{std::string_view{argv[1]} == "table64-v24"};
+    bool const old_function_interval_policy{std::string_view{argv[1]} == "function-calls-v26"};
+    bool const old_wide_memory_policy{std::string_view{argv[1]} == "memory64-v23"};
+    bool const old_tuple_tail_policy{std::string_view{argv[1]} == "typed-calls-v22"};
+    bool const old_unqualified_tail_policy{std::string_view{argv[1]} == "typed-calls-v21"};
+    bool const old_typed_call_policy{std::string_view{argv[1]} == "typed-calls-v20"};
+    bool const old_atomic_scalar_policy{std::string_view{argv[1]} == "atomic-scalars-v19"};
+    bool const old_ordered_size_policy{std::string_view{argv[1]} == "memory-layout-v17"};
+    bool const old_hot_metadata_policy{std::string_view{argv[1]} == "memory-layout-v14"};
+    if(old_table_policy || old_memory_policy || old_hot_metadata_policy || old_owner_policy || old_shared_type_policy || old_ordered_size_policy || old_atomic_bridge_policy || old_atomic_scalar_policy || old_typed_call_policy || old_unqualified_tail_policy || old_tuple_tail_policy || old_wide_memory_policy || old_wide_table_policy || old_function_interval_policy)
+    {
+        ctx.uwvm_abi = cache::uwvm_runtime_abi_fingerprint();
+        ctx.signature_seed = cache::collect_signature_seed(ctx);
+    }
     if(old_call_policy)
     {
         ctx.uwvm_abi = u8"full-width-noabicalls-c-abi-v2";
@@ -82,13 +107,24 @@ int main(int argc, char** argv)
     if(own.status != cache::cache_status::ok || own.signature_verified != signed_blob ||
        own.object.size() != sizeof(payload) || !std::equal(own.object.cbegin(), own.object.cend(), payload)) { return 4; }
 
-    if(old_call_policy)
+    if(old_call_policy || old_table_policy || old_memory_policy || old_hot_metadata_policy || old_owner_policy || old_shared_type_policy || old_ordered_size_policy || old_atomic_bridge_policy || old_atomic_scalar_policy || old_typed_call_policy || old_unqualified_tail_policy || old_tuple_tail_policy || old_wide_memory_policy || old_wide_table_policy || old_function_interval_policy)
     {
         // Model an embedder that reuses its cache key, source ID and all other
         // context fields. Even a legitimately signed old-policy object must
         // not be replayed after the live probe starts using noabicalls.
         auto previous{ctx};
-        previous.uwvm_abi = u8"full-width-c-abi-v1";
+        if(old_table_policy || old_memory_policy || old_hot_metadata_policy || old_owner_policy || old_shared_type_policy || old_ordered_size_policy || old_atomic_bridge_policy || old_atomic_scalar_policy || old_typed_call_policy || old_unqualified_tail_policy || old_tuple_tail_policy || old_wide_memory_policy || old_wide_table_policy || old_function_interval_policy)
+        {
+            auto old_abi{text(ctx.uwvm_abi)};
+            constexpr std::string_view current{"-runtime-abi-v27"};
+            auto const offset{old_abi.find(current)};
+            if(offset == std::string::npos) { return 15; }
+            auto const previous_version{old_function_interval_policy ? 26 : old_wide_table_policy ? 24 : old_wide_memory_policy ? 23 : old_tuple_tail_policy ? 22 : old_unqualified_tail_policy ? 21 : old_typed_call_policy ? 20 : old_atomic_scalar_policy ? 19 : old_atomic_bridge_policy ? 18 : old_ordered_size_policy ? 17 :
+                old_shared_type_policy ? 16 : old_owner_policy ? 15 : old_hot_metadata_policy ? 14 : old_memory_policy ? 13 : 12};
+            old_abi.replace(offset, current.size(), std::string{"-runtime-abi-v"} + std::to_string(previous_version));
+            previous.uwvm_abi = cache::details::u8string_from_chars(old_abi.data(), old_abi.size());
+        }
+        else { previous.uwvm_abi = u8"full-width-c-abi-v1"; }
         previous.signature_seed = cache::collect_signature_seed(previous);
         auto const previous_path{text(cache::cache_file_path(previous))};
         // Context changes already namespace the filename. Also force the old

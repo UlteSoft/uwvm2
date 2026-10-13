@@ -111,6 +111,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_ALWAYS_INLINE inline constexpr void read_imm(::std::byte const*& ip, T& out) noexcept
         {
             ::std::memcpy(::std::addressof(out), ip, sizeof(out));
+            // [compiler-emitted bytecode slots][successor] | stream end
+            // [complete typed slots                    ] | no guest Wasm read
+            // ^^ ip: read_imm consumes a complete compiler-owned slot; no guest bytecode is read here.
             ip += sizeof(out);
         }
 
@@ -119,6 +122,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             T v;  // no init
             ::std::memcpy(::std::addressof(v), ip, sizeof(v));
+            // [compiler-emitted bytecode slots][successor] | stream end
+            // [complete typed slots                    ] | no guest Wasm read
+            // ^^ ip: read_imm consumes a complete compiler-owned slot; no guest bytecode is read here.
             ip += sizeof(v);
             return v;
         }
@@ -428,6 +434,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::fast_io::fast_terminate();
         }
 
+        // Resolve the diagnostic owner only on the terminating cold path.
+        // The module keeps this native object alive throughout execution;
+        // successful loads/stores never read this field or add an index operand.
+        UWVM_NOINLINE UWVM_GNU_COLD [[noreturn]] inline constexpr void memory_oob_terminate(native_memory_t const& memory,
+                                                                                         ::std::uint_least64_t memory_static_offset,
+                                                                                         memory_offset_t effective_offset,
+                                                                                         ::std::size_t memory_length,
+                                                                                         ::std::size_t wasm_bytes) noexcept
+        {
+            memory_oob_terminate(memory.diagnostic_owner_memory_index, memory_static_offset, effective_offset, memory_length, wasm_bytes);
+        }
+
         // Unlike a wasm64 carry, a wasm32 overflow flag accompanies the full widened sum on 64-bit hosts. Reject a
         // wrapped/foreign carrier whose flag is set but whose stored offset is low; it is outside this proof's contract.
 # if defined(UWVM_SUPPORT_MMAP)
@@ -441,7 +459,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <typename MemoryT>
         UWVM_ALWAYS_INLINE inline constexpr void check_memory_bounds_unlocked(MemoryT const& memory,
-                                                                              ::std::size_t memory_idx,
+                                                                              [[maybe_unused]] ::std::size_t memory_idx,
                                                                               ::std::uint_least64_t memory_static_offset,
                                                                               memory_offset_t effective_offset,
                                                                               ::std::size_t wasm_bytes) noexcept
@@ -467,7 +485,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     if(effective_offset.offset_65_bit || wasm_bytes > memory_length ||
                        effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - wasm_bytes)) [[unlikely]]
                     {
-                        memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
+                        memory_oob_terminate(memory, memory_static_offset, effective_offset, memory_length, wasm_bytes);
                     }
                 }
                 else
@@ -487,7 +505,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                 if(memory.memory_length_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
                                 auto const memory_length{memory.memory_length_p->load(::std::memory_order_acquire)};
-                                memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
+                                memory_oob_terminate(memory, memory_static_offset, effective_offset, memory_length, wasm_bytes);
                             }
                         }
                         else if(!wasm32_full_mmap_can_use_hardware_bounds(effective_offset, wasm_bytes))
@@ -498,7 +516,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                             if(effective_offset.offset_65_bit || wasm_bytes > memory_length ||
                                effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - wasm_bytes)) [[unlikely]]
                             {
-                                memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
+                                memory_oob_terminate(memory, memory_static_offset, effective_offset, memory_length, wasm_bytes);
                             }
                         }
 # endif
@@ -514,7 +532,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                             if(memory.memory_length_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
                             auto const memory_length{memory.memory_length_p->load(::std::memory_order_acquire)};
-                            memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
+                            memory_oob_terminate(memory, memory_static_offset, effective_offset, memory_length, wasm_bytes);
                         }
 # else
                         // Compiled without mmap support; this branch should never be used.
@@ -535,7 +553,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 if(effective_offset.offset_65_bit || wasm_bytes > memory_length ||
                    effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - wasm_bytes)) [[unlikely]]
                 {
-                    memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
+                    memory_oob_terminate(memory, memory_static_offset, effective_offset, memory_length, wasm_bytes);
                 }
             }
         }
@@ -686,7 +704,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
 # if defined(UWVM_SUPPORT_MMAP)
         UWVM_ALWAYS_INLINE inline constexpr void bounds_check_mmap_full(native_memory_t const& memory,
-                                                                        ::std::size_t memory_idx,
+                                                                        [[maybe_unused]] ::std::size_t memory_idx,
                                                                         ::std::uint_least64_t memory_static_offset,
                                                                         memory_offset_t effective_offset,
                                                                         ::std::size_t wasm_bytes) noexcept
@@ -705,13 +723,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 if(effective_offset.offset_65_bit || wasm_bytes > memory_length ||
                    effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - wasm_bytes)) [[unlikely]]
                 {
-                    memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
+                    memory_oob_terminate(memory, memory_static_offset, effective_offset, memory_length, wasm_bytes);
                 }
             }
         }
 
+        // Distinct compile-time policy token. The selector proves both full
+        // wasm32 reservation coverage and the immutable standard 64 KiB page
+        // size. Bounds validation remains the full policy; stores can also
+        // specialize their page-boundary preflight without hot metadata loads.
+        UWVM_ALWAYS_INLINE inline constexpr void bounds_check_mmap_full_standard_page(native_memory_t const& memory,
+                                                                                      ::std::size_t memory_idx,
+                                                                                      ::std::uint_least64_t memory_static_offset,
+                                                                                      memory_offset_t effective_offset,
+                                                                                      ::std::size_t wasm_bytes) noexcept
+        { bounds_check_mmap_full(memory, memory_idx, memory_static_offset, effective_offset, wasm_bytes); }
+
         UWVM_ALWAYS_INLINE inline constexpr void bounds_check_mmap_path(native_memory_t const& memory,
-                                                                        ::std::size_t memory_idx,
+                                                                        [[maybe_unused]] ::std::size_t memory_idx,
                                                                         ::std::uint_least64_t memory_static_offset,
                                                                         memory_offset_t effective_offset,
                                                                         ::std::size_t wasm_bytes) noexcept
@@ -728,7 +757,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                    !offset_in_pow2_bound<::uwvm2::object::memory::linear::max_partial_protection_wasm64_index>(effective_offset.offset)) [[unlikely]]
                 {
                     auto const memory_length{memory.memory_length_p->load(::std::memory_order_acquire)};
-                    memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
+                    memory_oob_terminate(memory, memory_static_offset, effective_offset, memory_length, wasm_bytes);
                 }
             }
             else
@@ -737,13 +766,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                    !offset_in_pow2_bound<::uwvm2::object::memory::linear::max_partial_protection_wasm32_index>(effective_offset.offset)) [[unlikely]]
                 {
                     auto const memory_length{memory.memory_length_p->load(::std::memory_order_acquire)};
-                    memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
+                    memory_oob_terminate(memory, memory_static_offset, effective_offset, memory_length, wasm_bytes);
                 }
             }
         }
 
         UWVM_ALWAYS_INLINE inline constexpr void bounds_check_mmap_judge(native_memory_t const& memory,
-                                                                         ::std::size_t memory_idx,
+                                                                         [[maybe_unused]] ::std::size_t memory_idx,
                                                                          ::std::uint_least64_t memory_static_offset,
                                                                          memory_offset_t effective_offset,
                                                                          ::std::size_t wasm_bytes) noexcept
@@ -758,12 +787,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             if(effective_offset.offset_65_bit || wasm_bytes > memory_length ||
                effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - wasm_bytes)) [[unlikely]]
             {
-                memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
+                memory_oob_terminate(memory, memory_static_offset, effective_offset, memory_length, wasm_bytes);
             }
         }
 # else
         UWVM_ALWAYS_INLINE inline constexpr void bounds_check_allocator(native_memory_t const& memory,
-                                                                        ::std::size_t memory_idx,
+                                                                        [[maybe_unused]] ::std::size_t memory_idx,
                                                                         ::std::uint_least64_t memory_static_offset,
                                                                         memory_offset_t effective_offset,
                                                                         ::std::size_t wasm_bytes) noexcept
@@ -777,10 +806,54 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             if(effective_offset.offset_65_bit || wasm_bytes > memory_length ||
                effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - wasm_bytes)) [[unlikely]]
             {
-                memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
+                memory_oob_terminate(memory, memory_static_offset, effective_offset, memory_length, wasm_bytes);
             }
         }
 # endif
+
+        template <auto BoundsCheckFn, ::std::size_t WasmBytes, typename MemoryT>
+        UWVM_ALWAYS_INLINE inline constexpr ::std::byte* prepare_memory_store_pointer_with_policy(MemoryT const& memory,
+                                                                                                  ::std::uint_least64_t effective_offset) noexcept
+        {
+# if defined(UWVM_SUPPORT_MMAP)
+            if constexpr(BoundsCheckFn == bounds_check_mmap_full_standard_page)
+            {
+                static_assert(MemoryT::can_mmap);
+                static_assert(WasmBytes >= 1uz && WasmBytes <= 16uz);
+                // Called only after the full u32+u32 reservation proof. mmap
+                // never relocates the base, and grow only commits whole pages.
+                // [committed pages][protected reservation] | outside mapping
+                //                  ^^ logical end; probe may fault inside mapping
+                constexpr ::std::uint_least64_t page{65536u};
+                if constexpr(WasmBytes > 1uz)
+                {
+                    if((effective_offset & (page - 1u)) > page - WasmBytes) [[unlikely]]
+                    {
+                        if UWVM_IF_NOT_CONSTEVAL
+                        {
+                            // [store first byte ... last byte] within reservation
+                            //                       ^^ last; protected bytes trap
+                            // Integer address formation preserves the hardware
+                            // bounds path without out-of-object pointer arithmetic.
+                            auto const last{ptr_add_u64(memory.memory_begin, effective_offset + WasmBytes - 1uz)};
+                            auto const probe{*static_cast<::std::byte const volatile*>(last)};
+                            static_cast<void>(probe);
+                            // Compiler ordering only: no CPU fence, lock or pin.
+                            ::std::atomic_signal_fence(::std::memory_order_seq_cst);
+                        }
+                    }
+                }
+                // [committed/protected reservation] | outside mapping
+                //  ^^ returned store pointer; the complete range is proven or
+                //     its protected first/last byte faults before any write.
+                return ptr_add_u64(memory.memory_begin, effective_offset);
+            }
+            else
+# endif
+            {
+                return prepare_memory_store_pointer<WasmBytes>(memory, effective_offset);
+            }
+        }
 
         UWVM_ALWAYS_INLINE inline constexpr memory_offset_t wasm32_effective_offset(wasm_i32 addr, wasm_u32 static_offset) noexcept
         {
@@ -848,6 +921,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -859,7 +935,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             auto const& memory{*memory_p};
             auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
 
-            details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, WasmBytes);
+            details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, WasmBytes);
         }
 
         template <::std::size_t StoreBytes,
@@ -877,6 +953,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -908,7 +987,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             auto const& memory{*memory_p};
             auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
 
-            details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, StoreBytes);
+            details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, StoreBytes);
         }
 
         template <::std::size_t StoreBytes,
@@ -928,6 +1007,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -963,7 +1045,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             auto const& memory{*memory_p};
             auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
 
-            details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, StoreBytes);
+            details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, StoreBytes);
         }
 
         template <::std::size_t StoreBytes,
@@ -983,6 +1065,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1018,7 +1103,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             auto const& memory{*memory_p};
             auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
 
-            details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, StoreBytes);
+            details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, StoreBytes);
         }
 
         template <::std::size_t StoreBytes,
@@ -1038,6 +1123,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1073,7 +1161,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             auto const& memory{*memory_p};
             auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
 
-            details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, StoreBytes);
+            details::memory_oob_terminate(memory, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, StoreBytes);
         }
 
         template <auto BoundsCheckFn, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
@@ -1088,6 +1176,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1102,7 +1193,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
                     UWVM_MUSTTAIL return trap_oob_i32addr<4uz, CompileOption, curr_i32_stack_top, Type...>(type...);
                 }
@@ -1126,6 +1223,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else
             {
                 ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+                // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                //                [validated post-op stack depth           ] unsafe past frame_end
+                // ^^ type...[1u] advances by sizeof(out); operand_stack_byte_max reserves this result.
                 type...[1u] += sizeof(out);
             }
 
@@ -1151,6 +1251,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1164,7 +1267,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
                     UWVM_MUSTTAIL return trap_oob_i32addr<8uz, CompileOption, curr_i32_stack_top, Type...>(type...);
                 }
@@ -1196,6 +1305,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else
             {
                 ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+                // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                //                [validated post-op stack depth           ] unsafe past frame_end
+                // ^^ type...[1u] advances by sizeof(out); operand_stack_byte_max reserves this result.
                 type...[1u] += sizeof(out);
             }
 
@@ -1221,6 +1333,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1234,7 +1349,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
                     UWVM_MUSTTAIL return trap_oob_i32addr<4uz, CompileOption, curr_i32_stack_top, Type...>(type...);
                 }
@@ -1267,6 +1388,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else
             {
                 ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+                // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                //                [validated post-op stack depth           ] unsafe past frame_end
+                // ^^ type...[1u] advances by sizeof(out); operand_stack_byte_max reserves this result.
                 type...[1u] += sizeof(out);
             }
 
@@ -1292,6 +1416,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1305,7 +1432,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
                     UWVM_MUSTTAIL return trap_oob_i32addr<8uz, CompileOption, curr_i32_stack_top, Type...>(type...);
                 }
@@ -1338,6 +1471,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else
             {
                 ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+                // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                //                [validated post-op stack depth           ] unsafe past frame_end
+                // ^^ type...[1u] advances by sizeof(out); operand_stack_byte_max reserves this result.
                 type...[1u] += sizeof(out);
             }
 
@@ -1577,6 +1713,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1591,7 +1730,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 1uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
                     UWVM_MUSTTAIL return trap_oob_i32addr<1uz, CompileOption, curr_i32_stack_top, Type...>(type...);
                 }
@@ -1618,6 +1763,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else
             {
                 ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+                // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                //                [validated post-op stack depth           ] unsafe past frame_end
+                // ^^ type...[1u] advances by sizeof(out); operand_stack_byte_max reserves this result.
                 type...[1u] += sizeof(out);
             }
 
@@ -1642,6 +1790,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1656,7 +1807,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 2uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
                     UWVM_MUSTTAIL return trap_oob_i32addr<2uz, CompileOption, curr_i32_stack_top, Type...>(type...);
                 }
@@ -1686,6 +1843,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else
             {
                 ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+                // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                //                [validated post-op stack depth           ] unsafe past frame_end
+                // ^^ type...[1u] advances by sizeof(out); operand_stack_byte_max reserves this result.
                 type...[1u] += sizeof(out);
             }
 
@@ -1712,6 +1872,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1725,7 +1888,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 1uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
                     UWVM_MUSTTAIL return trap_oob_i32addr<1uz, CompileOption, curr_i32_stack_top, Type...>(type...);
                 }
@@ -1764,6 +1933,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else
             {
                 ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+                // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                //                [validated post-op stack depth           ] unsafe past frame_end
+                // ^^ type...[1u] advances by sizeof(out); operand_stack_byte_max reserves this result.
                 type...[1u] += sizeof(out);
             }
 
@@ -1790,6 +1962,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1803,7 +1978,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 2uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
                     UWVM_MUSTTAIL return trap_oob_i32addr<2uz, CompileOption, curr_i32_stack_top, Type...>(type...);
                 }
@@ -1845,6 +2026,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else
             {
                 ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+                // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                //                [validated post-op stack depth           ] unsafe past frame_end
+                // ^^ type...[1u] advances by sizeof(out); operand_stack_byte_max reserves this result.
                 type...[1u] += sizeof(out);
             }
 
@@ -1871,6 +2055,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1884,7 +2071,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
                     UWVM_MUSTTAIL return trap_oob_i32addr<4uz, CompileOption, curr_i32_stack_top, Type...>(type...);
                 }
@@ -1926,6 +2119,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else
             {
                 ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+                // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                //                [validated post-op stack depth           ] unsafe past frame_end
+                // ^^ type...[1u] advances by sizeof(out); operand_stack_byte_max reserves this result.
                 type...[1u] += sizeof(out);
             }
 
@@ -2040,6 +2236,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -2065,15 +2264,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>())
                     {
                         // Operand-stack mode: both `value` and `addr` were popped from memory.
+                        // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                        //                [validated post-op stack depth           ] unsafe past frame_end
+                        // ^^ type...[1u] advances by sizeof(wasm_i32) * 2uz; operand_stack_byte_max reserves this result.
                         type...[1u] += sizeof(wasm_i32) * 2uz;
                     }
                     else if constexpr(ring_sz < 2uz)
                     {
                         // Stack-top mode with tiny ring: `addr` was popped from operand stack memory.
+                        // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                        //                [validated post-op stack depth           ] unsafe past frame_end
+                        // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                         type...[1u] += sizeof(wasm_i32);
                     }
                     UWVM_MUSTTAIL return trap_oob_i32_store<4uz, CompileOption, curr_i32_stack_top, Type...>(type...);
@@ -2084,7 +2292,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
             }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_i32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), value);
+            details::store_i32_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 4uz>(memory, eff), value);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -2109,6 +2317,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -2146,14 +2357,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i64); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i64>()) { type...[1u] += sizeof(wasm_i64); }
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
                     else if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
                                       details::i32_i64_ranges_merged<CompileOption>() &&
                                       ((CompileOption.i64_stack_top_end_pos - CompileOption.i64_stack_top_begin_pos) < 2uz))
                     {
                         // Stack-top mode with tiny merged scalar ring: `addr` was popped from operand stack memory.
+                        // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                        //                [validated post-op stack depth           ] unsafe past frame_end
+                        // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                         type...[1u] += sizeof(wasm_i32);
                     }
                     UWVM_MUSTTAIL return trap_oob_i64_store<8uz, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>(type...);
@@ -2164,7 +2387,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
             }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_i64_le(details::prepare_memory_store_pointer<8uz>(memory, eff), value);
+            details::store_i64_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 8uz>(memory, eff), value);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -2189,6 +2412,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -2199,6 +2425,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             { value = get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...); }
             else
             {
+                // operand frame: operand_base ... [live prefix][typed input bytes] old_top ... frame_end
+                //                [validated existing stack depth       ] unsafe before operand_base
+                // ^^ type...[1u] retreats by sizeof(value); the emitter proved this typed input was live.
                 type...[1u] -= sizeof(value);
                 ::std::memcpy(::std::addressof(value), type...[1u], sizeof(value));
             }
@@ -2233,14 +2462,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_f32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_f32>()) { type...[1u] += sizeof(wasm_f32); }
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
                     else if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f32>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
                                       details::i32_f32_ranges_merged<CompileOption>() &&
                                       ((CompileOption.f32_stack_top_end_pos - CompileOption.f32_stack_top_begin_pos) < 2uz))
                     {
                         // Stack-top mode with tiny merged scalar ring: `addr` was popped from operand stack memory.
+                        // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                        //                [validated post-op stack depth           ] unsafe past frame_end
+                        // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                         type...[1u] += sizeof(wasm_i32);
                     }
                     UWVM_MUSTTAIL return trap_oob_f32_store<4uz, CompileOption, curr_f32_stack_top, curr_i32_stack_top, Type...>(type...);
@@ -2251,7 +2492,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
             }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_f32_le(details::prepare_memory_store_pointer<4uz>(memory, eff), value);
+            details::store_f32_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 4uz>(memory, eff), value);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -2276,6 +2517,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -2286,6 +2530,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             { value = get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...); }
             else
             {
+                // operand frame: operand_base ... [live prefix][typed input bytes] old_top ... frame_end
+                //                [validated existing stack depth       ] unsafe before operand_base
+                // ^^ type...[1u] retreats by sizeof(value); the emitter proved this typed input was live.
                 type...[1u] -= sizeof(value);
                 ::std::memcpy(::std::addressof(value), type...[1u], sizeof(value));
             }
@@ -2320,14 +2567,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_f64); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_f64>()) { type...[1u] += sizeof(wasm_f64); }
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
                     else if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f64>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
                                       details::scalar_ranges_all_merged<CompileOption>() &&
                                       ((CompileOption.f64_stack_top_end_pos - CompileOption.f64_stack_top_begin_pos) < 2uz))
                     {
                         // Stack-top mode with tiny merged scalar ring: `addr` was popped from operand stack memory.
+                        // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                        //                [validated post-op stack depth           ] unsafe past frame_end
+                        // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                         type...[1u] += sizeof(wasm_i32);
                     }
                     UWVM_MUSTTAIL return trap_oob_f64_store<8uz, CompileOption, curr_f64_stack_top, curr_i32_stack_top, Type...>(type...);
@@ -2338,7 +2597,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
             }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-            details::store_f64_le(details::prepare_memory_store_pointer<8uz>(memory, eff), value);
+            details::store_f64_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 8uz>(memory, eff), value);
             details::exit_memory_operation_memory_lock(memory);
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -2363,6 +2622,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -2388,15 +2650,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, static_cast<::std::size_t>(StoreBytes))) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>())
                     {
                         // Operand-stack mode: both `value` and `addr` were popped from memory.
+                        // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                        //                [validated post-op stack depth           ] unsafe past frame_end
+                        // ^^ type...[1u] advances by sizeof(wasm_i32) * 2uz; operand_stack_byte_max reserves this result.
                         type...[1u] += sizeof(wasm_i32) * 2uz;
                     }
                     else if constexpr(ring_sz < 2uz)
                     {
                         // Stack-top mode with tiny ring: `addr` was popped from operand stack memory.
+                        // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                        //                [validated post-op stack depth           ] unsafe past frame_end
+                        // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                         type...[1u] += sizeof(wasm_i32);
                     }
                     UWVM_MUSTTAIL return trap_oob_i32_store<static_cast<::std::size_t>(StoreBytes), CompileOption, curr_i32_stack_top, Type...>(type...);
@@ -2410,12 +2681,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             if constexpr(StoreBytes == 1u)
             {
-                details::store_u8(details::prepare_memory_store_pointer<1uz>(memory, eff),
+                details::store_u8(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 1uz>(memory, eff),
                                   static_cast<::std::uint_least8_t>(::std::bit_cast<::std::uint_least32_t>(value)));
             }
             else
             {
-                details::store_u16_le(details::prepare_memory_store_pointer<2uz>(memory, eff),
+                details::store_u16_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 2uz>(memory, eff),
                                       static_cast<::std::uint_least16_t>(::std::bit_cast<::std::uint_least32_t>(value)));
             }
             details::exit_memory_operation_memory_lock(memory);
@@ -2444,6 +2715,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
             auto const op_begin{type...[0]};
+            // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+            //           [complete pointer slot ] safe to its end; unsafe past stream_end
+            // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -2481,14 +2755,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if(details::should_trap_oob_unlocked(memory, eff65, static_cast<::std::size_t>(StoreBytes))) [[unlikely]]
                 {
+                    // bytecode: [current handler][complete emitted operands][successor] | stream_end
+                    //           [borrowed handler] safe while this function's bytecode is owned
+                    // ^^ type...[0] returns to op_begin, captured from this live handler before decoding.
                     type...[0] = op_begin;
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i64); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i64>()) { type...[1u] += sizeof(wasm_i64); }
+                    // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                    //                [validated post-op stack depth           ] unsafe past frame_end
+                    // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
                     else if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
                                       details::i32_i64_ranges_merged<CompileOption>() &&
                                       ((CompileOption.i64_stack_top_end_pos - CompileOption.i64_stack_top_begin_pos) < 2uz))
                     {
                         // Stack-top mode with tiny merged scalar ring: `addr` was popped from operand stack memory.
+                        // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+                        //                [validated post-op stack depth           ] unsafe past frame_end
+                        // ^^ type...[1u] advances by sizeof(wasm_i32); operand_stack_byte_max reserves this result.
                         type...[1u] += sizeof(wasm_i32);
                     }
                     UWVM_MUSTTAIL return trap_oob_i64_store<static_cast<::std::size_t>(StoreBytes),
@@ -2506,17 +2792,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             if constexpr(StoreBytes == 1u)
             {
-                details::store_u8(details::prepare_memory_store_pointer<1uz>(memory, eff),
+                details::store_u8(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 1uz>(memory, eff),
                                   static_cast<::std::uint_least8_t>(::std::bit_cast<::std::uint_least64_t>(value)));
             }
             else if constexpr(StoreBytes == 2u)
             {
-                details::store_u16_le(details::prepare_memory_store_pointer<2uz>(memory, eff),
+                details::store_u16_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 2uz>(memory, eff),
                                       static_cast<::std::uint_least16_t>(::std::bit_cast<::std::uint_least64_t>(value)));
             }
             else
             {
-                details::store_u32_le(details::prepare_memory_store_pointer<4uz>(memory, eff),
+                details::store_u32_le(details::prepare_memory_store_pointer_with_policy<BoundsCheckFn, 4uz>(memory, eff),
                                       static_cast<::std::uint_least32_t>(::std::bit_cast<::std::uint_least64_t>(value)));
             }
             details::exit_memory_operation_memory_lock(memory);
@@ -2795,6 +3081,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -2812,6 +3101,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             ::std::memcpy(type...[1u], ::std::addressof(pages), sizeof(pages));
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(pages); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(pages);
         }
 
@@ -2837,6 +3129,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ type...[0] advances by sizeof(uwvm_interpreter_opfunc_t<Type...>); the emitter wrote this complete opfunc slot.
         type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -2902,6 +3197,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         else
         {
             ::std::memcpy(type...[1u], ::std::addressof(result_pages), sizeof(result_pages));
+            // operand frame: operand_base ... [live bytes][typed result bytes] | frame_end
+            //                [validated post-op stack depth           ] unsafe past frame_end
+            // ^^ type...[1u] advances by sizeof(result_pages); operand_stack_byte_max reserves this result.
             type...[1u] += sizeof(result_pages);
         }
 
@@ -2933,6 +3231,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -2948,6 +3249,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
         auto const out{details::load_i32_le(details::ptr_add_u64(memory.memory_begin, eff))};
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -2964,6 +3268,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -2979,6 +3286,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
         auto const out{details::load_i64_le(details::ptr_add_u64(memory.memory_begin, eff))};
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -2995,6 +3305,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -3011,6 +3324,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f32 out;
         details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff), out);
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -3027,6 +3343,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -3043,6 +3362,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 out;
         details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff), out);
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -3058,6 +3380,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -3080,6 +3405,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -3095,6 +3423,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -3120,6 +3451,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -3136,6 +3470,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -3158,6 +3495,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -3174,6 +3514,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -3199,6 +3542,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -3215,6 +3561,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -3240,6 +3589,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(out); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(out);
     }
 
@@ -3254,6 +3606,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -3282,6 +3637,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -3310,12 +3668,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_f32 value;
+        // operand pop: operand_base ... [validated live bytes] old_top ... frame_end
+        // [safe existing stack prefix                   ] unsafe (before operand_base)
+        // ^^ typeref...[1u] retreats by sizeof(value); the emitted stack effect proves those bytes are live.
         typeref...[1u] -= sizeof(value);
         ::std::memcpy(::std::addressof(value), typeref...[1u], sizeof(value));
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
@@ -3340,12 +3704,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_f64 value;
+        // operand pop: operand_base ... [validated live bytes] old_top ... frame_end
+        // [safe existing stack prefix                   ] unsafe (before operand_base)
+        // ^^ typeref...[1u] retreats by sizeof(value); the emitted stack effect proves those bytes are live.
         typeref...[1u] -= sizeof(value);
         ::std::memcpy(::std::addressof(value), typeref...[1u], sizeof(value));
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
@@ -3370,6 +3740,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -3408,6 +3781,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -3441,12 +3817,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
         auto const pages{static_cast<wasm_i32>(memory_p->get_page_size())};
 
         ::std::memcpy(typeref...[1u], ::std::addressof(pages), sizeof(pages));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(pages); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(pages);
     }
 
@@ -3460,6 +3842,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
 
+        // bytecode: [current opfunc pointer][emitted operands / successor] | stream_end
+        //           [complete pointer slot ] safe to its end; unsafe past stream_end
+        // ^^ typeref...[0] advances by sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>); the emitter wrote this complete opfunc slot.
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
@@ -3517,6 +3902,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         ::std::memcpy(typeref...[1u], ::std::addressof(result_pages), sizeof(result_pages));
+        // result push: operand_base ... [current stack][result bytes] | frame_end
+        // [safe compiled post-op byte depth                   ] unsafe (past frame_end)
+        // ^^ typeref...[1u] advances by sizeof(result_pages); the frame reserves operand_stack_byte_max from validation.
         typeref...[1u] += sizeof(result_pages);
     }
 
@@ -3543,6 +3931,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 else if constexpr(::std::same_as<OperandT, op_details::wasm_i64>) { return curr_stacktop.i64_stack_top_curr_pos; }
                 else if constexpr(::std::same_as<OperandT, op_details::wasm_f32>) { return curr_stacktop.f32_stack_top_curr_pos; }
                 else if constexpr(::std::same_as<OperandT, op_details::wasm_f64>) { return curr_stacktop.f64_stack_top_curr_pos; }
+                else if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>)
+                { return curr_stacktop.v128_stack_top_curr_pos; }
                 else
                 {
                     return SIZE_MAX;
@@ -3817,9 +4207,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             enum class mmap_variant : unsigned
             {
                 full,
+                full_standard_page,
                 path,
                 judge
             };
+
+            template <typename Op>
+            inline consteval auto full_mmap_page_policy() noexcept
+            {
+                // Only writes benefit from the fixed page preflight. Reuse the
+                // original load handlers to avoid duplicating their machine code.
+                if constexpr(requires { typename Op::writes_memory; }) { return &op_details::bounds_check_mmap_full_standard_page; }
+                else { return &op_details::bounds_check_mmap_full; }
+            }
 
             inline constexpr mmap_variant select_mmap_variant(op_details::native_memory_t const& memory) noexcept
             {
@@ -3828,7 +4228,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
                 {
                     // 64-bit: wasm32 full protection; wasm64 partial protection.
-                    if(memory.status == ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm32) { return mmap_variant::full; }
+                    if(memory.status == ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm32)
+                    {
+                        return memory.custom_page_size_log2 == 16u ? mmap_variant::full_standard_page : mmap_variant::full;
+                    }
                     return mmap_variant::path;
                 }
                 else
@@ -3859,6 +4262,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                     End,
                                                                     OpWithBoundsCheck,
                                                                     &op_details::bounds_check_mmap_full,
+                                                                    Extra,
+                                                                    Type...>(pos);
+                    }
+                    case mmap_variant::full_standard_page:
+                    {
+                        return select_stacktop_fptr_or_default_with<CompileOption,
+                                                                    Begin,
+                                                                    End,
+                                                                    OpWithBoundsCheck,
+                                                                    full_mmap_page_policy<OpWithBoundsCheck>(),
                                                                     Extra,
                                                                     Type...>(pos);
                     }
@@ -3924,6 +4337,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                        InEnd,
                                                                        OpWithBoundsCheck2D,
                                                                        &op_details::bounds_check_mmap_full,
+                                                                       Extra,
+                                                                       Type...>(out_pos, in_pos);
+                    }
+                    case mmap_variant::full_standard_page:
+                    {
+                        return select_stacktop_fptr_or_default_with_2d<CompileOption,
+                                                                       OutBegin,
+                                                                       OutEnd,
+                                                                       InBegin,
+                                                                       InEnd,
+                                                                       OpWithBoundsCheck2D,
+                                                                       full_mmap_page_policy<OpWithBoundsCheck2D>(),
                                                                        Extra,
                                                                        Type...>(out_pos, in_pos);
                     }
@@ -4183,6 +4608,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct i32_store_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return op_details::memop::i32_store<BoundsCheckFn, CompileOption, Pos, Type...>; }
@@ -4190,6 +4616,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct i64_store_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return op_details::memop::i64_store<BoundsCheckFn, CompileOption, Pos, Pos, Type...>; }
@@ -4197,6 +4624,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct i64_store_op_with_2d
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn,
                           auto Extra,
                           uwvm_interpreter_translate_option_t CompileOption,
@@ -4209,6 +4637,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct i64_store_op_with_i32_only
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn,
                           auto Extra,
                           uwvm_interpreter_translate_option_t CompileOption,
@@ -4220,6 +4649,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f32_store_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return op_details::memop::f32_store<BoundsCheckFn, CompileOption, Pos, Pos, Type...>; }
@@ -4227,6 +4657,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f32_store_op_with_2d
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn,
                           auto Extra,
                           uwvm_interpreter_translate_option_t CompileOption,
@@ -4239,6 +4670,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f32_store_op_with_i32_only
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn,
                           auto Extra,
                           uwvm_interpreter_translate_option_t CompileOption,
@@ -4250,6 +4682,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f64_store_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return op_details::memop::f64_store<BoundsCheckFn, CompileOption, Pos, Pos, Type...>; }
@@ -4257,6 +4690,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f64_store_op_with_2d
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn,
                           auto Extra,
                           uwvm_interpreter_translate_option_t CompileOption,
@@ -4269,6 +4703,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct f64_store_op_with_i32_only
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn,
                           auto Extra,
                           uwvm_interpreter_translate_option_t CompileOption,
@@ -4280,6 +4715,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct i32_storeN_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return op_details::memop::i32_storeN<BoundsCheckFn, static_cast<unsigned>(Extra), CompileOption, Pos, Type...>; }
@@ -4287,6 +4723,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct i64_storeN_op_with
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return op_details::memop::i64_storeN<BoundsCheckFn, static_cast<unsigned>(Extra), CompileOption, Pos, Pos, Type...>; }
@@ -4294,6 +4731,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct i64_storeN_op_with_2d
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn,
                           auto Extra,
                           uwvm_interpreter_translate_option_t CompileOption,
@@ -4306,6 +4744,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             struct i64_storeN_op_with_i32_only
             {
+                using writes_memory = void;
                 template <auto BoundsCheckFn,
                           auto Extra,
                           uwvm_interpreter_translate_option_t CompileOption,

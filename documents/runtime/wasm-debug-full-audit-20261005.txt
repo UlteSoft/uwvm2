@@ -1,0 +1,890 @@
+Wasm 调试完整审阅与修复 — 2026-10-05
+
+状态：继续验证中。本文区分已完成证据、冻结版本和仍缺少资格验证的能力。
+两个本机仓库 uwvm2、uwvm2-ros 均保留本次修复及其他任务的并发修改。
+所有编译、验证器、VM、测试脚本、QEMU、GDB 均只在 SSH linux keeper cgroup 执行。
+
+本次检查发现并修复的问题
+
+1. Wasm if/loop 前缀 SSA 不能用当前基本块的调试副本替换。
+   前缀仍可能在兄弟分支或合并块中使用，原先替换会破坏 dominance。
+   保留 validator 的语义值；完成 CFG 后，仅重绑定被真实 identity 支配的使用。
+   PHI 使用按其真实入边判断；兄弟分支和合并使用保持原值。
+2. LLVM 局部值不能通过全局 metadata 保存未完成 CFG 的 identity。
+   使用编译器私有 WeakTrackingVH 记录，正确处理 RAUW、删除和最终验证。
+3. ConstantData 没有 intrusive use list。对 v128.const 调用 Value::uses()
+   会触发 LLVM 断言。改为索引真实指令操作数，仍只修改已证明的使用。
+4. v128 的物理值不能只依赖调试副本的 DWARF 位置。
+   现在同时记录真实原始 SSA 结果；在后续快照 store 将位置变成 spill 前，
+   保留实际运算结果的完整 128 位寄存器范围。独立消费 marker 仍证明活性。
+   scalar 展开继续依赖完成后的 marker，避免将尚未完成的 i64 结果当作精确值。
+5. numeric rebind 组件夹具的目标判断增加 Linux 条件，与实际 materializer 一致。
+
+ASM 边界
+
+只公开当前真实 Wasm JIT 数值对应的完整寄存器位置及认证过的生成指令。
+未放宽 native memory、SP、FP、宿主代码、未知目标或任意地址访问权限。
+完整类型和值、掩码外清零、过期/伪造/已退休身份拒绝均须通过真实运行测试。
+元数据组件测试通过，不等于物理寄存器读取通过。
+
+Wasm 栈及深度
+
+真实 activation 身份链使用稳定地址的动态分块；64 是块大小，不是总帧数上限。
+观察模式 frames=0 不设置固定帧数上限；存储预算、分配和身份耗尽仍明确报错。
+可恢复检查点默认 4096 帧是独立资源预算。
+精确 operands/locals 仍在真实 Wasm opcode/safepoint 暂停点读取。
+在 native PC 显示历史快照时提示：
+Note: Last Wasm safepoint snapshot; may differ from current native state.
+热替换必须核对所有暂停参与者的真实完整链，包括 64 帧之外的活动祖先。
+
+冻结版本与证据
+
+R8 为本次修复前的资格基线：两个仓库、x86_64/AArch64/i686/RV64 完整产品。
+已有 50 项 host CLI、224 项 cross typed、116 项线程/GC 测试通过。
+真实 broker、DWARF display、控制器和 DAP 的独立证据须分别计数。
+Core3 feature matrix 中的入口查询 smoke，不能当作所有特性的状态检查穷举。
+10 个架构的 40 次 DATA 组件执行也不能当作 10 个完整 VM/ASM 产品通过。
+
+R10：两个仓库、上述四个架构的 8 个完整产品已重新构建并核对实际依赖。
+每个产品核对 runtime/host/main 三个 TU、真实链接输入、SDK archive 与 source ID。
+x86_64 两个仓库共 50 项 CLI 回归通过；cross 回归仍在继续。
+严格物理寄存器测试曾失败：i64/f32/f64 有真实值，v128 覆盖为 0。
+这是真实发现的缺陷，没有将此前的组件通过当作修复证据。
+
+R10 独立对照实验只修改 original-v128 location 记录：
+真实 runtime 重新编译/链接，instruction 和 unwind 两种策略均通过。
+每种策略的真实覆盖：i64=8、f32=5、f64=2、v128=5；
+large-i64-constant=1、large-i64-result=1、real-si=70、real-ni=53。
+该实验复用冻结的 host/probe 对象，因此不是全部产品重新构建的资格结论。
+同步后的两个 numeric rebind 组件编译/链接/执行共 6 条命令通过。
+
+R11 为包含 original-v128 修复的完整本机源码冻结包：
+uwvm2     sha256:4b54d84c68bbb6d0c1dc18ba504c8d4fb9b6ec620d854dff39530510ede4450b
+uwvm2-ros sha256:0216c2c9b961568585d386622aa33a805bfa691a605fde57cf24bdf6ce00b21e
+源码归档 SHA256：
+aedef757a111611291fd37c070ce83571480902527500eb8956204a1d2361446
+6746 个选定源码/夹具文件；vendor、SDK 和准入脚本另有精确输入记录。
+Linux 根：/tmp/wasm-debug-full-audit-20261005-r11
+完整构建、numeric 组件和严格物理寄存器矩阵仍在进行；最终结果待补充。
+一次 cross 构建尝试因 cgroup 准入超时停止，编译器尚未启动；保留记录并重试。
+
+未宣称完成的范围
+
+- 冻结后并发新增的 i686 i64 XMM 载体、PPC VMX 判定及对应夹具尚待单独验证。
+- native next 的普通/分支与真实调用 continuation 是不同能力；
+  任意调用、native caller CFI、完整 native finish 和其他 OS 的精确 continuation
+  不能由数值预览、一步 SI/NI 或组件 DATA 成功推导。
+- 当前实际完整 target SDK 范围为 x86_64/AArch64/i686/RV64；其他架构的 DATA
+  结果与完整运行产品资格分开记录。
+- 未开启 dbg 的代码路径没有启用本次调试记录；旧数值夹具机器码比较
+  不是本次全程序性能基准。包含本次修改的新对象比较仍待补充。
+- 不将某个冻结快照的通过结论延伸到随后发生并发修改的整个工作区。
+
+keeper cgroup：
+/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope
+memory.max=64 GiB，swap=0。共享组已有历史 OOM；本段最新观察为
+oom=63、oom_kill=15、oom_group_kill=0。后续记录应比较实际区间，不宣称历史为零。
+未采用、发送信号或删除其他任务的进程/产物。
+
+Linux 重启后的恢复记录 — 2026-10-05
+
+原 64 GiB cgroup 已由其他任务恢复，本任务核对后直接复用。
+新 boot ID：fe09fe71-9493-4b3c-9295-694bcadeee5f
+keeper PID/birth：9593/18401；swap=0；CPU 集合与前文相同。
+原 /tmp、/dev/shm 中的 R8/R10/R11 未持久化产物和待运行进程已丢失。
+前文通过结果属于重启前的历史证据，未把旧 PID 或未完成尝试续认为成功。
+
+新的源码冻结根：/tmp/wasm-debug-reboot-20261005-r1
+uwvm2     sha256:8f9b74bb6cfe784624a67f415bf4d8fd61f9577d845d06055be67ce6b279f932
+uwvm2-ros sha256:f79fc683244c23f61b7ae9a9ba1cdf4bc35aa2846bc5e8860aaf917f925d4596
+当前源码、测试和 fast_io/bizwen/boost_unordered 共 8542 个文件。
+源码归档：40,865,317 字节；SHA256：
+9b1e4aa12b015d742c5be57ea7a23c9a7011e9e5e2ad3cac893599c7338c5496
+包含并发新增的 i686 i64 载体和 PPC VMX 判定；不覆盖冻结后继续发生的修改。
+
+恢复后的私有 SDK 使用仍在磁盘上的 LLVM 23.1.1-uwvm-ros.9 基础库及匹配源码。
+没有将它标成已经丢失的旧 .11 SDK。四个目标的 AsmParser 已重新编译、归档，
+8 条命令通过；分别检查了 1687/1656/1669/1643 个实际 ELF archive 成员的目标 ISA。
+两个仓库 activation ledger 编译/执行共 4 条命令通过，覆盖 10,000 层 DATA。
+两个仓库 numeric rebind/MCJIT 组件编译、链接、执行共 12 条命令通过；
+MCJIT 组件的实际代码生成及 DWARF 位置证明不等于真实 VM 内核寄存器捕获。
+
+第一次完整构建尝试的配方遗漏 UWVM_USE_UWVM_INT，触发配置错误；
+已补齐选择宏，runtime/host/main 使用同一组解释器和 LLVM JIT 选择宏重新构建。
+完整产品和真实 SIGTRAP/ASM 数值测试仍在继续；后续通过结果另行补充。
+本段已完成命令未出现新 OOM，组计数仍为 0/0/0；共享组后续执行另行记录。
+
+重启后匹配 SDK 与真实寄存器验证
+
+.9 基础 SDK 不能直接作为当前产品的依赖：ROS 的精确 .11 检查拒绝它；
+主仓库的真实 VM 在 JIT 物化时失败。GDB 诊断确认失败发生在 guest 执行前，
+基础 SDK 的 AsmPrinter 缺少当前 runtime 要求的 v2 机器码归属表生成器。
+没有放宽版本检查、归属证明或 native 地址/寄存器投影边界。
+
+对比当前 ROS vendor 与匹配的 .9 include/lib 源码，7331 个文件仅有
+13 个内容变化，没有缺失或新增文件。私有 provider11 保存实际源码增量，
+private SDK11 按目标重新构建 AsmPrinter、RuntimeDyld、RelocationResolver、
+MCJIT/ExecutionEngine 和所有已链接的版本字符串消费者，共每目标 17 个 TU。
+不使用旧 PCH；真实编译和 llvm-ar 替换均在 keeper cgroup 中完成。
+未构建的 MIPS/PPC/SPARC target 不因这些公共 loader 更新而获得 VM 资格。
+配置头由实际 CMake 模板重新生成；先对 .9 头做逐字节 roundtrip 校验，
+再选择实际 .11 配置。不是只改版本字符串冒充缺失的 producer/loader。
+四目标配置已通过；每目标 34 条实际编译/归档命令，共 136 条通过。
+核对 254 个 archives 的 6655 个 ELF 成员，68 个替换成员与真实新对象逐字节一致；
+成员集合和其他成员 payload 保持原值，四目标 ISA 正确。
+AArch64/RV64 基础 SDK 缺失反汇编库，已准备实际 MC/target disassembler 补建；
+未禁用反汇编能力或放宽 Wasm 归属检查。完整产品与 QEMU 回归继续运行。
+
+两个 x86_64 完整产品 runtime/host/main 全部重新编译、链接，共 8 条命令通过。
+实际 depfile 核对源文件哈希，并记录 SDK、系统头和真实链接输入。
+uwvm2 TU 依赖数量：3114/2242/2862；ROS：3096/2242/2845。
+产品 SHA256：
+uwvm2     ab45439141f1054ed1b9633f3999efdb601f0d869276fdea2f618eb8eab7b085
+uwvm2-ros 0c29730b8c4b2ea71d6b0ce970673a6cb3cb21dcaf10f39017c6ccf0b07fafb5
+
+两个仓库各自 fresh runtime、host 与 numeric probe 组合已完成编译/链接，
+验证真实 Wasm 夹具，然后执行 instruction/unwind，共 12 条命令通过。
+四次实际寄存器执行均为：
+traps=440，i64=8，f32=11，f64=11，v128=14，
+large-i64-constant=1，large-i64-result=1，real-si=224，real-ni=216。
+其中 v128 是完整实际 kernel register 捕获值，包含真实 Wasm lane 比较；
+不是 shadow memory、手工寄存器 DATA 或只检查 LLVM 调试元数据。
+同时验证隐藏 host 栈/帧指针及 runtime 代码、清除未证明的上位寄存器位、
+拒绝伪造/退休 stop identity 和不属于当前 participant 的请求。
+
+Wasm typed operands、深栈、DAP、EH/tail 与脚本回归仍在运行。
+一次 CLI 启动配方把 env 变量放在 -u 选项之前，导致 env 自身退出；
+已修正选项顺序并保留失败记录，不算作 VM 缺陷或测试通过。
+dbg-off/on 的新实际对象捕获构建另行进行，不以寄存器通过推导普遍性能结论。
+前文 native caller CFI、finish 和其他平台的未完成范围仍保留。
+
+新证据根仍为 /tmp/wasm-debug-reboot-20261005-r1。
+已把阶段性 receipts 带回本机，归档 SHA256：
+f2e56be2bc2d137b80acf9e4ae512b807049d8b20fc0fda843ece2c4e3cd71a6
+后续最终结果及新的源输入变化应另行补充，不能覆盖这些冻结身份。
+
+新 x86_64 Wasm/DAP/对象检查
+
+两个仓库 typed operands 各 40 项、深栈各 15 项、Core3 entry-stop smoke
+各 56 项通过。typed operands 覆盖 10,000 locals、300 项 operand 分页、
+混合数值/NaN 位模式/v128、GC reference kinds、两侧 if 合流、loop backedge、
+tail-call、非默认初始化引用及原子 RMW/wait。深栈包含真实 10,000 帧、
+超过 64/4096 的 active ancestor replacement 拒绝和 native stop 的正确失效。
+Core3 56 项是入口查询/执行/trace smoke，不是所有 feature state 的穷举证明。
+两个仓库另外各 16 项 EH/tail/DAP/opcode-step/replacement-script 回归通过。
+DAP 在 10,000 帧中的第 4096 帧返回真实类型和值，正确报告 totalFrames，
+step 后旧 variablesReference 失效；传输是实际 CLI reply，不冒充 socket 授权验证。
+
+额外 GC census 夹具发现正常构建配置下的错误前提检查：公共头会恢复内部
+feature macros，原夹具却在它们的作用域外检查 LLVM/native-thread/C++ EH。
+已同步给两个仓库加成对 push/pop scope，按实际配置派生检查，未强制定义内部
+capability 宏，也未改生产 API/layout。修复的独立 test overlay SHA256：
+5cbd8ed422c0fa703c4873260565f2567bebce45661ee556342693a05f67b7be
+两个仓库的新夹具已编译、链接、官方 parse/validate 通过。
+主仓库 instruction/unwind 的真实双 participant、两次完整 cohort、4096-edge
+GC chain/cycle、64 distinct children、alias/exn/旧 episode 拒绝均通过。
+这属于实际 typed native reader/census，日志明确 whole_restore=0。
+ROS 对应 instruction/unwind 实际执行也均通过。
+两个仓库实际 GC/throw catchpoint、memory64/table64/GC/EH/tail-call/SIMD event
+与脚本/trace 分页两策略通过，各 records=54、pages=18、真实 catchpoints=2。
+此 state11-r2 矩阵共 24 条编译/链接/parse/validate/真实执行命令通过；
+两个新 probe 的实际 depfile 分别核对 2453/2740 和 2442/2729 个输入。
+
+4096 个 checkpoint safe point 的高优化 GC 夹具冷编译较慢：主仓库 instruction
+完成约 446 秒，整个命令峰值 RSS 约 1.76 GiB。对实际自身 PID 的 5 秒 perf
+采样、报告也在同一 keeper cgroup 中完成，并保留 PID/birth/parent 及退休记录；
+385 个 samples 中约 96% 为 LLVM MemorySSA renameBlock/renameSuccessorPhis。
+这说明该阶段在优化，不能作为普通 guest 执行性能或 dbg-off 回归的证据。
+
+两个仓库另行 fresh 构建 test-only capture 产品，共 8 条编译/链接命令通过。
+实际 dbg-off/on 对象捕获共 4 次执行通过；LLVM 对象/符号/DWARF 检查 10 条通过。
+off guest leaf 的实际指令只有 movslq/addq/retq，另一个 nopl 为对齐；
+off 对象无 .debug_* 和 native owner section；on 对象保留实际 DWARF 与归属表，
+真实 CLI operand 值为 i64=1037。off/on 对象分别为 1800/11040 字节。
+这是此数值夹具关闭 dbg 时无 snapshot/numeric marker 指令的证明，
+不是所有程序、所有目标的普遍性能基准。普通产品没有 test capture hook。
+
+持久化与后续范围 — 2026-10-06
+
+真实 SDK 重建与 state11-r2 receipts 已带回本机，阶段归档：
+b9047a4f593d1779b84684d534ff3fcf40d1249673ea8b30547a696a6e4dcdc4
+实际 x86_64 完整对象、CLI/native/state/capture 产品和输入证据归档：
+bd8c263b22f9d28052ba13631d4252714018601ec3d1d307eff626a7a70adb5a
+该归档为 472,594,478 字节，本机 SHA 已校验。相应产物可按已核对输入恢复；
+回收的是本任务完成的编译输出，保留了后续 link 所需的普通 runtime/host/main
+对象及 cross numeric 的真实 Wasm 夹具。未删除其他任务的文件。
+464 个与持久化基础库逐字节一致的私有 SDK archives 改为引用相同实际输入，
+节约约 1256 MiB；修改过的 parser/producer/loader archives 保留自己的真实文件。
+
+共享组约 56 GiB；后续编译在原 48 GiB 准入门限等待，未放宽原执行限制。
+SDK disassembler 16 条、cross resume 21 条、cross CLI 18 drivers、
+actual native numeric cross 24 条和 closed-NI build/run 4/12 条已准备，
+其尚未执行的部分一律不算 PASS。AArch64 link 的真实 undefined disassembler
+symbols 失败记录保留；没有关闭反汇编或退化 Wasm native 归属边界。
+
+当前工作区并发新增了 shared noinline snapshot-copy 优化。源码审阅确认其
+256 只限制共享 helper 所选的 locals 前缀，超过 256 的完整 Wasm packet
+保留原 inline 路径；未因它把 10,000 locals 改为截断。原 v128 definition
+记录修复仍在两个仓库中。这些后续生成器改动不属于本报告 R1 冻结身份，
+未将 R1 运行通过推广到该并发修改后的产品。
+
+GC 夹具的后续 fast_io 调整
+
+两个仓库的路径存储改用 fast_io::u8string，policy 为 fast_io::cstring_view，
+使用 u8concat_fast_io；原有 std-string 参数 API 的边界用 fast_io::u8concat_std
+适配，显式包含 fast_io_dsal/string.h。不改生产 API/ABI。最新 test overlay13：
+d914236ca89385f183837fcbd71244e356317a5533c924af55f73fa5db70decd
+此变体的 state13 共 12 条命令等待原 cgroup 准入，尚无实际编译/运行通过。
+前文 state11-r2 的 24 条 PASS 精确对应 5cbd8e… 的宏作用域修复版本。
+中间 state12 只在 own flock 等待，无 compiler 子进程，已通过实际 PID/birth/
+argv/UID/no-children 检查和 PIDFD SIGINT 取消，保留记录；不是产品执行失败。
+
+本机持久化目录：
+/Users/liyinan/Documents/MacroModel/wasm-debug-audit-20261006-r1
+包含源码冻结包、实际 LLVM 增量、SDK/state 证据、新产品重建归档、最新 receipts
+和 overlay13 文件，逐文件核对 SHA256，另有 local-durable-manifest.json。
+此目录的存在只表示归档保存，不把 pending 变体记为运行通过。
+
+后续修复与重新验证 — 2026-10-06，stage14/15
+
+复用原 keeper、boot 与 64GiB/swap0 cgroup，未重建第二个测试组。
+测试驱动修正：执行 timeout 从实际放行之后计时，不再包含准入等待；
+资源等待不持有本任务的串行执行锁；阶段有原子 failed/passed 状态，
+后续任务能在上游失败时退出，不能一直只等待最后一个 receipt。
+文件名标签检查原来误拒绝 .a 后缀，现在仅允许有界 ASCII 单个路径分量。
+原大任务默认 RSS/headroom/AS=12/16/12 GiB 保留。小任务单独使用更低
+RSS/AS 预算，基于实际 AArch64 compiler 峰值229MiB将剩余 RISC-V
+assembler 编译设为 RSS1GiB、AS3GiB、准入余量2GiB。每次仍核对64GiB、
+swap0、boot、PID/birth/UID、cgroup、CPU affinity 和 PIDFD 实际退休；
+动态组余量保护与 OOM delta 检查保留。取消的旧任务均未启动 compiler。
+
+SDK 恢复的16条命令实际通过；随后 AArch64 链接明确发现额外缺失的
+AArch64ExternalSymbolizer vtable。核对真实 CMakeLists.txt：target archive
+必须包括 AArch64Disassembler.cpp 和 AArch64ExternalSymbolizer.cpp。
+补齐实际第二个 translation unit 和 archive 后，另外2条命令通过。
+当前13个实际新对象、4个新 disassembler archives 全部核对 depfiles、
+member payload、无重复 member 和 target ELF ISA。AArch64 uwvm2 完整产品
+链接实际通过；其原3个成功编译TU与新link作为单个产品核对了2448/1578/
+2187个实际依赖输入。没有关闭disassembler或放宽Wasm/native owner边界。
+这里仍是 R1 source cut +实际SDK .11，不能推广到并发修改后的全部工作区。
+
+两个仓库 DAP operand scope 已改为：
+Wasm operand stack (last safepoint; may differ from native state)
+当前adapter恰好等于R1冻结adapter加该单处标题修正，已核对 SHA。
+新的双仓库真实10,000-frame DAP回归使用独立overlay15，运行结果另记。
+readme删除了已失实的共同five-token说法，说明每种grammar各自有限界，
+并补充完整frames wasm、locals wasm、operands分页接口与原始snapshot提示。
+
+latest fast_io overlay13 在 uwvm2 中 actual compile/link/官方parse/validate通过；
+其长GC运行被动态shared cgroup headroom保护中止，已确认自身PIDFD退休、
+无新OOM。这是资源中止，不是 PASS，也不是已验证的VM功能失败。
+保留原失败记录；重试使用至少8GiB准入余量。ROS的同一I/O变体单独安排
+compile/link/parse/validate，以免长期GC执行妨碍双仓库构建验证。
+
+原R1 closed-NI 夹具 actual return场景失败在要求每个public row均有可解码
+instruction bytes。当前并发修改已修正为保留真实owner/PC/stop/generation
+核对，同时允许hidden bridge row并验证bytes/text/target均清空。已复制
+两个仓库相同的当前夹具为独立overlay15；其完整正向NI/异常/旧stop拒绝
+要求保留，未以deny/77/空显示替代正向通过。后续真实结果另记。
+
+stage14阶段证据归档已带回本机并校验SHA256：
+a1810232fafabbf43810853d4c443f02c68e299454bac4a366bf80ea07f0556b
+归档956828字节，只是阶段性证据，后续进行中的矩阵不算完成。
+所有已生成stage14/15 receipts对应的guard脚本源码按SHA保存为独立版本。
+
+实际后续结果 — 2026-10-06，source18 / source22
+
+前文尚未完成的 latest fast_io GC 夹具已完成 state14：两仓库共12条
+编译、链接、官方 parse/validate 和真实 instruction/unwind 执行全部通过。
+4096-edge链、循环、alias、两个participant和两次cohort是实际检查；
+whole_restore=0，不能将这些检查称为完整内存/VM checkpoint恢复。
+当前标题的10,000-frame DAP stage15两driver、四个真实VM场景也通过。
+
+source18的新完整产品在x86_64和AArch64双仓库实际fresh构建，16/16
+命令通过；实际3个TU、输入depfiles、原生owner功能和SDK均核对。
+AArch64初次link因遗漏已有的两个disassembler archives失败，已保留
+原失败recipe，按实际依赖补齐后真实link通过，没有关闭反汇编。
+调试默认编译策略在启用session时为session:debug/none/none；
+普通运行仍是aot:max/passbuilder-tuned/aggressive，显式策略保留。
+该选择在编译阶段完成，不增加guest opcode执行时的策略检查。
+两仓库x86_64及QEMU AArch64各8个合法CLI策略场景，共32/32通过。
+
+source18的closed-NI build 4/4、真实run 12/12通过，包括return/exception、
+两个call-stack策略、真实正向NI、旧stop拒绝、隐藏bridge和取消后的ACK。
+取消ACK生产修复来自并发工作区已有session.h改动，未归为本任务独立编写。
+上述验证精确对应source18，不能自动推广到后面的新生成器。
+
+source18 x86_64 typed operand preview实测38/40通过；两个
+heap-workspace-10000-locals场景在第一次prompt前SIGSEGV。
+cgroup内GDB确认崩溃栈位于LLVM SelectionDAG ReplaceAllUsesWith /
+DAGCombiner / MCJIT materialization；LLVM module verifier已通过。
+不能因为有log/receipt文件、预先设计了容量或编译通过就算功能PASS。
+source18的AArch64同一旧baseline由本任务通过birth/UID/argv/实际child
+cgroup检查和PIDFD受控取消，保留部分日志；这一未完成矩阵不算PASS。
+
+source22将完整snapshot copier分成每片最多256 locals的private noinline
+leaf；每个Wasm opcode仍调用同一个cached wrapper。完整addresses table
+使用已按声明数量预算的observer heap，未增加巨大的native shadow table。
+公共256-slot packet与完整packet的缓存extent分别核对，禁止错用大copy
+写入小packet；缺失初始化flag先选择immutable zero，再读取值。
+wrapper和leaf均不附加DISubprogram、Wasm activation/provenance/safepoint，
+不授予VM或host ASM地址调试权限。resumable/public layout保持原接口。
+
+source22真实组件回归12/12通过：两仓库actual生产helper经LLVM verifier
+和原生MCJIT执行，10000 locals / prefix256、9999尾值、真实更新、两种
+复制次序、absent flag、sentinel，以及错extent/短heap拒绝全部通过。
+另外原混合值组件保留scalar/v128/ref bits和1024-site线性IR检查。
+这些组件是实际DATA读写证明，不伪称为完整Wasm或ASM功能通过。
+source22的完整产品及CLI回归结果待后续实测记录。
+source22冻结身份：
+uwvm2 sha256:d00c6443df552ce2cb957794264d72d2d26cf45d1e9af46fa062fe6b40676706
+uwvm2-ros sha256:efb9097576f329ab1fc013fbc262aa9ea0c642375b4745c1fbb5e966cdaa08e1
+
+
+入口遗漏修复与真实复验 — 2026-10-06，source23 / test-overlay24
+
+source22完整产品的16条构建命令通过，但真实10000 locals仍在首个prompt前
+SIGSEGV；x86_64实际typed矩阵仍是38/40。仅将opcode copier分块不足以修复：
+入口保留了160KiB aggregate-zero及逐local展开。上述原失败记录全部保留。
+source23让观察入口复用同一个有界copier，非locals suffix及legacy packet
+清零使用LLVM memset，避免O0 SelectionDAG把巨大aggregate拆成海量值。
+私有leaf/wrapper不取得Wasm/native调试归属，原GC unavailable规则和quota保留。
+关闭debug时无checkpoint plan，不生成这些IR；普通策略仍为aot:max/O3。
+此为新增路径的源码条件保证，旧off/on数值对象证明只对应其旧冻结版本。
+
+source23的x86_64/AArch64双仓库已各以真实三个TU重新构建并链接，16条
+构建加首个真实10000 locals驱动共17/17通过，四完整产品实际输入均资格化。
+x86_64两仓库各operand40、deep15、Core3场景56，共222/222通过。
+主仓库QEMU AArch64 operand40/40已通过，含10000 locals、混合真实i32/i64、
+分页及超过64帧的真实identity；其余跨架构当前结果另记，未计为全部完成。
+
+旧checkpoint入口夹具使用prepare_owned_full_cli_source()，不保存不可变输入；
+真实materializer正确拒绝其checkpoint source identity。修复双仓库夹具为
+prepare_owned_full_cli_source(true)，在解析前保留输入，并使用fast_io::cstring_view。
+原SIGILL/materialization拒绝与cgroup内GDB诊断保留。新夹具hash：
+76793d28aa6d5afe458b83b4b67c5090c06df07e552ea338e4f3a9fc4528718c
+两个新fixture的实际compile/link共4/4通过，使用已资格化source23 runtime/host。
+随后两仓库官方parse/validate与instruction/unwind真实运行共48/48通过：
+非默认初始化GC local、nested/EH、saved GC、first-loop、identity-if、control-prefix。
+实际入口状态、原locals索引、coherent typed locals/operand查询与正常guest结果
+均核对；restore=false，不把状态观测记为完整checkpoint/reverse/replay恢复。
+
+共享组累计曾出现OOM=3、OOM-kill=1，相关准入中止记录保留。另有共享tmpfs
+低于原1GiB证据reserve的中止；没有降低64GiB/swap0或资源/ownership保护。
+只归档清理了本任务已逐文件核对的旧输出，未删除/信号操作其他任务进程。
+原keeper与boot保持不变。CLI重试保留了原guard及partial输出，未升级为PASS。
+
+为检查新多leaf helper的ASM边界，双仓库native cross CLI夹具的extra-locals
+输入范围扩到0..9999，避免argparse枚举巨大choices；实际总locals最多10000。
+新10000-locals SI/NI、物理数值寄存器、隐藏VM/helper/stack及旧stop拒绝回归
+已安排在真实四产品中；其尚未完成部分一律不算PASS。
+source23身份使用完整冻结路径到SHA256映射的canonical JSON哈希：
+uwvm2 sha256:f7b892b81b56689b5a383aa84535c5a3bec89694aab10fff3c434a5219b5a78e
+uwvm2-ros sha256:8644c380ef6e8a012dd1c7158e3cb88e3f1b90058b6e7dc7f67e332982acee9b
+本机/远端精确冻结输入和guard版本均保留；结果不会自动推广到并发修改。
+
+大函数 ASM 修复与补齐实测 — 2026-10-06，source26/27/28
+
+source23的后续CLI矩阵已经全部完成：x86_64和QEMU AArch64双仓库，
+4个完整产品各operand40/deep15/Core3 smoke56，共444个实际场景通过。
+Core3矩阵检查入口停止、调试查询和正常执行，不等于全部特性状态的穷尽检查。
+source23 closed-NI构建4/4、parse/validate和实际返回/异常执行12/12通过。
+
+真实10000-locals ASM回归在source23失败，正向指令/寄存器/步进不能因
+有日志或可拒绝而计为通过。小函数1/256 locals双策略原生回归均通过。
+cgroup内GDB测得真正JIT owner范围344388字节，超过旧64KiB函数缓冲上限；
+该地址属于真实Wasm生成函数，未授予VM/helper/host访问权限。
+
+双仓库修复全函数image为精确extent的冷路径动态存储；分配在domain/
+publication/native保护门外，进入门后重新核对真实owner、generation、epoch
+和范围。live trap回调只做已分配缓冲的核对/复制，禁止现场扩容。
+反汇编改为常量额外空间的两次前向遍历，去掉整函数64KiB/8192指令上限；
+查询页数和偏移预算保留，未知解码间隙之后不重新同步猜测边界。
+source27 pure window四次实际执行通过（双仓库、x86_64/AArch64），覆盖
+70001字节、8193条以上指令、尾部负偏移页、非边界和解码间隙拒绝。
+
+source27完整大函数ASM仍失败：真实停止点有进展，但公共指令字节仍为0。
+定位到provenance code_permissions残留的65536字节检查。
+source28双仓库删除这个整函数上限，增加owner非零/有序/完整包含核对；
+原source/epoch、unknown/ambiguous、literal-data以及4MiB累计row预算保留。
+本轮未扩大ASM授权范围，未在关闭dbg的guest路径增加代码。
+
+source28冻结身份：
+uwvm2 sha256:813ee18347bc583bc08fead2deb9a8dc88b6e91079226d228a0e6ba88b94a8ce
+uwvm2-ros sha256:1129931aa391be6f17d8087387017d4e35767b3ec9370ab70f935de583f3861d
+新的完整产品、真实ASM及Wasm回归结果将另记；旧结果不推广为source28 PASS。
+
+共享/tmp及root空间不足的原中止全部保留。source28输出迁到已有的
+/run/user/1000/uwvm-debug-source28-20261006-r1，不新建mount或测试cgroup；
+保留1GiB实际输出文件系统reserve、64GiB/swap0、PIDFD/CPU/所有权保护。
+所有实际compiler/validator/VM/QEMU测试仍在同一原cgroup进行。
+
+
+2026-10-06 source28 qualified cross-platform progress (source29/30 pending)
+-------------------------------------------------------------------------
+555 actual completed CLI case executions were rechecked against exact successful
+supervisor argv, 64 GiB/swap0 receipts, fresh binary qualification, binary and
+harness SHA-256, inputs.json and complete passing results.json:
+  x86_64 uwvm2 + uwvm2-ros: 222 cases.
+  QEMU Linux AArch64 uwvm2: 111 cases; ROS group remains queued.
+  QEMU Linux i686 uwvm2 + uwvm2-ros: 222 cases.
+Each product has 40 typed operand cases, 15 deep-frame cases and 56 Core3
+entry-stop query smoke/feature execution cases. Core3 is not exhaustive
+per-feature debugger state coverage. Pure copies and pending receipts are not
+counted as successful actual VM executions.
+
+Source28 real 10,000-local x86_64 ASM walks passed in both repositories and
+both instruction/unwind policies, with positive public machine instructions,
+numeric registers, private scaffold hiding, exact stale-stop refusal and
+retained boundary refusal. Twelve official parse/validate and true returning/
+exception NI commands also passed after fresh paired NI compile/link and
+runtime/host object binding checks. The source28 AArch64 large ASM failure is
+retained; it does not become a pass merely because Wasm preview passes.
+
+Source29 implementation removes the runtime-private physical backtrace's
+64 KiB frame/code cutoffs. At most seven CFI-owned eight-byte words are copied
+per physical frame, bounded by the actual registered worker stack; parent and
+child MC decoding remains under the same authenticated Wasm owner guards.
+Source30 implementation rebases native-step waiting at the actual target wake,
+after cold code copying and boundary/plan preparation. The production guest
+wait remains two seconds. QEMU harness walk/prompt budgets are explicit and
+retain every positive-instruction, public-register and refusal assertion.
+Both repairs are synced, frozen and retained locally as exact paired patches
+and source delta manifests. Their new runtime qualification remains pending.
+No Wasm-to-VM ASM traversal, host stack exposure or checkpoint restoration
+claim is made by these changes. No new OOM event has occurred during this run;
+historical cgroup counters are recorded separately.
+
+
+2026-10-06 source29 caller and source30 first AArch64 ASM qualifications
+---------------------------------------------------------------------
+Source29 passed 40 selected commands in the original SSH Linux 64 GiB/swap0
+cgroup: 16 fresh full-product/probe compile and link commands, eight official
+Wasm parse/validate commands, 12 actual physical Wasm caller runtime groups and
+four real MCJIT registered-CFI groups at O0/O3. All probe runtime/host inputs
+match the separately qualified fresh full products; all source/dependency/SDK
+and linked binary hashes matched again after execution.
+
+Both repositories passed both instruction/unwind policies on the new
+10,000-i64-local root/recursive Wasm fixture. Each of the four large groups
+proved 35 complete chains up to four actual parents, 35 sealed return proofs,
+35 real protected wakes, 35 no-commit retentions and 35 failed-wake rollbacks;
+it observed four genuine generation-two replacement callers and refused
+stale/forged/missing-domain/host context. Public native stack bytes remain zero.
+Small deep recursion separately proves the explicit 32-parent native query
+prefix. Sparse 200,000-byte labelled CFI cases are owned DATA tests only; the
+actual Wasm runtime groups provide separate physical-stack qualification.
+This qualifies x86_64 SysV callers; it does not qualify other ISA physical
+callers, native finish or full checkpoint/external I/O restoration.
+
+Source30 uwvm2 AArch64 passed the complete real 10,000-local ASM walk under
+QEMU in BOTH instruction/unwind policies. Each policy performed 34 real native
+transitions, 33 private scaffold observations and one retained boundary refusal.
+The current x8 register has genuinely known low 32 bits 0x00000011 (Wasm 17),
+with upper bits masked. Copied/actually executed instruction bytes, stale-stop
+refusal, VM/host stack/code filtering, no address input and managed guest/worker
+drain all passed. The immutable full-product and actual binary/source hashes
+were rechecked against successful cgroup receipts. No OOM counter increased.
+The harness permits 900 seconds per strict walk and 300 seconds per prompt;
+the production target wait remains two seconds, rebased at the true wake.
+Cold whole-function copying/MC proofs are still costly under QEMU; this repair
+is not a low-latency claim. ROS AArch64 and the complete source30 regression
+matrix remain pending. Current source30 production headers still include the
+paired source29 frame/code repair. Separate recorded source cuts are not mixed
+into a fresh product.
+
+
+2026-10-06 source28 six-product matrix; source30 full products
+------------------------------------------------------------
+Source28 has 666 verified actual CLI case executions in both repositories on
+x86_64, QEMU Linux AArch64 and i686 (111 per product: 40 typed operand/frame,
+15 deep-frame, 56 Core3 entry-query smoke/feature execution). The 10,000-frame
+case checks typed values at indices 64, 4096 and 9998. Core3 entry queries do
+not imply exhaustive intermediate debugger state coverage. Successful actual
+argv, 64 GiB/swap0 receipts, binary/harness hashes, results and qualified
+product bindings are retained in qualified-cli-progress31.json.
+
+All 16 source30 x86_64/AArch64 full-product build commands passed in both repos.
+Actual TU depfile/source/provider/SDK and final link inputs were qualified.
+ROS AArch64 large ASM, source30 CLI and NI regressions remain pending.
+A source28 RISC-V lld link exceeded its own 1 GiB RSS budget at 1,187,168,256
+bytes. Its failed receipt is preserved. The main retry passed with bounded
+RSS/admission/AS budgets of 2/4/12 GiB; the same profile applies to the ROS link.
+Shared 64 GiB/swap0 limits and supervisor guards remain unchanged.
+
+Later concurrent native-return-stop capture/authentication code is present in
+both local trees after frozen source29/30. Sparse-seven-word and large-function
+repairs remain present; frozen results do not qualify that later whole tree or
+the new return-stop implementation. Exact differences are separately retained
+in concurrent-native-return-stop-scope31.json.
+
+Actual full-product qualification JSON closures and the 666-case evidence were
+verified and retained locally in the sibling wasm-debug-audit-20261006-r1.
+Full TU archives are verified remote copies. Local TU archive copy attempts
+failed ENOSPC; only incomplete own temporaries were removed. Remote originals
+were retained and are not labelled durable local archive retention.
+
+
+2026-10-06 source30 all four large-function ASM products qualified
+-----------------------------------------------------------------
+Both repositories passed the full 10,000-local real ASM walk on x86_64 and
+QEMU Linux AArch64 in both instruction/unwind policies:8 genuine policy groups.
+Per x86_64 policy:29 native transitions,29 hidden scaffold observations and
+2 retained boundary refusals. Per AArch64 policy:34 transitions,33 hidden
+scaffold observations and1 retained boundary refusal. All groups include
+actual public copied/executed instruction bytes, positive genuine numeric
+register values, exact stale-stop and no-address-input refusals, VM/host
+code/stack filtering and managed guest/worker drain. Every binary still matches
+its fresh full product/source/depfile/SDK link qualification. OOM counters did
+not increase. Complete evidence is retained locally as source30-full-ASM-
+qualified31.json in the sibling audit directory (four products,eight groups).
+The production two-second target-wait budget is unchanged. QEMU cold
+whole-body copying and MC boundary proof latency remain high; no GDB-speed
+or all-ISA equivalence claim follows. Same-cut CLI and NI results remain pending.
+
+
+2026-10-06 source30 complete selected regression qualification
+--------------------------------------------------------------
+Both frozen source30 full products on x86_64 and QEMU Linux AArch64 passed
+the selected CLI regression: 444 actual cases across 12 suite groups (40 typed
+operand cases, 15 deep-frame cases and 56 Core3 entry-query/feature smoke cases
+per product). Closed NI probe compile/link: four commands passed with exact
+full runtime/host-object bindings; official parse/validation and actual
+return/exception NI runtime: twelve commands passed. Together with the prior
+16 full-build commands and eight real large-function ASM policy groups, these
+complete the selected source30 matrix. Results, successful receipts, binary
+bindings and source/SDK qualification are recorded in the locally retained
+source30-complete-qualified-results31.json. These selected tests do not qualify
+all intermediate Core3 states, every exception cause, native finish or all ISAs.
+
+Source28 RISC-V full products were qualified after both bounded link retries.
+The first actual operand suite passed 30 cases, then deep-300-pagination failed
+to reach the initial debug prompt within 300 seconds; observations were empty.
+The failed row is retained and is NOT counted as a passing execution. The
+owned suite was cancelled through the existing supervisor's PIDFD handling;
+owned descendants were retired, no foreign process was signalled, and no OOM
+counter increased. Cold-start diagnosis remains open. The warning about the
+unrecognized zicfiss feature is recorded, not asserted as the cause.
+
+Current paired trees additionally contain concurrent language scalar conversion
+and optional ASM harness policy-selection edits after source30. Exact changes
+are retained in concurrent-controller-harness-scope31.json. The true-wake
+timeout repair remains present; frozen source30 results do not qualify the
+current whole trees or later native-return-stop implementation.
+
+
+2026-10-06 source31/33 incremental observer and numeric marker repair
+--------------------------------------------------------------------
+Paired compiler repairs retain unchanged numeric SSA packet cells only for the
+actual trusted observation producer. Shrink forgets popped cells; references
+are always refreshed; narrower cells clear their complete padding. Mutable
+locals still capture at every opcode. Real Wasm CFG changes refresh the packet;
+only compiler-created normal shutdown-poll successors may carry its witness.
+Legacy/resumable packets retain complete overwrite. DBG-off returns before
+packet IR or cache allocation.
+
+A second compiler repair records changed native numeric definitions, avoiding
+repeatedly forcing every retained prefix into registers before/after each
+opcode. New opcode tops in the existing native numeric projection still have
+an actual consuming completion marker. Tracking handles follow SSA deletion/
+RAUW; new Wasm CFG blocks refresh. This is compiler metadata reuse, not a claim
+that old register values survive a host call. ASM authority remains exact
+current-PC register-only DWARF and genuine Wasm-generated code. The Wasm
+operand preview remains a complete, separately typed observation packet.
+
+Both frozen source33 native DATA components passed actual LLVM verification and
+MCJIT execution in the original 64GiB/swap0 cgroup: 609 packet captures, 5024
+packet IR instructions, and 300-push/drop numeric stress with 2062 IR
+instructions. Tests cover repeated same-opcode identities, shrink/pop reuse,
+NaN/v128/padding, distinct CFG refresh, opaque reference refusal and no DBG-off
+IR/cache. The new numeric test needs LLVM's real native asm parser; source32's
+initial fixture-init failure is preserved and excluded. Source33 fixes this
+test setup and has six passing compile/link/native execution commands. Actual
+depfile, frozen source, provider/SDK and final product bindings are retained in
+current33-packet-ir-qualified-inputs/results.json.
+
+Source31 complete RISC-V main and ROS products were built and qualified, but
+the main deep-300-pagination test still failed its original 300-second initial
+prompt in both policies. Empty observations and failed receipts are retained,
+not counted as passes. Source33 additionally removes the repeated native
+numeric markers. Its fresh main full RISC-V product is qualified, and an actual
+QEMU instruction-policy retry now passes in about 23 seconds for the complete
+harness: all 300 typed i32 values 37..336, full paging, subsequent empty stack,
+guest exit 0, managed worker retirement. Original prompt/stop limits stay
+300/120 seconds. Evidence: current33-rv-first-preview-qualified-results.json.
+ROS, unwind policy and fresh full-product ASM/operand regressions are pending.
+
+Own prior build products/TUs are verified in remote disk archives under
+/tmp/wasm-debug-reboot-20261005-r1/owned-archive-retention31. Finite executable
+tmpfs paths for moved prior archives are verified symlinks to those retained
+copies. Reclaimed originals were only own unchanged regular files with no
+live reference; old TU/product qualification requires archive restoration.
+The output reserve, all ownership guards, 64GiB/swap0 limits and foreign
+process isolation remain unchanged. These remote archives are not described
+as durable local copies. Metadata, source deltas and selected JSON evidence
+are retained locally in the sibling wasm-debug-audit-20261006-r1 directory.
+
+
+2026-10-06 source33 full RISC-V operand and DBG-off completion
+------------------------------------------------------------
+Both fresh full RISC-V products were built from the frozen source33 cut and
+qualified against their actual runtime/host/main depfiles, linked LLVM SDK17
+and provider17 inputs. Main binary SHA256 is
+e30c7a0a51ed32b8445bf143b25fd3dd0bcb8c6249e9e0c73aff052f5fb0d1c4; ROS is
+5faaebd964adaa63bc193a1a14789ba045a61273e5966d106b2439c3279bf135.
+The paired deep-300 targeted retries passed all four repo/policy groups.
+Original 300-second prompt and 120-second stop limits were preserved.
+
+The complete selected operand suite now passes 80/80 actual CLI cases: twenty
+fixtures in instruction/unwind policies for both repositories. It checks
+scalar bit patterns, SIMD, GC/reference types, both if branches, loops,
+multivalue calls/caller prefixes, tail-call, exception payload/rethrow,
+nondefaultable locals, atomic RMW/load/wait, 300-slot paging and subsequent
+empty stack, 1000/1001/10000 locals, and a preview site reached through a
+72-activation recursive fixture. Every row contains actual typed observations,
+normal guest exit 0 and managed native-error=0 retirement. No unavailable
+preview row is counted as complete. These selected cases do not establish all
+intermediate states of every Core3 feature, all thread schedules or Wasip1.
+Official wasm-tools parse/validate is a checked subprocess in the hash-bound
+successful harness; these short processes need not appear in periodic rosters.
+The genuine QEMU/VM execution argv and original cgroup were observed directly.
+Evidence: current33-rv-operand-regression-qualified-results.json (80 cases),
+SHA256 759206553df3793a078eb04c672ca2a7ee38311a0e1ce372f1cd257c71be0f90.
+
+Both source33 RISC-V VMs additionally pass all four normal -Raot executions
+without -Rdbg, using the same deep-300 fixture and both call-stack policies.
+No debugger prompt appeared; actual process return code is zero. Together
+with the two native component no-IR checks, this supports the DBG-off contract
+for this change. The four normal runs are correctness evidence, not a
+performance benchmark. Evidence: current33-rv-dbg-off-runtime-qualified-
+results.json, SHA256
+75e98d90db6f2e2b0d40ffd546bc8371060eaa805f382b06d870d92ba6039238.
+All these receipts bind 64GiB/swap0, unchanged OOM counters, exact binaries,
+source identities, harness, QEMU, fixture/log/result hashes and owned-process
+retirement. Both qualification JSON files are retained locally.
+
+At this checkpoint the fresh x86_64 full build still waits for its original
+9GiB admission headroom; its compiler has not launched. Native DATA components
+have passed, but current33 full x86_64 ASM/operand regressions remain pending.
+Previously qualified source30 x86_64/AArch64 ASM results do not qualify this
+new native-marker optimization. No all-ISA or GDB-speed assertion is made.
+The eight paired implementation/unit files still match the source33 cut.
+
+Additional own completed/superseded TU and product originals were removed
+only after exact no-live-reference and archive member/hash checks. Verified
+remote archives: completed-source31-RV-TUs-and-failed-component32-33.tar.gz and
+completed-own-superseded30-31-products-and-source33-RV-TUs33.tar.gz under
+/tmp/wasm-debug-reboot-20261005-r1/owned-archive-retention31. Current source33
+full RISC-V binaries and native components remain executable. Source33 RISC-V
+TU requalification requires restoring its archived .o/.d originals; the
+completed qualification JSON and evidence remain retained. The original
+1GiB output reserve and 8/9/12GiB native runtime budgets are unchanged.
+
+
+2026-10-06 source33 native admission result and evidence retention
+----------------------------------------------------------------
+The source33 x86_64 full build exhausted its original one-hour admission wait
+for 9GiB memory headroom. The exact receipt contains no process history or
+retired child, zero owned RSS, null execution time and no compiler log. It is
+a resource admission failure, not a compiler or VM failure. No OOM counter
+increased; the same boot and keeper remained alive. Fresh full native ASM,
+native operand and native DBG-off suites were never started and remain
+unverified. The idle metadata wait ended independently without signalling
+any target. Failed receipts/status and original plans/profiles are retained;
+future retry must preserve this evidence and use unchanged budgets after
+rechecking actual available resources. Evidence:
+current33-native-admission-unexecuted-qualified.json and
+current33-native-products-admission-failure-receipts.json in the local audit.
+
+A compact copy of the completed source33 RISC-V regressions is now also
+verified locally: source33-RV-selected-regression-evidence.tar.gz, 232 members,
+773782 bytes, SHA256
+3874d24dffc8332286e0048f33cefef7af6840190dfd543191ee36232df091eb.
+Each archive member matches its retained manifest. It contains only own
+completed plans/profiles/status, receipts, original logs, fixtures, typed
+results and product qualifications. This small evidence archive is a durable
+local copy; full TUs/product archives described above remain remote copies.
+Both repositories' implementation and unit-test bytes still match frozen33.
+
+2026-10-06 ASM forward-window repair, source35 through source38
+------------------------------------------------------------
+Paired uwvm2 and uwvm2-ros production changes: nonnegative disassembly pages
+retain at most 32 rows during the same entry-to-stop boundary proof. Immediate
+ordinary step successor reuses the validated adjacent row. Negative offsets,
+distant branch/NPC proofs, unknown-prefix refusal, mapping DATA masks, owned
+function bounds and all actual runtime authorization remain in force. These
+are cold debugger queries; this patch adds no normal guest IR or execution path.
+
+Actual old performance assertion reproduced in both repositories: a 70001-byte
+late stop required 140002 decode calls. Repaired finite policy requires 70001.
+Actual native x86 MC current+ordinary successor now requires 2 decodes, previously 6.
+Both source trees retain the preexisting concurrent SPARC annul/NPC and ARM
+mapping edits present in the before snapshot. Paired 12-file patch:
+paired-ASM-forward-repair35-38.patch, SHA256
+3d3118259f75edf059e266da56eb6e7019dfef36eafca16205c02abef8b11100.
+
+Completed 20 selected component executions: x86_64 native and QEMU Linux
+RISC-V64/AArch64/i686, both repositories. Native cases include finite window,
+actual window MC, actual step-boundary MC and generic actual target MC.
+Cross cases include finite window and real target MC. The final generic probe
+derives endian/length/assembler alignment from the actual linked MC tables.
+Its original missing-endian compile failure and incorrect manual RV/AA target
+description failures are preserved; no decoder or boundary assertion was relaxed.
+Expected old counter failure initially lost buffered stdout; original failure
+receipt retained and the same native binary rerun through aPTY recovered its
+actual140002 count. These are DATA components, not live Wasm/ASM gate qualification.
+
+Remote current38-forward-components-qualified-results.json binds 94 actual
+completed compile/link/execute/expected-reproduction commands, object/depfile,
+frozen source35/36/37/38 headers, provider17 dependencies, explicit SDK link
+inputs and binary/receipt/log SHA256. 7710180 bytes, SHA256
+f25caee3540e400494401eac468c4c5bbf214afb14f4d1a7033252bc3c54eddf.
+Selected 20 result labels are in local source35-38-selected-results.json.
+Each qualified receipt retained 64 GiB/swap0, no foreign adoption/signals and
+unchanged cgroup memory events. Original failed rows are excluded.
+
+Source33 actual full RV VM diagnostic: 8 small managed-quit cases passed,
+both repositories, instruction/unwind, Wasm stop/native stop. Independently,
+the 10000-local Wasm-only stop then quit aborted with uncaught private shutdown
+signal, without any ASM step. The earlier large ASM 900 sec walk failure and
+this separate quit failure are retained. Source38 private actual MCJIT C-ABI
+diagnostic passed in both header/compiler closures: 3 recursive 240000-byte
+frames, registered native backtrace and foreign C++ exception caught after
+generated frames. This simple scenario does not qualify real Wasm cleanup or
+identify the remaining large-function root cause.
+
+After shared headroom rose above 9 GiB, fresh source38 full x86_64 and RV products
+were dispatched with original runtime 8/9/12 GiB budget, no reduced admission.
+The driver reported START first runtime, then SSH became inaccessible through
+both known Tailscale IPv4/IPv6. Compiler launch/completion and resulting full
+products are UNKNOWN. The 12 actual product ASM cases and one guarded external
+developer GDB diagnostic are prepared, not run/qualified. The GDB script binds
+only its own unreaped QEMU child PIDFD/birth/listening socket; it grants no VM
+debugging capability to the public Wasm ASM interface. No whole-Core3/all-ISA,
+new full-runtime pass, large-function fix, or GDB-speed claim is made.
+
+Own storage retention: closed NI11-15 local archive 148973498 bytes moved to
+linux owned-archive-retention31/owned-closed-ni11-15-local-retention38.tar.gz
+after SHA256/tar-member/fsync verification; old local duplicate removed.
+Nineteen completed own DATA binaries35..37 archived and member-verified at
+linux owned-archive-retention31/completed-source35-37-DATA-components38.tar.gz
+(193950365 compressed bytes), releasing 515961600 tmpfs bytes. Object/depfile
+and passed/failed raw logs retained. No foreign files removed. One controlled
+clean regular-file cache reclaim after actual new MC compilations used
+swappiness=0; no anonymous/swap request, limits or process signals changed.
+SSH interruption leaves fresh full-build state pending; do not restart it or
+overwrite its evidence until actual boot/keeper/PID state is recovered.
+
+One later intermittent SSH response confirmed the same boot and fresh full
+product stage still running, completed_commands=0. Subsequent IPv4/IPv6 and
+control-master reconnects timed out. Actual compiler launch or completion is
+still unverified. Preserve this in-flight stage and recover its real state
+before a resume/retry; no second full build was started.
+
+
+2026-10-06 reboot recovery39 / native diagnostic40
+------------------------------------------------
+New boot7458ba8f-e0eb-4fff-be38-97fc93aab47a. Old /tmp and
+/run/user/1000 roots and deleted uwvm3-implementation dependencies are gone.
+The old current38 full stage was interrupted by reboot; its result remains
+unqualified. Remote-only historical archives in the erased tmpfs are lost;
+local source/qualification metadata and local source39 transport are retained.
+
+Restored64 GiB/swap0 shared cgroup keeper45005 birth74453, UID1000.
+CPUs were independently restored to0,2,4,6,16-31; own workers retain16-31.
+Persistent root:/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2.
+Other ASM tasks have reused that root/cgroup; their paths/processes are never
+removed,adopted or signalled. Own path inventory isown-paths39.json.
+Folder admission/periodic high-water16 GiB,filesystem free floor24 GiB;
+these are monitor/stop policies,not a filesystem quota. Logs32 MiB,file512
+MiB,cores0,RSS/AS/deadline/PIDFD checks retained. Serial shared lock prevents
+this full product build from overlapping the ongoing shared SDK build.
+
+One fresh paired source/fixture cut restored12617 files147413861 raw bytes.
+20 historical test result JSON files omitted from the execution folder.
+Native actual source identities:
+uwvm2 sha256:565015ceb8a0e6d0037c9012b7328349bf714bb250d8c417dd0fc8e2184d60bc
+uwvm2-ros sha256:79ac60bc3c2b222718dd18364bc872ce00edc31adb6fbfe3a615473e99113f2f
+No old/source38 header or full-product qualification is inferred from this cut.
+
+Actual environment-smoke2/2 passed:worker verified its own cgroup/CPU/limits
+and Clang started inside cgroup. Both finite window-policy components passed.
+Private native diagnostic40:three recursive activations, four actual Invoke
+cleanup/Resume callbacks,foreign C++ exception caught; small,10000-alloca
+large-frame,10000-store long-code cases all passed inboth repository closures.
+It uses installed native LLVM23 and isnot real Wasm producer/managed shutdown
+qualification. The original ROS compile failure retained because that tree
+no longer exposes legacyconditional-temp-label helper. Paired new diagnostic
+now retains labels directly; local SHA256
+9cc061e6b0277990f8fcfe417549abc24991bbca6f3602fdf3eb989348856705.
+
+Static QEMU package1:10.2.1+ds-1ubuntu3.2 restored40 binaries(~136 MiB
+allocated). Package SHA256
+f0585a9676a039f46607f185b3657c1e78c1ba4187595724cc567fcc1ae0d1b9.
+10 selected QEMU versions passed inside cgroup:AA,PPC64/PPC64LE,MIPS64/LE,
+SPARC/SPARC64,LoongArch64,i686,RV64. This doesnot qualify guest sysroots or
+Wasm products. Deleted patched cross SDK/sysroots requirefresh preparation.
+
+Atthis recording,recovery39-full-native-products has0 completed commands;
+its compiler hasnot startedwhile the shared SDK build owns the serial lock.
+Original full runtime8/9/12 GiB budget preserved. Selected native/tool checks
+retained zero OOM events. Shared root about2 GiB,disk free about123 GiB.
+Own closed historical560869061-byte product archive relocated/fsynced/member
+verified onpersistent disk,and exact local duplicate removed; source metadata
+retained locally. No foreign artifacts deleted.
+
+2026-10-06 recovery46/48/49/50: verified native environment restored
+
+This later result supersedes the pending recovery39 status above. Restored
+64 GiB/swap0 cgroup and persistent arena; current boot/keeper identities are
+pinned in RECOVERY-RESULT50.json. All builds, validators, VM and QEMU checks
+were supervised in the cgroup. Peer tasks/files were neither modified nor
+adopted/signalled. Folder 16 GiB high-water and filesystem 24 GiB free floor
+are periodic/admission stop policies, not filesystem quotas.
+
+Original generic-LLVM and budget/link failures remain recorded:
+- main-only retained-import helpers called getTerminatorOrNull, absent from
+  installed LLVM23.0. Safe empty()/back()/isTerminator() checks now preserve
+  null results for unfinished blocks across API versions. ROS has removed
+  that lazy compilation path; do not reintroduce it into ROS full modes.
+- Main TU exceeded old 3 GiB RSS cap and was retired; measured successful
+  compile uses 4/5/6 GiB RSS/headroom/AS. Runtime stays 8/9/12 GiB.
+- Zstd runtime existed but development linker alias was absent.
+- Generic LLVM native41 JIT startup failed; ROS explicitly requires bundled
+  LLVM23.1.1-uwvm-ros.11. Rebuilt both products with that exact existing shared
+  SDK, after verifying 64 archives, generated headers and vendor source cut.
+  No new SDK copy, no pinned-version bypass. SDK proof is metadata only while
+  the actual complete VM is independently compiled/linked and run.
+
+Recovery46: all eight fresh native compile/link commands passed. Source41
+contains source39 plus four main-tree compatibility edits, unchanged files
+hardlinked. 5190 actual dependency files and both full LLVM+uwvm-int products
+verified in recovery46-native-products-qualified.json. Source identities:
+uwvm2 sha256:e453add270bfeb9418442e3ed83f89bcf978018748498dfc2644cc4ab0564874
+uwvm2-ros sha256:23f22802e84e45c36cbac3d7809e9c5d2b48e366077729c1a4416d5e6e156f95
+
+Recovery48/main 6/6 and recovery49/ROS 5/5 commands passed. Each repository
+ran both instruction/unwind policies for mixed numeric bit values (i32/i64,
+negative zero, NaN payloads, v128), 10000 locals and typed operand preview,
+65 actual activations with paginated ancestor values/replacement checks, and
+native SI/NI copied Wasm instruction/positive register/scope checks. Actual
+VM executions total16. Native scope tests require hidden scaffold suppression,
+stale stop denial, blocked transfers, masked stack registers and successful
+managed quit. These are restoration smoke cases, not complete Core3 coverage.
+
+Closed unqualified native41 products verified/archived: 302702694 raw bytes
+to 30633933 compressed bytes, then own loose files removed. Archive SHA256
+d3de6041f7f439a1445e631da9440b2dda8bdba79ed5663642d6e8eecef3d1a8.
+Current source, SDK46 products, failed/passed receipts and peer files retained.
+
+Ten QEMU startup/version checks passed earlier. Deleted cross sysroots and
+cross SDK products still need per-architecture rebuilding; no restored guest
+Wasm execution or all-architecture equivalence is asserted. Prior large-RV
+managed shutdown issue remains unqualified on the new environment.
+
+Final snapshot: folder 4.83 GiB, filesystem free 115.60 GiB,
+shared cgroup memory 17.32 GiB, OOM/max counters0.
+Full machine-readable record: /Users/liyinan/Documents/MacroModel/wasm-debug-audit-20261006-r1/RECOVERY-RESULT50.json.
+
+2026-10-06 follow-up60: paired 10 new exact Wasm debugger fixtures; 686 actual
+Linux x86_64 VM sessions qualified. See wasm-debug-followup-20261006.txt.

@@ -1,0 +1,193 @@
+{
+  "schema": "uwvm-cross-module-reference-runtime-20261008-v1",
+  "passed": true,
+  "source_identities": {
+    "uwvm2": "sha256:1d6de706d4eea6124474021534431209ff548f1cd529cf1bfce8503f51228e2f",
+    "uwvm2-ros": "sha256:99b8ea8f9ca068b44fdaa12f7c8d89cf7360b5980e1a218b618cbc4f3b5398de"
+  },
+  "source_cut": "imported-tag qualified C++ cut plus pinned reference test overlay",
+  "producer_stage": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2",
+  "pilot_stage": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-reference-r4",
+  "runtime_stage": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-reference-r5",
+  "producer_closed": true,
+  "pilot_closed": true,
+  "runtime_closed": true,
+  "actual_VM_sessions": 192,
+  "typed_pauses": 312,
+  "GC_exception_member_pages": 10224,
+  "counts": {
+    "uncaught": 120,
+    "handled": 72
+  },
+  "architectures": [
+    "x86_64",
+    "riscv64",
+    "aarch64"
+  ],
+  "jit_policies": [
+    "default",
+    "max"
+  ],
+  "call_stack_policies": [
+    "instruction",
+    "unwind"
+  ],
+  "coverage": [
+    "cross-module struct/packed-i16 array provenance",
+    "negative i31",
+    "null extern",
+    "extern wrapper underlying-object alias",
+    "real Wasm function reference identity",
+    "caller GC locals and operand prefix",
+    "imported/re-exported tag identity",
+    "same signature different tag negative control",
+    "forwarded tail activation retirement",
+    "cross-module throw_ref",
+    "immutable reference-bearing exception payload",
+    "actual uncaught before-unwind inspection and fatal continuation",
+    "matching handler no-false-uncaught controls",
+    "full/final/empty original-root member pages",
+    "terminal VM/helper ASM admission refused"
+  ],
+  "production_Cpp_change_required": false,
+  "harness_overlay": {
+    "uwvm2/test/0018.debugger/run_wasm_uncaught_import_cli.py": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-reference-r5/harness/uwvm2/run_wasm_uncaught_import_cli.py",
+      "sha256": "9589f8ab2991cf954b60e9cbdfaedcd65ce86adb0c73c9b908b80d3e9fd56130",
+      "bytes": 13548
+    },
+    "uwvm2/test/0018.debugger/run_wasm_uncaught_reference_cli.py": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-reference-r5/harness/uwvm2/run_wasm_uncaught_reference_cli.py",
+      "sha256": "a34753e5ac51201932a878153f06a055159f42b98bf8fa4b7fccefe49218a059",
+      "bytes": 11218
+    },
+    "uwvm2/test/0018.debugger/wasm_uncaught_reference_cases.py": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-reference-r5/harness/uwvm2/wasm_uncaught_reference_cases.py",
+      "sha256": "b79e924ac46512b7eaf80947f15babbbf52cf6aabe1b5f2f2e5fb0bde050fb83",
+      "bytes": 9962
+    },
+    "uwvm2-ros/test/0018.debugger/run_wasm_uncaught_import_cli.py": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-reference-r5/harness/uwvm2-ros/run_wasm_uncaught_import_cli.py",
+      "sha256": "9589f8ab2991cf954b60e9cbdfaedcd65ce86adb0c73c9b908b80d3e9fd56130",
+      "bytes": 13548
+    },
+    "uwvm2-ros/test/0018.debugger/run_wasm_uncaught_reference_cli.py": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-reference-r5/harness/uwvm2-ros/run_wasm_uncaught_reference_cli.py",
+      "sha256": "a34753e5ac51201932a878153f06a055159f42b98bf8fa4b7fccefe49218a059",
+      "bytes": 11218
+    },
+    "uwvm2-ros/test/0018.debugger/wasm_uncaught_reference_cases.py": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-reference-r5/harness/uwvm2-ros/wasm_uncaught_reference_cases.py",
+      "sha256": "b79e924ac46512b7eaf80947f15babbbf52cf6aabe1b5f2f2e5fb0bde050fb83",
+      "bytes": 9962
+    }
+  },
+  "producer_qualification_sha256": "c2d4ab02f9677bdc5977428f016f000bc3f7fce1076942c6ed77e493a4286ba3",
+  "runtime_qualification_sha256": "0eecc07c81263a6dc2437fb8f3b4702f7ccdc592f6371962b1d2ac0d9394142d",
+  "root_retirements": {
+    "pilot": [
+      {
+        "pid": 1144985,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      }
+    ],
+    "runtime": [
+      {
+        "pid": 1148525,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      },
+      {
+        "pid": 1184214,
+        "pidfd_readable": true,
+        "actual_reaped_returncode": 0
+      }
+    ]
+  },
+  "products": {
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/native/uwvm2/uwvm": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/native/uwvm2/uwvm",
+      "bytes": 178943824,
+      "sha256": "78ec233b43d98edf7c1c5dd626fd64631c98360fc1075356df1696a9a27e2faa",
+      "compressed_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/native/uwvm2/uwvm.gz",
+      "compressed_sha256": "3bb21f75f968ed769624ad0f46534f8154d5549c6bebe2380c809fab3b64c599"
+    },
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/native/uwvm2-ros/uwvm": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/native/uwvm2-ros/uwvm",
+      "bytes": 144500024,
+      "sha256": "8bf51faaf6e2a3e2bdf8ffa9d390019d8b37450e2aed10acdb6b995bdd0259c3",
+      "compressed_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/native/uwvm2-ros/uwvm.gz",
+      "compressed_sha256": "f57b199e6fb049c11f39ffebdc22a0689bf56a357869ce2ed31a335cb0a90256"
+    },
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/riscv64/uwvm2/uwvm": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/riscv64/uwvm2/uwvm",
+      "bytes": 176205256,
+      "sha256": "f5b6054c75086e4a96c619e5b01b2ce073323b4696775c938f4315c54da43a80",
+      "compressed_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/riscv64/uwvm2/uwvm.gz",
+      "compressed_sha256": "ba97763a74e3cc8bff5e9018ed9a857d60193fd058b7655010c66b297cf3ef09"
+    },
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/riscv64/uwvm2-ros/uwvm": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/riscv64/uwvm2-ros/uwvm",
+      "bytes": 140995552,
+      "sha256": "6a79903181fa43e40895ec8ae7dae5b577a55e6654e8e52f7b2e6afdc92ce56d",
+      "compressed_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/riscv64/uwvm2-ros/uwvm.gz",
+      "compressed_sha256": "64d206c2cc1fbeec45bdde02af0675d6957b702aed88c3ebc248e7419ba93298"
+    },
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/aarch64/uwvm2/uwvm": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/aarch64/uwvm2/uwvm",
+      "bytes": 204032544,
+      "sha256": "482883822ca56c80f933deaeda90890dee2bf68c27f62a163640cf680598288f",
+      "compressed_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/aarch64/uwvm2/uwvm.gz",
+      "compressed_sha256": "bc7bbca1e6727f959058b561abc68df0b052e9baab802a8f7bc742277a74ad99"
+    },
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/aarch64/uwvm2-ros/uwvm": {
+      "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/aarch64/uwvm2-ros/uwvm",
+      "bytes": 155473536,
+      "sha256": "cbf008a779c03a3a12bc1d3da9216549a4cbe237006ad51ddcf444d9da87b98c",
+      "compressed_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-import-build-r2/products/aarch64/uwvm2-ros/uwvm.gz",
+      "compressed_sha256": "5979c74864a01d0b6290e6c13c1279956d9d6a0184577be2db2030aaf16f1bbf"
+    }
+  },
+  "reused_producer_compilation_link_roots": 24,
+  "reused_producer_detached_DAP_tests": 100,
+  "all_compile_dependencies_prebound": true,
+  "resource": {
+    "owned_RSS_peak_bytes": 358236160,
+    "cgroup_memory_bytes": 68719476736,
+    "cgroup_swap_bytes": 0,
+    "all_OOM_max_events_zero": true,
+    "foreign_processes_signalled": false,
+    "foreign_processes_adopted": false,
+    "private_folder_budget_bytes": 17179869184,
+    "required_actual_free_bytes": 25769803776
+  },
+  "latest_mutable_working_tree_qualified": false,
+  "all_Core3_qualified": false,
+  "all_architectures_qualified": false,
+  "threaded_or_host_origin_uncaught_qualified": false,
+  "quota_exhaustion_qualified": false,
+  "debug_off_measured_performance_qualified": false,
+  "remaining_scope": [
+    "threaded and host-origin uncaught runtime paths",
+    "quota exhaustion",
+    "other full-LLVM architectures",
+    "all-Core3 completion",
+    "measured debug-off performance",
+    "later concurrent source changes"
+  ],
+  "retained_failures": [
+    {
+      "stage": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-reference-r1",
+      "reason": "invalid nullable reference fixture;0 VMs"
+    },
+    {
+      "stage": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-reference-r2",
+      "reason": "member header oracle and WAT token separation;4 VMs"
+    },
+    {
+      "stage": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/wasm-trap-stop-20261007-r1/uncaught-reference-r3",
+      "reason": "member MODULE/FRAME argument order and local.tee declared nullable type oracle;16 VMs"
+    }
+  ]
+}

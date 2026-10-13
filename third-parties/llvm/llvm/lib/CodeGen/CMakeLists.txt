@@ -22,6 +22,20 @@ if (DEFINED LLVM_HAVE_TF_AOT OR LLVM_HAVE_TFLITE)
   endif()
 endif()
 
+# Clang 23's optimized MIPS64EL N64 host build dereferences an end iterator
+# in ScheduleDAGInstrs::addPhysRegDeps on a real MCJIT O3 function. Compile
+# only this host scheduler TU without optimization, avoiding the O1 PCH too.
+# This does not alter the generated Wasm code's CodeGenOptLevel or IR passes.
+# Other compilers, ABIs and architectures keep their normal build policy.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND
+   CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 23 AND
+   CMAKE_CXX_COMPILER_VERSION VERSION_LESS 24 AND
+   LLVM_HOST_TRIPLE MATCHES "^mips64el(-[^-]+)?-linux-gnuabi64$")
+  set_source_files_properties(ScheduleDAGInstrs.cpp PROPERTIES
+    SKIP_PRECOMPILE_HEADERS ON
+    COMPILE_OPTIONS "-O0")
+endif()
+
 add_llvm_component_library(LLVMCodeGen
   AggressiveAntiDepBreaker.cpp
   AllocationOrder.cpp

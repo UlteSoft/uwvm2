@@ -70,6 +70,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ::uwvm2::parser::wasm::standard::wasm1::section::section_span_view sec_span{};
 
         ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::features::final_wasm_code_t<Fs...>> codes{};
+        // Preserve the binary encoding gate after an extension projects equivalent nullable local types.
+        // Copying/moving a code section preserves this policy metadata without changing guest frame layout.
+        bool locals_require_function_references{};
+        // The encoded valtype of every run counts, including a zero-count unused run.
+        bool locals_require_exceptions{};
     };
 
     /// @brief Define functions for value_type against wasm1 for checking value_type
@@ -461,6 +466,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 //                                                                   ^^ section_curr
 
                 ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> fvt;
+
+                // Extension hooks own their bounded, transactional cursor update. Wasm 1.0-only feature
+                // packs and custom type replacements keep the existing one-byte ADL path below.
+                if constexpr(requires { { define_parse_extended_codesec_value_type(sec_adl, module_storage, section_curr, code_end, fvt,
+                    fle.requires_function_references, fle.core_type, fle.has_core_type, err, fs_para) } -> ::std::same_as<bool>; })
+                {
+                    if(define_parse_extended_codesec_value_type(sec_adl, module_storage, section_curr, code_end, fvt,
+                        fle.requires_function_references, fle.core_type, fle.has_core_type, err, fs_para))
+                    {
+                        // [local count][complete explicit valtype] next local/expression ... code_end
+                        // [safe                                  ] unsafe (could be code_end)
+                        //                                          ^^ section_curr after the checked hook.
+                        fle.type = fvt;
+                        codesec.locals_require_function_references |= fle.requires_function_references;
+                        code.locals.push_back_unchecked(::std::move(fle)); // Local vector count/reserve proved above.
+                        continue;
+                    }
+                }
 
                 ::std::memcpy(::std::addressof(fvt), section_curr, sizeof(::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>));
 

@@ -92,6 +92,7 @@
 #include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/IR/DebugLoc.h"
+#include "llvm/IR/Function.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/TargetMachine.h"
@@ -660,7 +661,8 @@ void MipsBranchExpansion::expandToLongBranch(MBBInfo &I) {
       BuildMI(*LongBrMBB, Pos, DL,
               TII->get(STI->inMicroMipsMode() ? Mips::BC_MMR6 : Mips::BC))
           .addMBB(TgtMBB);
-    } else if (SameSegmentJump) {
+    } else if (SameSegmentJump &&
+               !MFp->getFunction().hasFnAttribute("uwvm.native.debug.pcrel")) {
       // Pre R6:
       // $longbr:
       //  j $tgt
@@ -670,6 +672,9 @@ void MipsBranchExpansion::expandToLongBranch(MBBInfo &I) {
       BuildMI(*LongBrMBB, Pos, DL, TII->get(Mips::J)).addMBB(TgtMBB);
       TII->insertNop(*LongBrMBB, Pos, DL)->bundleWithPred();
     } else {
+      // Static native-debug long edges use a full-width relocated MBB address.
+      // R_MIPS_26 would otherwise introduce a RuntimeDyld trampoline outside
+      // the exact published Wasm function, including same-segment local jumps.
       // At this point, offset where we need to branch does not fit into
       // immediate field of the branch instruction and is not in the same
       // segment as jump instruction. Therefore we will break it into couple
@@ -706,7 +711,8 @@ void MipsBranchExpansion::expandToLongBranch(MBBInfo &I) {
             .addReg(Mips::AT)
             .addMBB(TgtMBB, MipsII::MO_ABS_LO);
       }
-      buildProperJumpMI(LongBrMBB, Pos, DL);
+      if (buildProperJumpMI(LongBrMBB, Pos, DL))
+        TII->insertNop(*LongBrMBB, Pos, DL)->bundleWithPred();
     }
   }
 
@@ -887,7 +893,8 @@ bool MipsBranchExpansion::handlePossibleLongBranch() {
 
       if ((Br != End) && Br->isBranch() && !Br->isIndirectBranch() &&
           (Br->isConditionalBranch() ||
-           (Br->isUnconditionalBranch() && IsPIC))) {
+           (Br->isUnconditionalBranch() &&
+            (IsPIC || Br->getOpcode() == Mips::B)))) {
         int64_t Offset = computeOffset(&*Br);
 
         if (ForceLongBranchFirstPass ||
@@ -932,6 +939,25 @@ bool MipsBranchExpansion::runOnMachineFunction(MachineFunction &MF) {
 
   MFp = &MF;
 
+  // An actual UWVM native-debug function must keep short internal edges in
+  // its exact published body. RuntimeDyld's static R_MIPS_26 path otherwise
+  // sends even local J edges through a section-tail trampoline. Do not make
+  // that trampoline part of the debugger's code/register authority.
+  // B has the same one-MBB operand/delay-slot shape. The existing range pass
+  // below still expands every out-of-range edge; neither ABI nor calls change.
+  bool DebugPcrelChanged = false;
+  if (MF.getFunction().hasFnAttribute("uwvm.native.debug.pcrel") &&
+      ABI.IsN64() && !STI->inMips16Mode() && !STI->inMicroMipsMode() &&
+      !STI->hasMips32r6()) {
+    for (MachineBasicBlock &MBB : MF)
+      for (MachineInstr &MI : MBB)
+        if (MI.getOpcode() == Mips::J && MI.getNumExplicitOperands() == 1 &&
+            MI.getOperand(0).isMBB()) {
+          MI.setDesc(TII->get(Mips::B));
+          DebugPcrelChanged = true;
+        }
+  }
+
   ForceLongBranchFirstPass = ForceLongBranch;
   // Run these at least once.
   bool longBranchChanged = handlePossibleLongBranch();
@@ -940,7 +966,7 @@ bool MipsBranchExpansion::runOnMachineFunction(MachineFunction &MF) {
   bool loadDelaySlotChanged = handleLoadDelaySlot();
   bool MfloChanged = handleMFLO();
 
-  bool Changed = longBranchChanged || forbiddenSlotChanged ||
+  bool Changed = DebugPcrelChanged || longBranchChanged || forbiddenSlotChanged ||
                  fpuDelaySlotChanged || loadDelaySlotChanged || MfloChanged;
 
   // Then run them alternatively while there are changes.

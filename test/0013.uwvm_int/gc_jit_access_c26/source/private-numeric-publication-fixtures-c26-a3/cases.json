@@ -1,0 +1,85 @@
+{
+  "cases": [
+    {
+      "name": "fresh-no-publication",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/fresh-no-publication.wat",
+      "wat_sha": "23acbf98b9f9e42a34b45f5436b354e8bf570effa89e641a8c3b7d4511ac446b",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/fresh-no-publication.wasm",
+      "wasm_sha": "22c61fac0007d61343da4ea3cc74ed1f18d966c73a4d9167188d683aa580b1ac",
+      "requires_lock": false
+    },
+    {
+      "name": "global-publication-after-loop",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/global-publication-after-loop.wat",
+      "wat_sha": "1e5b66fba5045c8516e99d38b28081c9763f960f3f5ce236441da029147e8611",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/global-publication-after-loop.wasm",
+      "wasm_sha": "a1e85e4377d0da0a7d49c8dccc190ec6236df3a6f2014af4d07b6584d899bed8",
+      "requires_lock": true
+    },
+    {
+      "name": "table-publication-after-loop",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/table-publication-after-loop.wat",
+      "wat_sha": "6edf59d69ec39c7aa891e3e37166a69175114bc68d210b34673f5d2c30948ac6",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/table-publication-after-loop.wasm",
+      "wasm_sha": "66c9237be4ed3fc65177b0159bbc121d7c7ab1993307ac374374a8c43d060561",
+      "requires_lock": true
+    },
+    {
+      "name": "reference-field-publication",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/reference-field-publication.wat",
+      "wat_sha": "d29a994cfa46cfe3b6c51afea8367a1a2953c4468be2526431a31f3b231c7873",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/reference-field-publication.wasm",
+      "wasm_sha": "4a8edeb92efac6395bd9bf729d8159f85b6489e17e5876e36b089c96e22bd51a",
+      "requires_lock": true
+    },
+    {
+      "name": "call-after-loop",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/call-after-loop.wat",
+      "wat_sha": "fd99e30aa210ea35ba5b89dfabfacef985504e8da402f76158d4eaa7116bc1bd",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/call-after-loop.wasm",
+      "wasm_sha": "dae5e88153f252d8e201927c8421ea1d5bbd7457d87ae792401190a8fca0e3e0",
+      "requires_lock": true
+    },
+    {
+      "name": "dead-global-publication",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/dead-global-publication.wat",
+      "wat_sha": "69a58fd021bf5f92c8b12c6588aad2de606b98a465704fd117cfcc7a43fdc67a",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/dead-global-publication.wasm",
+      "wasm_sha": "9f4a5d32bad4786a9a60b7c40d8adf1f8712ca889c43deb04a0dc29fbd2c3ebd",
+      "requires_lock": true
+    },
+    {
+      "name": "tail-call-after-loop",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/tail-call-after-loop.wat",
+      "wat_sha": "bef543cc0dd58c01cd098236d354d221ea11e07c8a71c0b3c42415e616f43a47",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/tail-call-after-loop.wasm",
+      "wasm_sha": "1a6b0cf5228f0e98e11713613fc9d153db20d1392d1c6ef8d699e350cdfe556f",
+      "requires_lock": true
+    },
+    {
+      "name": "extern-bridge-after-loop",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/extern-bridge-after-loop.wat",
+      "wat_sha": "780222e3244b07bb853828c9ed63e843cf06e3b4cd91d2e38345be91519ff52e",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/extern-bridge-after-loop.wasm",
+      "wasm_sha": "1a46e1dac8108da4c625aec4614fa387495bfbda8f06bd483ccd9cca26f923cb",
+      "requires_lock": true
+    },
+    {
+      "name": "numeric-struct-allocation-no-publication",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/numeric-struct-allocation-no-publication.wat",
+      "wat_sha": "db794a55c5dfa827f20c5951cfd5c63e62c1968f27611394324157b617dfe091",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/numeric-struct-allocation-no-publication.wasm",
+      "wasm_sha": "ce0390052c10e5b3c64aebad15ab2759a0fc6f8ef357195152ccd533916a40a9",
+      "requires_lock": false
+    },
+    {
+      "name": "unknown-parameter",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/unknown-parameter.wat",
+      "wat_sha": "c7cd5b095501378ad69f00f00fa5f3799f7f38aae1aaf601efee117633f2fbcb",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/private-numeric-publication-fixtures-c26-a3/unknown-parameter.wasm",
+      "wasm_sha": "ff2161fc38cb3adbb543043fafb4d597e7f43cd311ec4ac8b695a07edacdc92e",
+      "requires_lock": true
+    }
+  ],
+  "scope": "Independent Wasm assertions + expected typed-array lock eligibility: late publication/dead branch/parameters/tailcall/extern/reference fields must retain locks; fresh-only/numeric-only struct construction may elide. Numeric sum and last values checked."
+}

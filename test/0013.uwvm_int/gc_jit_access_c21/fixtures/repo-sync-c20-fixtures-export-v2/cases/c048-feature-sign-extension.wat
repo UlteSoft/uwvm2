@@ -1,0 +1,1 @@
+(module (func (export "_start") (local $i i32) loop $l local.get $i i32.const 65535 i32.or i32.extend16_s i32.const -1 i32.ne if unreachable end local.get $i i64.extend_i32_u i64.const 255 i64.or i64.extend8_s i64.const -1 i64.ne if unreachable end local.get $i i32.const 1 i32.add local.tee $i i32.const 10000 i32.lt_u br_if $l end))

@@ -1,0 +1,33 @@
+{
+  "cases": [
+    {
+      "name": "i8-root-survives-collection",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-live-collection-c21-a2/i8-root-survives-collection.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-live-collection-c21-a2/i8-root-survives-collection.wasm",
+      "wasm_sha": "4c4c2248417aad07b2cb04e990b6903570afbdbbc4d2c21f950905348a7ed8b8",
+      "trap": null
+    },
+    {
+      "name": "i16-root-survives-collection",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-live-collection-c21-a2/i16-root-survives-collection.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-live-collection-c21-a2/i16-root-survives-collection.wasm",
+      "wasm_sha": "b3676cdb022f7314a6aa5e4ba6f24e20b6928cf59542d0f11abf183c4d308b18",
+      "trap": null
+    },
+    {
+      "name": "i32-root-survives-collection",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-live-collection-c21-a2/i32-root-survives-collection.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-live-collection-c21-a2/i32-root-survives-collection.wasm",
+      "wasm_sha": "b1fad9d4f9d24d1b5d6cb134e3903a98c17e8f4758c00863afbcc29517fc9646",
+      "trap": null
+    },
+    {
+      "name": "f32-root-survives-collection",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-live-collection-c21-a2/f32-root-survives-collection.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-live-collection-c21-a2/f32-root-survives-collection.wasm",
+      "wasm_sha": "9a1a9e65a6a6154b8d33d23dec367089543e2b4ea3dbb8723f131b1a28aba879",
+      "trap": null
+    }
+  ],
+  "scope": "Remove unused exception tag from four scalar GC retention fixtures; all four keep50000allocation churn and exact post-write/read assertions. ActualGCcollection metrics asserted in paired test. Earlier tagged variants intentionally fail GC eligibility and cannot prove collection."
+}

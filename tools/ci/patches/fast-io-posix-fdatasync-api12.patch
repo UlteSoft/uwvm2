@@ -1,0 +1,54 @@
+--- a/third-parties/fast_io/include/fast_io_hosted/filesystem/posix_nothrow.h
++++ b/third-parties/fast_io/include/fast_io_hosted/filesystem/posix_nothrow.h
+@@ -116,6 +116,12 @@
+ extern seek_offset_type fd_seek(int, seek_offset_type, int) noexcept __asm__("lseek64");
+ #else
+ extern seek_offset_type fd_seek(int, seek_offset_type, int) noexcept __asm__("lseek");
++#endif
++#if defined(__linux__)
++// Linux's public fdatasync SDK ABI is int(int). It has no off_t/stat/time64
++// payload or symbol redirection. Only use this noexcept libc alias when the
++// target headers do not supply the real raw syscall number.
++extern int fd_data_sync(int) noexcept __asm__("fdatasync");
+ #endif
+ // The readonly getter below accepts F_GETFL only. No arbitrary fcntl
+ // command, locking-structure ABI or pointer payload is accepted.
+@@ -381,6 +387,26 @@
+ #endif
+ 	return {};
+ }
++#if defined(__linux__)
++template <::fast_io::posix_family family, ::std::integral char_type>
++inline posix_operation_result posix_fdatasync_nothrow(basic_posix_family_io_observer<family, char_type> file) noexcept
++{
++	// Borrow only the caller-pinned descriptor number through ONE native
++	// fdatasync. Flush user-space buffers first. This operation neither closes
++	// the observer, allocates, throws, retries EINTR nor substitutes fsync.
++	// Preserve every native error, including ENOSYS, for explicit caller policy.
++	// A successful request is not a power-loss or parent-directory publication
++	// qualification; it does not flush metadata unrelated to data retrieval.
++# if defined(__NR_fdatasync)
++	auto const result{::fast_io::system_call<__NR_fdatasync, int>(file.native_handle())};
++	if (::fast_io::linux_system_call_fails(result)) return {static_cast<int>(-result)};
++# else
++	auto const result{details::posix_nothrow_abi::fd_data_sync(file.native_handle())};
++	if (result < 0) return {details::posix_nothrow_abi::last_error()};
++# endif
++	return {};
++}
++#endif
+ template <::fast_io::posix_family family, ::std::integral char_type>
+ inline posix_operation_result posix_close_nothrow(basic_posix_family_file<family, char_type>& file) noexcept
+ {
+--- a/third-parties/fast_io/share/fast_io/fast_io_inc/host/posix.inc
++++ b/third-parties/fast_io/share/fast_io/fast_io_inc/host/posix.inc
+@@ -28,6 +28,9 @@
+     using ::fast_io::posix_fsync_nothrow;
+     using ::fast_io::posix_close_nothrow;
+ #endif
++#if defined(__linux__)
++    using ::fast_io::posix_fdatasync_nothrow;
++#endif
+ 
+ #if ((!defined(_WIN32) || defined(__WINE__)) || defined(__CYGWIN__))
+     namespace posix

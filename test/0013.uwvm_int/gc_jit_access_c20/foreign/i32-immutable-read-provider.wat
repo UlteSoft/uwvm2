@@ -1,0 +1,1 @@
+(module (type $a (array i32)) (func (export "get") (result (ref null $a)) i32.const 42 i32.const 257 array.new $a))

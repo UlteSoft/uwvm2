@@ -1,0 +1,1 @@
+(module (type $a (array i32)) (func $tail (param $n i32) (result i32) (local $a (ref null $a)) local.get $n i32.eqz if local.get $a array.len return end i32.const 19 array.new_default $a local.set $a local.get $n i32.const 1 i32.sub return_call $tail) (func (export "_start") i32.const 1 call $tail drop))

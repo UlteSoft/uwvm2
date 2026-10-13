@@ -1,0 +1,23 @@
+;; Core 3 mutable numeric fields on an actual child typed as its parent.
+;; Both candidate states must execute IDENTICAL official-validated bytes.
+(module
+  (type $base (sub (struct (field (mut i32)) (field (mut f32))
+    (field (mut i8)) (field (mut i16)) (field i32))))
+  (type $child (sub $base (struct (field (mut i32)) (field (mut f32))
+    (field (mut i8)) (field (mut i16)) (field i32) (field (mut i64)))))
+  (func (export "_start") (local $r (ref $base))
+    (local.set $r (struct.new $child (i32.const 0) (f32.const 0)
+      (i32.const 0) (i32.const 0) (i32.const 31415) (i64.const 0)))
+    (struct.set $base 0 (local.get $r) (i32.const 0xabcdef12))
+    (if (i32.ne (struct.get $base 0 (local.get $r)) (i32.const 0xabcdef12)) (then unreachable))
+    (struct.set $base 1 (local.get $r) (f32.reinterpret_i32 (i32.const 0x7f812345)))
+    (if (i32.ne (i32.reinterpret_f32 (struct.get $base 1 (local.get $r))) (i32.const 0x7f812345)) (then unreachable))
+    (struct.set $base 1 (local.get $r) (f32.reinterpret_i32 (i32.const 0x80000000)))
+    (if (i32.ne (i32.reinterpret_f32 (struct.get $base 1 (local.get $r))) (i32.const 0x80000000)) (then unreachable))
+    (struct.set $base 2 (local.get $r) (i32.const 0xabcdef12))
+    (if (i32.ne (struct.get_u $base 2 (local.get $r)) (i32.const 0x12)) (then unreachable))
+    (struct.set $base 3 (local.get $r) (i32.const 0xabcd9876))
+    (if (i32.ne (struct.get_u $base 3 (local.get $r)) (i32.const 0x9876)) (then unreachable))
+    (if (i32.ne (struct.get_s $base 3 (local.get $r)) (i32.const -26506)) (then unreachable))
+    (if (i32.ne (struct.get $base 4 (local.get $r)) (i32.const 31415)) (then unreachable)))
+  (func (export "checksum") (result i32) (i32.const 31415)))

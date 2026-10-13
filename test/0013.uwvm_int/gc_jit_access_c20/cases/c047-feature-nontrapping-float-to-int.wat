@@ -1,0 +1,1 @@
+(module (func (export "_start") (local $i i32) f64.const nan i32.trunc_sat_f64_s i32.eqz i32.eqz if unreachable end f64.const inf i32.trunc_sat_f64_s i32.const 2147483647 i32.ne if unreachable end loop $l local.get $i f64.convert_i32_u i32.trunc_sat_f64_u local.get $i i32.ne if unreachable end local.get $i i32.const 1 i32.add local.tee $i i32.const 10000 i32.lt_u br_if $l end))

@@ -1,0 +1,49 @@
+{
+  "cases": [
+    {
+      "name": "i8-write-read-gc-pressure",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-gc-pressure-c21/i8-write-read-gc-pressure.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-gc-pressure-c21/i8-write-read-gc-pressure.wasm",
+      "wasm_sha": "c4267ac7ef8649d82aeed21e4c9fb94f01124008d38ee156095a71775716f0f7",
+      "reads": 132096,
+      "writes": 131072,
+      "ephemeral_structs": 131072,
+      "expected_allocations": 131073,
+      "checksum": 16711680
+    },
+    {
+      "name": "i16-write-read-gc-pressure",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-gc-pressure-c21/i16-write-read-gc-pressure.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-gc-pressure-c21/i16-write-read-gc-pressure.wasm",
+      "wasm_sha": "64b57d793ab3fd1f7a05d52d65cf14cfb740086d8b62f2e87ed5c01c345fb3f9",
+      "reads": 132096,
+      "writes": 131072,
+      "ephemeral_structs": 131072,
+      "expected_allocations": 131073,
+      "checksum": 4294901760
+    },
+    {
+      "name": "i32-write-read-gc-pressure",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-gc-pressure-c21/i32-write-read-gc-pressure.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-gc-pressure-c21/i32-write-read-gc-pressure.wasm",
+      "wasm_sha": "25fba1bcfd5ab600e7f6ab77e55f5f0ac3a2562692dcf7e6e630dd262ecc4343",
+      "reads": 132096,
+      "writes": 131072,
+      "ephemeral_structs": 131072,
+      "expected_allocations": 131073,
+      "checksum": 1968111616
+    },
+    {
+      "name": "f32-write-read-gc-pressure",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-gc-pressure-c21/f32-write-read-gc-pressure.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-store-gc-pressure-c21/f32-write-read-gc-pressure.wasm",
+      "wasm_sha": "7104d5ee20e41418e0e39c275da76d2b73a9d977fc6c965f4f30b38f1a503511",
+      "reads": 132096,
+      "writes": 131072,
+      "ephemeral_structs": 131072,
+      "expected_allocations": 131073,
+      "checksum": 1968111616
+    }
+  ],
+  "scope": "Actual collection pressure: after every numericstore allocate/drop one i64struct, then readsamearray before nextiteration. 131072write/read/allocations and final1024slots; live array crosses allocation safepoints. No imports/tags/debug. Native workmetrics MUST prove GCenabled,collections/reclaimed>0; access benchmarks are separate."
+}

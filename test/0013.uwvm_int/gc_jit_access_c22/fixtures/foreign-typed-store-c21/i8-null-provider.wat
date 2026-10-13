@@ -1,0 +1,1 @@
+(module (type $A (sub (array (mut i8)))) (type $B (sub $A (array (mut i8)))) (func (export "get") (result (ref null $A)) ref.null $A))

@@ -133,3 +133,139 @@ Trade-offs:
 - Correctness for shared writable task state is the responsibility of the caller.
 
 That trade-off is intentional: UWVM2 only needs a dependable, low-overhead way to fan out coarse-grained compile work, and this design stays close to that requirement.
+
+## Owner-scoped execution and blocking waits
+
+`execution_lifetime` is a separate, bounded admission/lifetime primitive for work
+executing on host-owned threads. Its move-only lease holds one admission until
+release. Stop closes admission and exposes a cooperative stop flag; drain waits
+for all admitted work to leave. It neither detaches nor forcibly terminates an OS
+thread, and it does not create Wasm threads. The owner must stop new callers before
+destruction and must never drain while retaining its own lease.
+
+`keyed_wait_set` is a generic blocking registry keyed by `(resource identity,
+position)`. It has 64 mutex shards and stack-owned waiter nodes. The value
+comparison and queue insertion use the same mutex as notification. Notifications
+select at most the requested number of matching, not-yet-selected waiters; host
+spurious wakeups do not count as notifications. Each node has its own event, so
+unrelated addresses are not woken by a notification. Timeouts use a monotonic clock
+and saturate at its maximum time point. Negative timeouts are unbounded.
+
+An owning runtime first requests execution stop, then closes its wait set to wake
+blocked executions, drains execution leases, and joins owned OS threads before
+freeing their resources. Closing/draining the wait registry does not itself join
+host threads or reclaim their resource identities. Identity reuse is forbidden
+while a waiter can still reference the old resource. Imported aliases must use
+the same owner's identity and position. These utilities contain no Wasm types and
+are not used by ordinary load/store handlers.
+
+Both utilities are available on targets with native thread support; unsupported
+targets expose `has_keyed_wait_set == false`. Their current focused Linux
+ASan/UBSan test is `test/0017.runtime/keyed_wait_set.cc`. Integration with Wasm
+shared-memory declarations and wait/notify instructions remains separate work.
+
+For resources shared across execution owners, pass the lease's cancellation token
+to `keyed_wait_set::wait`. Stopping one owner then cancels only its waits; the shared
+registry remains open for other owners. Stop callbacks take the same shard mutex
+as comparison/enqueue to avoid lost cancellation wakeups. Callback unregistration
+runs after releasing that mutex, and drain counts entire wait calls through callback
+destruction, preventing either a callback/destructor deadlock or premature shard
+reclamation. `matches()` must not request cancellation on its own waiting thread.
+`tools/ci/run_wasm_threads_primitives.sh` runs the focused sanitizer test in the
+required Linux cgroup, including cancellation of one of two sharing owners.
+
+
+`execution_domain` owns reusable execution generations. `try_enter()` returns a
+lease from the current generation; `request_stop()` closes admission and requests
+cooperative cancellation. `reset(cleanup)` closes admission, cancels and drains
+existing leases, runs cleanup, then publishes a fresh generation. Cleanup failure
+leaves admission closed. Administration is serialized separately from admission;
+no admission lock is held during callbacks, drain or cleanup. A reset/drain caller
+must not hold a lease, and cleanup/cancellation callbacks must not recursively
+reset or drain their own domain. Work that borrows resources must retain its lease
+through callback unregistration and final cleanup. Stop flags are not forced
+termination or synchronization for otherwise racy user data.
+
+`stop_and_drain(callback)` keeps maintenance ownership through a dependent
+producer-shutdown callback. A concurrent reset cannot reopen execution between
+lease drain and producer shutdown. The callback may query admission or request
+stop but must not reset/drain this domain; a throwing callback leaves it closed.
+The focused sanitizer test exercises shutdown/reset serialization and recovery.
+
+Both runtimes use this domain at the outermost full/lazy/public-raw host execution
+boundary (ROS has full/public-raw only). Supported nested raw callback entry reuses
+the outer lease. Reset waits until thread-state cleanup and native-stack restoration
+finish before destroying code and module registries. The host still owns and joins
+its OS threads and synchronizes external loader/configuration mutations. The
+runtime's stop API can be called by a host callback without waiting for itself;
+reset from an active callback remains fatal. No lease operation is added to guest
+function dispatch or ordinary memory loads/stores.
+
+Both runtimes additionally expose `runtime_stop_and_drain_host_api()` for host
+administration. It cooperatively closes and drains outer executions, joins the
+ordinary product's compiler schedulers, and flushes accepted cache writes. Code
+and registries remain alive; admission stays closed until explicit reset. It
+rejects synchronous invocation from execution or compilation/provider callbacks,
+which would otherwise wait for themselves. The process-owned cache service stays
+idle and reusable, avoiding synchronous disk writes after a later reset. External
+module storage still requires reset before destruction, and the host still joins
+its own native threads. This is not debugger suspension or forced interruption.
+
+The focused `execution_domain.cc` test exercises cancellation, draining before
+cleanup, closed admission during replacement, distinct cancellation generations
+and exception recovery under ASan/UBSan. `wasm_execution_domain.cc` runs real
+interpreter and LLVM entry points, preserves values across `atomic.fence`, resets
+while an import callback is live, reenters generated code from that callback, and
+verifies that replacement generations execute. Its two-thread barrier verifies
+concurrent full execution in both instruction and native-unwind modes. Ordinary
+lazy entry tests additionally run independent cold compilations with two configured
+workers. Full JIT publishes immutable unwind maps before execution; ordinary lazy
+unwind uses the snapshot facility below. The Wasm-specific shared-memory checks,
+wait32/wait64/notify semantics and host-entry binding now live in
+`runtime/wasm_threads`; the queue and generation utilities here remain independent
+of Wasm. Host entry installs one wait domain/cancellation scope for the admitted
+activation. Import aliases use stable native memory identity and offset, so memory
+growth cannot orphan waiters. Allocator pins cover only comparisons, not sleep.
+Only standard results 0/1/2 return to guest code. Host cancellation currently uses
+the runtime's fatal trap path after releasing wait locks; recoverable activation
+cancellation is not implemented. The OS thread remains owned by its embedder.
+
+
+### Immutable publication and VM-owned compiler workers
+
+`immutable_snapshot<Payload>` is a Wasm-independent metadata publication utility.
+A nonmovable reader registers at an outer owner boundary, before entering any
+signal/trap path. `acquire()` and `release()` use lock-free pointer atomics without
+allocation or a reader mutex. The returned immutable borrow lasts until the same
+reader acquires again, releases, or is destroyed. It is not reentrant. Writers
+serialize copy/edit or replacement, retire old versions, and reclaim only versions
+absent from all registered hazards. Failed construction/edit preserves publication.
+The owner must outlive its readers; payload callbacks/destructors must not reenter
+this store. `collect()` can reclaim retired versions after readers release.
+
+The ordinary runtime keeps compact mutable unwind builders behind a writer mutex
+and publishes entries and executable ranges as a single snapshot. Lazy host entry
+registers one reader; callback reentry reuses it. Trap resolution uses OS TLS even with optional VM TLS caches disabled, and returns
+an entry by value before releasing the borrow. Reset first drains execution, stops compiler
+writers, then clears metadata. Full-mode lookup still uses its frozen vectors.
+No per-function logical stack recording is added to native-unwind execution.
+
+Lazy schedulers belong to the VM generation, not an individual host call. Returning
+one call cannot destroy queues still borrowed by another. Reset stops workers after
+host execution drain, and a guard registered at first entry drains/stops workers
+before namespace-static caches and thread maps are destroyed at process teardown.
+Explicit proc-exit shutdown remains a terminal operation, not concurrent reusable
+administration. Generic scheduler `start()`/`stop()` require owner serialization
+and drained external producers/helpers; `running()` publishes completed startup
+atomically for concurrent deferred-start polling. It is not an ownership lease.
+
+`tools/ci/run_immutable_snapshot.sh` runs ASan/UBSan and TSan tests in the Linux
+cgroup. `native_thread_tsan.cc` also exercises concurrent readiness polling.
+
+The Linux alternate-signal-stack cache retires once at thread exit, then uses its
+trivial TLS marker to force uncached late host-destructor reentry. Only Darwin
+rearms the resource-free TSD marker needed across TLV re-creation. This avoids
+entering signal-stack interceptors after another runtime has retired thread state.
+The runtime mmap trap callback is also published once before guest execution,
+not rewritten by each concurrent host entry. These are lifecycle operations;
+normal mmap load/store paths retain hardware protection without extra guards.

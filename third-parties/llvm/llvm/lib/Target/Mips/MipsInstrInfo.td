@@ -56,6 +56,13 @@ def MipsJmpLink : SDNode<"MipsISD::JmpLink",SDT_MipsJmpLink,
 def MipsTailCall : SDNode<"MipsISD::TailCall", SDT_MipsJmpLink,
                           [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 
+def tailcc_n64_delta : Operand<i64>;
+
+def SDT_MipsTailReturn : SDTypeProfile<0, -1,
+    [SDTCisVT<0, i64>, SDTCisVT<1, i64>]>;
+def MipsTailReturn : SDNode<"MipsISD::TailReturn", SDT_MipsTailReturn,
+    [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
+
 // Hi and Lo nodes are used to handle global addresses. Used on
 // MipsISelLowering to lower stuff like GlobalAddress, ExternalSymbol
 // static model. (nothing to do with Mips Registers Hi and Lo)

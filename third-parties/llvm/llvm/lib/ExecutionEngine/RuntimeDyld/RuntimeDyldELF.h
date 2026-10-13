@@ -64,6 +64,9 @@ class RuntimeDyldELF : public RuntimeDyldImpl {
   void resolvePPC64Relocation(const SectionEntry &Section, uint64_t Offset,
                               uint64_t Value, uint32_t Type, int64_t Addend);
 
+  void resolveSparc64Relocation(const SectionEntry &Section, uint64_t Offset,
+                                uint64_t Value, uint32_t Type, int64_t Addend);
+
   void resolveSystemZRelocation(const SectionEntry &Section, uint64_t Offset,
                                 uint64_t Value, uint32_t Type, int64_t Addend);
 
@@ -72,7 +75,7 @@ class RuntimeDyldELF : public RuntimeDyldImpl {
 
   void resolveRISCVRelocation(const SectionEntry &Section, uint64_t Offset,
                               uint64_t Value, uint32_t Type, int64_t Addend,
-                              SID SectionID);
+                              SID SectionID, uint64_t CallStubOffset);
 
   unsigned getMaxStubSize() const override {
     if (Arch == Triple::aarch64 || Arch == Triple::aarch64_be)
@@ -85,19 +88,28 @@ class RuntimeDyldELF : public RuntimeDyldImpl {
       return 32;
     if (Arch == Triple::loongarch64)
       return 20; // lu12i.w; ori; lu32i.d; lu52i.d; jr
+    else if (Arch == Triple::ppc || Arch == Triple::ppcle)
+      return 16; // lis; ori; mtctr; bctr
+    else if (Arch == Triple::sparcv9)
+      return 32; // abs64 in g1/g5; jmpl g1,g0; nop
     else if (Arch == Triple::ppc64 || Arch == Triple::ppc64le)
       return 44;
     else if (Arch == Triple::x86_64)
       return 6; // 2-byte jmp instruction + 32-bit relative address
     else if (Arch == Triple::systemz)
       return 16;
+    else if (Arch == Triple::riscv64)
+      return 24; // auipc; ld; jr; nop; 64-bit destination
     else
       return 0;
   }
 
   Align getStubAlignment() override {
-    if (Arch == Triple::systemz)
+    if (Arch == Triple::systemz || Arch == Triple::riscv64)
       return Align(8);
+    else if (Arch == Triple::ppc || Arch == Triple::ppcle ||
+             Arch == Triple::sparcv9)
+      return Align(4);
     else
       return Align(1);
   }

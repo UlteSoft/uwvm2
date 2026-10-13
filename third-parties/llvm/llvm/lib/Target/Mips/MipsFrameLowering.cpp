@@ -12,6 +12,7 @@
 
 #include "MipsFrameLowering.h"
 #include "MipsInstrInfo.h"
+#include "MipsMachineFunction.h"
 #include "MipsTargetMachine.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -88,7 +89,8 @@ bool MipsFrameLowering::hasFPImpl(const MachineFunction &MF) const {
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   const TargetRegisterInfo *TRI = STI.getRegisterInfo();
 
-  return MF.getTarget().Options.DisableFramePointerElim(MF) ||
+  return MF.getInfo<MipsFunctionInfo>()->hasTailCCStackCall() ||
+         MF.getTarget().Options.DisableFramePointerElim(MF) ||
          MFI.hasVarSizedObjects() || MFI.isFrameAddressTaken() ||
          TRI->hasStackRealignment(MF);
 }
@@ -127,6 +129,11 @@ uint64_t MipsFrameLowering::estimateStackSize(const MachineFunction &MF) const {
   return Size + MFI.estimateStackSize(MF);
 }
 
+bool MipsFrameLowering::enableShrinkWrapping(const MachineFunction &MF) const {
+  return MF.getFunction().getCallingConv() != CallingConv::Tail &&
+         !MF.getInfo<MipsFunctionInfo>()->hasTailCCStackCall();
+}
+
 // Eliminate ADJCALLSTACKDOWN, ADJCALLSTACKUP pseudo instructions
 MachineBasicBlock::iterator MipsFrameLowering::
 eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
@@ -137,8 +144,11 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
     int64_t Amount = I->getOperand(0).getImm();
     if (I->getOpcode() == Mips::ADJCALLSTACKDOWN)
       Amount = -Amount;
+    else if (I->getOpcode() == Mips::ADJCALLSTACKUP)
+      Amount -= I->getOperand(1).getImm();
 
-    STI.getInstrInfo()->adjustStackPtr(SP, Amount, MBB, I);
+    if (Amount)
+      STI.getInstrInfo()->adjustStackPtr(SP, Amount, MBB, I);
   }
 
   return MBB.erase(I);

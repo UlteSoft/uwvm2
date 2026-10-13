@@ -1,0 +1,13 @@
+--- a/third-parties/fast_io/share/fast_io/fast_io_inc/core.inc
++++ b/third-parties/fast_io/share/fast_io/fast_io_inc/core.inc
+@@ -171,6 +171,10 @@
+ using ::fast_io::manipulators::member_function_pointer_holder_t;
+ using ::fast_io::manipulators::whole_get_t;
+ 
++using ::fast_io::manipulators::le_get;
++using ::fast_io::manipulators::be_get;
++using ::fast_io::manipulators::le_put;
++
+ using ::fast_io::manipulators::leb128_get;
+ using ::fast_io::manipulators::leb128_put;
+ 

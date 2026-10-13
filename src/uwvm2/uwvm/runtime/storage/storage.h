@@ -46,10 +46,22 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 {
+    using runtime_registry_type = ::uwvm2::utils::container::unordered_flat_map<
+        ::uwvm2::utils::container::u8string_view, ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t>;
+
     /// @brief  wasm module -> runtime storage
     /// @note   This must be used after the initialization of all_module to ensure that strvw is available.
     inline ::uwvm2::utils::container::unordered_flat_map<::uwvm2::utils::container::u8string_view, ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t>
         wasm_module_runtime_storage{};  // [global]
+
+    namespace details
+    {
+        // Borrow only; full_source_instance supplies the genuine strong owner.
+        // Native maintenance/publication serialize all selector changes.
+        inline runtime_registry_type* selected_runtime_registry{};
+    }
+    [[nodiscard]] inline constexpr runtime_registry_type& active_runtime_registry() noexcept
+    { return details::selected_runtime_registry ? *details::selected_runtime_registry : wasm_module_runtime_storage; }
 }
 
 #ifndef UWVM_MODULE

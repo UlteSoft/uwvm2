@@ -18,7 +18,9 @@ using namespace llvm;
 yaml::RISCVMachineFunctionInfo::RISCVMachineFunctionInfo(
     const llvm::RISCVMachineFunctionInfo &MFI)
     : VarArgsFrameIndex(MFI.getVarArgsFrameIndex()),
-      VarArgsSaveSize(MFI.getVarArgsSaveSize()) {}
+      VarArgsSaveSize(MFI.getVarArgsSaveSize()),
+      ArgumentStackToRestore(MFI.getArgumentStackToRestore()),
+      HasTailCCStackCall(MFI.hasTailCCStackCall()) {}
 
 MachineFunctionInfo *RISCVMachineFunctionInfo::clone(
     BumpPtrAllocator &Allocator, MachineFunction &DestMF,
@@ -92,7 +94,8 @@ RISCVMachineFunctionInfo::getPushPopKind(const MachineFunction &MF) const {
   // We cannot use fixed locations for the callee saved spill slots if the
   // function uses a varargs save area.
   // TODO: Use a separate placement for vararg registers to enable Zcmp.
-  if (VarArgsSaveSize != 0)
+  if (VarArgsSaveSize != 0 ||
+      MF.getFunction().getCallingConv() == CallingConv::Tail)
     return PushPopKind::None;
 
   // SiFive interrupts are not compatible with push/pop.
@@ -139,6 +142,8 @@ void RISCVMachineFunctionInfo::initializeBaseYamlFields(
     const yaml::RISCVMachineFunctionInfo &YamlMFI) {
   VarArgsFrameIndex = YamlMFI.VarArgsFrameIndex;
   VarArgsSaveSize = YamlMFI.VarArgsSaveSize;
+  ArgumentStackToRestore = YamlMFI.ArgumentStackToRestore;
+  HasTailCCStackCall = YamlMFI.HasTailCCStackCall;
 }
 
 void RISCVMachineFunctionInfo::addSExt32Register(Register Reg) {

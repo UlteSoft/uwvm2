@@ -1,0 +1,80 @@
+{
+  "source_only": true,
+  "native_executed": false,
+  "frozen_ancestor_archive": "cbf518d2fed81103c841a7cfaffca335794e5ff95c563ed155335a48297f52d8",
+  "files": [
+    {
+      "path": "fixtures/memarg_bad_optional_index.wasm",
+      "size": 35,
+      "sha256": "967782eb3450741fa3d693646b03965164f0fea26487896fc5bc3d6ee596deac",
+      "exact_frozen_original": true
+    },
+    {
+      "path": "fixtures/memarg_missing_optional_index.wasm",
+      "size": 31,
+      "sha256": "6fc310d52265cf37bf049d5cdd4f8b6321f3a3bb71ecfe097d909e80e6ee3175",
+      "exact_frozen_original": true
+    },
+    {
+      "path": "fixtures/memarg_reserved_bit7.wasm",
+      "size": 35,
+      "sha256": "55fdc96b258dafe00538a2fe32dc5665de6e62a835c22c24c9f5d784fa3a2a9d",
+      "exact_frozen_original": true
+    },
+    {
+      "path": "fixtures/memarg_u64_overflow.wasm",
+      "size": 43,
+      "sha256": "39b54c36daa76aaf268cbaf10ce65628b26834df7c98ee19cee8e9435abcb1e6",
+      "exact_frozen_original": true
+    },
+    {
+      "path": "fixtures/memarg_u64_unterminated.wasm",
+      "size": 43,
+      "sha256": "5f9cdc054679cbcfd76d45c22bce56dd11b70061029e1bd8e184ea242736e9e6",
+      "exact_frozen_original": true
+    },
+    {
+      "path": "fixtures/oracle.json",
+      "size": 6037,
+      "sha256": "8c47d7a895257303d524f3a75bf3a00a4bf5baa947f3b29f62cb3e3f40a510f0",
+      "exact_frozen_original": true
+    },
+    {
+      "path": "fixtures/scalar_memory32_memory64_all23.wast",
+      "size": 7876,
+      "sha256": "d16c6c9b14f17c10f4b7cac5b606e42b26af57d4b8ed476ad6d23d6b77c2e344",
+      "exact_frozen_original": true
+    },
+    {
+      "path": "fixtures/scalar_memory64_boundary.wast",
+      "size": 910,
+      "sha256": "78b869d0fc7d812515a2d9f00ab2d3819d9c95f5ae2af2642c5f5374ed51b51d",
+      "exact_frozen_original": true
+    },
+    {
+      "path": "fixtures/scalar_memory_event_component.cc",
+      "size": 3120,
+      "sha256": "a8fd2b8a99892c98cea13e5c52960dc3fb1caa97b8dd06aa94749949a3c1439b",
+      "exact_frozen_original": true
+    },
+    {
+      "path": "fixtures/unused_invalid_before_imported_memory_effect_32.contract.json",
+      "size": 569,
+      "sha256": "5b4224be256c686fede89287448aa6cda2bb28e859fc088889070d63e31cf951",
+      "exact_frozen_original": true
+    },
+    {
+      "path": "fixtures/unused_invalid_before_imported_memory_effect_32.wat",
+      "size": 469,
+      "sha256": "c111d20d78badbf51412118abb6acf8e5d8043ff35e36d45da7a556629a72178",
+      "exact_frozen_original": true
+    },
+    {
+      "path": "fixtures/unused_invalid_function_32.wat",
+      "size": 400,
+      "sha256": "4170ce85c2d46ba91b92574ca37beda8b63083423685d3e349aa817a8122ebae",
+      "exact_frozen_original": true
+    }
+  ],
+  "all_products_native_pending": true
+}

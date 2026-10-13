@@ -1,0 +1,626 @@
+ ;; Source-only fixture; official Core3 + threads WAT conversion happens on Linux.
+;; main memory0/1 import provider plain/shared;2 local memory32;3 memory64.
+;; large65537-page memory64 case touches only selected sparse pages, never fills4GiB.
+(module
+  (type $node (struct (field i32)))
+  (import "memory-state-provider" "plain" (memory $plain 1 2))
+  (import "memory-state-provider" "shared" (memory $shared 1 2 shared))
+  (memory $local 1 1)
+  (memory $wide i64 2 2)
+  (global $root (mut (ref null $node)) (ref.null $node))
+  (global $armed (mut i32) (i32.const 0))
+  (func $setup
+    i32.const 0 global.set $armed
+    i32.const 7 struct.new $node global.set $root
+    i32.const 0 i32.const 161 i32.store8 $local
+    i32.const 1 i32.const 178 i32.store8 $local
+    i32.const 63 i32.const 17 i32.store8 $local
+    i32.const 64 i32.const 90 i32.const 5 memory.fill $local
+    i32.const 69 i32.const 34 i32.store8 $local
+    i32.const 65535 i32.const 125 i32.store8 $local
+    i64.const 0 i32.const 161 i32.store8 $wide
+    i64.const 1 i32.const 178 i32.store8 $wide
+    i64.const 71 i32.const 17 i32.store8 $wide
+    i64.const 72 i32.const 90 i64.const 5 memory.fill $wide
+    i64.const 77 i32.const 34 i32.store8 $wide
+    i64.const 131071 i32.const 125 i32.store8 $wide
+    i64.const 8 i32.const 60 i32.store8 $wide
+    i64.const 9 i32.const 60 i32.store8 $wide
+    i64.const 10 i32.const 60 i32.store8 $wide
+    i64.const 11 i32.const 60 i32.store8 $wide
+    i64.const 12 i32.const 60 i32.store8 $wide
+    i64.const 65536 i32.const 60 i32.store8 $wide
+    i64.const 65537 i32.const 60 i32.store8 $wide
+    i64.const 65538 i32.const 60 i32.store8 $wide
+    i64.const 65539 i32.const 60 i32.store8 $wide
+    i64.const 65540 i32.const 60 i32.store8 $wide
+  )
+  (func $run (result i32)
+    (local $n (ref $node)) (local $index i32)
+    ;; A real initialized nondefaultable GC root is present before every pause.
+    global.get $root ref.as_non_null local.set $n
+    ;; Finite scheduling window; keep both actual participants and every memory assertion.
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    local.get $n struct.get $node 0 i32.const 7 i32.ne if unreachable end
+    i32.const 0 i32.load8_u $plain i32.const 161 i32.ne if unreachable end
+    i32.const 1 i32.load8_u $plain i32.const 178 i32.ne if unreachable end
+    i32.const 63 i32.load8_u $plain i32.const 17 i32.ne if unreachable end
+    i32.const 69 i32.load8_u $plain i32.const 34 i32.ne if unreachable end
+    i32.const 65535 i32.load8_u $plain i32.const 125 i32.ne if unreachable end
+    i32.const 255 i32.load8_u $plain i32.const 17 i32.ne if unreachable end
+    i32.const 512 i32.load8_u $plain i32.const 34 i32.ne if unreachable end
+    i32.const 0 i32.load8_u $plain i32.const 161 i32.ne if unreachable end
+    i32.const 1 i32.load8_u $plain i32.const 178 i32.ne if unreachable end
+    i32.const 79 i32.load8_u $plain i32.const 17 i32.ne if unreachable end
+    i32.const 85 i32.load8_u $plain i32.const 34 i32.ne if unreachable end
+    i32.const 65535 i32.load8_u $plain i32.const 125 i32.ne if unreachable end
+    i32.const 0 i32.atomic.load8_u $shared i32.const 161 i32.ne if unreachable end
+    i32.const 1 i32.atomic.load8_u $shared i32.const 178 i32.ne if unreachable end
+    i32.const 63 i32.atomic.load8_u $shared i32.const 17 i32.ne if unreachable end
+    i32.const 69 i32.atomic.load8_u $shared i32.const 34 i32.ne if unreachable end
+    i32.const 65535 i32.atomic.load8_u $shared i32.const 125 i32.ne if unreachable end
+    i32.const 0 i32.load8_u $local i32.const 161 i32.ne if unreachable end
+    i32.const 1 i32.load8_u $local i32.const 178 i32.ne if unreachable end
+    i32.const 63 i32.load8_u $local i32.const 17 i32.ne if unreachable end
+    i32.const 69 i32.load8_u $local i32.const 34 i32.ne if unreachable end
+    i32.const 65535 i32.load8_u $local i32.const 125 i32.ne if unreachable end
+    i64.const 0 i32.load8_u $wide i32.const 161 i32.ne if unreachable end
+    i64.const 1 i32.load8_u $wide i32.const 178 i32.ne if unreachable end
+    i64.const 71 i32.load8_u $wide i32.const 17 i32.ne if unreachable end
+    i64.const 77 i32.load8_u $wide i32.const 34 i32.ne if unreachable end
+    i64.const 131071 i32.load8_u $wide i32.const 125 i32.ne if unreachable end
+    i64.const 8 i32.load8_u $wide i32.const 60 i32.ne if unreachable end
+    i64.const 9 i32.load8_u $wide i32.const 60 i32.ne if unreachable end
+    i64.const 10 i32.load8_u $wide i32.const 60 i32.ne if unreachable end
+    i64.const 11 i32.load8_u $wide i32.const 60 i32.ne if unreachable end
+    i64.const 12 i32.load8_u $wide i32.const 60 i32.ne if unreachable end
+    i64.const 65536 i32.load8_u $wide i32.const 60 i32.ne if unreachable end
+    i64.const 65537 i32.load8_u $wide i32.const 60 i32.ne if unreachable end
+    i64.const 65538 i32.load8_u $wide i32.const 60 i32.ne if unreachable end
+    i64.const 65539 i32.load8_u $wide i32.const 60 i32.ne if unreachable end
+    i64.const 65540 i32.load8_u $wide i32.const 60 i32.ne if unreachable end
+    global.get $armed if
+      i32.const 64 i32.load $plain i32.const 1732584193 i32.ne if unreachable end
+      i32.const 68 i32.load8_u $plain i32.const 137 i32.ne if unreachable end
+
+      i32.const 80 i32.load $plain i32.const -272716322 i32.ne if unreachable end
+      i32.const 84 i32.load8_u $plain i32.const 204 i32.ne if unreachable end
+      i32.const 64 i32.atomic.load $shared i32.const 1732584193 i32.ne if unreachable end
+      i32.const 68 i32.atomic.load8_u $shared i32.const 137 i32.ne if unreachable end
+      i32.const 64 i32.load $local i32.const 1732584193 i32.ne if unreachable end
+      i32.const 68 i32.load8_u $local i32.const 137 i32.ne if unreachable end
+      i64.const 72 i32.load $wide i32.const 1732584193 i32.ne if unreachable end
+      i64.const 76 i32.load8_u $wide i32.const 137 i32.ne if unreachable end
+    else
+      i32.const 64 i32.load $plain i32.const 1515870810 i32.ne if unreachable end
+      i32.const 68 i32.load8_u $plain i32.const 90 i32.ne if unreachable end
+      i32.const 80 i32.load $plain i32.const 1515870810 i32.ne if unreachable end
+      i32.const 84 i32.load8_u $plain i32.const 90 i32.ne if unreachable end
+      i32.const 64 i32.atomic.load $shared i32.const 1515870810 i32.ne if unreachable end
+      i32.const 68 i32.atomic.load8_u $shared i32.const 90 i32.ne if unreachable end
+      i32.const 64 i32.load $local i32.const 1515870810 i32.ne if unreachable end
+      i32.const 68 i32.load8_u $local i32.const 90 i32.ne if unreachable end
+      i64.const 72 i32.load $wide i32.const 1515870810 i32.ne if unreachable end
+      i64.const 76 i32.load8_u $wide i32.const 90 i32.ne if unreachable end
+    end
+      ;; Initial bytes90 or all256 debugger-written bytes; guards255/512 unchanged.
+      loop $verify-maximal
+        local.get $index i32.const 256 i32.add i32.load8_u $plain
+        global.get $armed if (result i32) local.get $index else i32.const 90 end
+        i32.ne if unreachable end
+        local.get $index i32.const 1 i32.add local.tee $index i32.const 256 i32.lt_u
+        br_if $verify-maximal
+      end
+    i32.const 42)
+)
