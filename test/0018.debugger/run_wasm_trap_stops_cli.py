@@ -115,7 +115,7 @@ def main():
                 trap_reply = console.send(f'catch wasm trap 0 {function}')
                 catch = re.search(rb'wasm-catchpoint ([0-9]+) after-failure', trap_reply); assert catch, trap_reply
                 assert b'error:' not in console.send('trace wasm on trap')
-                assert b'registered' in console.send(f'break 0 {function} {sites[function][0]}')
+                assert b'registered' in console.send(f'breakwasm 0 {function} {sites[function][0]}')
                 console.send('continue'); stopped(console, args.stop_timeout)
                 thread, actual_function, offset = console.location()
                 assert (actual_function, offset) == (function, sites[function][0])

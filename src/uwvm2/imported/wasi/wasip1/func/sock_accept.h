@@ -493,6 +493,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
 
                     ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, ro_fd_ptrsz, new_fd);
+                    if(env.debug_fd_created!=nullptr) { env.debug_fd_created(new_fd); }
 
 #  ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
                     // Encode the peer address into the __wasi_addr_port_t layout used by WASIX:
@@ -760,6 +761,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
 
                     ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, ro_fd_ptrsz, new_fd);
+                    if(env.debug_fd_created!=nullptr) { env.debug_fd_created(new_fd); }
 
 #  ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
                     // Encode the peer address into the __wasi_addr_port_t layout used by WASIX:

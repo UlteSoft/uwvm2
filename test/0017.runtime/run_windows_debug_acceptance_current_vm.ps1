@@ -110,7 +110,7 @@ function Position($Session,[bool]$NeedSource) {
 function Begin($Session,[uint64]$Function) {
     Prompt $Session | Out-Null
     Require ((Send $Session 'status').Contains('prepared; no Wasm instruction executed')) 'not actual debug-full initial state'
-    $reply=Send $Session ('break 0 '+$Function+' 0'); $m=[regex]::Match($reply,'breakpoint ([0-9]+)')
+    $reply=Send $Session ('breakwasm 0 '+$Function+' 0'); $m=[regex]::Match($reply,'breakpoint ([0-9]+)')
     Require $m.Success 'real emitted entry breakpoint missing'; $breakpoint=$m.Groups[1].Value
     Send $Session 'continue' | Out-Null
     $found=$false

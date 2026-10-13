@@ -25,7 +25,7 @@
     {
         auto const& pin{state.actual.modules[owner]};
         if(type.heap.code > 0xffffffffll ||
-            type.heap.code >= pin.module->type_section_storage.type_section_count || state.module_ids[owner] == 0u)
+            static_cast<::std::uint_least64_t>(type.heap.code) >= pin.module->type_section_storage.type_section_count || state.module_ids[owner] == 0u)
         { return state.fail(census_error::incompatible_type); }
         out.heap = cp::heap_kind::defined; out.type_module = state.module_ids[owner];
         out.type_index = static_cast<::std::uint32_t>(type.heap.code); return true;

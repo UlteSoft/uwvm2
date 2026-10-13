@@ -78,7 +78,7 @@ def main():
                 raise
             finally:
                 record['quit_returncode'] = s.console.child.returncode
-                record['managed_shutdown_complete'] = b'managed shutdown complete' in s.console.transcript
+                record['managed_shutdown_complete'] = s.console.normal_quit_completed
                 if record['quit_returncode'] != 0 or not record['managed_shutdown_complete']:
                     record['passed'] = False
         record['inputs_after'] = {str(p): sha(p) for p in paths}

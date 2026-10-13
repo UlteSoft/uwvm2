@@ -64,7 +64,12 @@ int arm_tailcc_normal_call_oracle(llvm::Triple const& target)
         llvm::IRBuilder<> ir{context};
         auto module{std::make_unique<llvm::Module>("arm-tailcc-normal-calls",context)};
         auto* const i32{ir.getInt32Ty()};
-        auto* const type{llvm::FunctionType::get(i32,{i32},false)};
+        // Sixty arguments exceed the four AAPCS core argument registers.
+        // Genuine TailCC must restore/pop the actual 240-byte argument area
+        // on normal calls, at O0 as well as optimized SelectionDAG.
+        constexpr unsigned argument_count{64u};
+        llvm::SmallVector<llvm::Type*,64u> parameters(argument_count,i32);
+        auto* const type{llvm::FunctionType::get(i32,parameters,false)};
         auto* const slot{new llvm::GlobalVariable(*module,i32,false,llvm::GlobalValue::InternalLinkage,
             ir.getInt32(0u),"tailcc_numeric_side_effect")};
         auto* const leaf{llvm::Function::Create(type,llvm::GlobalValue::InternalLinkage,"tailcc_leaf",*module)};
@@ -78,18 +83,27 @@ int arm_tailcc_normal_call_oracle(llvm::Triple const& target)
             function->addFnAttr("disable-tail-calls","true");
         }
         ir.SetInsertPoint(llvm::BasicBlock::Create(context,"entry",leaf));
-        ir.CreateRet(ir.CreateAdd(ir.CreateMul(leaf->getArg(0u),ir.getInt32(17u)),ir.getInt32(23u)));
+        llvm::Value* sum{ir.getInt32(23u)};
+        for(unsigned n{}; n != argument_count; ++n)
+        { sum = ir.CreateAdd(sum,ir.CreateMul(leaf->getArg(n),ir.getInt32(17u + 2u*n))); }
+        ir.CreateRet(sum);
         ir.SetInsertPoint(llvm::BasicBlock::Create(context,"entry",effect));
         ir.CreateStore(effect->getArg(0u),slot)->setVolatile(true);
         ir.CreateRetVoid();
         ir.SetInsertPoint(llvm::BasicBlock::Create(context,"entry",caller));
-        auto* const value{ir.CreateCall(leaf,{caller->getArg(0u)})};
+        llvm::SmallVector<llvm::Value*,64u> forwarded;
+        for(auto& argument: caller->args()) { forwarded.push_back(&argument); }
+        auto* const value{ir.CreateCall(leaf,forwarded)};
         value->setCallingConv(llvm::CallingConv::Tail);
         value->setTailCallKind(llvm::CallInst::TCK_NoTail);
         ir.CreateRet(ir.CreateXor(value,ir.getInt32(UINT32_C(0x13579bdf))));
-        auto* const entry{llvm::Function::Create(type,llvm::GlobalValue::ExternalLinkage,"tailcc_c_entry",*module)};
+        auto* const entry_type{llvm::FunctionType::get(i32,{i32},false)};
+        auto* const entry{llvm::Function::Create(entry_type,llvm::GlobalValue::ExternalLinkage,"tailcc_c_entry",*module)};
         ir.SetInsertPoint(llvm::BasicBlock::Create(context,"entry",entry));
-        auto* const result{ir.CreateCall(caller,{entry->getArg(0u)})};
+        llvm::SmallVector<llvm::Value*,64u> arguments;
+        for(unsigned n{}; n != argument_count; ++n)
+        { arguments.push_back(ir.CreateAdd(entry->getArg(0u),ir.getInt32(5u + 3u*n))); }
+        auto* const result{ir.CreateCall(caller,arguments)};
         result->setCallingConv(llvm::CallingConv::Tail);
         result->setTailCallKind(llvm::CallInst::TCK_NoTail);
         auto* const side{ir.CreateCall(effect,{result})};
@@ -108,12 +122,26 @@ int arm_tailcc_normal_call_oracle(llvm::Triple const& target)
         using invoke = std::uint32_t (*)(std::uint32_t);
         for(auto const input : {UINT32_C(0),UINT32_C(1),UINT32_C(0x80000000),UINT32_C(0xffffffff)})
         {
-            auto const expected{((input * 17u + 23u) ^ UINT32_C(0x13579bdf)) * 2u};
-            CHECK(reinterpret_cast<invoke>(static_cast<std::uintptr_t>(address))(input) == expected);
+            std::uint32_t expected{23u};
+            for(unsigned n{}; n != argument_count; ++n)
+            { expected += (input + 5u + 3u*n) * (17u + 2u*n); }
+            expected = (expected ^ UINT32_C(0x13579bdf)) * 2u;
+#if defined(__arm__) && defined(__linux__)
+            // Test-private ABI values: only equality is reported. No
+            // address/register value grants a Wasm debugger display/read.
+            std::uintptr_t before_sp{},before_frame{},after_sp{},after_frame{};
+            asm volatile("mov %0,sp; mov %1,r11" : "=&r"(before_sp),"=&r"(before_frame) : : "memory");
+#endif
+            auto const actual{reinterpret_cast<invoke>(static_cast<std::uintptr_t>(address))(input)};
+#if defined(__arm__) && defined(__linux__)
+            asm volatile("mov %0,sp; mov %1,r11" : "=&r"(after_sp),"=&r"(after_frame) : : "memory");
+            CHECK(before_sp == after_sp && before_frame == after_frame);
+#endif
+            CHECK(actual == expected);
         }
         fast_io::io::println("PASS actual ARM TailCC normal integer/void calls and returns optimization=",
             fast_io::mnp::os_c_str(level == llvm::CodeGenOptLevel::None ? "O0-FastISel-fallback" : "optimized-SelectionDAG"),
-            " exact-numeric-results=true C-entry=true");
+            " exact-numeric-results=true C-entry=true arguments=64 stack-and-frame-preserved=true");
     }
     return 0;
 }

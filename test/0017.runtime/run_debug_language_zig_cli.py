@@ -32,11 +32,11 @@ try:
     for expression,value in [('value',3),('packet.tag',3),('packet.grid[1][2]',15),('shadow',7)]:
         reply=language.scalar(s,origin,expression,value)
         row['values'].append({'expression':expression,'expected':value,'reply':reply.decode()})
-    command=f'break-source 0 {origin["file"]}:{markers["PROBE_CALL"]}'
+    command=f'breaksource 0 {origin["file"]}:{markers["PROBE_CALL"]}'
     reply=language.query(s,command);bid=re.search(rb'breakpoint (\d+)',reply)
     assert bid is not None,(command,reply)
     table=language.query(s,'info breakpoints')
-    bad=language.query(s,f'break-source 0 {origin["file"]}.absent:{markers["PROBE_CALL"]}')
+    bad=language.query(s,f'breaksource 0 {origin["file"]}.absent:{markers["PROBE_CALL"]}')
     assert b'error:' in bad and table==language.query(s,'info breakpoints')
     s.send('continue')
     for _ in range(20):
@@ -67,7 +67,7 @@ finally:
         except BaseException as e:row.update(passed=False,close_error=repr(e));raise
         finally:
             row['quit_returncode']=s.console.child.returncode
-            row['managed_shutdown_complete']=b'managed shutdown complete' in s.console.transcript
+            row['managed_shutdown_complete']=s.console.normal_quit_completed
             if row['quit_returncode']!=0 or not row['managed_shutdown_complete']:row['passed']=False
     row['inputs_after']={str(p):sha(p) for p in paths}
     if row['inputs_after']!=before:row.update(passed=False,inputs_changed=True)

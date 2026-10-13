@@ -230,7 +230,7 @@ def main():
     console, checks = Console(command, args.out), []
     try:
         console.prompt()
-        assert b'breakpoint' in console.send('break 0 0 0')
+        assert b'breakpoint' in console.send('breakwasm 0 0 0')
         console.send('continue')
         assert b'stopped:' in console.send('wait')
         _, participant = status(console)
@@ -258,8 +258,9 @@ def main():
         assert len(text.encode()) > 512
         before, after = mutation(console, text, True)
         checks.append({'name': 'full256 payload survives real CLI input', 'applied': True, 'before': before, 'after': after})
-        assert b'running' in console.send('continue')
-        assert b'guest exited: 0' in console.send('wait')
+        resumed = console.send('continue')
+        assert b'error:' not in resumed and not re.search(rb'(?m)^running\r?$', resumed), resumed
+        assert b'Program exited normally.' in console.send('wait')
         console.process.stdin.write(b'quit\n'); console.process.stdin.flush()
         assert console.process.wait(timeout=15) == 0
     finally:

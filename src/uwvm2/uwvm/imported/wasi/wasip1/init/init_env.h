@@ -26,6 +26,8 @@
 // std
 # include <cstddef>
 # include <cstdint>
+# include <uwvm2/uwvm/debugger/console_stdio.h>
+# include <uwvm2/uwvm/debugger/wasip1_calls.h>
 # include <cstring>
 # include <cerrno>
 # include <limits>
@@ -60,7 +62,7 @@
 # include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
 # include <uwvm2/imported/wasi/wasip1/impl.h>
-# include <uwvm2/uwvm/cmdline/impl.h>
+# include <uwvm2/uwvm/cmdline/parser_state.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
 # include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 #endif
@@ -447,6 +449,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                                   return true;
                               }};
 
+        if(::uwvm2::uwvm::wasm::storage::execute_wasm_mode == ::uwvm2::uwvm::wasm::base::mode::debug_jit)
+        { env.debug_console_write=::uwvm2::uwvm::debugger::console_stdio::write;
+          env.debug_console_read=::uwvm2::uwvm::debugger::console_stdio::read;
+          env.debug_trace_identity=::uwvm2::uwvm::debugger::wasip1_calls::new_environment();
+          env.debug_fd_created=::uwvm2::uwvm::debugger::wasip1_calls::created_descriptor; }
         // Native stdin/stdout/stderr are always installed first as fds 0, 1, 2.
         // WASI Preview 1 assumes these descriptors exist; therefore fd_limit
         // smaller than 3 is rejected before this point.
@@ -472,8 +479,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t fd0{};
             if(::uwvm2::uwvm::wasm::storage::execute_wasm_mode != ::uwvm2::uwvm::wasm::base::mode::debug_jit)
             { if(!init_stdio(*fd0.fd_p, ::fast_io::in())) [[unlikely]] { return false; } }
-            // In console mode fd0 remains a closed, zero-rights placeholder.
-            // Never duplicate the management input into a guest capability.
+            else
+            {
+                // A separate EOF device backs the capability. Only the bounded
+                // host callback supplies guest data; command input stays sealed.
+#if defined(_WIN32) && !defined(__CYGWIN__)
+                ::fast_io::native_file input{u8"NUL",::fast_io::open_mode::in};
+#else
+                ::fast_io::native_file input{u8"/dev/null",::fast_io::open_mode::in};
+#endif
+                if(!init_stdio(*fd0.fd_p,input)) { return false; }
+                using rights=::uwvm2::imported::wasi::wasip1::abi::rights_t;
+                fd0.fd_p->rights_base=rights::right_fd_read | rights::right_fd_filestat_get | rights::right_poll_fd_readwrite;
+                fd0.fd_p->rights_inherit={};
+            }
             fd0.fd_p->wasi_fd.ptr->checkpoint_stdio_index=0;
             if(!try_emplace_fd(static_cast<fd_t>(0), ::std::move(fd0))) [[unlikely]] { return false; }
         }

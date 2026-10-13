@@ -515,6 +515,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full
     [[nodiscard]] inline full_source_instance::owner selected_full_source_owner_pin() noexcept
     { return details::selected_full_source; } // cold native setup/materialization only
 
+    // Lexical identity comparison under the SAME maintenance/publication or
+    // execution lease that protects the selected owner. No owner is returned
+    // or retained, and this result grants no independent lifetime/admission.
+    // Compare both pointer and control block without dereferencing a candidate;
+    // an alias, old source or non-owning pointer cannot substitute for the root.
+    [[nodiscard]] inline bool selected_full_source_matches_owner(full_source_instance::owner const& candidate) noexcept
+    {
+        auto const& selected{details::selected_full_source};
+        return candidate && selected && candidate.get() == selected.get() &&
+            !candidate.owner_before(selected) && !selected.owner_before(candidate);
+    }
+
     [[nodiscard]] inline bool select_unparsed_full_source_after_drain(
         full_source_instance::mutable_owner const& candidate) noexcept
     {

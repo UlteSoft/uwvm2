@@ -44,6 +44,7 @@ namespace details
         // Internal DATA join only, never a public permission. Actual consumers
         // must retain their authenticated stopped participant/cursor/cohort and
         // execution/GC lease BEFORE this publication-locked exact lookup.
+        [[nodiscard]] static bool has_actual_sealed_full_root(compiled_module_record const&) noexcept;
         [[nodiscard]] static bool resolve_actual_full(compiled_module_record const&,
             ::std::size_t,::std::uint_least64_t,::std::uintptr_t,::std::uintptr_t&,::std::uintptr_t&) noexcept;
     };

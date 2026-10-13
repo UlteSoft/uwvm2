@@ -161,6 +161,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full
         builtin_wasip1_loader_identity(builtin_wasip1_loader_identity const&) = delete;
         builtin_wasip1_loader_identity& operator=(builtin_wasip1_loader_identity const&) = delete;
         ~builtin_wasip1_loader_identity() = default;
+        // Native restart preparation only, inside the already drained source
+        // replacement callback. Remove solely the concrete factory's last
+        // insertion, after every old module registry view has been retired.
+        [[nodiscard]] static bool retire_actual_builtin_after_source_drain() noexcept
+        {
+            auto& actual{::uwvm2::uwvm::wasm::storage::preload_local_imported};
+            if(!::uwvm2::uwvm::wasm::storage::all_module.empty()) { return false; }
+            if(!selected_) { return actual.empty(); }
+            if(!canonical(selected_) || selected_->ordinal_ >= actual.size() ||
+               actual.size() - selected_->ordinal_ != 1u ||
+               actual.index_unchecked(selected_->ordinal_).ptr != selected_->implementation_) { return false; }
+            selected_.reset(); actual.pop_back(); return true;
+        }
         // Sole issuer performs the real original insertion itself from the
         // exact builtin concrete type. No module pointer, type name, caller
         // ready bool, imported target or external registration is accepted.

@@ -47,7 +47,7 @@ class Console:
         return self.wait(start,complete)
     def send(self,s):
         start=len(self.log);self.write(s.encode()+b'\n')
-        markers=(b'breakpoint ',) if s.startswith('break ') else (b'running',b'stopped: breakpoint') if s=='continue' else (b'stop-id ',)
+        markers=(b'breakpoint ',) if s.startswith('breakwasm ') else (b'running',b'stopped: breakpoint') if s=='continue' else (b'stop-id ',)
         reply=self.response(start,markers)
         check(b'error:' not in reply,'real command refused: '+repr(reply[-1800:]));return reply
     def interrupt_step(self,command,external):
@@ -105,7 +105,7 @@ def main():
         argv=[str(binary),'-Rdbg','-Rct','0','-Rllvm-call-stack',policy,'-Rllvm-cache-path','disable','--run',str(a.wasm)]
         con=Console(argv);row={'policy':policy,'argv':argv,'passed':False}
         try:
-            con.prompt(0);con.send('break 0 1 0');con.send('continue');initial=con.send('wait')
+            con.prompt(0);con.send('breakwasm 0 1 0');con.send('continue');initial=con.send('wait')
             check(b'stopped: breakpoint' in initial,'actual caller call-site breakpoint')
             m=re.search(rb'thread ([0-9]+) module=0 function=1 ',initial);check(m,'actual caller participant')
             participant=int(m[1]);before=stop_id(initial)

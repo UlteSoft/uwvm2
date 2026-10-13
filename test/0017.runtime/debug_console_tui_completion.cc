@@ -45,8 +45,8 @@ int main(int argc,char** argv)
     input(editor,"\x1b[5");check(editor.feed('~')==edit::action::page_up,"PageUp recognized");
     editor.begin();input(editor,"memory 0 0 ");check(editor.feed(9)==edit::action::unchanged,"unsupported arguments do not request a provider");
     editor.begin();input(editor,"replace 0 1 1 /tmp/f");check(editor.feed(9)==edit::action::completion,"path Tab requests a provider without executing input");
-    editor.begin();input(editor,"break-source 0 /tmp/part:12");for(unsigned i{};i<3u;++i){static_cast<void>(editor.feed(2));}
-    request=completion::context(editor.line().view(),editor.cursor());check(request.type==completion::kind::path && request.prefix=="/tmp/part" && request.end==24u,"source path completion preserves line selector");
+    editor.begin();input(editor,"breaksource 0 /tmp/part:12");for(unsigned i{};i<3u;++i){static_cast<void>(editor.feed(2));}
+    request=completion::context(editor.line().view(),editor.cursor());check(request.type==completion::kind::path && request.prefix=="/tmp/part" && request.end==23u,"source path completion preserves line selector");
     fast_io::string output{};
     {
         tui::screen screen{&output,+[](void* p,view text) noexcept { static_cast<fast_io::string*>(p)->append(text); },true};

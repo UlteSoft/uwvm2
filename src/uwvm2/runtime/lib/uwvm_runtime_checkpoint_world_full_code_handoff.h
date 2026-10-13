@@ -34,6 +34,7 @@ bool full_code_handoff_complete_{};
            actual_prepared_profile_.owner_before(publication->checkpoint_profile) ||
            publication->runtime_epoch!=0u || publication->debug_source_runtime_epoch!=0u || publication->plan ||
            publication->debug_source_binding || publication->checkpoint_compilation_identity || record.llvm_jit_ready ||
+           !checkpoint_root_generation_publication_bridge::matches_private_prepared(record,dense) ||
            record.llvm_jit_debug_source_fused_epoch!=0u || record.llvm_jit_precise_gc_roots_emitted ||
            publication->debug_cfi_manager!=staged.debug_cfi_manager_ || !publication->debug_cfi_manager ||
            publication->debug_cfi_manager->has_finalization_failure() ||
@@ -146,6 +147,9 @@ bool full_code_handoff_complete_{};
         { return fail(preparation_status::source_mismatch); }
 #endif
     }
+    // Charge all final immutable identity allocations before ownership transfer.
+    if(!charge_native(engines_.size(),checkpoint_root_generation_publication_bridge::allocation_bytes()) ||
+       !charge_native(prepared_publication_functions_,checkpoint_root_generation_publication_bridge::row_bytes())) { return false; }
     for(::std::size_t dense{};dense<engines_.size();++dense)
     {
         auto& staged=*engines_[dense];auto& record=indirect_dispatch_modules_.index_unchecked(dense);
@@ -176,10 +180,19 @@ bool full_code_handoff_complete_{};
         if(publication.actual_native_endpoints) { publication.actual_native_endpoints->code_publication_=::std::addressof(publication); }
 #endif
     }
+    for(::std::size_t dense{};dense<engines_.size();++dense)
+    {
+        auto& record=indirect_dispatch_modules_.index_unchecked(dense);
+        record.llvm_jit_full_publication->checkpoint_root_identity=
+            checkpoint_root_generation_publication_bridge::prepare(record,dense);
+        if(!record.llvm_jit_full_publication->checkpoint_root_identity) { return fail(preparation_status::allocation_failed); }
+    }
     full_code_handoff_complete_=true;
     if(!preflight_private_handed_off_full_code()) { return fail(preparation_status::source_mismatch); }
     out.prepared_full_code_owner_modules=engines_.size();out.prepared_full_code_owner_functions=prepared_publication_functions_;
     out.prepared_full_code_effective_bodies=handed_off_effective_bodies_;
+    out.prepared_full_root_code_identities=engines_.size();out.prepared_full_root_code_identity_functions=prepared_publication_functions_;
+    out.runtime_full_root_identities_prepared_privately=true;
     out.runtime_full_code_owners_transferred_privately=true;out.runtime_full_code_targets_allocation_preserved=true;
     return true;
 }

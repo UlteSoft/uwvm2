@@ -59,17 +59,17 @@ int main()
     CHECK(assembly.operation == ::uwvm2::utils::control::operation::step);
     CHECK(assembly.requested_step_thread == 42u && assembly.payload_size == 8u);
     for(::std::size_t index{}; index != 8u; ++index) { CHECK(assembly.payload[index] == wasm.payload[index]); }
-    auto const source_break{parse("break-source 7 C:\\work dir\\main.cpp:42")};
+    auto const source_break{parse("breaksource 7 C:\\work dir\\main.cpp:42")};
     CHECK(source_break.kind == console_command_kind::source_breakpoint);
     CHECK(source_break.operation == ::uwvm2::utils::control::operation::breakpoint_set);
     CHECK(source_break.source_module == 7u && source_break.source_line == 42u);
     CHECK((::std::string_view{source_break.source_path.data(), source_break.source_path_size} == "C:\\work dir\\main.cpp"));
-    auto const utf8_break{parse("break-source 0 src/变量.rs:9")};
+    auto const utf8_break{parse("breaksource 0 src/变量.rs:9")};
     CHECK(utf8_break.kind == console_command_kind::source_breakpoint);
     CHECK((::std::string_view{utf8_break.source_path.data(), utf8_break.source_path_size} == "src/变量.rs"));
-    for(auto const invalid_source : {"break-source 0 main.c:0", "break-source x main.c:1",
-                                     "break-source 0 main.c:-1", "break-source 0 :9",
-                                     "break-source 0 main.c:18446744073709551616"})
+    for(auto const invalid_source : {"breaksource 0 main.c:0", "breaksource x main.c:1",
+                                     "breaksource 0 main.c:-1", "breaksource 0 :9",
+                                     "breaksource 0 main.c:18446744073709551616"})
     { CHECK(parse(invalid_source).kind == console_command_kind::invalid); }
     CHECK(message(parse("server")) == "error: command is unsupported\n");
     for(auto const invalid : {"step wasm", "step wasm 0", "step wasm -1", "step wasm 18446744073709551616",

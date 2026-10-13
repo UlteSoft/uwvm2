@@ -27,8 +27,8 @@ def main():
   def ask(command):
    reply=c.send(command);record['actions'].append({'command':command,'reply':reply.decode(errors='strict')});assert len(c.transcript)<8*1024*1024;return reply
   assert b'prepared; no Wasm instruction executed' in ask('status')
-  reply=ask('break-source 0 debug_source_tinygo.go:31');assert b'error:' in reply or b'rejected' in reply,reply
-  reply=ask(f'break 0 {target} 0');m=re.search(rb'breakpoint (\d+)',reply);assert m is not None
+  reply=ask('breaksource 0 debug_source_tinygo.go:31');assert b'error:' in reply or b'rejected' in reply,reply
+  reply=ask(f'breakwasm 0 {target} 0');m=re.search(rb'breakpoint (\d+)',reply);assert m is not None
   ask('continue')
   for _ in range(60):
    reply=ask('wait')
@@ -43,16 +43,16 @@ def main():
   ask('delete '+m[1].decode());ask('continue')
   for _ in range(60):
    reply=ask('wait')
-   if b'guest exited:' in reply:break
+   if b'Program exited' in reply:break
   else:raise AssertionError('actual gc Go guest did not exit')
-  assert b'guest exited: 0' in reply,reply
+  assert b'Program exited normally.' in reply,reply
   record.update(passed=True,reason='actual gc Wasip1 producer has no DWARF even with -N -l; source queries fail without fabricated values')
  except BaseException as error:record['error']=repr(error);raise
  finally:
   if c is not None:
    try:c.finish()
    except BaseException as error:record.update(passed=False,close_error=repr(error));raise
-   finally:record.update(quit_returncode=c.child.returncode,managed_shutdown_complete=b'managed shutdown complete' in c.transcript)
+   finally:record.update(quit_returncode=c.child.returncode,managed_shutdown_complete=c.normal_quit_completed)
   record['inputs_after']={p:meta.sha(Path(p)) for p in pins}
   if pins!=record['inputs_after']:record.update(passed=False,inputs_changed=True)
   (a.out/'summary.json').write_text(json.dumps(record,indent=2)+'\n')

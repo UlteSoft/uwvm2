@@ -275,7 +275,7 @@ if source_stems:
    try:
     assert b'prepared; no Wasm instruction executed' in c.send('status')
     entry=wasm_export_function_index(a.out/(stem+'.wasm'),'_start')
-    assert b'breakpoint 1' in c.send(f'break 0 {entry} 0')
+    assert b'breakpoint 1' in c.send(f'breakwasm 0 {entry} 0')
     c.send('continue')
     stopped=c.until(b'stopped: breakpoint')
     for _ in range(64):
@@ -289,19 +289,19 @@ if source_stems:
     second=stepped.split(b'  source ',1)[1].split(b'\n',1)[0]
     assert first!=second,(first,second,stepped)
     assert b'stopped: selected participant step' in c.send('status')
-    c.send('continue');c.until(b'guest exited: 0')
+    c.send('continue');c.until(b'Program exited normally.')
     c.close()
     source_path,source_line,_column=first.rsplit(b':',2)
     source_spec=source_path.decode('utf-8')+':'+source_line.decode('ascii')
     c=Console(stem,'unwind',tag='source-break')
     try:
-     assert b'breakpoint 1 source=' in c.send(f'break-source 0 {source_spec}')
+     assert b'breakpoint 1 source=' in c.send(f'breaksource 0 {source_spec}')
      assert b'error: source stepping unavailable' not in c.send('status')
      c.send('continue');source_stop=c.until(b'stopped: breakpoint')
      assert b'  source '+source_path+b':'+source_line+b':' in source_stop,source_stop
-     assert b'error: source stepping unavailable' in c.send(f'break-source 0 {source_path.decode("utf-8")}:99999999')
+     assert b'error: source stepping unavailable' in c.send(f'breaksource 0 {source_path.decode("utf-8")}:99999999')
      assert b'breakpoint deleted' in c.send('delete 1')
-     c.send('continue');c.until(b'guest exited: 0');c.close()
+     c.send('continue');c.until(b'Program exited normally.');c.close()
     except BaseException:
      c.close(False);raise
     if stem == 'source-c-dwarf4':
@@ -311,9 +311,9 @@ if source_stems:
      c=Console(stem,'unwind',tag='source-replaced')
      try:
       assert b'function replaced; generation 2' in c.send(f'replace 0 {helper} 1 {replacement_body}')
-      assert b'error: source stepping unavailable' in c.send(f'break-source 0 {source_path.decode("utf-8")}:13')
-      assert b'error: Wasm byte offset has no emitted executable debug safe point' in c.send(f'break 0 {helper} 1')
-      assert b'breakpoint 1' in c.send(f'break 0 {helper} 0')
+      assert b'error: source stepping unavailable' in c.send(f'breaksource 0 {source_path.decode("utf-8")}:13')
+      assert b'error: Wasm byte offset has no emitted executable debug safe point' in c.send(f'breakwasm 0 {helper} 1')
+      assert b'breakpoint 1' in c.send(f'breakwasm 0 {helper} 0')
       c.send('continue');c.until(b'stopped: breakpoint')
       # The replacement declares no locals; the original C body declares
       # several. A parked debugger must inspect the published generation's
@@ -321,7 +321,7 @@ if source_stems:
       replacement_locals=c.send('locals 1')
       assert b'local 0 i32=5' in replacement_locals and b'local 1 ' not in replacement_locals,replacement_locals
       assert b'breakpoint deleted' in c.send('delete 1')
-      c.send('continue');c.until(b'guest exited: 0');c.close()
+      c.send('continue');c.until(b'Program exited normally.');c.close()
      except BaseException:
       c.close(False);raise
    except BaseException:
@@ -347,7 +347,7 @@ if source_stems:
     stepped=c.send(f'step source 1 {policy}')
     assert b'stopped: selected participant step' in stepped and f'function={destination}'.encode() in stepped,stepped
     assert b'  source ' in stepped,stepped
-    c.send('continue');c.until(b'guest exited: 0');c.close()
+    c.send('continue');c.until(b'Program exited normally.');c.close()
    except BaseException:
     c.close(False);raise
  if a.source_fixture_dir:
@@ -364,7 +364,7 @@ if source_stems:
    assert b'stopped: selected participant step' in stepped and b'  source ' in stepped,stepped
    second=stepped.split(b'  source ',1)[1].split(b'\n',1)[0]
    assert first!=second,(first,second,stepped)
-   c.send('continue');c.until(b'guest exited: 0')
+   c.send('continue');c.until(b'Program exited normally.')
    c.close()
   except BaseException:
    c.close(False);raise
@@ -377,10 +377,10 @@ if source_stems:
    c.send('continue');c.until(b'stopped: breakpoint')
    rejected=c.send('step source 1 into')
    assert b'error: source stepping unavailable: DWARF or Code section boundary is invalid' in rejected,rejected
-   rejected=c.send('break-source 0 debug_source_c.c:1')
+   rejected=c.send('breaksource 0 debug_source_c.c:1')
    assert b'error: source stepping unavailable: DWARF or Code section boundary is invalid' in rejected,rejected
    assert b'stopped: breakpoint' in c.send('status')
-   c.send('continue');c.until(b'guest exited: 0')
+   c.send('continue');c.until(b'Program exited normally.')
    c.close()
   except BaseException:
    c.close(False);raise
@@ -394,7 +394,7 @@ if source_stems:
    rejected=c.send('step source 1 into')
    assert b'error: source stepping unavailable: DWARF or Code section boundary is invalid' in rejected,rejected
    assert b'stopped: breakpoint' in c.send('status')
-   c.send('continue');c.until(b'guest exited: 0')
+   c.send('continue');c.until(b'Program exited normally.')
    c.close()
   except BaseException:
    c.close(False);raise
@@ -413,7 +413,7 @@ try:
  assert b'breakpoint 1' in c.send('break 0 0 0')
  c.send('continue');c.until(b'stopped: breakpoint')
  assert b'breakpoint deleted' in c.send('delete 1')
- c.send('continue');c.until(b'guest exited: 0');c.close()
+ c.send('continue');c.until(b'Program exited normally.');c.close()
 except BaseException:
  c.close(False);raise
 
@@ -423,7 +423,7 @@ for policy in ('instruction','unwind','none'):
   assert b'prepared; no Wasm instruction executed' in c.send('status')
   assert b'error: Wasm byte offset has no emitted executable debug safe point' in c.send('break 0 0 1')
   assert b'error: breakpoint target is not a defined LLVM-full Wasm function' in c.send('break 0 9999 0')
-  assert b'error: source stepping unavailable' in c.send('break-source 0 missing.c:1')
+  assert b'error: source stepping unavailable' in c.send('breaksource 0 missing.c:1')
   assert b'registered' in c.send('break 0 0 0')
   assert b'breakpoint 1' in c.send('info breakpoints')
   c.send('continue');stopped=c.until(b'stopped: breakpoint')
@@ -460,7 +460,7 @@ for policy in ('instruction','unwind','none'):
   assert b'breakpoint deleted' in c.send('delete 1')
   assert b'error: command exceeds 512 bytes' in c.send('x'*513)
   assert b'error: invalid command' in c.send('break 0 0 18446744073709551616')
-  c.send('continue');c.until(b'guest exited: 0')
+  c.send('continue');c.until(b'Program exited normally.')
   assert b'error:' in c.send('memory 0 0 32 3')
   c.close()
  except BaseException:
@@ -468,7 +468,7 @@ for policy in ('instruction','unwind','none'):
 
 c=Console('stdio','instruction')
 try:
- c.send('continue');c.until(b'guest exited: 0');assert b'stdio-isolated\n' in c.log,c.log;c.close()
+ c.send('continue');c.until(b'Program exited normally.');assert b'stdio-isolated\n' in c.log,c.log;c.close()
 except BaseException:c.close(False);raise
 c=Console('infinite','unwind')
 try:
@@ -483,14 +483,14 @@ try:
  assert b'memory: 4d 36 34' in c.send('memory 0 1 64 3')
  assert b'memory: <empty>' in c.send('memory 0 1 65536 0')
  assert b'error: memory module, index or byte range unavailable' in c.send('memory 0 1 65537 0')
- c.send('continue');c.until(b'guest exited: 0');c.close()
+ c.send('continue');c.until(b'Program exited normally.');c.close()
 except BaseException:c.close(False);raise
 
 for policy in ('instruction','unwind'):
  c=Console('patchable_calls',policy)
  try:
   assert b'prepared; no Wasm instruction executed' in c.send('status')
-  c.send('continue');c.until(b'guest exited: 0');c.close()
+  c.send('continue');c.until(b'Program exited normally.');c.close()
  except BaseException:c.close(False);raise
 
 # Two independent module records keep distinct fixed slot arrays. Provider
@@ -498,7 +498,7 @@ for policy in ('instruction','unwind'):
 for policy in ('instruction','unwind'):
  c=Console('patchable_importer',policy,extra_args=['-Wpre',str(a.out/'patchable_provider.wasm'),'p'])
  try:
-  c.send('continue');c.until(b'guest exited: 0');c.close()
+  c.send('continue');c.until(b'Program exited normally.');c.close()
  except BaseException:c.close(False);raise
 
 # The importer active element overwrites an exported provider table after
@@ -507,7 +507,7 @@ for policy in ('instruction','unwind'):
 for policy in ('instruction','unwind'):
  c=Console('alias_importer',policy,extra_args=['-Wpre',str(a.out/'alias_provider.wasm'),'p'])
  try:
-  c.send('continue');c.until(b'guest exited: 0');c.close()
+  c.send('continue');c.until(b'Program exited normally.');c.close()
  except BaseException:c.close(False);raise
 
 # A code image containing a process-local typed-slot base must never be reused
@@ -516,7 +516,7 @@ cache=a.out/'patchable-cache'
 for phase in ('cold','warm'):
  c=Console('patchable_calls','instruction',cache,phase)
  try:
-  c.send('continue');c.until(b'guest exited: 0');c.close()
+  c.send('continue');c.until(b'Program exited normally.');c.close()
   compile_log=(a.out/(c.name+'.compile.log')).read_text()
   assert 'object-cache-hit' not in compile_log,compile_log
   assert not any(path.is_file() for path in cache.rglob('*')),list(cache.rglob('*'))
@@ -527,7 +527,7 @@ for phase in ('cold','warm'):
 for phase in ('fallback-cold','fallback-warm'):
  c=Console('locals','instruction',cache,phase)
  try:
-  c.send('continue');c.until(b'guest exited: 0');c.close()
+  c.send('continue');c.until(b'Program exited normally.');c.close()
   compile_log=(a.out/(c.name+'.compile.log')).read_text()
   assert 'object-cache-hit' not in compile_log,compile_log
   assert not any(path.is_file() for path in cache.rglob('*')),list(cache.rglob('*'))
@@ -551,7 +551,7 @@ try:
   seen.update(item for item in expected if item in values)
   if len(seen)==len(expected):break
  assert len(seen)==len(expected),(seen,expected,bytes(c.log)[-5000:])
- c.send('continue');c.until(b'guest exited: 0');c.close()
+ c.send('continue');c.until(b'Program exited normally.');c.close()
 except BaseException:c.close(False);raise
 
 incompatible=[['-Rint']] if a.ros else [['-Rcc','int','-Rcm','full'],['-Rcc','jit','-Rcm','lazy'],['-Rjit'],['-Rint'],['-Rcc','tiered']]

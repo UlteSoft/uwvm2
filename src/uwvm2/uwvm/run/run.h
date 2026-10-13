@@ -1325,7 +1325,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                          static_cast<::std::uint64_t>(expr - code_begin),
                                          static_cast<::std::uint64_t>(end - expr)});
                 }
-                installed = control.install_source_module(module_id, sections, ::std::move(functions), invalid);
+                installed = control.install_source_module(module_id, sections, ::std::move(functions), invalid,
+                    ::fast_io::string_view{reinterpret_cast<char const*>(runtime_entry.first.data()), runtime_entry.first.size()},
+                    ::fast_io::string_view{reinterpret_cast<char const*>(file->file_name.data()), file->file_name.size()});
             }(wasm::feature::wasm_binfmt1_features);
             if(!installed) { return false; }
             // Only the runtime's actual canonical source/native publication can
@@ -2281,6 +2283,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
                 namespace debugger = ::uwvm2::uwvm::debugger;
                 namespace control = ::uwvm2::utils::control;
+                debugger::console_restart_request restart{};
+                if(::uwvm2::uwvm::cmdline::wasm_file_ppos != nullptr)
+                { restart.program_name = ::fast_io::concat_fast_io(::fast_io::mnp::code_cvt(::uwvm2::uwvm::cmdline::wasm_file_ppos->str)); }
+                debugger::console_keyboard::native_session keyboard{};
+                if(!keyboard.ready()) { return static_cast<int>(retval::parameter_error); }
+                for(;;)
+                {
+                if(restart.pending)
+                {
+                    // Reached only after managed cleanup observed actual native,
+                    // producer and guest OS retirement in the previous scope.
+                    // The normal source factory reparses the original configured
+                    // inputs and recreates memories/globals/tables/WASI state.
+                    auto const prepared{prepare_owned_full_cli_source(true, true)};
+                    if(prepared != static_cast<int>(retval::ok)) { return prepared; }
+                    runtime_entry = resolve_runtime_entry_invocation(::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name);
+                    restart.pending = false;
+                }
                 control::launch_config config{};
                 config.debug_enabled = true;
                 // Let the authenticated host controller validate replace requests; the runtime currently rejects
@@ -2321,6 +2341,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                         ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                     return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
                 }
+                for(auto const& old : restart.breakpoints)
+                {
+                    // Settings are DATA only; execute validates this new
+                    // module/function/opcode and installs the policy atomically.
+                    auto point{debugger::parse_console_command(::fast_io::concat_fast_io("breakwasm ",
+                        ::fast_io::mnp::dec(old.module), " ", ::fast_io::mnp::dec(old.function), " ",
+                        ::fast_io::mnp::dec(old.offset)).subview(0u))};
+                    point.breakpoint_source_display=old.source_level;
+                    point.breakpoint_initial_ignore = true; point.breakpoint_ignore = old.ignore_remaining;
+                    point.breakpoint_initial_condition = old.condition_size != 0u;
+                    point.breakpoint_condition = old.condition; point.breakpoint_condition_size = old.condition_size;
+                    auto const installed{controller->execute(point)};
+                    if(installed.status != control::error::none)
+                    {
+                        ::fast_io::io::println(::fast_io::out(), "restart breakpoint ", ::fast_io::mnp::dec(old.identifier),
+                            " unavailable in the reloaded Wasm module");
+                        continue;
+                    }
+                    if(!old.enabled)
+                    { static_cast<void>(controller->execute(debugger::parse_console_command(::fast_io::concat_fast_io("disable ",
+                        ::fast_io::mnp::dec(installed.breakpoint_identifier)).subview(0u)))); }
+                    ::fast_io::io::println(::fast_io::out(), "restart breakpoint ", ::fast_io::mnp::dec(old.identifier),
+                        " -> ", ::fast_io::mnp::dec(installed.breakpoint_identifier));
+                }
+                restart.breakpoints.clear();
                 ::uwvm2::runtime::lib::full_compile_run_config run_config{};
                 configure_runtime_entry_buffers(run_config, runtime_entry);
                 // The actual launched FastIO owner remains exclusive until a
@@ -2358,7 +2403,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 // containment after actual physical EOF if finite managed
                 // cleanup is still pending. Terminal CtrlD has a distinct editor
                 // event and can retain the prompt for quit retry / quit force.
-                auto result{debugger::run_console(*controller, ::std::addressof(shutdown), true)};
+                auto result{debugger::run_console(*controller, keyboard, ::std::addressof(shutdown), true,
+                    owned_full_prepared ? ::std::addressof(restart) : nullptr)};
+                if(result == debugger::console_exit::restart) { continue; }
                 if(result == debugger::console_exit::input_failure)
                 {
                     // The native input adapter has restored its terminal/signal
@@ -2397,6 +2444,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 #  else
                 ::std::_Exit(result == debugger::console_exit::input_failure ? 1 : 0);
 #  endif
+                } // Restart iteration releases all old physical worker/controller owners before fresh initialization.
+                break;
 # else
                 return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
 # endif

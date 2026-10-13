@@ -92,18 +92,18 @@ def first_expression(data):
     raise AssertionError('no code section')
 
 class Console:
-    def __init__(self, argv, log):
+    def __init__(self, argv, log, initial_timeout=120):
         self.log_path = log; self.log = bytearray(); self.pending = bytearray()
         self.child = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         self.selector = selectors.DefaultSelector()
         self.selector.register(self.child.stdout, selectors.EVENT_READ)
         try:
-            self.prompt()
+            self.prompt(initial_timeout)
         except BaseException:
             self.close(False)
             raise
-    def prompt(self):
-        deadline = time.monotonic() + 120
+    def prompt(self, timeout=120):
+        deadline = time.monotonic() + timeout
         marker = b'(uwvm-debug) '
         while marker not in self.pending:
             remaining = deadline - time.monotonic()
@@ -181,7 +181,7 @@ def main():
         debug_argv = [*base, '-Rdbg', '--run', str(wasm)]
         console = None; actions = []; success = False
         try:
-            console = Console(debug_argv, out/('O'+str(level)+'-debug.log'))
+            console = Console(debug_argv, out/('O'+str(level)+'-debug.log'), c.get('jit_startup_timeout', 120))
             reply = console.send('break 0 0 '+str(pause))
             assert b'breakpoint 1' in reply, reply
             for expected in expected_debug:
@@ -200,6 +200,9 @@ def main():
         assert success
         rows[-1].update(debug_argv=debug_argv, debug_checks=checks, debug_values=len(actions),
                         debug_log_sha256=sha(out/('O'+str(level)+'-debug.log')))
+        (out/'debug-checkpoint.json').write_text(json.dumps(dict(completed_levels=len(rows), rows=rows,
+            product_sha256=sha(c['product']), source_identities=q['source_identities'],
+            test_code_sha256=sha(__file__), wasm_sha256=sha(wasm)), indent=2)+'\n')
         print('PASS v128 joins and exact debug operands', c['repo'], 'O'+str(level), flush=True)
     for p, h in c['pins'].items():
         assert sha(p) == h

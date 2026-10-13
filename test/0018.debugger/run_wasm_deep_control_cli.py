@@ -36,7 +36,7 @@ for name,wat_text in cases.items():
   row=dict(case=name,policy=policy,actual_VM=True,observations=[]);c=None
   try:
    c=OperandConsole([*runner,str(a.binary),'-Rdbg','-Rct','0','-Rllvm-cache-path','disable','-Rllvm-call-stack',policy,'-WFE-tail-call','-WFE-exceptions','--run',str(wasm)],a.out/(name+'-'+policy+'.log'));c.prompt()
-   assert b'registered' in c.send(f'break 0 0 {sites[0][0]}');c.send('continue')
+   assert b'registered' in c.send(f'breakwasm 0 0 {sites[0][0]}');c.send('continue')
    limit=time.monotonic()+a.stop_timeout
    while b'stopped:' not in c.send('status'):assert time.monotonic()<limit;time.sleep(.01)
    thread,function,offset=c.location();assert function==0

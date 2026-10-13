@@ -32,6 +32,9 @@ def main():
     elif config.get('fixture_kind') == 'simd-sign':
         from tiered_simd_sign import fixture as selected_fixture
         feature_flags = ['-WFE-simd']
+    elif config.get('fixture_kind') == 'simd-rounding':
+        from tiered_simd_rounding import fixture as selected_fixture
+        feature_flags = ['-WFE-simd']
     else:
         selected_fixture = fixture
         feature_flags = []
@@ -107,7 +110,8 @@ def main():
                                argv=argv, exit=completed.returncode, seconds=time.monotonic() - started,
                                actual_t2_target_entry=entered, full_module_ready=ready, counters=counters,
                                checked_calls=4_000_000,
-                               bit_checks_per_call=12 if config.get('fixture_kind') == 'simd-sign' else 6,
+                               bit_checks_per_call=12 if config.get('fixture_kind') == 'simd-sign' else
+                               24 if config.get('fixture_kind') == 'simd-rounding' else 6,
                                compiler_log_sha256=digest(compiler_log) if compiler_log.exists() else None,
                                physical_compiler_log=str(compiler_log), run_log_sha256=digest(run_log),
                                wasm_sha256=digest(wasm), cache_entries=entries,

@@ -58,7 +58,7 @@ int main(int argc, char** argv)
     check(lib::llvm_jit_configure_debug_value_observation_host_api() ==
         lib::llvm_jit_debug_configure_result::ok,"real precompile typed Wasm observer selection");
     check(lib::llvm_jit_prepare_debug_host_api() && owner->arm_initial_pause(), "actual compiled initial pause");
-    check(command(*owner, ::fast_io::concat_fast_io(::fast_io::mnp::os_c_str(cancel ? "break 0 3 0" : "break 0 0 31"))).status == control::error::none, "real before-call Wasm breakpoint");
+    check(command(*owner, ::fast_io::concat_fast_io(::fast_io::mnp::os_c_str(cancel ? "breakwasm 0 3 0" : "breakwasm 0 0 31"))).status == control::error::none, "real before-call Wasm breakpoint");
     check(command(*owner, ::fast_io::concat_fast_io("continue")).status == control::error::none, "open launch gate");
     ::std::uint32_t result{}; ::std::atomic_bool finished{};
     ::std::thread guest{[&]

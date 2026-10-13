@@ -116,8 +116,9 @@ public:
     }
 };
 [[nodiscard]] inline bool emit_runtime_local_func_llvm_jit_checkpoint_current_opcode(
-    runtime_local_func_llvm_jit_emit_state_t& state, ::std::size_t offset) noexcept
+    runtime_local_func_llvm_jit_emit_state_t& state, ::std::size_t offset, ::std::uint64_t* fused_site = nullptr) noexcept
 {
+    if(fused_site != nullptr) { *fused_site = 0u; }
     namespace checkpoint = ::uwvm2::runtime::checkpoint;
     auto const plan{state.checkpoint_plan};
     if(plan == nullptr || plan->producer_availability != checkpoint::status::ok || state.checkpoint_current_site == 0u) { return true; }
@@ -158,6 +159,17 @@ public:
         state, site, state.checkpoint_executed_local_flags, actual,
         ::std::addressof(state.checkpoint_packet_values), ::std::addressof(state.checkpoint_packet_flags))};
     if(!packet.valid) { return false; }
+    bool const deferred{publish_runtime_local_func_llvm_jit_observer_site(state,site)};
+    if(fused_site != nullptr && state.checkpoint_observer_controls != nullptr &&
+       state.checkpoint_observer_workspace != nullptr &&
+       site.identifier <= checkpoint::observation_fused_max_site)
+    {
+        // The immediately following real safepoint bridge validates the actual
+        // TLS activation and copies this complete packet before its observer or
+        // park. No guest instruction/call runs between emission and that bridge.
+        *fused_site = site.identifier; return true;
+    }
+    if(deferred) { return true; } // Cold reader expands the actual stable slots.
     auto& builder{*state.ir_builder};
     auto const integer{builder.getIntNTy(static_cast<unsigned>(sizeof(::std::uintptr_t) * CHAR_BIT))};
     auto const type{::llvm::FunctionType::get(builder.getVoidTy(),

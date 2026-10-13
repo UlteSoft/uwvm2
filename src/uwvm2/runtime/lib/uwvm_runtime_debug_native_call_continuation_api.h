@@ -9,28 +9,28 @@
         llvm_jit_debug_native_call_continuation() = default;
         llvm_jit_debug_activation_capture_owner capture_{};
         llvm_jit_debug_native_activation_cursor_owner cursor_{};
-        void const* session_{};
+        [[maybe_unused]] void const* session_{};
         llvm_jit_debug_native_call_continuation_view view_{};
         // Comparison-only scalars. They are NEVER converted to borrowed code,
         // native memory or stack pointers. Every query reselects actual owners
         // under the real publication guard and actual worker execution lease.
-        void const* caller_owner_{}, *callee_owner_{};
-        ::std::uintptr_t callee_target_{}, callee_begin_{}, callee_end_{};
-        ::std::size_t register_index_{SIZE_MAX}; // private exact MC operand, never caller data
-        ::std::size_t call_size_{};
-        ::std::uintptr_t slot_address_{}; // comparison only; NEVER cast/dereferenced
-        ::std::uint64_t trap_revision_{}; // actual kernel sequence; never supplied by caller
-        ::std::array<::std::uint64_t, 38u> origin_gpr_{}; // private actual trap only, including the original SP
-        ::std::uintptr_t origin_sp_{};
+        [[maybe_unused]] void const* caller_owner_{}, *callee_owner_{};
+        [[maybe_unused]] ::std::uintptr_t callee_target_{}, callee_begin_{}, callee_end_{};
+        [[maybe_unused]] ::std::size_t register_index_{SIZE_MAX}; // private exact MC operand, never caller data
+        [[maybe_unused]] ::std::size_t call_size_{};
+        [[maybe_unused]] ::std::uintptr_t slot_address_{}; // comparison only; NEVER cast/dereferenced
+        [[maybe_unused]] ::std::uint64_t trap_revision_{}; // actual kernel sequence; never supplied by caller
+        [[maybe_unused]] ::std::array<::std::uint64_t, 38u> origin_gpr_{}; // private actual trap only, including the original SP
+        [[maybe_unused]] ::std::uintptr_t origin_sp_{};
         llvm_jit_debug_native_breakpoint_plan software_plan_{};
 #if defined(__linux__) && defined(__arm__)
         ::fast_io::string instruction_identity_{};
 #endif
-        bool opaque_call_{}; // runtime-minted NI fallthrough only; never a callee ownership grant
-        ::std::uint_least64_t callee_module_{}, callee_function_{}, callee_generation_{};
-        friend auto ::uwvm2::runtime::lib::llvm_jit_debug_mint_native_call_continuation_host_api(
+        [[maybe_unused]] bool opaque_call_{}; // runtime-minted NI fallthrough only; never a callee ownership grant
+        [[maybe_unused]] ::std::uint_least64_t callee_module_{}, callee_function_{}, callee_generation_{};
+        friend auto ::uwvm2::runtime::lib::llvm_jit_debug_mint_native_call_policy_host_api(
             llvm_jit_debug_activation_capture_owner const&, llvm_jit_debug_native_activation_cursor_owner const&,
-            void const*) noexcept -> llvm_jit_debug_native_call_continuation_owner;
+            void const*, bool, ::std::size_t) noexcept -> llvm_jit_debug_native_call_continuation_owner;
         friend auto ::uwvm2::runtime::lib::llvm_jit_debug_native_call_continuation_host_api(
             llvm_jit_debug_native_call_continuation_owner const&, void const*,
             llvm_jit_debug_native_call_continuation_view&) noexcept -> bool;
@@ -40,7 +40,7 @@
         friend auto ::uwvm2::runtime::lib::llvm_jit_debug_resume_native_call_continuation_host_api(
             llvm_jit_debug_native_call_continuation_owner const&, void const*, void*,
             llvm_jit_debug_native_call_resume_callback) noexcept -> bool;
-#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE) && \
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && ((defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)) || UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION) && \
     defined(UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2) && UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2 == 1
         ::uwvm2::uwvm::debugger::native_owned_instruction_semantics::call_memory_operand memory_operand_{};
         struct observation
@@ -52,6 +52,8 @@
             void const* caller_owner{}, *callee_owner{};
             ::std::uintptr_t callee_begin{}, callee_end{}, callee_target{}, slot_address{};
             ::std::uint_least64_t callee_module{}, callee_function{}, callee_generation{};
+            ::std::size_t callee_stack_adjustment{};
+
         };
         // Cold bounded DATA join, ONLY inside observe's real publication guard.
         // A raw adapter/helper/descriptor/unknown alias cannot satisfy the true
@@ -96,6 +98,38 @@
                     if(owner == nullptr) { return false; }
                     output.callee_owner = owner; output.callee_begin = begin; output.callee_end = end;
                     output.callee_module = id; output.callee_function = function; output.callee_generation = generation;
+#if defined(__linux__) && defined(__x86_64__)
+                    // LLVM fastcc can emit RET imm16 to reclaim stack arguments.
+                    // Derive one uniform cleanup from this actual typed callee's
+                    // immutable, published owner under the SAME execution/domain/
+                    // publication guards. Decode bounded OWNED instruction copies;
+                    // no supplied target/stack address grants a byte read.
+                    output.callee_stack_adjustment=SIZE_MAX;
+                    llvm_jit_debug_native_target metadata{};
+                    if(end-begin<=PTRDIFF_MAX && debug_copy_actual_native_target(id,function,generation,owner,metadata))
+                    {
+                        ::uwvm2::uwvm::debugger::native_disassembly::decoder display{metadata};
+                        ::uwvm2::uwvm::debugger::native_owned_instruction_semantics::decoder semantics{metadata};
+                        bool valid{bool(display) && bool(semantics)}, seen{}; ::std::size_t adjustment{};
+                        for(auto pc{begin};valid && pc<end;)
+                        {
+                            ::std::array<::std::uint8_t,32u> copied{};
+                            auto const count{(::std::min)(static_cast<::std::size_t>(end-pc),copied.size())};
+                            ::std::memcpy(copied.data(),reinterpret_cast<void const*>(pc),count);
+                            auto const row{display.decode(pc,{copied.data(),count})};
+                            if(!row || row.size==0u || row.size>count) { valid=false;break; }
+                            auto const instruction{semantics.decode(pc,{copied.data(),row.size})};
+                            if(instruction.semantics().kind==::uwvm2::uwvm::debugger::native_instruction_semantics::flow::return_instruction)
+                            {
+                                auto const pop{instruction.near_return_pop_bytes()};
+                                if(pop==SIZE_MAX || (seen && adjustment!=pop)) { valid=false;break; }
+                                adjustment=pop;seen=true;
+                            }
+                            pc+=row.size; // authenticated owner bounds and nonzero complete MC size
+                        }
+                        if(valid && seen) { output.callee_stack_adjustment=adjustment; }
+                    }
+#endif
                     found = true;
                 }
             }
@@ -168,8 +202,11 @@
             if(get_runtime_state_publication_depth() != 1u) { return false; }
             bool valid{};
             if(!external || !capture_->matches_native_publication_locked(actual, external) || capture_->snapshot_.frames.empty() ||
-               capture_->code_owners_.empty() || !capture_->native_ledger_owner_ ||
-               cursor_->ledger_ != capture_->native_ledger_owner_.get()) { return false; }
+               capture_->code_owners_.empty() || !capture_->native_ledger_owner_
+#if !UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
+               || cursor_->ledger_ != capture_->native_ledger_owner_.get()
+#endif
+               ) { return false; }
             auto const& site{capture_->native_site_};
             auto const generation{capture_->snapshot_.frames.back().function_generation};
             static_cast<void>(::uwvm2::uwvm::debugger::native_step::with_owned_registers_and_revision(session_,
@@ -182,12 +219,16 @@
                    delay_slot || registers.size() == 0u || registers.values.size() != 38u ||
                    registers.pc() != pc || registers.sp() == 0u ||
                    !site.valid || site.participant != capture_->snapshot_.participant || site.native_thread != thread ||
-                   site.owner_begin != begin || site.owner_end != end ||
-                   thread != cursor_->thread_ || begin != cursor_->begin_ || end != cursor_->end_ ||
+                   site.owner_begin != begin || site.owner_end != end) { return; }
+#if UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
+                if(!capture_->matches_native_cursor_locked(session_,thread,pc,registers.sp(),begin,end)) { return; }
+#else
+                if(thread != cursor_->thread_ || begin != cursor_->begin_ || end != cursor_->end_ ||
                    site.return_pc != cursor_->first_ || !cursor_->witnessed_ || cursor_->retirement_ != 4u ||
                    cursor_->witnessed_pc_ != pc || cursor_->witnessed_sp_ != registers.sp() ||
                    cursor_->count_ == 0u ||
                    !cursor_->ledger_->matches_native_chain(cursor_->expected_, cursor_->count_)) { return; }
+#endif
                 ::std::uintptr_t actual_begin{}, actual_end{};
                 if(!debug_resolve_actual_native_function_body(actual.code_unit, actual.function, generation,
                     actual.code_generation, pc, actual_begin, actual_end) || actual_begin != begin || actual_end != end ||
@@ -280,9 +321,11 @@
         // stopped participant + publication + actual native snapshot gate.
         [[nodiscard]] bool observe(observation& output, llvm_jit_debug_native_function_image* image) const
         {
-            if(!capture_ || !cursor_ || session_ == nullptr || !capture_->control_ || !capture_->ticket_ ||
-               cursor_->session_ != session_ || cursor_->capture_.get() != capture_.get() ||
+            if(!capture_ || session_ == nullptr || !capture_->control_ || !capture_->ticket_) { return false; }
+#if !UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
+            if(!cursor_ || cursor_->session_ != session_ || cursor_->capture_.get() != capture_.get() ||
                cursor_->capture_.owner_before(capture_) || capture_.owner_before(cursor_->capture_)) { return false; }
+#endif
             auto gc_reader{::uwvm2::runtime::gc::runtime_gc_entry_admission.try_enter()}; if(!gc_reader) { return false; }
             auto lease{g_runtime.execution_domain.try_enter()}; if(!lease) { return false; }
             bool valid{};
@@ -296,7 +339,7 @@
         }
         [[nodiscard]] bool matches_observation(observation const& actual) const noexcept
         {
-            auto expected{view_}; expected.continuation_pc = 0u;
+            auto expected{view_}; expected.continuation_pc = 0u; expected.return_stack_adjustment = 0u;
             return trap_revision_ != 0u && actual.trap_revision == trap_revision_ && actual.view == expected &&
                 actual.gpr == origin_gpr_ && actual.stack == origin_sp_ &&
                 actual.caller_owner == caller_owner_ && actual.callee_owner == callee_owner_ &&
@@ -332,9 +375,11 @@
         }
         [[nodiscard]] bool resume(void* context, llvm_jit_debug_native_call_resume_callback callback) const
         {
-            if(!capture_ || !cursor_ || session_ == nullptr || !capture_->control_ || !capture_->ticket_ ||
-               cursor_->session_ != session_ || cursor_->capture_.get() != capture_.get() ||
+            if(!capture_ || session_ == nullptr || !capture_->control_ || !capture_->ticket_) { return false; }
+#if !UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
+            if(!cursor_ || cursor_->session_ != session_ || cursor_->capture_.get() != capture_.get() ||
                cursor_->capture_.owner_before(capture_) || capture_.owner_before(cursor_->capture_)) { return false; }
+#endif
             if(callback == nullptr || (!opaque_call_ && callee_target_ == 0u) ||
                trap_revision_ == 0u || trap_revision_ == UINT64_MAX) { return false; }
             auto gc_reader{::uwvm2::runtime::gc::runtime_gc_entry_admission.try_enter()}; if(!gc_reader) { return false; }
@@ -365,7 +410,7 @@
         llvm_jit_debug_native_call_continuation(llvm_jit_debug_native_call_continuation const&) = delete;
         llvm_jit_debug_native_call_continuation& operator=(llvm_jit_debug_native_call_continuation const&) = delete;
     };
-#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE) && \
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && ((defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)) || UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION) && \
     defined(UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2) && UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2 == 1
     namespace
     {
@@ -387,11 +432,11 @@
         }
     }
 #endif
-    extern "C++" llvm_jit_debug_native_call_continuation_owner llvm_jit_debug_mint_native_call_continuation_host_api(
+    extern "C++" llvm_jit_debug_native_call_continuation_owner llvm_jit_debug_mint_native_call_policy_host_api(
         llvm_jit_debug_activation_capture_owner const& supplied, llvm_jit_debug_native_activation_cursor_owner const& supplied_cursor,
-        void const* session) noexcept
+        void const* session, bool require_guest, ::std::size_t linear_limit) noexcept
     {
-#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE) && \
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && ((defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)) || UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION) && \
     defined(UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2) && UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2 == 1
         namespace mode = ::uwvm2::uwvm::runtime::runtime_mode;
         if(session == nullptr || mode::global_runtime_mode != mode::runtime_mode_t::full_compile ||
@@ -402,14 +447,20 @@
         try
         {
             auto const capture{debug_activation_canonical_capture(supplied)};
+            #if UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
+            (void)supplied_cursor;
+            llvm_jit_debug_native_activation_cursor_owner cursor{};
+            if(!capture) { return {}; }
+#else
             auto const cursor{canonical_native_activation_cursor(supplied_cursor)};
             if(!capture || !cursor) { return {}; }
+#endif
             // Allocate all bounded cold owners/copies before entering the real
             // native gate; never allocate in a handler or after event enable.
             auto candidate{::std::shared_ptr<llvm_jit_debug_native_call_continuation>{new llvm_jit_debug_native_call_continuation}};
             candidate->capture_ = capture; candidate->cursor_ = cursor; candidate->session_ = session;
-#if UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE
-            candidate->opaque_call_ = true; // NI supplies no callee observer.
+#if UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE || UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
+            candidate->opaque_call_ = !require_guest; // SI additionally requires the actual typed guest target.
 #endif
             auto image{::std::make_unique<llvm_jit_debug_native_function_image>()};
             if(!candidate->prepare_image_storage(*image)) { return {}; }
@@ -424,6 +475,38 @@
             ::uwvm2::uwvm::debugger::native_owned_instruction_semantics::decoder decoder{image->target};
             if(!decoder) { return {}; }
             auto const offset{static_cast<::std::size_t>(image->stop_pc - image->owner_begin)};
+            if(linear_limit != 0u)
+            {
+#if UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION || (defined(__linux__) && defined(__x86_64__) && __SIZEOF_POINTER__ == 8 && defined(PERF_ATTR_SIZE_VER7) && !defined(__ILP32__))
+                if(require_guest || linear_limit <= offset || linear_limit >= image->size) { return {}; }
+                // Numeric limit is only a bound on a requested forward RUN.
+                // Derive every executed instruction from this SAME actual
+                // trapped owner's immutable bytes. Never jump, skip a control
+                // transfer, execute a host instruction or alter stack identity.
+                ::std::size_t end{offset}, count{};
+                while(end < linear_limit && count != 256u)
+                {
+                    auto const bytes{::std::span<::std::uint8_t const>{image->bytes.data()+end,image->size-end}};
+                    auto const decoded{decoder.decode(image->owner_begin+end,bytes)};
+                    if(!decoder.linear_run_safe(image->owner_begin+end,bytes) ||
+                       decoded.semantics().size > linear_limit-end) { break; }
+                    end += decoded.semantics().size; ++count;
+                }
+                if(count < 2u || end >= image->size ||
+                   !decoder.decode(image->owner_begin+end,{image->bytes.data()+end,image->size-end})) { return {}; }
+                candidate->opaque_call_ = true;
+                llvm_jit_debug_native_call_continuation::observation second{};
+                if(!candidate->observe(second,nullptr) || second.trap_revision != first.trap_revision ||
+                   second.gpr != first.gpr || second.view != first.view || second.caller_owner != first.caller_owner) { return {}; }
+                candidate->origin_gpr_=second.gpr; candidate->origin_sp_=second.stack;
+                candidate->view_=second.view; candidate->view_.continuation_pc=image->owner_begin+end;
+                candidate->caller_owner_=second.caller_owner;
+                ::std::lock_guard registry{g_debug_native_call_continuation_mutex};
+                for(auto& slot:g_debug_native_call_continuations)
+                { if(slot.expired()) { slot=candidate; return candidate; } }
+#endif
+                return {};
+            }
             decltype(decoder.decode(0u, {})) call{};
 #if defined(__linux__) && defined(__arm__)
             ::uwvm2::uwvm::debugger::native_disassembly::decoder display{image->target};
@@ -473,8 +556,33 @@
             for(::std::size_t b{};b!=resumed.semantics().size;++b)
             { if(image->instruction_code[next+b]!=1u) { return {}; } }
 #endif
+#if UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
+            // Recursive hits privately execute one proved instruction. A direct
+            // branch is also valid when both successors stay in this same owned
+            // body; LLVM commonly emits a branch immediately after a host call.
+            bool escape_safe{resumed.safe_for_single_instruction()};
+            if(!escape_safe && resumed.safe_for_same_owner_direct_branch() && resumed.destination())
+            {
+                auto const target{resumed.destination().display_pc};
+                if(target>=image->owner_begin && target<image->owner_end)
+                {
+                    auto const target_offset{target-image->owner_begin};
+                    for(::std::size_t at{};at<=target_offset;)
+                    {
+                        auto const instruction{decoder.decode(image->owner_begin+at,{image->bytes.data()+at,image->size-at})};
+                        auto const width{instruction.semantics().size};
+                        if(!instruction || !width || width>image->size-at) { break; }
+                        if(at==target_offset) { escape_safe=true;break; }
+                        if(width>target_offset-at) { break; }at+=width;
+                    }
+                }
+            }
+            if(!escape_safe || continuation + resumed.semantics().size >= image->owner_end) { return {}; }
+#endif
             auto const register_index{call.call_register_index()};
 #if !UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE
+            if(!candidate->opaque_call_)
+            {
             if(call.call_memory().valid)
             {
                 if(register_index!=SIZE_MAX || call.destination()) { return {}; }
@@ -492,7 +600,8 @@
                 if(register_index != SIZE_MAX || !call.destination()) { return {}; }
                 candidate->callee_target_ = call.destination().display_pc;
             }
-#else
+            }
+#elif UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE
             (void)register_index;
             // A recursive activation can hit the same return address. Its
             // private escape executes only an ordinary instruction or a direct
@@ -525,9 +634,11 @@
             candidate->software_plan_=cursor->breakpoint_plan(cursor,image->stop_pc,first.trap_revision,false,width,count,sites,originals,
                 {escaped.first_successor,escaped.second_successor},escaped.successor_npc,escaped.successor_delay_slot);
 #endif
+            (void)register_index;
             llvm_jit_debug_native_call_continuation::observation second{};
             if(!candidate->observe(second, nullptr))
             {
+                if(require_guest) { return {}; }
                 // Typed Wasm SI and NI fallthrough have distinct authorities.
                 // A genuine near CALL in this exact sealed Wasm caller may run
                 // a VM/host helper normally while TF stays off. Its destination
@@ -545,7 +656,15 @@
             if(!candidate->opaque_call_ && second.callee_target == 0u) { return {}; }
             candidate->origin_gpr_ = second.gpr; candidate->origin_sp_ = second.stack;
             candidate->callee_target_=second.callee_target;candidate->slot_address_=second.slot_address;
+#if defined(__linux__) && defined(__x86_64__)
+            if(!require_guest && !candidate->opaque_call_ &&
+               (second.callee_stack_adjustment==SIZE_MAX || second.callee_stack_adjustment>UINTPTR_MAX-second.stack)) { return {}; }
+#endif
             candidate->view_ = second.view; candidate->view_.continuation_pc = continuation;
+#if defined(__linux__) && defined(__x86_64__)
+            if(!require_guest && !candidate->opaque_call_)
+            { candidate->view_.return_stack_adjustment=second.callee_stack_adjustment; }
+#endif
             candidate->caller_owner_ = second.caller_owner; candidate->callee_owner_ = second.callee_owner;
             candidate->callee_begin_ = second.callee_begin; candidate->callee_end_ = second.callee_end;
             candidate->callee_module_ = second.callee_module; candidate->callee_function_ = second.callee_function;
@@ -557,15 +676,19 @@
         }
         catch(...) { return {}; }
 #else
-        (void)supplied; (void)supplied_cursor; (void)session; return {};
+        (void)supplied; (void)supplied_cursor; (void)session; (void)require_guest; (void)linear_limit; return {};
 #endif
     }
+    extern "C++" llvm_jit_debug_native_call_continuation_owner llvm_jit_debug_mint_native_call_continuation_host_api(
+        llvm_jit_debug_activation_capture_owner const& capture, llvm_jit_debug_native_activation_cursor_owner const& cursor,
+        void const* session) noexcept
+    { return llvm_jit_debug_mint_native_call_policy_host_api(capture,cursor,session,false); }
     extern "C++" bool llvm_jit_debug_native_call_continuation_host_api(
         llvm_jit_debug_native_call_continuation_owner const& supplied, void const* session,
         llvm_jit_debug_native_call_continuation_view& out) noexcept
     {
         out = {};
-#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE) && \
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && ((defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)) || UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION) && \
     defined(UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2) && UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2 == 1
         namespace mode = ::uwvm2::uwvm::runtime::runtime_mode;
         if(session == nullptr || mode::global_runtime_mode != mode::runtime_mode_t::full_compile ||
@@ -577,7 +700,11 @@
         {
             auto const owner{canonical_native_call_continuation(supplied)};
             if(!owner || owner->session_ != session || (!owner->opaque_call_ && owner->callee_target_ == 0u) ||
-               !debug_activation_canonical_capture(owner->capture_) || !canonical_native_activation_cursor(owner->cursor_)) { return false; }
+               !debug_activation_canonical_capture(owner->capture_)
+#if !UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
+               || !canonical_native_activation_cursor(owner->cursor_)
+#endif
+               ) { return false; }
             llvm_jit_debug_native_call_continuation::observation actual{};
             if(!owner->observe(actual, nullptr) || !owner->matches_observation(actual)) { return false; }
             out = owner->view_; return true;
@@ -593,7 +720,7 @@
         llvm_jit_debug_native_call_continuation_owner const& supplied, void const* session,
         void* context, llvm_jit_debug_native_call_resume_callback callback) noexcept
     {
-#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE) && \
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && ((defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)) || UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION) && \
     defined(UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2) && UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2 == 1
         namespace mode = ::uwvm2::uwvm::runtime::runtime_mode;
         if(session == nullptr || callback == nullptr || mode::global_runtime_mode != mode::runtime_mode_t::full_compile ||
@@ -604,8 +731,11 @@
         try
         {
             auto const owner{canonical_native_call_continuation(supplied)};
-            if(!owner || owner->session_ != session || !debug_activation_canonical_capture(owner->capture_) ||
-               !canonical_native_activation_cursor(owner->cursor_)) { return false; }
+            if(!owner || owner->session_ != session || !debug_activation_canonical_capture(owner->capture_)
+#if !UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
+               || !canonical_native_activation_cursor(owner->cursor_)
+#endif
+               ) { return false; }
             return owner->resume(context, callback);
         }
         catch(...) { return false; }
@@ -617,7 +747,7 @@
         llvm_jit_debug_native_call_continuation_owner const& supplied, void const* session,
         void* context, llvm_jit_debug_native_call_event_resume_callback callback) noexcept
     {
-#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE) && \
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && ((defined(__linux__) && (defined(__x86_64__) || UWVM2_DEBUG_NATIVE_LINUX_SOFTWARE)) || UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION) && \
     defined(UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2) && UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2 == 1
         namespace mode = ::uwvm2::uwvm::runtime::runtime_mode;
         if(session == nullptr || callback == nullptr || mode::global_runtime_mode != mode::runtime_mode_t::full_compile ||
@@ -628,8 +758,11 @@
         try
         {
             auto const owner{canonical_native_call_continuation(supplied)};
-            if(!owner || owner->session_ != session || !debug_activation_canonical_capture(owner->capture_) ||
-               !canonical_native_activation_cursor(owner->cursor_)) { return false; }
+            if(!owner || owner->session_ != session || !debug_activation_canonical_capture(owner->capture_)
+#if !UWVM2_DEBUG_NATIVE_HARDWARE_CONTINUATION
+               || !canonical_native_activation_cursor(owner->cursor_)
+#endif
+               ) { return false; }
             return owner->resume_event(owner,context,callback);
         }
         catch(...) { return false; }

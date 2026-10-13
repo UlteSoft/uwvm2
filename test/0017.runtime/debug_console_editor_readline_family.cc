@@ -69,14 +69,23 @@ static bool undo_yank_pop_and_completion() noexcept
        value.feed(31) != action::changed || !state(value, "second", 6u) ||
        value.feed(31) != action::changed || !state(value, "", 0u)) { return false; }
     value.begin();
-    if(!type(value, "sta") || value.feed(9) != action::changed ||
+    if(!type(value, "stat") || value.feed(9) != action::changed ||
        !state(value, "status", 6u) || value.feed(31) != action::changed ||
-       !state(value, "sta", 3u) || value.feed(31) != action::changed ||
+       !state(value, "stat", 4u) || value.feed(31) != action::changed ||
+       !state(value, "", 0u)) { return false; }
+    // start/starti/startw share sta with status. Listing those candidates changes
+    // neither the input nor the undo history, and cannot choose a launch.
+    value.begin();
+    if(!type(value, "sta") || value.feed(9) != action::candidates || !state(value, "sta", 3u)) { return false; }
+    unsigned candidates{}; bool start{}, starti{}, startw{}, status{};
+    value.display_candidates([&](::fast_io::string_view word)
+    { ++candidates; start = start || word == "start"; starti = starti || word == "starti"; startw = startw || word == "startw"; status = status || word == "status"; });
+    if(candidates != 4u || !start || !starti || !startw || !status || value.feed(31) != action::changed ||
        !state(value, "", 0u)) { return false; }
     value.begin();
-    if(!type(value, "break") || value.feed(9) != action::changed ||
-       !state(value, "break ", 6u) || value.feed(31) != action::changed ||
-       !state(value, "break", 5u)) { return false; }
+    if(!type(value, "breakwasm") || value.feed(9) != action::changed ||
+       !state(value, "breakwasm ", 10u) || value.feed(31) != action::changed ||
+       !state(value, "breakwasm", 9u)) { return false; }
     value.begin();
     if(!type(value, "info ") || value.feed(9) != action::candidates ||
        !state(value, "info ", 5u) || value.feed(31) != action::changed ||
@@ -146,7 +155,7 @@ static bool ascii_word_commands() noexcept
     { if(meta(value, 'f') != action::changed || !state(value, "one-two_33  four", cursor)) { return false; } }
     constexpr ::std::size_t backward[]{12u, 8u, 4u, 0u};
     for(auto cursor : backward)
-    { if(meta(value, 'b') != action::changed || !state(value, "one-two_33  four", cursor)) { return false; } }
+    { if(meta(value, 'bw') != action::changed || !state(value, "one-two_33  four", cursor)) { return false; } }
     if(meta(value, 'd') != action::changed || !state(value, "-two_33  four", 0u) ||
        value.feed(25) != action::changed || !state(value, "one-two_33  four", 3u) ||
        value.feed(31) != action::changed || !state(value, "-two_33  four", 0u) ||

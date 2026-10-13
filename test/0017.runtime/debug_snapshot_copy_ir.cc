@@ -125,6 +125,13 @@ int main(int argc,char** argv)
             auto const integer{::llvm::Type::getIntNTy(*context,static_cast<unsigned>(emit::get_runtime_wasm_value_type_abi_size(types[i])*8u))};
             auto const value{ir.CreateLoad(integer,cell(i*16u))}; value->setAlignment(::llvm::Align{1u});
             check(ir.CreateICmpEQ(value,::llvm::ConstantInt::get(integer,bits[i])));
+            auto const width{emit::get_runtime_wasm_value_type_abi_size(types[i])};
+            for(::std::size_t pad{width}; pad != 16u; ++pad)
+            {
+                auto const padding{ir.CreateLoad(ir.getInt8Ty(),cell(i*16u+pad))};
+                padding->setAlignment(::llvm::Align{1u});
+                check(ir.CreateICmpEQ(padding,ir.getInt8(0u)));
+            }
         }
         if(i==7u)
         {
@@ -201,6 +208,73 @@ int main(int argc,char** argv)
     require(emit::prepare_runtime_local_func_llvm_jit_snapshot_copy(many,256u,true)==nullptr &&
         instructions(*stress)==before_bad_kind,"missing cache kind rejected before IR without SDK assertion");
     many.debug_local_snapshot_copy->addFnAttr("uwvm.debug.private.local-copy.kind","numeric");
+    // Tiny numeric debug copiers inline into their owning function. Test raw
+    // and public bit copies, absent null addresses, scalar/sNaN bits, padding
+    // and executed flags through native MCJIT, not a mock inliner statistic.
+    ::std::array<::llvm::Function*,8u> tiny_functions{};
+    constexpr ::std::array tiny_types{emit::runtime_operand_stack_value_type::i32,
+        emit::runtime_operand_stack_value_type::i64,emit::runtime_operand_stack_value_type::f32,
+        emit::runtime_operand_stack_value_type::f64};
+    constexpr ::std::array<::std::uint64_t,4u> tiny_bits{0x89abcdefu,0u,0x7f812345u,0x7ff0123456789abcu};
+    for(::std::size_t count{1u};count<=4u;++count)
+    for(unsigned public_mode{};public_mode!=2u;++public_mode)
+    {
+        auto const index{(count-1u)*2u+public_mode};
+        auto const signature{::llvm::FunctionType::get(ir.getVoidTy(),{ir.getPtrTy()},false)};
+        auto const tiny{::llvm::Function::Create(signature,::llvm::GlobalValue::ExternalLinkage,
+            "tiny."+::std::to_string(index),*module)};
+        tiny_functions[index]=tiny;
+        emit::runtime_local_func_llvm_jit_emit_state_t small{};
+        small.llvm_context_holder=context.get();small.llvm_module=module.get();small.llvm_function=tiny;
+        small.emit_debug_safe_points=true;small.debug_activation_enabled=true;
+        ::uwvm2::runtime::checkpoint::function_plan plan{};
+        plan.profile=::uwvm2::runtime::checkpoint::compilation_profile::create_for_trusted_observer();
+        small.checkpoint_plan=::std::addressof(plan);
+        small.ir_builder=::uwvm2::utils::container::make_delete_owned<::llvm::IRBuilder<>>(::llvm::BasicBlock::Create(*context,"entry",tiny));
+        auto& builder{*small.ir_builder};
+        for(::std::size_t i{};i!=count;++i)
+        {
+            small.local_types.push_back(tiny_types[i]);
+            auto const type{emit::get_llvm_type_from_wasm_value_type(*context,tiny_types[i])};
+            auto const local{emit::create_llvm_jit_entry_block_alloca(builder,type,nullptr,"tiny.local")};
+            small.local_pointers.push_back(local);
+            if(i==1u) { continue; }
+            builder.CreateStore(::llvm::ConstantInt::get(builder.getIntNTy(static_cast<unsigned>(
+                emit::get_runtime_wasm_value_type_abi_size(tiny_types[i])*8u)),tiny_bits[i]),local);
+        }
+        require(emit::prepare_runtime_local_func_llvm_jit_snapshot_local_pointers(small,count),"tiny real address table");
+        if(count>=2u)
+        {
+            auto const cell{builder.CreateInBoundsGEP(::llvm::ArrayType::get(builder.getPtrTy(),count),
+                small.snapshot_local_pointers,{builder.getInt32(0u),builder.getInt64(1u)})};
+            builder.CreateStore(::llvm::ConstantPointerNull::get(builder.getPtrTy()),cell);
+        }
+        ::llvm::SmallVector<::std::uint8_t,4u> mask{};
+        for(::std::size_t i{};i!=count;++i) { mask.push_back(i==1u ? 0u:1u); }
+        auto const init{new ::llvm::GlobalVariable(*module,::llvm::ArrayType::get(builder.getInt8Ty(),count),true,
+            ::llvm::GlobalValue::PrivateLinkage,::llvm::ConstantDataArray::get(*context,mask),"tiny.flags")};
+        auto const saved{builder.CreateInBoundsGEP(builder.getInt8Ty(),tiny->getArg(0u),builder.getInt64(count*16u))};
+        require(emit::emit_runtime_local_func_llvm_jit_snapshot_copy(small,count,tiny->getArg(0u),saved,init,public_mode!=0u),"tiny real copier");
+        auto const copy{public_mode ? small.debug_local_snapshot_copy : small.checkpoint_local_snapshot_copy};
+        require(copy!=nullptr && copy->getSubprogram()==nullptr,"tiny private helper retains no Wasm/ASM debug scope");
+#if defined(__linux__) && defined(__x86_64__)
+        require(copy->hasFnAttribute(::llvm::Attribute::AlwaysInline),"tiny policy selected");
+        for(auto const& block:*tiny) for(auto const& instruction:block)
+        { if(auto const call{::llvm::dyn_cast<::llvm::CallBase>(::std::addressof(instruction))};call!=nullptr)
+          { require(call->getCalledFunction()!=copy,"private tiny copier call removed"); } }
+#endif
+        // A different compilation purpose must not reuse an inline observer
+        // copier; the resumable producer/cache policy remains unchanged.
+        plan.profile=::uwvm2::runtime::checkpoint::compilation_profile::create_for_trusted_manager();
+#if defined(__linux__) && defined(__x86_64__)
+        require(emit::prepare_runtime_local_func_llvm_jit_snapshot_copy(small,count,public_mode!=0u)==nullptr,
+            "resumable purpose cannot reuse observer-only inline copier");
+        small.checkpoint_plan=nullptr;
+        require(emit::prepare_runtime_local_func_llvm_jit_snapshot_copy(small,count,public_mode!=0u)==nullptr,
+            "no observer profile cannot reuse observer-only inline copier");
+#endif
+        builder.CreateRetVoid();
+    }
     auto const main_return{::llvm::cast<::llvm::ReturnInst>(function->getEntryBlock().getTerminator())};
     ir.SetInsertPoint(main_return);
     auto const stress_output{emit::create_llvm_jit_entry_block_alloca(ir,
@@ -215,6 +289,29 @@ int main(int argc,char** argv)
     auto const last_flag{ir.CreateLoad(ir.getInt8Ty(),
         ir.CreateInBoundsGEP(ir.getInt8Ty(),stress_output,ir.getInt64(256u*16u+255u)))};
     last_flag->setAlignment(::llvm::Align{1u});check(ir.CreateICmpEQ(last_flag,ir.getInt8(0u)));
+    for(::std::size_t count{1u};count<=4u;++count)
+    for(unsigned public_mode{};public_mode!=2u;++public_mode)
+    {
+        auto const packet{emit::create_llvm_jit_entry_block_alloca(ir,
+            ::llvm::ArrayType::get(ir.getInt8Ty(),count*17u),nullptr,"tiny.output")};
+        ir.CreateMemSet(packet,ir.getInt8(0xa5u),count*17u,::llvm::MaybeAlign{1u});
+        ir.CreateCall(tiny_functions[(count-1u)*2u+public_mode],{packet});
+        for(::std::size_t i{};i!=count;++i)
+        {
+            auto const address{ir.CreateInBoundsGEP(ir.getInt8Ty(),packet,ir.getInt64(i*16u))};
+            auto const bits_type{ir.getIntNTy(static_cast<unsigned>(emit::get_runtime_wasm_value_type_abi_size(tiny_types[i])*8u))};
+            auto const value{ir.CreateLoad(bits_type,address)};value->setAlignment(::llvm::Align{1u});
+            auto const expected{i==1u ? 0u:tiny_bits[i]};
+            check(ir.CreateICmpEQ(value,::llvm::ConstantInt::get(bits_type,expected)));
+            auto const flag{ir.CreateLoad(ir.getInt8Ty(),ir.CreateInBoundsGEP(ir.getInt8Ty(),packet,ir.getInt64(count*16u+i)))};
+            flag->setAlignment(::llvm::Align{1u});check(ir.CreateICmpEQ(flag,ir.getInt8(i==1u ? 0u:1u)));
+            for(::std::size_t pad{emit::get_runtime_wasm_value_type_abi_size(tiny_types[i])};pad!=16u;++pad)
+            {
+                auto const byte{ir.CreateLoad(ir.getInt8Ty(),ir.CreateInBoundsGEP(ir.getInt8Ty(),address,ir.getInt64(pad)))};
+                byte->setAlignment(::llvm::Align{1u});check(ir.CreateICmpEQ(byte,ir.getInt8(0u)));
+            }
+        }
+    }
     main_return->setOperand(0u,ir.CreateSelect(ok,ir.getInt32(0u),ir.getInt32(1u)));
 
     require(instructions(*stress)<4000u && instructions(*many.debug_local_snapshot_copy)<6000u,

@@ -98,7 +98,7 @@ int main()
     check(path.root_name == "outer::value" && path.steps.size() == 6u &&
         step(path, 0u, source_expression_step_kind::dereference) && step(path, 1u, source_expression_step_kind::member, "a") &&
         step(path, 2u, source_expression_step_kind::index, {}, -2) && step(path, 3u, source_expression_step_kind::dereference) &&
-        step(path, 4u, source_expression_step_kind::member, "b") && step(path, 5u, source_expression_step_kind::member, "0"),
+        step(path, 4u, source_expression_step_kind::member, "bw") && step(path, 5u, source_expression_step_kind::member, "0"),
         "whitespace, exact namespace root, arrows, signed indices and Rust numeric member");
     auto const star_arrow{parse("*p->a")};
     check(star_arrow.steps.size() == 3u && step(star_arrow, 0u, source_expression_step_kind::dereference) &&

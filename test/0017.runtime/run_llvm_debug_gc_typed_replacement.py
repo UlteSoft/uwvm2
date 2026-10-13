@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import resource
 import selectors
 import subprocess
@@ -165,11 +166,11 @@ def console_run(command, expected, out, rejected_bodies=(), good_body=None):
             responses['stale'] = response.decode(errors='replace')
             assert b'function generation changed' in response, response
         response = reply('continue')
-        assert b'running' in response, response
+        assert b'error:' not in response and not re.search(rb'(?m)^running\r?$', response), response
         deadline = time.monotonic() + 30
         while True:
             response = reply('status')
-            if b'guest exited: 0' in response:
+            if b'Program exited normally.' in response:
                 break
             assert time.monotonic() < deadline, response
             time.sleep(.01)

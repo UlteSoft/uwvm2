@@ -31,7 +31,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
     enum class phase : ::std::uint32_t
     {
         idle, ready, arming, at_guest_pc, executing, trapped,
-        releasing, released, failed
+        releasing, released, failed, continuation_running, continuation_escape, continuation_cancel_pending
     };
     struct session
     {
@@ -41,6 +41,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
         ::std::uintptr_t owner_begin{}, owner_end{}, expected_pc{};
         ::std::uintptr_t first_pc{}, next_pc{};
         native_registers::snapshot register_snapshot{};
+        ::std::uint64_t trap_revision{};
+        ::std::uintptr_t continuation_pc{}, continuation_origin_sp{};
+        ::std::atomic_bool continuation_disarmed{true};
+        bool retained_entry_stop{}; // Host guard; first real trap remains on its original gate.
         ::std::uint_least64_t first_dr6{}, second_dr6{};
         ::std::uint32_t first_eflags{}, second_eflags{};
         ::std::uint32_t first_exception_code{}, second_exception_code{};
@@ -56,6 +60,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
         // The controller retains this entire session until clear() observes
         // ready/released; destructing a live trapped session is unsupported.
         ::fast_io::nt_file target_owner{}, first_gate_owner{}, second_gate_owner{};
+        ::CONTEXT original_debug{};
         ~session() noexcept;
 #endif
     };
@@ -139,7 +144,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
             bool suspended{};
             explicit suspended_target(DWORD id) noexcept
             {
-                owner.reset(::uwvm2::utils::control::win32_abi::uwvm_OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT |
+                owner.reset(::uwvm2::utils::control::win32_abi::uwvm_OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT |
                     THREAD_QUERY_LIMITED_INFORMATION, FALSE, id));
                 handle = owner.native_handle();
                 if(handle != nullptr && ::uwvm2::utils::control::win32_abi::uwvm_GetProcessIdOfThread(handle) == ::fast_io::win32::GetCurrentProcessId() &&
@@ -181,6 +186,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
             if(state == phase::arming)
             {
                 step->first_pc = pc;
+                capture_registers(step->register_snapshot, *context);
+                if(++step->trap_revision==0u) { fail_invalid_gate(); }
                 step->first_dr6 = context->Dr6;
                 step->first_eflags = context->EFlags;
                 step->first_exception_code = pointers->ExceptionRecord->ExceptionCode;
@@ -203,14 +210,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
                     step->state.store(phase::released, ::std::memory_order_release);
                     return EXCEPTION_CONTINUE_EXECUTION;
                 }
+                if(resumed_state == phase::continuation_running)
+                { context->Dr0=step->continuation_pc;context->Dr6=0u;context->Dr7=(context->Dr7 & ~0xf000fu) | 1u;return EXCEPTION_CONTINUE_EXECUTION; }
                 if(resumed_state != phase::executing) { fail_invalid_gate(); }
                 context->EFlags |= trap_flag;
                 return EXCEPTION_CONTINUE_EXECUTION;
             }
-            if(state == phase::executing)
+            if(state == phase::executing || state == phase::continuation_running || state == phase::continuation_escape || state == phase::continuation_cancel_pending)
             {
+                bool const continuation{state!=phase::executing};bool const escape{state==phase::continuation_escape};
+                if(continuation && !escape)
+                {
+                    if(pc!=step->continuation_pc || context->Dr0!=pc || (context->Dr7&1u)==0u ||
+                       pc<step->owner_begin || pc>=step->owner_end) { return EXCEPTION_CONTINUE_SEARCH; }
+                    context->Dr0=step->original_debug.Dr0;context->Dr6=step->original_debug.Dr6;context->Dr7=step->original_debug.Dr7;
+                    if(!step->abort_requested.load(::std::memory_order_acquire) && context->Rsp!=step->continuation_origin_sp)
+                    {
+                        if(context->Rsp>=step->continuation_origin_sp) { fail_invalid_pc(); }
+                        step->state.store(phase::continuation_escape,::std::memory_order_release);context->EFlags|=trap_flag;
+                        return EXCEPTION_CONTINUE_EXECUTION;
+                    }
+                }
+                if(escape && !step->abort_requested.load(::std::memory_order_acquire))
+                {
+                    if(pc<step->owner_begin || pc>=step->owner_end) { fail_invalid_pc(); }
+                    context->EFlags&=~trap_flag;context->Dr0=step->continuation_pc;context->Dr6=0u;context->Dr7=(context->Dr7&~0xf000fu)|1u;
+                    step->state.store(phase::continuation_running,::std::memory_order_release);return EXCEPTION_CONTINUE_EXECUTION;
+                }
                 step->next_pc = pc;
                 capture_registers(step->register_snapshot, *context);
+                if(++step->trap_revision==0u) { fail_invalid_gate(); }
                 step->second_dr6 = context->Dr6;
                 step->second_eflags = context->EFlags;
                 step->second_exception_code = pointers->ExceptionRecord->ExceptionCode;
@@ -232,6 +261,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
                     context->EFlags |= trap_flag;
                     return EXCEPTION_CONTINUE_EXECUTION;
                 }
+                if(resumed_state==phase::continuation_running && !step->abort_requested.load(::std::memory_order_acquire))
+                { context->Dr0=step->continuation_pc;context->Dr6=0u;context->Dr7=(context->Dr7&~0xf000fu)|1u;return EXCEPTION_CONTINUE_EXECUTION; }
                 if(resumed_state != phase::releasing && resumed_state != phase::executing)
                 { fail_invalid_gate(); }
                 current_thread_session = nullptr;
@@ -310,11 +341,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
         if(!second_owner) { details::close_owned_kernel_handle(first_owner); return false; }
         auto* const first{first_owner.native_handle()};
         auto* const second{second_owner.native_handle()};
+        step.original_debug = debug_context;
+        step.continuation_disarmed.store(true,::std::memory_order_relaxed);
         step.target_thread = native_thread;
         step.owner_begin = owner_begin;
         step.owner_end = owner_end;
         step.expected_pc = return_pc;
-        step.first_pc = step.next_pc = 0u;
+        step.first_pc = step.next_pc = 0u; step.retained_entry_stop = false;
         step.register_snapshot = {};
         step.first_dr6 = step.second_dr6 = 0u;
         step.first_eflags = step.second_eflags = 0u;
@@ -361,6 +394,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
         details::current_thread_session = step;
         return true;
     }
+    // Publish a zero-instruction native stop only from the actual backend's
+    // first kernel trap. A supplied PC/session label cannot manufacture it.
+    [[nodiscard]] inline bool retain_initial_trap(session& step) noexcept
+    {
+        details::host_transition_guard guard{};
+        if(details::active.load(::std::memory_order_acquire) != ::std::addressof(step) ||
+           step.state.load(::std::memory_order_acquire) != phase::at_guest_pc ||
+           step.abort_requested.load(::std::memory_order_acquire) || step.retained_entry_stop ||
+           step.target_thread == 0u || step.first_pc != step.expected_pc ||
+           step.first_pc < step.owner_begin || step.first_pc >= step.owner_end ||
+           step.register_snapshot.size() == 0u || step.register_snapshot.pc() != step.first_pc ||
+           step.register_snapshot.sp() == 0u) { return false; }
+        step.next_pc = step.first_pc;
+        step.retained_entry_stop = true;
+        return true; // No gate wake, TF change, instruction execution or register write.
+    }
     [[nodiscard]] inline bool continue_one(session& step) noexcept
     {
         details::host_transition_guard guard{};
@@ -380,21 +429,75 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
         if(details::active.load(::std::memory_order_acquire) != ::std::addressof(step))
         { return false; }
         if(step.next_pc < step.owner_begin || step.next_pc >= step.owner_end) { return false; }
-        auto expected{phase::trapped};
+        auto expected{step.state.load(::std::memory_order_acquire)};
+        bool const first{expected == phase::at_guest_pc};
+        if(expected != phase::trapped && !(first && step.retained_entry_stop)) { return false; }
         if(!step.state.compare_exchange_strong(expected, phase::executing,
             ::std::memory_order_acq_rel, ::std::memory_order_acquire)) { return false; }
         step.first_pc = step.next_pc;
         step.expected_pc = step.next_pc;
-        if(::uwvm2::utils::control::win32_abi::uwvm_SetEvent(step.second_gate) == 0) { details::fail_invalid_gate(); }
+        if(::uwvm2::utils::control::win32_abi::uwvm_SetEvent(first ? step.first_gate : step.second_gate) == 0) { details::fail_invalid_gate(); }
         return true;
     }
+    [[nodiscard]] inline bool continue_to_continuation(session& step, ::std::uintptr_t pc) noexcept
+    {
+        details::host_transition_guard guard{};
+        auto const state{step.state.load(::std::memory_order_acquire)};
+        bool const first{state==phase::at_guest_pc && step.retained_entry_stop};
+        if(details::active.load(::std::memory_order_acquire)!=&step || (state!=phase::trapped && !first) ||
+           step.abort_requested.load(::std::memory_order_acquire) || pc<=step.next_pc || pc>=step.owner_end || step.register_snapshot.sp()==0u) { return false; }
+        step.continuation_pc=pc;step.continuation_origin_sp=step.register_snapshot.sp();step.first_pc=step.next_pc;
+        step.continuation_disarmed.store(false,::std::memory_order_release);
+        step.state.store(phase::continuation_running,::std::memory_order_release);
+        if(::uwvm2::utils::control::win32_abi::uwvm_SetEvent(first ? step.first_gate : step.second_gate)==0) { details::fail_invalid_gate(); }
+        return true;
+    }
+    [[nodiscard]] inline bool skip_pause_for_continuation() noexcept
+    {
+        auto* const step{details::current_thread_session};
+        if(step==nullptr || details::active.load(::std::memory_order_acquire)!=step) { return false; }
+        auto const state{step->state.load(::std::memory_order_acquire)};
+        if(state==phase::continuation_running && !step->abort_requested.load(::std::memory_order_acquire)) { return true; }
+        if(state!=phase::continuation_cancel_pending) { return false; }
+        // The manager first suspends this actual thread and removes DR0. Keep
+        // its fixed session alive until the worker acknowledges that removal.
+        while(!step->continuation_disarmed.load(::std::memory_order_acquire)) {}
+        details::current_thread_session=nullptr;
+        step->state.store(phase::released,::std::memory_order_release);return false;
+    }
+    inline void cancel_continuation_on_worker() noexcept
+    {
+        auto* const step{details::current_thread_session};
+        if(step==nullptr || details::active.load(::std::memory_order_acquire)!=step) { return; }
+        details::host_transition_guard guard{};
+        if(step->state.load(::std::memory_order_acquire)==phase::continuation_running)
+        { step->abort_requested.store(true,::std::memory_order_release);step->state.store(phase::continuation_cancel_pending,::std::memory_order_release); }
+    }
+    inline void acknowledge_continuation_execution_exit() noexcept
+    { cancel_continuation_on_worker();static_cast<void>(skip_pause_for_continuation()); }
     [[nodiscard]] inline bool release(session& step) noexcept
     {
         details::host_transition_guard guard{};
         if(details::active.load(::std::memory_order_acquire) != ::std::addressof(step))
         { return false; }
-        auto const state{step.state.load(::std::memory_order_acquire)};
-        if(state == phase::arming || state == phase::executing)
+        auto state{step.state.load(::std::memory_order_acquire)};
+        if(state==phase::continuation_running || state==phase::continuation_cancel_pending)
+        {
+            details::suspended_target target{static_cast<DWORD>(step.target_thread)};
+            if(!target.suspended) { return false; }
+            state=step.state.load(::std::memory_order_acquire);
+            if(state==phase::continuation_running || state==phase::continuation_cancel_pending)
+            {
+                ::CONTEXT debug{};debug.ContextFlags=CONTEXT_DEBUG_REGISTERS;
+                if(!::uwvm2::utils::control::win32_abi::uwvm_GetThreadContext(target.handle,&debug)) { return false; }
+                debug.Dr0=step.original_debug.Dr0;debug.Dr6=step.original_debug.Dr6;debug.Dr7=step.original_debug.Dr7;
+                if(!::uwvm2::utils::control::win32_abi::uwvm_SetThreadContext(target.handle,&debug)) { return false; }
+                step.abort_requested.store(true,::std::memory_order_release);
+                step.state.store(phase::continuation_cancel_pending,::std::memory_order_release);
+                step.continuation_disarmed.store(true,::std::memory_order_release);return true;
+            }
+        }
+        if(state == phase::arming || state == phase::executing || state==phase::continuation_escape)
         {
             // The target can be between publishing its trap and entering a
             // gate wait. Signal both private gates so a cancellation in that
@@ -428,7 +531,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
         // [actual active controller-owned session] host-transition guard
         // [safe                                 ] excludes release/clear;
         //  ^^ identity was compared before any supplied object was read.
-        if(step->state.load(::std::memory_order_acquire) != phase::trapped || step->target_thread == 0u ||
+        if((step->state.load(::std::memory_order_acquire) != phase::trapped &&
+            !(step->state.load(::std::memory_order_acquire) == phase::at_guest_pc && step->retained_entry_stop)) || step->target_thread == 0u ||
            step->owner_begin == 0u || step->owner_end <= step->owner_begin ||
            step->next_pc < step->owner_begin || step->next_pc >= step->owner_end) { return false; }
         inspect(step->target_thread, step->next_pc, step->owner_begin, step->owner_end);
@@ -447,7 +551,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
         // [actual controller-owned active session] host-transition guard
         // [safe                                  ] identity is compared before dereferencing;
         //  ^^ state acquire observes the complete register copy made by the trap handler.
-        if(step->state.load(::std::memory_order_acquire) != phase::trapped || step->target_thread == 0u ||
+        if((step->state.load(::std::memory_order_acquire) != phase::trapped &&
+            !(step->state.load(::std::memory_order_acquire) == phase::at_guest_pc && step->retained_entry_stop)) || step->target_thread == 0u ||
            step->owner_begin == 0u || step->owner_end <= step->owner_begin ||
            step->next_pc < step->owner_begin || step->next_pc >= step->owner_end ||
            step->register_snapshot.size() == 0u || step->register_snapshot.pc() != step->next_pc)
@@ -456,6 +561,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
         auto const copied{step->register_snapshot};
         inspect(step->target_thread, step->next_pc, step->owner_begin, step->owner_end, copied);
         return true;
+    }
+    template<typename Inspect>
+    [[nodiscard]] inline bool with_owned_registers_and_revision(void const* identity, Inspect inspect) noexcept
+    {
+        return with_owned_registers(identity,[&](auto thread,auto pc,auto begin,auto end,auto const& registers) noexcept
+        { auto const* step{details::active.load(::std::memory_order_acquire)};inspect(thread,pc,begin,end,registers,step->trap_revision); });
     }
     [[nodiscard]] inline bool clear(session& step) noexcept
     {
@@ -485,6 +596,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_step_windows
     [[nodiscard]] inline constexpr bool request(session&, ::std::uint_least64_t,
         ::std::uintptr_t, ::std::uintptr_t, ::std::uintptr_t) noexcept { return false; }
     [[nodiscard]] inline constexpr bool arm_at_return(::std::uintptr_t) noexcept { return false; }
+    [[nodiscard]] inline constexpr bool retain_initial_trap(session&) noexcept { return false; }
     [[nodiscard]] inline constexpr bool continue_one(session&) noexcept { return false; }
     [[nodiscard]] inline constexpr bool continue_from_trap(session&) noexcept { return false; }
     [[nodiscard]] inline constexpr bool release(session&) noexcept { return false; }

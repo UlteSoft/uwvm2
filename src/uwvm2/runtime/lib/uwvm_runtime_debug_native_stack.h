@@ -27,7 +27,7 @@ namespace uwvm2::runtime::lib::details::debug_native_stack
         friend class scope;
         ::std::uintptr_t low_{}, high_{};
         ::std::uint_least64_t thread_{};
-        int process_{};
+        [[maybe_unused]] int process_{};
         ::std::atomic_bool live_{true};
         registration(::std::uintptr_t low, ::std::uintptr_t high,
             ::std::uint_least64_t thread, int process) noexcept

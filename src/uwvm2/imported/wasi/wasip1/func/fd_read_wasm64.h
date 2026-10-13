@@ -372,7 +372,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
 
-            switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
+            ::std::size_t console_read{};
+            if(env.debug_console_read!=nullptr &&
+               env.debug_console_read(curr_fd.wasi_fd.ptr->checkpoint_stdio_index,scatter_base,scatter_length,console_read))
+            { total_bytes_read=static_cast<::fast_io::intfpos_t>(console_read); }
+            else switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
             {
                 [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
                 {

@@ -14,8 +14,10 @@
 # include <string>
 # include <memory>
 # include <cstdint>
+# include <limits>
 # include <chrono>
 # include <utility>
+# include <vector>
 # include <fast_io_dsal/string_view.h>
 # include <fast_io_dsal/string.h>
 # include <fast_io.h>
@@ -24,12 +26,15 @@
 # include "controller.h"
 # include "managed_cli_shutdown.h"
 # include "console_line_editor.h"
+# include "console_help.h"
 # include "console_keyboard.h"
 # include "console_aliases.h"
 # include "console_execution.h"
 # include "console_completion.h"
 # include "console_displays.h"
 # include "console_tui.h"
+# include "console_messages.h"
+# include "console_module_help.h"
 # include "wasm_state.h"
 # include "wasm_mutation.h"
 # include "wasip1_state.h"
@@ -45,7 +50,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
     // shutdown_pending is only a retained HOST embedding result. The original
     // issuer must keep its helper, guest thread, controller and all VM owners
     // alive and retry later; it is never permission to destroy those owners.
-    enum class console_exit { terminate_process, input_failure, managed_exit, shutdown_pending };
+    enum class console_exit { terminate_process, input_failure, managed_exit, shutdown_pending, restart };
+    struct console_restart_request
+    {
+        bool pending{}, resume_new_launch{}, background{}, killed{};
+        ::std::unique_ptr<console_tui::screen> screen{};
+        ::std::unique_ptr<console_editing::editor> editor{};
+        console_launch_action action{console_launch_action::run};
+        ::fast_io::string program_name{}; // Owned host display label, never guest/launch authority.
+        ::std::vector<breakpoint> breakpoints{}; // Cold settings, revalidated in the new instance.
+    };
     struct console_io
     {
         // HOST-ONLY callbacks. read_byte returns 0..255, -1 EOF, -2 failure,
@@ -60,6 +74,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         bool (*interrupt_pending)(void*) noexcept{}; // synchronous host flag query, never a signal/controller callback
         bool foreground_execution{}; // HOST input policy, independent of terminal display/output
         bool (*consume_interrupt)(void*) noexcept{}; // normal management acknowledgement of a delivered HOST event
+        void* display_context{};
+        void (*display_poll)(void*){};
+        bool (*input_ready)(void*) noexcept{}; // Nonblocking host queue observation for mouse batching.
     };
     enum class line_status { complete, end, oversized, failure, interrupted };
     struct console_line
@@ -95,6 +112,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         console_editing::action (*complete)(void*, console_editing::editor&){};
         bool (*draw)(void*, console_editing::editor const&, console_editing::action){};
         void (*candidates)(void*,console_editing::editor const&,bool){};
+        bool (*input)(void*,console_editing::editor&,int){};
     };
     [[nodiscard]] inline console_line read_console_line(console_io io, console_editing::editor& editor,
         console_read_hooks hooks = {})
@@ -102,11 +120,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         static_assert(console_editing::maximum_bytes == max_input_command_bytes);
         editor.begin();
         bool const full_screen{hooks.draw != nullptr && hooks.draw(hooks.context, editor, console_editing::action::unchanged)};
-        if(io.interactive && !full_screen && editor.line().size != 0u) { io.write(io.context, editor.line().view()); }
+        if(io.interactive && !full_screen)
+        {
+            auto const row{console_tui::command_input(editor, console_tui::terminal_dimensions().columns)};
+            io.write(io.context, row.text.subview(0u));
+        }
         for(;;)
         {
             auto const input_byte{io.read_byte(io.context)};
-            auto action{editor.feed(input_byte)};
+            bool const consumed{hooks.input!=nullptr && hooks.input(hooks.context,editor,input_byte)};
+            auto action{consumed ? console_editing::action::changed : editor.feed(input_byte)};
             bool dynamic_candidates{};
             if(action == console_editing::action::completion)
             { action = hooks.complete == nullptr ? console_editing::action::unchanged : hooks.complete(hooks.context, editor);
@@ -124,24 +147,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     editor.display_candidates([&](::fast_io::string_view name)
                     { io.write(io.context, name); io.write(io.context, "\n"); });
                 }
-                auto const text{editor.line().view()}; auto const cursor{editor.cursor()};
-                // [owned bounded edited command ... cursor ... size] end
-                // [safe                                             ] cursor <= size;
-                // subviews stay inside this synchronous editor-owned buffer.
-                auto const prompt{editor.searching() ? ::fast_io::concat_fast_io(
-                    editor.searching_forward()
-                        ? (editor.search_matched() ? ::fast_io::string_view{"(i-search)`"} : ::fast_io::string_view{"(failed i-search)`"})
-                        : (editor.search_matched() ? ::fast_io::string_view{"(reverse-i-search)`"} : ::fast_io::string_view{"(failed reverse-i-search)`"}),
-                    editor.search_query(), "': ") : ::fast_io::concat_fast_io("(uwvm-debug) ")};
-                auto const rendered{::fast_io::concat_fast_io("\r\x1b[2K", prompt, text.subview(0u, cursor),
-                    "\x1b[s", text.subview(cursor), "\x1b[u")};
+                auto const rendered{console_tui::command_line(editor, console_tui::terminal_dimensions().columns)};
                 io.write(io.context, ::fast_io::string_view{rendered.data(), rendered.size()});
             }
-            if(action == console_editing::action::changed || action == console_editing::action::unchanged ||
+            if(action == console_editing::action::changed || action == console_editing::action::unchanged || action==console_editing::action::idle ||
                 action == console_editing::action::redraw || action == console_editing::action::candidates ||
                 action == console_editing::action::tui_toggle || action == console_editing::action::tui_single ||
                 action == console_editing::action::tui_split || action == console_editing::action::page_up ||
-                action == console_editing::action::page_down) { continue; }
+                action == console_editing::action::page_down || action == console_editing::action::mouse) { continue; }
             console_line line{};
             line.physical_input_eof = input_byte == -1;
             switch(action)
@@ -214,6 +227,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         {
             ::std::string text;
             ::fast_io::ostring_ref_std output{__builtin_addressof(text)};
+            if(command.kind==console_command_kind::execution_relocate)
+            {
+                using result=::uwvm2::runtime::lib::llvm_jit_debug_relocation_status;
+                if(reply.relocation_status==result::moved)
+                { return ::fast_io::concat_std("Execution moved to ",::fast_io::mnp::hex0x(reply.native_step_to),"; still stopped.\n"); }
+                auto reason{reply.relocation_status==result::invalid_target ? "target is outside the current JIT function or is not an instruction boundary" :
+                    reply.relocation_status==result::incompatible_frame ? "target crosses a call, branch or incompatible native frame state" :
+                    reply.relocation_status==result::restore_state_unavailable ? "target requires captured operand/control stacks and a resumable JIT landing" :
+                    reply.relocation_status==result::current_stop_required ? "requires an exact => stop at the requested level; N> cannot be moved" : "native context relocation is unavailable"};
+                return ::fast_io::concat_std("error: jump unavailable: ",::fast_io::mnp::os_c_str(reason),"; current stop retained\n");
+            }
             if(reply.source_frame_out_of_range)
             { return ::fast_io::concat_std("error: frame ordinal is outside the current authenticated frame list; selection unchanged\n"); }
             if(reply.source_frame_caller_unavailable)
@@ -560,8 +584,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     auto const& instruction{reply.disassembly[index]};
                     if(!native_branch_display::matches(reply.disassembly_destinations[index], instruction) ||
                        !native_branch_display::displayable(public_decoder, instruction, reply.disassembly_destinations[index],
-                           reply.disassembly_owner_begin, reply.disassembly_owner_end) ||
-                       (!instruction && instruction.pc != 0u) ||
+                           reply.disassembly_owner_begin, reply.disassembly_owner_end, true) ||
+                       (!instruction && instruction.pc != 0u && (instruction.pc < reply.disassembly_owner_begin ||
+                         instruction.pc >= reply.disassembly_owner_end)) ||
                        (instruction && (instruction.pc < reply.disassembly_owner_begin ||
                          instruction.pc >= reply.disassembly_owner_end || instruction.size > instruction.bytes.size() ||
                          instruction.size > reply.disassembly_owner_end - instruction.pc ||
@@ -593,7 +618,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     auto const& instruction{reply.disassembly[index]};
                     ::fast_io::io::print(output, "  instruction ", ::fast_io::mnp::dec(index));
                     if(!instruction) { ::fast_io::io::print(output, " unavailable\n"); continue; }
-                    ::fast_io::io::print(output, " pc=0x", ::fast_io::mnp::hex<false, true>(instruction.pc), " bytes=");
+                    ::fast_io::io::print(output, " function-offset=", ::fast_io::mnp::dec(instruction.pc - reply.disassembly_owner_begin),
+                        " pc=0x", ::fast_io::mnp::hex<false, true>(instruction.pc), " bytes=");
                     for(::std::size_t byte{}; byte != instruction.size; ++byte)
                     {
                         if(byte != 0u) { ::fast_io::io::print(output, ::fast_io::mnp::chvw(' ')); }
@@ -624,7 +650,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     auto const& instruction{reply.disassembly[index]};
                     if(!native_branch_display::matches(reply.disassembly_destinations[index], instruction) ||
                        !native_branch_display::displayable(public_decoder, instruction, reply.disassembly_destinations[index],
-                           reply.disassembly_owner_begin, reply.disassembly_owner_end) ||
+                           reply.disassembly_owner_begin, reply.disassembly_owner_end, true) ||
                        instruction.pc == 0u || instruction.size > instruction.bytes.size() ||
                        (instruction && ::std::memchr(instruction.text.data(), '\0', instruction.text.size()) == nullptr))
                     { return ::fast_io::concat_std("error: native disassembly result is invalid\n"); }
@@ -640,7 +666,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     ::fast_io::io::print(output, "  instruction ", ::fast_io::mnp::dec(index), " pc=0x",
                         ::fast_io::mnp::hex<false, true>(instruction.pc));
                     if(!instruction) { ::fast_io::io::print(output, " unavailable\n"); continue; }
-                    ::fast_io::io::print(output, " bytes=");
+                    ::fast_io::io::print(output, " function-offset=", ::fast_io::mnp::dec(instruction.pc - reply.disassembly_owner_begin), " bytes=");
                     for(::std::size_t byte{}; byte != instruction.size; ++byte)
                     {
                         if(byte != 0u) { ::fast_io::io::print(output, ::fast_io::mnp::chvw(' ')); }
@@ -662,14 +688,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             }
             if(command.operation == ::uwvm2::utils::control::operation::read_memory)
             {
-                ::fast_io::io::print(output, "memory:");
-                if(reply.memory.empty()) { ::fast_io::io::print(output, " <empty>"); }
-                for(auto const byte : reply.memory)
-                {
-                    auto const value{::std::to_integer<unsigned char>(byte)};
-                    ::fast_io::io::print(output, " ", ::fast_io::mnp::hex<false, true>(value));
-                }
-                ::fast_io::io::print(output, ::fast_io::mnp::chvw('\n')); return text;
+                ::std::uint64_t module{},offset{};::std::uint32_t memory{},reserved{};
+                ::uwvm2::utils::control::input_buffer fields{command.payload};
+                ::fast_io::io::scan(fields,::fast_io::mnp::le_get<64>(module),::fast_io::mnp::le_get<32>(memory),
+                    ::fast_io::mnp::le_get<32>(reserved),::fast_io::mnp::le_get<64>(offset));
+                ::fast_io::io::print(output,"Wasm memory module=",module," index=",memory," offset=",offset," bytes=",reply.memory.size(),"\n",
+                    console_memory::dump(reply.memory,offset)); return text;
             }
             if(command.operation == ::uwvm2::utils::control::operation::replace_function)
             {
@@ -713,7 +737,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 " -> 0x",::fast_io::mnp::hex<false,true>(reply.native_step_to),"\n"); }
             if(reply.breakpoint_identifier != 0u)
             {
-                if(command.kind == console_command_kind::source_breakpoint)
+                if(command.kind == console_command_kind::assembly_breakpoint)
+                { ::fast_io::io::print(output, "breakpoint ", ::fast_io::mnp::dec(reply.breakpoint_identifier),
+                    " asm function-offset=", ::fast_io::mnp::dec(command.native_breakpoint_offset), "\n"); }
+                else if(command.kind == console_command_kind::source_breakpoint)
                 {
                     ::fast_io::io::print(output, "breakpoint ", ::fast_io::mnp::dec(reply.breakpoint_identifier),
                         " source=", ::fast_io::string_view{command.source_path.data(), command.source_path_size},
@@ -739,6 +766,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 {
                     ::fast_io::io::print(output, "breakpoint ", ::fast_io::mnp::dec(point.identifier),
                                         " module=", ::fast_io::mnp::dec(point.module), " function=", ::fast_io::mnp::dec(point.function),
+                                        " kind=", ::fast_io::mnp::cond(point.assembly, "asm", "wasm"),
                                         " byte-offset=", ::fast_io::mnp::dec(point.offset),
                                         " enabled=", ::fast_io::mnp::os_c_str(point.enabled ? "yes" : "no"), " hits=", ::fast_io::mnp::dec(point.hits),
                                         " ignore=", ::fast_io::mnp::dec(point.ignore_remaining));
@@ -840,7 +868,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 auto output{::fast_io::ostring_ref_std{::std::addressof(text)}};
                 ::fast_io::io::print(output, "wasip1-stop ", ::fast_io::mnp::dec(reply.stop_identifier), "\n");
                 if(wasip1_calls::is_trace(command.wasip1_state_request.operation)) { wasip1_calls::print(output, reply.wasip1_trace_values); }
-                else { wasip1_state::print(output, reply.wasip1_state_values); }
+                else
+                { wasip1_state::print(output, reply.wasip1_state_values);
+                  if(command.wasip1_state_request.operation==wasip1_state::action::descriptor_detail)
+                  { ::fast_io::io::print(output,"Descriptor-number history (may include close/reuse); current path above is observed separately.\n");
+                    wasip1_calls::print(output,reply.wasip1_trace_values); } }
                 return text;
             }
             if(command.kind==console_command_kind::wasm_path)
@@ -930,6 +962,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 case execution_status::stopped:
                     ::fast_io::io::print(output, ::fast_io::mnp::os_c_str(reply.reason == stop_reason::initial ? "prepared; no Wasm instruction executed\n" :
                         reply.reason == stop_reason::breakpoint ? "stopped: breakpoint\n" :
+                        reply.reason == stop_reason::native_breakpoint ? "stopped: native breakpoint\n" :
+                        reply.reason == stop_reason::wasm_entry ? "stopped: first Wasm instruction\n" :
+                        reply.reason == stop_reason::execution_relocated ? "stopped: execution relocated\n" :
+                        reply.reason == stop_reason::native_entry ? "stopped: first Wasm instruction JIT entry\n" :
                         reply.reason == stop_reason::native_step ? "stopped: native instruction step\n" :
                         reply.reason == stop_reason::wasm_uncaught ? "stopped: Uncaught Wasm exception before unwind; continue propagates\n" :
                         reply.reason == stop_reason::wasm_trap ? "stopped: Wasm trap after failure; pre-trap operands; continue terminates\n" :
@@ -937,6 +973,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                         reply.reason == stop_reason::step ? "stopped: selected participant step\n" : "stopped: pause\n"));
                     if(reply.reason == stop_reason::wasm_uncaught && reply.wasm_terminal_participant != 0u)
                     { ::fast_io::io::print(output, "uncaught-thread ", ::fast_io::mnp::dec(reply.wasm_terminal_participant), "\n"); }
+                    if(reply.native_breakpoint_hit != 0u)
+                    { ::fast_io::io::print(output, "native-breakpoint ", ::fast_io::mnp::dec(reply.native_breakpoint_hit), "\n"); }
                     if(reply.stop_identifier != 0u)
                     { ::fast_io::io::print(output, "stop-id ", ::fast_io::mnp::dec(reply.stop_identifier), "\n"); }
                     if(reply.breakpoint_condition_error != ::uwvm2::utils::control::error::none)
@@ -1088,17 +1126,163 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             return text;
         }
     }
+    namespace details
+    {
+        // The CLI presents execution events. The authenticated text transport
+        // keeps format_reply's existing machine-readable status/exit grammar.
+        [[nodiscard]] inline ::fast_io::string format_cli_reply(controller_reply const& reply, console_command const& command)
+        {
+            auto message{console_messages::error(reply, command)};
+            if(!message.empty()) { return message; }
+            auto const raw{format_reply(reply, command)};
+            if(reply.status == ::uwvm2::utils::control::error::none)
+            {
+                auto const view{::fast_io::string_view{raw.data(), raw.size()}};
+                auto native{console_messages::native_view(reply, command, view)}; if(!native.empty()) { return native; }
+                auto source{console_messages::source_values(reply, command, view)}; if(!source.empty()) { return source; }
+                auto stack{console_messages::backtrace(reply, command, view)}; if(!stack.empty()) { return stack; }
+            }
+            if(reply.status == ::uwvm2::utils::control::error::none && raw.starts_with("source-frames stop="))
+            { auto selected{console_messages::frame(reply, command)}; if(!selected.empty()) { return selected; } }
+            if(command.kind == console_command_kind::wasm_script && reply.status == ::uwvm2::utils::control::error::none &&
+               !raw.starts_with("error:") && reply.script_replies.size() == reply.script_commands.size() && reply.script_replies.size() <= 16u)
+            {
+                ::fast_io::string script{}; ::std::size_t shown{};
+                for(::std::size_t i{}; i < reply.script_replies.size(); ++i)
+                {
+                    if(reply.script_commands[i].kind == console_command_kind::wasm_script)
+                    { return ::fast_io::concat_fast_io("error: Recursive scripts are not allowed. Type \"help wasm-script\".\n"); }
+                    auto heading{::fast_io::concat_fast_io("wasm-script command ", ::fast_io::mnp::dec(i + 1u),
+                        " (", console_messages::topic(reply.script_commands[i]), "):\n")};
+                    auto child{format_cli_reply(reply.script_replies[i], reply.script_commands[i])};
+                    constexpr auto budget{maximum_formatted_reply_bytes - reply_trailer_reserve};
+                    if(script.size() > budget || heading.size() > budget - script.size() || child.size() > budget - script.size() - heading.size()) { break; }
+                    script.append(heading); script.append(child); ++shown;
+                }
+                if(shown != reply.script_replies.size())
+                { script.append(::fast_io::concat_fast_io("wasm-script output-truncated shown=", ::fast_io::mnp::dec(shown),
+                    " executed=", ::fast_io::mnp::dec(reply.script_replies.size()), " last-command-status=",
+                    ::fast_io::mnp::dec(static_cast<unsigned>(reply.script_replies.back().status)), "\n")); }
+                script.append("wasm-script end\n"); return script;
+            }
+            if(reply.status == ::uwvm2::utils::control::error::none && !reply.timed_out)
+            {
+                if(command.kind == console_command_kind::protocol && command.operation == ::uwvm2::utils::control::operation::resume &&
+                   (raw.starts_with("running\n") || raw.starts_with("pause requested; executions are not all stopped\n")))
+                { return {}; }
+                if(reply.execution == execution_status::exited && raw.starts_with("guest exited: "))
+                {
+                    if(reply.guest_exit_code == 0) { return ::fast_io::concat_fast_io("Program exited normally.\n"); }
+                    // GDB displays ordinary exit codes in octal, prefixed by 0.
+                    if(reply.guest_exit_code > 0)
+                    { return ::fast_io::concat_fast_io("Program exited with code 0", ::fast_io::mnp::oct(reply.guest_exit_code), ".\n"); }
+                    return ::fast_io::concat_fast_io("Program exited with code ", ::fast_io::mnp::dec(reply.guest_exit_code), ".\n");
+                }
+            }
+            bool const needs_hint{reply.status != ::uwvm2::utils::control::error::none ||
+                (command.kind == console_command_kind::wasm_state && reply.wasm_state_values.result != wasm_state::status::available) ||
+                (command.kind == console_command_kind::wasm_mutation && !reply.wasm_mutation_value.applied) ||
+                (command.kind == console_command_kind::wasip1_state && reply.wasip1_state_values.result != wasip1_state::status::ok &&
+                 !(command.wasip1_state_request.operation >= wasip1_state::action::trace_enable &&
+                   command.wasip1_state_request.operation <= wasip1_state::action::trace_read))};
+            return ::fast_io::concat_fast_io(::fast_io::string_view{raw.data(), raw.size()},
+                needs_hint ? ::fast_io::concat_fast_io("Type \"help ", console_messages::topic(command), "\" for usage and requirements.\n") : ::fast_io::string{});
+        }
+        [[nodiscard]] inline ::fast_io::string format_program_start(::fast_io::string_view program)
+        {
+            if(program.empty()) { return ::fast_io::concat_fast_io("Starting program.\n"); }
+            auto const safe{console_tui::clean(program)};
+            ::fast_io::string label{};
+            for(char c : safe) { if(c == '\n') { label.append("\\n"); } else { label.push_back(c); } }
+            return ::fast_io::concat_fast_io("Starting program: ", label, "\n");
+        }
+    }
+    namespace console_inspection
+    {
+        struct register_value { ::fast_io::string type{},value{};bool available{}; };
+        // Copied, already qualified public register data only. Unknown bits
+        // remain unknown even when the backing scalar/byte array contains data.
+        [[nodiscard]] inline register_value register_preview(native_registers::display_snapshot const& state,::fast_io::string_view name)
+        {
+            if(name.starts_with("$")) { name=name.subview(1u); }if(name.empty() || name.size()>31u) { return {}; }
+            ::std::u8string token{};for(unsigned char c:name) { if(c>=128u) { return {}; }token.push_back(static_cast<char8_t>(c)); }
+            unsigned requested{};
+            if(state.machine==native_registers::architecture::aarch64)
+            {
+                if(token==u8"wzr" || token==u8"xzr") { return {::fast_io::concat_fast_io(token.front()==u8'w' ? ::fast_io::string_view{"u32"} : ::fast_io::string_view{"u64"}),::fast_io::concat_fast_io("0x0"),true}; }
+                if(token==u8"wsp") { token=u8"sp";requested=32u; }
+                else if(token.size()>1u && token.front()==u8'w' && token[1]>=u8'0' && token[1]<=u8'9') { token[0]=u8'x';requested=32u; }
+            }
+            if(state.machine==native_registers::architecture::x86_64)
+            {
+                constexpr ::std::u8string_view small[]{u8"eax",u8"ebx",u8"ecx",u8"edx",u8"esi",u8"edi",u8"ebp",u8"esp",u8"r8d",u8"r9d",u8"r10d",u8"r11d",u8"r12d",u8"r13d",u8"r14d",u8"r15d"};
+                for(::std::size_t i{};i<16u;++i) { if(token==small[i]) { token=native_registers::name(state.machine,i);requested=32u;break; } }
+            }
+            auto const index{native_registers::index_of(state.machine,token)};
+            if(index<state.size())
+            {
+                auto known{state.known_bits[index]};auto width{requested ? requested : state.word_bits};
+                if((known!=32u && known!=64u) || (width!=32u && width!=64u) || known>state.word_bits) { return {}; }
+                register_value result{::fast_io::concat_fast_io("u",width),::fast_io::concat_fast_io("0x"),true};
+                for(unsigned byte{width/8u};byte;--byte) { if(byte>known/8u) { result.value.append("??"); }
+                    else { result.value.append(::fast_io::concat_fast_io(::fast_io::mnp::hex<false,true>(static_cast<::std::uint8_t>(state.values[index]>>((byte-1u)*8u))))); } }
+                return result;
+            }
+            unsigned float_width{};
+            if(state.machine==native_registers::architecture::aarch64 && token.size()>1u && token[1]>=u8'0' && token[1]<=u8'9')
+            { if(token[0]==u8's') { float_width=4u;token[0]=u8'v'; }else if(token[0]==u8'd') { float_width=8u;token[0]=u8'v'; }else if(token[0]==u8'q') { token[0]=u8'v'; } }
+            auto const fp{native_registers::fp_index_of(state.machine,token)};
+            if(!state.floating.available || fp>=native_registers::max_fp_registers) { return {}; }
+            auto const& value{state.floating.values[fp]};auto width{float_width ? float_width : native_registers::fp_width(state.machine,fp)};
+            if(value.width==0u || value.width>value.bytes.size() || width==0u || width>value.bytes.size()) { return {}; }
+            if(float_width && value.width>=float_width)
+            { ::std::uint64_t bits{};for(unsigned i{};i<float_width;++i) { bits|=static_cast<::std::uint64_t>(value.bytes[i])<<(i*8u); }
+              return {::fast_io::concat_fast_io("f",float_width*8u),float_width==4u ? ::fast_io::concat_fast_io(::std::bit_cast<float>(static_cast<::std::uint32_t>(bits))) : ::fast_io::concat_fast_io(::std::bit_cast<double>(bits)),true}; }
+            register_value result{::fast_io::concat_fast_io("bits",width*8u),::fast_io::concat_fast_io("0x"),true};
+            for(auto byte{width};byte;--byte) { if(byte>value.width) { result.value.append("??"); }
+                else { result.value.append(::fast_io::concat_fast_io(::fast_io::mnp::hex<false,true>(value.bytes[byte-1u]))); } }
+            return result;
+        }
+        // Consume only the qualified public snapshot for this exact stop. PC
+        // comes first so a small pane cannot hide all of its available values.
+        template<typename Format>
+        [[nodiscard]] inline ::fast_io::string register_panel(controller_reply const& reply,::std::uint64_t thread,
+            ::std::uint64_t stop,::std::uint64_t pc,Format&& format)
+        {
+            auto const& state{reply.registers};auto const pc_index{native_registers::pc_index(state.machine)};
+            if(!pc) { return ::fast_io::concat_fast_io("Wasm stop; use si or ni for native registers\n"); }
+            if(reply.status!=::uwvm2::utils::control::error::none || !stop || reply.registers_stop_identifier!=stop ||
+                reply.disassembly_code.participant!=thread || reply.disassembly_code.pc!=pc || state.pc()!=pc ||
+                (state.word_bits!=32u && state.word_bits!=64u) || pc_index>=state.size() || state.known_bits[pc_index]!=state.word_bits)
+            { return ::fast_io::concat_fast_io("Registers unavailable at this native stop\n"); }
+            ::fast_io::string text{};::std::size_t count{};
+            auto append{[&](char8_t const* label)
+            {
+                if(!label) { return; }
+                auto name{::fast_io::concat_fast_io(::fast_io::mnp::code_cvt(::fast_io::mnp::os_c_str(label)))};
+                auto value{register_preview(state,name.subview(0u))};if(!value.available) { return; }
+                text.append(format(name.subview(0u),value.type.subview(0u),value.value.subview(0u),true));++count;
+            }};
+            append(native_registers::name(state.machine,pc_index));
+            for(::std::size_t i{};i<state.size();++i) { if(i!=pc_index) { append(native_registers::name(state.machine,i)); } }
+            for(::std::size_t i{};i<native_registers::max_fp_registers;++i) { append(native_registers::fp_name(state.machine,i)); }
+            if(count==1u) { text.append("No other mapped values at this instruction\n"); }
+            return text;
+        }
+    }
     // One normal HOST management session. UI/completion receives copied reply
     // DATA only. Every source/native/Wasm query still goes through execute().
     class console_visual_session final
     {
         controller& control_;
         console_io io_;
-        console_tui::screen screen_;
+        console_tui::screen& screen_;
         console_completion::candidates candidates_{};
         ::std::uint64_t painted_stop_{};
         execution_status painted_execution_{execution_status::closed};
-        bool refresh_needed_{true};
+        bool refresh_needed_{true},deferred_mouse_frame_{};
+        ::std::chrono::steady_clock::time_point mouse_batch_start_{};
+        ::std::size_t mouse_batch_count_{};
         [[nodiscard]] controller_reply query(::fast_io::string_view input)
         { return control_.execute(parse_console_command(input)); }
         void panel_reply(console_tui::layout which, ::fast_io::string const& input) { panel_reply(which,input.subview(0u)); }
@@ -1107,26 +1291,288 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             auto const command{parse_console_command(input)};
             auto const reply{control_.execute(command)};
             auto const text{details::format_reply(reply,command)};
-            if(which == console_tui::layout::registers && reply.registers_stop_identifier == 0u)
-            { screen_.set_panel(which,::fast_io::concat_fast_io(
-                "native registers unavailable: requires an authenticated Wasm JIT trap\n",
-                ::fast_io::string_view{text.data(),text.size()})); }
+            if(which==console_tui::layout::memory && reply.status==::uwvm2::utils::control::error::none)
+            {
+                ::std::uint64_t module{},offset{};::std::uint32_t memory{},reserved{};
+                ::uwvm2::utils::control::input_buffer fields{command.payload};
+                ::fast_io::io::scan(fields,::fast_io::mnp::le_get<64>(module),::fast_io::mnp::le_get<32>(memory),::fast_io::mnp::le_get<32>(reserved),::fast_io::mnp::le_get<64>(offset));
+                screen_.memory_snapshot(reply.memory,offset);
+            }
+            if(which==console_tui::layout::memory && reply.status!=::uwvm2::utils::control::error::none) { screen_.memory_snapshot({},0u); }
+            if(which == console_tui::layout::assembly && reply.status == ::uwvm2::utils::control::error::none &&
+               reply.disassembly_stop_identifier != 0u && reply.disassembly_count <= reply.disassembly.size())
+            {
+                auto listing{::fast_io::concat_fast_io("JIT module=", reply.disassembly_code.module,
+                    " function=", reply.disassembly_code.function, "\n")};
+                native_owned_instruction_semantics::decoder decoder{reply.disassembly_code.target};
+                for(::std::size_t i{}; i != reply.disassembly_count; ++i)
+                {
+                    auto const& instruction{reply.disassembly[i]};
+                    if(instruction.pc < reply.disassembly_owner_begin || instruction.pc >= reply.disassembly_owner_end) { continue; }
+                    auto const marker{instruction.pc == reply.disassembly_code.pc ? "=> " : "   "};
+                    listing.append(::fast_io::concat_fast_io(::fast_io::mnp::os_c_str(marker),
+                        ::fast_io::mnp::hex0x(instruction.pc), "  "));
+                    if(instruction && native_branch_display::displayable(decoder, instruction, reply.disassembly_destinations[i],
+                        reply.disassembly_owner_begin, reply.disassembly_owner_end, true))
+                    { listing.append(console_tui::clean(::fast_io::string_view{instruction.text.data(),
+                        static_cast<::std::size_t>(::std::find(instruction.text.begin(), instruction.text.end(), '\0') - instruction.text.begin())})); }
+                    else { listing.append("<runtime boundary; instruction unavailable>"); }
+                    listing.push_back('\n');
+                }
+                screen_.set_panel(which, listing);
+            }
             else { screen_.set_panel(which,::fast_io::string_view{text.data(),text.size()}); }
         }
+        void assembly_panel(::std::uint64_t thread,::std::uint64_t stop)
+        {
+            auto const read{[&](::std::int64_t first,::std::size_t count)
+            { return query(::fast_io::concat_fast_io("disassemble-range ",thread," ",stop," ",count," 0 ",first," 0").subview(0u)); }};
+            auto const valid{[&](controller_reply const& reply)
+            { return reply.status==::uwvm2::utils::control::error::none && reply.disassembly_stop_identifier==stop &&
+                reply.disassembly_count && reply.disassembly_count<=reply.disassembly.size(); }};
+            auto const occupied{[](controller_reply const& reply)
+            { return reply.disassembly[0].pc>=reply.disassembly_owner_begin && reply.disassembly[0].pc<reply.disassembly_owner_end && reply.disassembly[0].pc!=0u; }};
+            auto first{screen_.assembly_first()};auto probe{read(first,1u)};
+            if(!valid(probe)) { screen_.set_panel(console_tui::layout::assembly,"JIT instructions unavailable at this stop\n");return; }
+            if(!occupied(probe))
+            {
+                // Search between the last real displayed row and the requested
+                // page. This clamps large scrolls to the first/last instruction,
+                // rather than presenting an endless sequence of empty pages.
+                auto inside{screen_.assembly_valid_first()},outside{first};auto anchor{read(inside,1u)};
+                if(!valid(anchor) || !occupied(anchor)) { return; }
+                while(inside>outside ? inside-outside>1 : outside-inside>1)
+                {
+                    auto const middle{inside+(outside-inside)/2};auto candidate{read(middle,1u)};
+                    if(!valid(candidate)) { return; }
+                    if(occupied(candidate)) { inside=middle; }else { outside=middle; }
+                }
+                screen_.assembly_bound(first<inside,inside);first=inside;probe=read(first,1u);
+                if(!valid(probe) || !occupied(probe)) { return; }
+            }
+            auto const symbol{control_.wasm_function_label(probe.disassembly_code.module,probe.disassembly_code.function)};
+            auto listing{::fast_io::concat_fast_io(symbol.empty()?::fast_io::string_view{"JIT"}:symbol.subview(0u),
+                " [",probe.disassembly_code.module,":",probe.disassembly_code.function,"]\n")};
+            auto const body{screen_.pane_body_rows(console_tui::layout::assembly)};
+            auto const count{body>1u ? body-1u : 1u};bool end{};
+            native_owned_instruction_semantics::decoder decoder{probe.disassembly_code.target};
+            for(::std::size_t shown{};shown<count && !end;)
+            {
+                auto const requested{::std::min(count-shown,::std::size_t{32u})};
+                auto const page{read(first+static_cast<::std::int64_t>(shown),requested)};
+                if(!valid(page) || page.disassembly_owner_begin!=probe.disassembly_owner_begin ||
+                    page.disassembly_owner_end!=probe.disassembly_owner_end || page.disassembly_code.pc!=probe.disassembly_code.pc)
+                { return; }
+                for(::std::size_t i{};i<page.disassembly_count;++i)
+                {
+                    auto const& instruction{page.disassembly[i]};
+                    if(instruction.pc<page.disassembly_owner_begin || instruction.pc>=page.disassembly_owner_end)
+                    { screen_.assembly_bound(false,first+static_cast<::std::int64_t>(shown+i)-1);end=true;break; }
+                    // Both a native trap PC and the authenticated cooperative
+                    // JIT return edge are the selected frame's exact resume PC.
+                    // This display marker never grants native register/jump access.
+                    auto const marker{instruction.pc==page.disassembly_code.pc ? "=> " : "   "};
+                    listing.append(::fast_io::concat_fast_io(::fast_io::mnp::os_c_str(marker),::fast_io::mnp::hex0x(instruction.pc),"  "));
+                    if(instruction && native_branch_display::displayable(decoder,instruction,page.disassembly_destinations[i],page.disassembly_owner_begin,page.disassembly_owner_end,true))
+                    { listing.append(console_tui::clean(::fast_io::string_view{instruction.text.data(),
+                        static_cast<::std::size_t>(::std::find(instruction.text.begin(),instruction.text.end(),'\0')-instruction.text.begin())})); }
+                    else { listing.append("<instruction unavailable>"); }
+                    listing.push_back('\n');
+                }
+                shown+=requested;
+            }
+            screen_.assembly_position(first);screen_.set_panel(console_tui::layout::assembly,listing);
+        }
+        [[nodiscard]] static ::fast_io::string inspection_line(::fast_io::string_view name,::fast_io::string_view type,::fast_io::string_view value,bool available=true)
+        {
+            auto const clean_name{console_tui::clean(name,160u)},clean_type{console_tui::clean(type,120u)},clean_value{console_tui::clean(value,320u)};
+            bool color{::uwvm2::uwvm::utils::ansies::put_color};using view=::fast_io::string_view;
+            ::std::size_t indent{};while(indent<clean_name.size() && clean_name[indent]==' ') { ++indent; }
+            return ::fast_io::concat_fast_io(clean_name.subview(0u,indent),color ? view{"\x1b[94m"} : view{},clean_type,
+                clean_type.empty() ? view{} : view{" "},color ? view{"\x1b[96m"} : view{},clean_name.subview(indent),
+                color ? view{"\x1b[0m"} : view{}," = ",color ? (available ? view{"\x1b[93m"} : view{"\x1b[90m"}) : view{},clean_value,
+                color ? view{"\x1b[0m"} : view{},"\n");
+        }
+        [[nodiscard]] static ::fast_io::string wasm_value_text(wasm_state::value const& value)
+        {
+            if(!value.available) { return ::fast_io::concat_fast_io("unavailable"); }
+            if(value.type.kind==wasm_state::value_kind::f32)
+            { ::std::uint32_t bits{};if(wasm_state::details::read_numeric<32u>(value,bits)) { return ::fast_io::concat_fast_io(::std::bit_cast<float>(bits)); } }
+            if(value.type.kind==wasm_state::value_kind::f64)
+            { ::std::uint64_t bits{};if(wasm_state::details::read_numeric<64u>(value,bits)) { return ::fast_io::concat_fast_io(::std::bit_cast<double>(bits)); } }
+            ::std::string row{};wasm_state::details::print_value(::fast_io::ostring_ref_std{::std::addressof(row)},value);
+            auto separator{row.find(" = ")};return ::fast_io::concat_fast_io(::std::string_view{row}.substr(separator==row.npos?0u:separator+3u));
+        }
+        void wasm_values_panel(console_tui::layout pane,::std::uint64_t thread,bool native)
+        {
+            auto reply{query(::fast_io::concat_fast_io(pane==console_tui::layout::locals?::fast_io::string_view{"locals wasm "} : ::fast_io::string_view{"operands "},
+                thread," 0 0 64").subview(0u))};
+            auto const& values{reply.wasm_state_values};::fast_io::string text{};
+            if(reply.status!=::uwvm2::utils::control::error::none || !wasm_state::valid(values) || values.result!=wasm_state::status::available)
+            { text=::fast_io::concat_fast_io("Unavailable at this stop\n"); }
+            else
+            {
+                if(native) { text.append("Snapshot at last Wasm boundary\n"); }
+                for(auto const& row:values.rows)
+                {
+                    auto name{::fast_io::concat_fast_io("[",row.index,"]")};::std::string type{};
+                    wasm_state::details::print_type(::fast_io::ostring_ref_std{::std::addressof(type)},row.data.type);
+                    auto value{wasm_value_text(row.data)};
+                    text.append(inspection_line(name.subview(0u),::fast_io::string_view{type.data(),type.size()},value.subview(0u),row.data.available));
+                }
+                if(values.rows.empty()) { text.append(pane==console_tui::layout::locals ? ::fast_io::string_view{"No locals\n"} : ::fast_io::string_view{"Empty stack\n"}); }
+                if(values.rows.size()<values.total_values)
+                { text.append(::fast_io::concat_fast_io(values.rows.size()," / ",values.total_values," values; use ",
+                    pane==console_tui::layout::locals ? ::fast_io::string_view{"locals wasm"} : ::fast_io::string_view{"operands"}," for more\n")); }
+            }
+            screen_.set_value_panel(pane,text.subview(0u));
+        }
+        [[nodiscard]] static ::fast_io::string scalar_text(source_dwarf::numeric_kind kind,::std::uint64_t bits,unsigned bytes)
+        {
+            switch(kind)
+            {
+                case source_dwarf::numeric_kind::boolean: return ::fast_io::concat_fast_io(bits ? ::fast_io::string_view{"true"} : ::fast_io::string_view{"false"});
+                case source_dwarf::numeric_kind::signed_integer:
+                { if(bytes!=1u && bytes!=2u && bytes!=4u && bytes!=8u) { return ::fast_io::concat_fast_io("unavailable"); }
+                  source_dwarf::numeric_variable value{};value.bits=bits;value.byte_count=static_cast<::std::uint8_t>(bytes);return ::fast_io::concat_fast_io(source_dwarf::numeric_signed_value(value)); }
+                case source_dwarf::numeric_kind::unsigned_integer: return ::fast_io::concat_fast_io(bits);
+                case source_dwarf::numeric_kind::f32_bits:return ::fast_io::concat_fast_io(::std::bit_cast<float>(static_cast<::std::uint32_t>(bits)));
+                case source_dwarf::numeric_kind::f64_bits:return ::fast_io::concat_fast_io(::std::bit_cast<double>(bits));
+                default:return ::fast_io::concat_fast_io("unavailable");
+            }
+        }
+        [[nodiscard]] ::fast_io::string inspect_value(::fast_io::string_view input,bool hover=false)
+        {
+            auto line{[&](::fast_io::string_view name,::fast_io::string_view type,::fast_io::string_view value,bool available=true) { return hover && !available ? ::fast_io::string{} : inspection_line(name,type,value,available); }};
+            auto const level{console_aliases::split(input)};auto const part{console_aliases::split(level.tail)};
+            auto actual{control_.inspect()};
+            if(actual.execution!=execution_status::stopped || actual.threads.size()!=1u)
+            { return hover ? ::fast_io::string{} : ::fast_io::concat_fast_io("value unavailable: requires one stopped thread\n"); }
+            auto const& thread{actual.threads.front()};::fast_io::string request{};
+            if(level.word=="src" && !level.tail.empty()) { request=::fast_io::concat_fast_io("print ",level.tail); }
+            else if(level.word=="wasm" && (part.word=="local" || part.word=="stack"))
+            { ::std::uint64_t index{};auto token{part.tail};auto p{::fast_io::parse_by_scan(token.begin(),token.end(),::fast_io::mnp::dec_get<true,true>(index))};
+              if(token.empty() || p.code!=::fast_io::parse_code::ok || p.iter!=token.end()) { return ::fast_io::concat_fast_io("error: inspect wasm local|stack INDEX\n"); }
+              request=::fast_io::concat_fast_io(part.word=="local" ? ::fast_io::string_view{"locals wasm "} : ::fast_io::string_view{"operands "},thread.identifier," 0 ",index," 1"); }
+            else if(level.word=="asm" && !part.word.empty() && part.tail.empty())
+            { request=::fast_io::concat_fast_io("info registers ",thread.identifier," ",actual.stop_identifier); }
+            else { return ::fast_io::concat_fast_io("error: inspect src EXPR | inspect wasm local|stack INDEX | inspect asm REGISTER\n"); }
+            auto command{parse_console_command(request.subview(0u))};auto reply{control_.execute(command)};
+            if(reply.status!=::uwvm2::utils::control::error::none)
+            { return line(level.tail,{},"unavailable at this stop",false); }
+            if(level.word=="src")
+            {
+                if(reply.source_stop_identifier!=actual.stop_identifier) { return line(level.tail,{},"unavailable at this stop",false); }
+                if(reply.source_object_value_available && !reply.source_object_type.empty() && reply.source_object_type.size()<=1024u)
+                {
+                    ::fast_io::string text{};unsigned shown{};
+                    for(auto const& node:reply.source_object_type)
+                    {
+                        if(node.depth>1u) { continue; }if(shown==8u) { text.append("…\n");break; }++shown;
+                        ::fast_io::string value{};bool available{node.value_available || node.display_text_available};
+                        if(node.display_text_available) { value=::fast_io::concat_fast_io("\"",::std::string_view{node.display_text},node.display_text_truncated ? ::fast_io::string_view{"…\""} : ::fast_io::string_view{"\""}); }
+                        else if(node.reason!=source_dwarf::object_unavailable_reason::none) { value=::fast_io::concat_fast_io("unavailable");available=false; }
+                        else if(node.value_available && node.kind==source_dwarf::type_kind::pointer) { value=::fast_io::concat_fast_io(::fast_io::mnp::hex0x(node.bits)); }
+                        else if(node.value_available) { value=scalar_text(node.scalar_kind,node.bits,node.scalar_bytes);available=value.subview(0u)!="unavailable"; }
+                        else { value=::fast_io::concat_fast_io("{…}");available=true; }
+                        auto name{node.depth==0u ? ::fast_io::concat_fast_io(level.tail) : ::fast_io::concat_fast_io("  ",::std::string_view{node.name})};
+                        text.append(line(name.subview(0u),::fast_io::string_view{node.type_name.data(),node.type_name.size()},value.subview(0u),available));
+                    }
+                    return text;
+                }
+                if(reply.source_locals_available && !reply.source_locals.empty())
+                { auto const& value{reply.source_locals.front()};auto text{scalar_text(value.kind,value.bits,value.byte_count)};
+                  return line(level.tail,::fast_io::string_view{value.type_name.data(),value.type_name.size()},text.subview(0u),value.kind!=source_dwarf::numeric_kind::unavailable); }
+                return line(level.tail,{},"unavailable at this stop",false);
+            }
+            if(level.word=="wasm")
+            {
+                auto const& values{reply.wasm_state_values};auto name{::fast_io::concat_fast_io(part.word,"[",part.tail,"]")};
+                if(!wasm_state::valid(values) || values.result!=wasm_state::status::available || values.rows.size()!=1u)
+                { return line(name.subview(0u),{},"unavailable at this stop",false); }
+                auto const& value{values.rows.front().data};::std::string type{};auto out{::fast_io::ostring_ref_std{::std::addressof(type)}};wasm_state::details::print_type(out,value.type);
+                ::fast_io::string formatted{};
+                if(!value.available) { formatted=::fast_io::concat_fast_io("unavailable"); }
+                else if(value.type.kind==wasm_state::value_kind::i32 || value.type.kind==wasm_state::value_kind::f32)
+                { ::std::uint32_t bits{};if(!wasm_state::details::read_numeric<32u>(value,bits)) { return line(name.subview(0u),{},"unavailable",false); }
+                  formatted=scalar_text(value.type.kind==wasm_state::value_kind::i32 ? source_dwarf::numeric_kind::signed_integer : source_dwarf::numeric_kind::f32_bits,bits,4u); }
+                else if(value.type.kind==wasm_state::value_kind::i64 || value.type.kind==wasm_state::value_kind::f64)
+                { ::std::uint64_t bits{};if(!wasm_state::details::read_numeric<64u>(value,bits)) { return line(name.subview(0u),{},"unavailable",false); }
+                  formatted=scalar_text(value.type.kind==wasm_state::value_kind::i64 ? source_dwarf::numeric_kind::signed_integer : source_dwarf::numeric_kind::f64_bits,bits,8u); }
+                else
+                { ::std::string row{};wasm_state::details::print_value(::fast_io::ostring_ref_std{::std::addressof(row)},value);
+                  auto separator{row.find(" = ")};formatted=::fast_io::concat_fast_io(::std::string_view{row}.substr(separator==row.npos ? 0u : separator+3u)); }
+                return line(name.subview(0u),::fast_io::string_view{type.data(),type.size()},formatted.subview(0u),value.available);
+            }
+            if(reply.registers_stop_identifier!=actual.stop_identifier) { return line(part.word,{},"unavailable at this stop",false); }
+            auto value{console_inspection::register_preview(reply.registers,part.word)};
+            return value.available ? line(part.word,value.type.subview(0u),value.value.subview(0u)) : line(part.word,{},"unavailable",false);
+        }
     public:
-        console_visual_session(controller& control, console_io io)
-            : control_{control}, io_{io}, screen_{io.context,io.write,io.interactive} {}
-        void output(::fast_io::string_view text) { screen_.output(text); }
+        console_visual_session(controller& control, console_io io, console_tui::screen& screen)
+            : control_{control}, io_{io}, screen_{screen} {}
+        void output(::fast_io::string_view text)
+        {
+            if(io_.interactive && text.starts_with("error:"))
+            { screen_.output(console_help::format_error(text, true, console_tui::terminal_dimensions().columns)); }
+            else { screen_.output(text); }
+        }
         [[nodiscard]] bool enabled() const noexcept { return screen_.enabled(); }
         void disable() noexcept { screen_.disable(); }
         void output(::fast_io::string const& text) { output(text.subview(0u)); }
         [[nodiscard]] bool command(::fast_io::string_view input)
-        { bool const handled{screen_.command(input)}; if(handled) { refresh_needed_=true; } return handled; }
+        {
+            auto parts{console_aliases::split(input)};
+            if(parts.word=="inspect") { output(inspect_value(parts.tail));return true; }
+            if(parts.word == "list")
+            {
+                auto level{console_aliases::split(parts.tail)};
+                if(!level.tail.empty() || (level.word!="src" && level.word!="wasm" && level.word!="asm"))
+                { output("error: list src|wasm|asm\n"); return true; }
+                auto const actual{control_.inspect()};
+                if(actual.execution!=execution_status::stopped || actual.threads.size()!=1u)
+                { output("error: list requires one stopped thread\n"); return true; }
+                auto const& thread{actual.threads.front()};
+                if(level.word=="wasm") { output(control_.wasm_instruction_listing(thread.identifier,actual.stop_identifier)); }
+                else if(level.word=="asm")
+                {
+                    auto const command{parse_console_command(::fast_io::concat_fast_io("disassemble ",thread.identifier," ",actual.stop_identifier," 16").subview(0u))};
+                    auto const text{details::format_reply(control_.execute(command),command)};
+                    output(::fast_io::string_view{text.data(),text.size()});
+                }
+                else if(thread.source)
+                {
+                    auto const& source{*thread.source};auto const path{screen_.source_override().empty() ?
+                        ::fast_io::string_view{source.file.data(),source.file.size()} : screen_.source_override()};
+                    screen_.prepare_source(path,source.line,actual.stop_identifier); ::std::uint64_t total{};
+                    output(console_tui::source_text(path,source.line,nullptr,!actual.source_statement_stop,
+                        screen_.source_first_line(),::std::addressof(total))); screen_.source_bounds(total);
+                }
+                else { output("source location unavailable at this stop\n"); }
+                return true;
+            }
+            bool const handled{screen_.command(input)}; if(handled) { apply_pointer_query(); refresh_needed_=true; } return handled;
+        }
+        void apply_pointer_query()
+        {
+            auto const hover{screen_.take_hover_query()};
+            if(!hover.empty()) { auto const text{inspect_value(hover.subview(0u),true)};screen_.hover_reply(text.subview(0u)); }
+            auto const query{screen_.take_query()}; if(query.empty()) { return; }
+            refresh_needed_=true;
+            // Mouse and typed `info wasip1 fd` use exactly the same authenticated query.
+            auto const command{parse_console_command(query.subview(0u))};
+            auto const reply{control_.execute(command)}; auto const text{details::format_reply(reply,command)};
+            if(command.operation==::uwvm2::utils::control::operation::read_memory)
+            { if(reply.status==::uwvm2::utils::control::error::none) { ::std::uint64_t module{},offset{};::std::uint32_t memory{},reserved{};::uwvm2::utils::control::input_buffer fields{command.payload};
+                ::fast_io::io::scan(fields,::fast_io::mnp::le_get<64>(module),::fast_io::mnp::le_get<32>(memory),::fast_io::mnp::le_get<32>(reserved),::fast_io::mnp::le_get<64>(offset));screen_.memory_snapshot(reply.memory,offset); }
+              else { screen_.memory_snapshot({},0u); } }
+            screen_.output(::fast_io::string_view{text.data(),text.size()});
+        }
         [[nodiscard]] bool function_breakpoint(::fast_io::string_view input, console_command& result)
         {
             auto const request{console_completion::context(input,input.size())};
             if(request.type != console_completion::kind::function || request.prefix.empty()) { return false; }
-            // Numeric break MODULE FUNCTION BYTE_OFFSET retains its exact grammar.
+            // Numeric breakwasm MODULE FUNCTION BYTE_OFFSET retains its exact grammar.
             if(parse_console_command(input).kind != console_command_kind::invalid) { return false; }
             ::std::uint64_t function{},offset{}; bool found{},ambiguous{};
             bool const exhaustive{control_.visit_source_function_symbols(request.module,request.prefix,
@@ -1137,18 +1583,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     else { function=f;offset=at;found=true; } return true;
                 })};
             if(!found || ambiguous || !exhaustive)
-            { output("error: function symbol unavailable or ambiguous; use break MODULE FUNCTION BYTE_OFFSET\n"); return true; }
-            result=parse_console_command(::fast_io::concat_fast_io("break ",::fast_io::mnp::dec(request.module)," ",
+            { output("error: function symbol unavailable or ambiguous; use breakwasm MODULE FUNCTION BYTE_OFFSET\n"); return true; }
+            result=parse_console_command(::fast_io::concat_fast_io("breakwasm ",::fast_io::mnp::dec(request.module)," ",
                 ::fast_io::mnp::dec(function)," ",::fast_io::mnp::dec(offset)).subview(0u)); return true;
         }
         void submitted(::fast_io::string_view input)
         { screen_.record(::fast_io::concat_fast_io("(uwvm-debug) ",input,"\n")); refresh_needed_=true; }
         void refresh()
         {
+            screen_.drain_guest();
             if(!screen_.enabled()) { return; }
             auto const actual{control_.inspect()};
             if(!refresh_needed_ && actual.stop_identifier == painted_stop_ && actual.execution == painted_execution_) { return; }
             refresh_needed_=false; painted_stop_=actual.stop_identifier; painted_execution_=actual.execution;
+            screen_.observe_stop(actual.execution==execution_status::stopped ? actual.stop_identifier : 0u,actual.threads.empty() ? 0u : actual.threads.front().location.code_generation);
             screen_.clear_panels();
             auto const phase{actual.execution == execution_status::stopped ? ::fast_io::string_view{"stopped"} :
                 actual.execution == execution_status::running ? ::fast_io::string_view{"running"} :
@@ -1158,55 +1606,77 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             if(actual.execution != execution_status::stopped || actual.stop_identifier == 0u || actual.threads.size() != 1u)
             {
                 for(auto layout : {console_tui::layout::src,console_tui::layout::assembly,console_tui::layout::registers,
-                    console_tui::layout::wasm,console_tui::layout::wasip1})
+                    console_tui::layout::wasm,console_tui::layout::wasip1,console_tui::layout::locals,console_tui::layout::operands,console_tui::layout::memory})
                 { screen_.set_panel(layout,"view unavailable: requires one currently stopped Wasm thread\n"); }
                 return;
             }
             auto const& thread{actual.threads.front()}; auto const id{thread.identifier};
-            auto const layout{screen_.current_layout()};
+
             auto const prefix{::fast_io::concat_fast_io("thread=",::fast_io::mnp::dec(id)," module=",
                 ::fast_io::mnp::dec(thread.location.code_unit)," function=",::fast_io::mnp::dec(thread.location.function),
                 " wasm-offset=",::fast_io::mnp::dec(thread.location.offset),"\n")};
-            if(layout == console_tui::layout::src || layout == console_tui::layout::split)
+            if(screen_.wants(console_tui::layout::src))
             {
-                auto const command{parse_console_command("frame")}; auto const frames{control_.execute(command)};
-                auto const text{details::format_reply(frames,command)};
+                auto const command{parse_console_command("frame")};
+                auto const frames{thread.native_pc ? controller_reply{} : control_.execute(command)};
                 auto source{::fast_io::string{}};
+                console_source_highlight::line_styles source_styles{};
                 if(thread.source && (!frames.source_frames_available || frames.selected_source_frame == 0u))
                 {
                     auto const& at{*thread.source};
                     source.append(::fast_io::concat_fast_io(console_tui::clean(::fast_io::string_view{at.file.data(),at.file.size()}),":",
                         ::fast_io::mnp::dec(at.line),"\n"));
                     auto const path{screen_.source_override().empty() ? ::fast_io::string_view{at.file.data(),at.file.size()} : screen_.source_override()};
-                    source.append(console_tui::source_text(path,at.line));
+                    screen_.prepare_source(path,at.line,actual.stop_identifier); ::std::uint64_t source_lines{};
+                    source.append(console_tui::source_text(path,at.line,::std::addressof(source_styles),!actual.source_statement_stop,
+                        screen_.source_first_line(),::std::addressof(source_lines))); screen_.source_bounds(source_lines);
                 }
                 else { source.append("source text unavailable at this selected stop/frame\n"); }
-                source.append(prefix); source.append(::fast_io::string_view{text.data(),text.size()});
+                if(!thread.source) { source.append(prefix); }
                 screen_.set_panel(console_tui::layout::src,source);
+                screen_.set_source_styles(::std::move(source_styles),1u);
             }
-            if(layout == console_tui::layout::assembly || layout == console_tui::layout::split || layout == console_tui::layout::registers)
-            { panel_reply(console_tui::layout::assembly,::fast_io::concat_fast_io("disassemble ",::fast_io::mnp::dec(id),
-                " ",::fast_io::mnp::dec(actual.stop_identifier)," 16")); }
-            if(layout == console_tui::layout::registers)
-            { panel_reply(console_tui::layout::registers,::fast_io::concat_fast_io("info registers ",::fast_io::mnp::dec(id),
-                " ",::fast_io::mnp::dec(actual.stop_identifier))); }
-            if(layout == console_tui::layout::wasm)
-            {
-                auto const locals_command{parse_console_command(::fast_io::concat_fast_io("locals wasm ",::fast_io::mnp::dec(id)," 0 0 16").subview(0u))};
-                auto const operands_command{parse_console_command(::fast_io::concat_fast_io("operands ",::fast_io::mnp::dec(id)," 0 0 16").subview(0u))};
-                auto const locals{control_.execute(locals_command)}, operands{control_.execute(operands_command)};
-                auto const l{details::format_reply(locals,locals_command)}, o{details::format_reply(operands,operands_command)};
-                screen_.set_panel(layout,::fast_io::concat_fast_io(prefix,"[locals]\n",::fast_io::string_view{l.data(),l.size()},
-                    "[operands]\n",::fast_io::string_view{o.data(),o.size()}));
-            }
-            if(layout == console_tui::layout::wasip1)
-            { panel_reply(layout,::fast_io::concat_fast_io("info wasip1 fds ",::fast_io::mnp::dec(thread.location.code_unit)," 0 16")); }
+            if(screen_.wants(console_tui::layout::assembly))
+            { assembly_panel(id,actual.stop_identifier); }
+            if(screen_.wants(console_tui::layout::registers))
+            { auto reply{thread.native_pc ? query(::fast_io::concat_fast_io("info registers ",id," ",actual.stop_identifier).subview(0u)) : controller_reply{}};
+              auto text{console_inspection::register_panel(reply,id,actual.stop_identifier,thread.native_pc.value_or(0u),inspection_line)};
+              screen_.set_value_panel(console_tui::layout::registers,text.subview(0u)); }
+            if(screen_.wants(console_tui::layout::wasm))
+            { screen_.set_panel(console_tui::layout::wasm,control_.wasm_instruction_listing(id,actual.stop_identifier)); }
+            if(screen_.wants(console_tui::layout::memory))
+            { if(screen_.memory_query().empty()) { panel_reply(console_tui::layout::memory,::fast_io::concat_fast_io("memory ",thread.location.code_unit," 0 0 128")); }
+              else { panel_reply(console_tui::layout::memory,screen_.memory_query()); } }
+            if(screen_.wants(console_tui::layout::locals)) { wasm_values_panel(console_tui::layout::locals,id,thread.native_pc.has_value()); }
+            if(screen_.wants(console_tui::layout::operands)) { wasm_values_panel(console_tui::layout::operands,id,thread.native_pc.has_value()); }
+            screen_.wasip1_module(thread.location.code_unit);
+            if(screen_.wants(console_tui::layout::wasip1))
+            { if(screen_.fd_query().empty()) { panel_reply(console_tui::layout::wasip1,::fast_io::concat_fast_io("info wasip1 fds ",::fast_io::mnp::dec(thread.location.code_unit)," 0 64")); }
+              else { panel_reply(console_tui::layout::wasip1,screen_.fd_query()); } }
         }
         [[nodiscard]] console_editing::action complete(console_editing::editor& editor)
         {
             candidates_={};
             auto const request{console_completion::context(editor.line().view(),editor.cursor())};
-            if(request.type == console_completion::kind::path) { console_completion::paths(request,candidates_); }
+            if(request.type == console_completion::kind::pane)
+            { if(request.root=="direction")
+              { for(auto name:{::fast_io::string_view{"left"},::fast_io::string_view{"right"},::fast_io::string_view{"above"},::fast_io::string_view{"below"}}) { static_cast<void>(candidates_.add(name,request.prefix)); } }
+              else { for(auto name : console_tui::layout_names) { if(name!="split") { static_cast<void>(candidates_.add(name,request.prefix)); } }
+                for(auto name:{::fast_io::string_view{"stack"},::fast_io::string_view{"register"},::fast_io::string_view{"registers"}})
+                { static_cast<void>(candidates_.add(name,request.prefix)); } } }
+            else if(request.type == console_completion::kind::module)
+            {
+                for(::std::uint64_t page{1u}; page<=32u; ++page)
+                {
+                    auto const modules{control_.source_module_page(page,8u)};
+                    if(!modules.valid) { break; }
+                    for(::std::size_t i{}; i<modules.size; ++i)
+                    { auto name{::fast_io::concat_fast_io(::fast_io::mnp::dec(modules.rows[i].identifier))}; static_cast<void>(candidates_.add(name.subview(0u),request.prefix)); }
+                    if(page>=modules.pages) { break; }
+                    if(page==32u) { candidates_.truncated=true; }
+                }
+            }
+            else if(request.type == console_completion::kind::path) { console_completion::paths(request,candidates_); }
             else if(request.type == console_completion::kind::function)
             {
                 candidates_.truncated=!control_.visit_source_function_symbols(request.module,request.prefix,
@@ -1250,25 +1720,53 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 }
             }
             auto const action{candidates_.apply(editor,request)};
-            if(candidates_.unavailable && action == console_editing::action::unchanged) { output("\ncompletion unavailable for this path\n"); }
+            if(candidates_.unavailable && action == console_editing::action::unchanged) { return console_editing::action::candidates; }
             return action;
         }
         void show_candidates(console_editing::editor const& editor,bool dynamic)
         {
-            output("\n");
+            ::fast_io::string text{};
             if(!dynamic)
-            { editor.display_candidates([&](::fast_io::string_view text) { output(text);output("\n"); });return; }
-            for(::std::size_t i{}; i < candidates_.size; ++i) { output(candidates_.words[i].subview(0u)); output("\n"); }
-            if(candidates_.truncated) { output("[completion truncated; type a longer prefix]\n"); }
+            { editor.display_candidates([&](::fast_io::string_view word) { if(!text.empty()) { text.push_back('\n'); } text.append(word); }); }
+            else
+            {
+                if(candidates_.unavailable) { text.append("Path completion unavailable; edit the path and press Tab again."); }
+                for(::std::size_t i{}; i < candidates_.size; ++i)
+                { if(!text.empty()) { text.push_back('\n'); } text.append(candidates_.words[i]); }
+                if(candidates_.truncated) { text.append("\n[completion truncated; type a longer prefix]"); }
+            }
+            screen_.show_candidates(text.subview(0u));
         }
         [[nodiscard]] bool draw(console_editing::editor const& editor, console_editing::action action)
         {
+            bool const resize{screen_.needs_resize()};
+            if(action==console_editing::action::idle && !resize && !deferred_mouse_frame_ && !screen_.drain_guest()) { return screen_.enabled(); }
+            // Escape-sequence bytes do not change the editor or screen. In
+            // particular, never redraw a full frame for each byte of SGR mouse.
+            if(action==console_editing::action::unchanged && !resize && (!refresh_needed_ || deferred_mouse_frame_)) { return screen_.enabled(); }
+            if(resize) { refresh_needed_=true; }
             auto const before{screen_.enabled()}; auto const previous{screen_.current_layout()}; screen_.key(action);
-            if(before != screen_.enabled() || previous != screen_.current_layout() || action == console_editing::action::redraw)
+            if(action==console_editing::action::mouse) { screen_.mouse(editor.mouse()); apply_pointer_query(); }
+            if(before != screen_.enabled() || previous != screen_.current_layout() || action == console_editing::action::redraw ||
+               screen_.take_content_change() || action==console_editing::action::page_up || action==console_editing::action::page_down)
             { refresh_needed_=true; }
+            if(action==console_editing::action::mouse && (editor.mouse().button&64u)!=0u && screen_.enabled())
+            {
+                auto const now{::std::chrono::steady_clock::now()};
+                if(!deferred_mouse_frame_) { mouse_batch_start_=now;mouse_batch_count_=0u; }
+                ++mouse_batch_count_;
+                if(io_.input_ready!=nullptr && io_.input_ready(io_.context) && mouse_batch_count_<256u &&
+                    now-mouse_batch_start_<::std::chrono::milliseconds{40})
+                { deferred_mouse_frame_=true;return true; }
+            }
+            deferred_mouse_frame_=false;
             if(before && !screen_.enabled())
-            { io_.write(io_.context,"(uwvm-debug) "); io_.write(io_.context,editor.line().view()); }
+            {
+                auto const rendered{console_tui::command_line(editor, console_tui::terminal_dimensions().columns)};
+                io_.write(io_.context, rendered.subview(0u)); return true;
+            }
             if(screen_.enabled()) { refresh(); screen_.render(editor); return true; }
+            if(screen_.has_candidates()) { screen_.render(editor); return true; }
             return false;
         }
         [[nodiscard]] console_read_hooks hooks() noexcept
@@ -1276,120 +1774,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             return {this,
                 +[](void* self,console_editing::editor& editor) { return static_cast<console_visual_session*>(self)->complete(editor); },
                 +[](void* self,console_editing::editor const& editor,console_editing::action action) { return static_cast<console_visual_session*>(self)->draw(editor,action); },
-                +[](void* self,console_editing::editor const& editor,bool dynamic) { static_cast<console_visual_session*>(self)->show_candidates(editor,dynamic); }};
+                +[](void* self,console_editing::editor const& editor,bool dynamic) { static_cast<console_visual_session*>(self)->show_candidates(editor,dynamic); },
+                +[](void* self,console_editing::editor& editor,int key) { return static_cast<console_visual_session*>(self)->screen_.input_key(editor,key); }};
         }
     };
-    inline constexpr ::fast_io::string_view console_help{
-        "tui enable|disable | tui source PATH | layout src|asm|split|regs|wasm|wasip1|next | focus next|prev|cmd|code\n"
-        "Ctrl+X A toggles TUI; Ctrl+X 1/2 selects source/split; PgUp/PgDn scrolls the focused pane; Ctrl+L refreshes/resizes.\n"
-        "TUI uses current authenticated replies; asm/register views never open VM/runtime code. Source text is bounded local file data.\n"
-        "break MODULE SYMBOL | b MODULE SYMBOL (exact unambiguous live DWARF function; Tab completes names)\n"
-        "break MODULE FUNCTION BYTE_OFFSET | break-source MODULE FILE:LINE | delete BREAKPOINT | enable [BREAKPOINT] | disable [BREAKPOINT] | ignore BREAKPOINT COUNT | info breakpoints\n"
-        "break/break-source ... ignore COUNT installs the initial hit policy atomically; no unconditional registration window.\n"
-        "break/break-source ... [ignore COUNT] if EXPR | condition BREAKPOINT [EXPR] (bounded read-only source condition; omitted EXPR clears)\n"
-        "Conditions evaluate at a genuine complete cooperative stop, frame0 of the actual hitting thread; false resumes, unavailable retains the stop.\n"
-        "continue | wait | pause | step wasm THREAD [into|over|out] | status | info threads | bt THREAD | locals THREAD\n"
-        "step source THREAD [into|over|out] | step asm THREAD | locals source THREAD\n"
-        "globals THREAD MODULE [FIRST COUNT] | info globals THREAD MODULE [FIRST COUNT]\n"
-        "table THREAD MODULE TABLE [FIRST COUNT] | info table THREAD MODULE TABLE [FIRST COUNT]\n"
-        "operands THREAD [FRAME [FIRST COUNT]] | info operands THREAD [FRAME [FIRST COUNT]]\n"
-        "locals wasm THREAD [FRAME [FIRST COUNT]] (COUNT 1..64; actual typed stop, no host addresses)\n"
-        "saved THREAD [FRAME [FIRST COUNT]] | controls THREAD [FRAME [FIRST COUNT]] | handlers THREAD [FRAME [FIRST COUNT]]\n"
-        "control-params|control-results|handler-params THREAD FRAME CONTROL_OR_CLAUSE [FIRST COUNT]\n"
-        "  Controls and handlers are lexical Wasm layouts; saved values use actual if parameters, not native catch state.\n"
-        "members locals|operands|saved|globals|table THREAD MODULE FRAME TABLE ROOT FIRST COUNT [PATH...]\n"
-        "path create locals|operands|saved|globals|table THREAD MODULE FRAME TABLE ROOT [PATH...]\n"
-        "path extend SESSION HANDLE [PATH...] (returns new handle; retires parent)\n"
-        "path members SESSION HANDLE FIRST COUNT | path clear\n"
-        "  FRAME/TABLE zero where unused; ROOT/PATH are original indices, at most 16 edges and 64 members.\n"
-        "info wasip1 args|env|fds|preopens MODULE [FIRST COUNT]\n"
-        "trace wasip1 on [NAME|all] | off | clear | read [AFTER COUNT]\n"
-        "set wasip1 file MODULE HEXBYTES | set wasip1 fd-dup MODULE FD OLD_BASE OLD_INHERIT\n"
-        "unset wasip1 fd MODULE FD OLD_BASE OLD_INHERIT\n"
-        "set wasip1 checkpoint MODULE SLOT | set wasip1 restore MODULE SLOT bindings|strict\n"
-        "unset wasip1 checkpoint MODULE SLOT (SLOT 0..7; live environment only)\n"
-        "set wasip1 export MODULE HEXPATH | set wasip1 import MODULE HEXPATH [RESOURCE=TARGET_FD,...]\n"
-                "set wasip1 export-group HEXPATH MODULE... [if-stop N]\n"
-                "set wasip1 import-group HEXPATH MODULE[:RESOURCE=FD,...]... [if-stop N]\n"
-        "portable WASIp1: content external; configure target mnt with matching guest names; pair with Wasm checkpoint\n"
-        "Checkpoint Wasm and WASIp1 together at the same cooperative stop. External IO is not rolled back.\n"
-        "set wasm memory MODULE MEMORY THREAD OFFSET bytes HEX (1..256 bytes; guest address order)\n"
-        "set wasm global MODULE GLOBAL THREAD bits i32|i64|f32|f64|v128 HEX [HEX]\n"
-        "set wasm global MODULE GLOBAL THREAD null|i31 VALUE|function MODULE FUNCTION\n"
-        "set wasm table MODULE TABLE ELEMENT THREAD null|i31 VALUE|function MODULE FUNCTION\n"
-        "set wasm global|table ... from locals|operands|saved FRAME INDEX [path EDGES...]\n"
-        "set wasm global|table ... from globals MODULE INDEX | from table MODULE TABLE ELEMENT\n"
-        "set wasm global|table ... from handle SESSION HANDLE [path EDGES...]\n"
-        "set wasm member THREAD locals|operands|saved FRAME INDEX [path EDGES...] at MEMBER SOURCE\n"
-        "set wasm member THREAD globals MODULE INDEX | table MODULE TABLE ELEMENT [path EDGES...] at MEMBER SOURCE\n"
-        "set wasm member THREAD handle SESSION HANDLE [path EDGES...] at MEMBER SOURCE\n"
-        "set wasip1 arg|arg-insert MODULE INDEX HEX | unset wasip1 arg MODULE INDEX\n"
-        "set wasip1 env MODULE HEXKEY HEXVALUE\n"
-        "WASIp1 mutations may append: if-stop STOP_ID (rejects a different pause)\n"
-        "unset wasip1 env MODULE HEXKEY | set wasip1 rights MODULE FD OLD_BASE OLD_INHERIT NEW_BASE NEW_INHERIT\n"
-        "WASIp1 text uses hex bytes (- means empty), up to 4096 raw bytes; rights accept decimal or 0x hex and may only decrease.\n"
-        "ni [THREAD] | nexti [THREAD] (current Wasm native trap; qualified instructions, same-owner direct branches and near-call continuations)\n"
-        "ni requires a proved Wasm caller return point; host/VM callees run normally without exposing their code, registers, stack or memory. Unavailable continuations and unsupported returns retain the stop. First establish step asm THREAD.\n"
-        "finish asm [THREAD] | fin asm [THREAD] (current native top frame; authenticated Wasm parent only)\n"
-        "Native finish stops at a proved normal parent return. Root/host/unknown callers are refused; Ctrl+C/EH retain a real cooperative Wasm pause. Parent locals/source snapshots are unavailable.\n"
-        "disassemble THREAD STOP_ID COUNT (1..32 instructions; no address or offset input)\n"
-        "disassemble-range THREAD STOP_ID COUNT BYTE_OFFSET INSTRUCTION_OFFSET SYMBOLS (bounded owner; COUNT 1..32, SYMBOLS 0|1)\n"
-        "memory MODULE MEMORY OFFSET LENGTH | replace MODULE FUNCTION GENERATION BODY_FILE | help | quit\n"
-        "catch wasm EVENT MODULE FUNCTION|all | info wasm-events | delete|enable|disable wasm-event ID\n"
-        "catch wasm trap MODULE FUNCTION|all (after failure; pre-trap operands; continue terminates)\n"
-        "catch wasm uncaught MODULE FUNCTION|all (actual throw; before unwind; continue propagates)\n"
-        "trace wasm on [EVENT] | trace wasm off|clear | trace wasm read [AFTER_SEQUENCE [COUNT]] (COUNT=1..128)\n"
-        "wasm-script COMMAND; COMMAND (up to 16 diagnostic/policy commands, including ABI-checked replace; no resume/step or host evaluation)\n"
-        "info registers [REGISTER] | info registers THREAD STOP_ID [REGISTER] (real native trap, top frame only)\n"
-        "ptype NAME | ptype THREAD STOP_ID NAME (scoped C/C++/Rust type layout)\n"
-        "print EXPR | print THREAD STOP_ID EXPR (bounded copied guest selectors, integer/f32/f64 arithmetic, builtin numeric casts and sizeof; no calls)\n"
-        "print-frame THREAD STOP_ID FRAME EXPR | ptype-frame THREAD STOP_ID FRAME EXPR (explicit source frame, any expression prefix)\n"
-        "Rust tuple fields: pair.0 / pair.1; Zig conventional pointer dereference: p.* / p.*.field (owned guest bytes only).\n"
-        "display EXPR | info display | undisplay [ID] | enable|disable|delete display [ID]\n"
-        "Displays: at most32 printable expressions of256 bytes; evaluate source frame0 at each new genuine sole-thread stop. Unavailable values retain the entry; no saved pointer/value is reused.\n"
-        "Wasm EVENT: all|throw|exception|gc|memory|table|atomic|call|reference|simd|control|trap|uncaught. Opcode events are BEFORE instructions; trap/uncaught require actual runtime witnesses.\n"
-        "Trace holds the newest 512 observations, reports overwritten entries, and never invokes scripts on a guest thread.\n"
-        "wait observes a stop/guest exit for at most two seconds; Ctrl+C separately requests a cooperative pause.\n"
-        "IDs and byte offsets are decimal; offsets are relative to the function expression and must name an emitted safe point.\n"
-        "break-source compares embedded DWARF or source-map paths exactly and opens no source text file.\n"
-        "locals source shows only current cooperative numeric direct-local/constant values; unsupported locations are unavailable.\n"
-        "bt THREAD at a real native stop inspects up to 32 authenticated physical Wasm parents; complete/partial status is explicit, and no native stack bytes or registers are exposed.\n"
-        "frames [THREAD STOP_ID [FIRST COUNT]], frame [N|THREAD STOP_ID N], up/down [COUNT|THREAD STOP_ID COUNT] select real source frames.\n"
-        "frames wasm THREAD STOP_ID FIRST COUNT lists canonical Wasm frames without DWARF; pages contain at most128 rows and report the full total.\n"
-        "Caller values require their authenticated saved source PC and typed packet; unavailable locations are reported; resume/replacement/native stepping retire selection.\n"
-        "print/ptype THREAD STOP_ID FRAME NAME and locals source THREAD STOP_ID FRAME query a frame atomically without changing selection.\n"
-        "step wasm (also step THREAD or s THREAD) resumes all participants and stops at the next emitted\n"
-        "Wasm instruction safe point; other participants may advance before parking.\n"
-        "Wasm over skips child/tail-successor activations; out follows this activation through tail calls to its caller or guest exit.\n"
-        "Both use actual Wasm activation identities without DWARF; breakpoints and catchpoints interrupt over/out.\n"
-        "source into/over execute the innermost activation; out follows a selected DWARF frame or the current physical source-map frame. Actual full-JIT activation identities and DWARF scopes or Source Map v3 coordinates are required.\n"
-        "asm executes exactly one native instruction on a qualified LLVM-full JIT thread; other guests stay stopped.\n"
-        "memory reads at most 256 bytes and requires all guest threads stopped.\n"
-        "locals shows up to 256 typed values from the selected stopped thread.\n"
-        "replacement requires an owner-controlled regular body file, exact function ABI, and a stopped guest without an active target frame.\n"
-        "Use tools/debug/secure_server.py for an authorized server launched before guest entry.\n"
-        "Interactive c/continue waits for an actual stop; c&/continue& runs in the background.\n"
-        "Piped/script input keeps asynchronous continue; controller/server/DAP resume is unchanged.\n"
-        "Ctrl+C cancels partial input and requests a cooperative pause; a blocked host timeout keeps its request pending.\n"
-        "Up/Down or Ctrl+P/Ctrl+N recall 32 commands; Ctrl+A/E/B/F, Backspace, Ctrl+U/K/W edit the line.\nCtrl+_ or Ctrl+X Ctrl+U undo current input edits; Alt+F/B move by word and Alt+D/Alt+Backspace kill words.\n"
-        "Ctrl+Y restores killed input text; the command still needs Enter and stays within 8448 input bytes (WASIp1 text4096, legacy grammar512, raw memory256 bytes).\n"
-        "Ctrl+T transposes characters; Ctrl+V quotes printable input (newline/tab become spaces); Ctrl+O accepts and recalls the next history line.\n"
-        "Ctrl/Alt+Left/Right move by word; Alt+< / Alt+> select first history / current draft; Alt+digits repeat bounded input edits.\n"
-        "Bracketed paste treats newlines as spaces and requires Enter after its closing marker; overflow or incomplete markers reject the whole line.\n"
-        "Ctrl+L redraws; Tab completes commands, replace/tui source paths and current source variables/members and break MODULE function symbols; Ctrl+R/S search history backward/forward, Ctrl+G restores the search draft. Alt+Y cycles the immediate prior yank.\n"
-        "Empty Enter repeats eligible step/query commands; replacement/scripts/resume are never implicitly repeated.\n"
-        "s/step, n/next, finish select source into/over/out; si/stepi, bt/where, disas use the sole current stopped thread.\n"
-        "until/u FILE:LINE|LINE | advance/adv FILE:LINE|LINE (sole stopped thread, innermost frame); explicit until/advance THREAD STOP FILE:LINE|LINE.\n"
-        "Exact embedded statement in the origin module; until skips recursive calls, advance may enter them; both stop after return.\n"
-        "Explicit s THREAD/step THREAD retain Wasm stepping. i r, i b, i threads are info aliases.\n"
-        "Ctrl+D deletes under the cursor; on empty input it behaves as EOF.\n"
-        "Unique command prefixes (cont, hel, info reg) and GDB aliases (backtrace, f, d/del) are accepted; ambiguous prefixes are rejected.\n"
-        "LLDB aliases: thread step-in/step-over/step-out/step-inst/step-inst-over, thread backtrace/list, process continue/interrupt/status, frame variable/select, register read, breakpoint list/set/delete.\n"
-        "Breakpoints use explicit Wasm identities: b MODULE FUNCTION OFFSET or b MODULE FILE:LINE; unique published function symbols are supported; arbitrary native addresses and VM/host debugging remain unavailable.\n"
-        "Managed CLI quit requests bounded real cleanup; pending keeps owners and permits status/help/quit retry.\n"
-        "quit force explicitly terminates this process without claiming finalizers. CtrlD may retain a pending prompt.\n"
-        "A standalone launcher may preselect process termination after actual pipe EOF cannot complete cleanup.\n"
-        "Without an installed managed cleanup owner, quit/EOF retains the launcher's process termination policy.\n"};
     // Normal CLI management only. No OS callback, guest address, synthetic
     // park or recursive controller request is used here. Each completed wait
     // ticket is acknowledged before the next synchronous wait starts.
@@ -1407,6 +1795,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         for(;;)
         {
             auto reply{control.execute(wait, ::std::chrono::milliseconds{50}, interruption.borrow())};
+            if(io.display_poll!=nullptr) { io.display_poll(io.display_context); }
             if(interruption.observed())
             {
                 if(interruption_deadline == clock_type::time_point{})
@@ -1437,15 +1826,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
     // guest stop, stack, native-register or code-reset permission.
     inline void write_console_shutdown_result(console_io io, managed_cli_shutdown_result result)
     {
-        auto const text{::fast_io::concat_std(
-            result.phase == managed_cli_shutdown_phase::completed ?
-                ::fast_io::string_view{"managed shutdown complete: "} : ::fast_io::string_view{"error: managed shutdown: "},
+        if(result.phase == managed_cli_shutdown_phase::completed) { return; }
+        auto const text{::fast_io::concat_fast_io("error: managed shutdown: ",
             managed_cli_shutdown_phase_text(result.phase), " native-error=", ::fast_io::mnp::dec(result.native_error),
             result.deadline_expired ? ::fast_io::string_view{"; deadline expired; owners retained\n"} : ::fast_io::string_view{"\n"})};
-        io.write(io.context, ::fast_io::string_view{text.data(), text.size()});
+        io.write(io.context, text.subview(0u));
     }
     [[nodiscard]] inline console_exit run_console(controller& control, console_io io,
-        managed_cli_shutdown* shutdown = nullptr, bool force_on_physical_eof = false)
+        managed_cli_shutdown* shutdown = nullptr, bool force_on_physical_eof = false,
+        console_restart_request* restart = nullptr)
     {
         if(io.read_byte == nullptr || io.write == nullptr) { return console_exit::input_failure; }
         if(shutdown != nullptr && !shutdown->matches_controller(control))
@@ -1456,14 +1845,111 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             ~paste_terminal_scope() { if(io.interactive) { io.write(io.context, "\x1b[?2004l"); } }
         } const paste_scope{io};
         if(io.interactive) { io.write(io.context, "\x1b[?2004h"); }
-        io.write(io.context, "UWVM LLVM full debugger. Type help for commands.\n");
+        if(restart == nullptr || !restart->resume_new_launch)
+        { io.write(io.context, "UWVM debugger. Type \"help\" for command classes, \"help run\" to begin.\n"); }
         // The bounded history/kill/undo buffers outlive each command. Keep
         // their owner off the management thread stack: at -O0 the editor plus
         // execute() exceeded the ordinary 1 MiB Windows thread stack.
-        auto editor_owner{::std::make_unique<console_editing::editor>()};
+        ::std::unique_ptr<console_editing::editor> local_editor{};
+        ::std::unique_ptr<console_tui::screen> local_screen{};
+        auto& editor_owner{restart == nullptr ? local_editor : restart->editor};
+        auto& screen_owner{restart == nullptr ? local_screen : restart->screen};
+        if(!editor_owner) { editor_owner=::std::make_unique<console_editing::editor>(); }
+        if(!screen_owner) { screen_owner=::std::make_unique<console_tui::screen>(io.context,io.write,io.interactive); }
         auto& editor{*editor_owner};
-        console_visual_session visual{control,io};
+        console_visual_session visual{control,io,*screen_owner};
+        struct display_state { console_tui::screen& screen; console_editing::editor& editor; } display{*screen_owner,editor};
+        io.display_context=::std::addressof(display);
+        io.display_poll=+[](void* context)
+        { auto& state{*static_cast<display_state*>(context)};
+          if(state.screen.drain_guest() && state.screen.enabled()) { state.screen.render(state.editor); } };
         auto const output{[&](::fast_io::string_view text) { visual.output(text); }};
+        auto launch_layout{[&](console_launch_action action)
+        {
+            if(!screen_owner->enabled() || screen_owner->custom_layout()) { return; }
+            if(action == console_launch_action::start_wasm) { screen_owner->select(console_tui::layout::wasm); }
+            else if(action == console_launch_action::start_instruction) { screen_owner->select(console_tui::layout::assembly); }
+            else if(action == console_launch_action::start) { screen_owner->select(console_tui::layout::src); }
+        }};
+        if(restart != nullptr && restart->resume_new_launch) { launch_layout(restart->action); }
+        breakpoint temporary_start{}; // Cold target labels, never a native address or read grant.
+        auto const retire_start_hit{[&]
+        {
+            if(temporary_start.identifier == 0u) { return; }
+            auto const actual{control.inspect()};
+            if(actual.execution != execution_status::stopped || actual.reason != stop_reason::breakpoint) { return; }
+            for(auto const& thread : actual.threads)
+            {
+                if(thread.location.code_unit != temporary_start.module || thread.location.function != temporary_start.function ||
+                   thread.location.offset != temporary_start.offset) { continue; }
+                // Delete only this CLI's temporary main breakpoint through the
+                // ordinary current controller; user breakpoints remain intact.
+                static_cast<void>(control.execute(parse_console_command(::fast_io::concat_fast_io("delete ",
+                    ::fast_io::mnp::dec(temporary_start.identifier)).subview(0u))));
+                temporary_start = {}; break;
+            }
+        }};
+        auto const remember_breakpoints{[&]
+        {
+            auto points{control.copy_restart_breakpoints()};
+            points.erase(::std::remove_if(points.begin(), points.end(), [&](auto const& point)
+                { return point.identifier == temporary_start.identifier; }), points.end());
+            restart->breakpoints = ::std::move(points);
+        }};
+        auto const arm_main{[&]() -> bool
+        {
+            ::std::uint64_t function{}, offset{}; bool found{}, ambiguous{};
+            bool const exhaustive{control.visit_source_function_symbols(0u, "main",
+                [&](::fast_io::string_view name, ::std::uint64_t f, ::std::uint64_t at)
+                {
+                    if(name != "main") { return true; }
+                    if(found && function != f) { ambiguous = true; }
+                    if(!found || at < offset) { function = f; offset = at; }
+                    found = true; return true;
+                })};
+            if(!found || ambiguous || !exhaustive)
+            { output("error: main is unavailable or ambiguous in module 0. Use startw, or set a breakpoint and run.\n"); return false; }
+            if(temporary_start.identifier != 0u)
+            {
+                static_cast<void>(control.execute(parse_console_command(::fast_io::concat_fast_io("delete ",
+                    ::fast_io::mnp::dec(temporary_start.identifier)).subview(0u))));
+                temporary_start = {};
+            }
+            auto const previous{control.copy_restart_breakpoints()};
+            bool const user_point{::std::any_of(previous.begin(), previous.end(), [&](auto const& point)
+                { return point.module == 0u && point.function == function && point.offset == offset; })};
+            auto point{parse_console_command(::fast_io::concat_fast_io("breakwasm 0 ",
+                ::fast_io::mnp::dec(function), " ", ::fast_io::mnp::dec(offset)).subview(0u))};
+            point.breakpoint_source_display=true;
+            auto const installed{control.execute(point)};
+            if(installed.status != ::uwvm2::utils::control::error::none)
+            { output("error: Cannot set the temporary main breakpoint. Use startw or help breakwasm.\n"); return false; }
+            auto const temporary_id{control.make_initial_temporary_breakpoint(installed.breakpoint_identifier, user_point)};
+            if(temporary_id == 0u)
+            {
+                if(!user_point)
+                { static_cast<void>(control.execute(parse_console_command(::fast_io::concat_fast_io("delete ",
+                    ::fast_io::mnp::dec(installed.breakpoint_identifier)).subview(0u)))); }
+                output("error: Cannot reserve a temporary main breakpoint at the initial stop. Use status and info breakpoints.\n"); return false;
+            }
+            temporary_start = {}; temporary_start.identifier = temporary_id;
+            temporary_start.function = function; temporary_start.offset = offset;
+            output(::fast_io::concat_fast_io("Temporary breakpoint ", ::fast_io::mnp::dec(temporary_id), " at main.\n").subview(0u));
+            return true;
+        }};
+        auto const launch_first_instruction{[&](bool native)
+        {
+            output(details::format_program_start(restart == nullptr ? ::fast_io::string_view{} : restart->program_name.subview(0u)).subview(0u));
+            management_wait_interrupt_observation interruption{{io.context, io.interrupt_pending}};
+            auto const stopped{control.launch_first_instruction(native, ::std::chrono::seconds{2}, interruption.borrow())};
+            if(stopped.status != ::uwvm2::utils::control::error::none)
+            {
+                output(native ? ::fast_io::string_view{"error: Cannot authenticate the initial JIT instruction trap. Use status, or startw for Wasm entry.\n"} :
+                    ::fast_io::string_view{"error: The first Wasm instruction stop is unavailable. Use status to inspect the actual execution state.\n"});
+            }
+            auto const report{details::format_cli_reply(stopped, parse_console_command("wait"))};
+            output(::fast_io::string_view{report.data(), report.size()});
+        }};
         console_displays::session displays{};
         auto const show_displays{[&](controller_reply const& observed, ::std::uint64_t only = 0u)
         {
@@ -1489,9 +1975,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 output(::fast_io::string_view{formatted.data(),formatted.size()});
             }
         }};
+        if(restart != nullptr && restart->resume_new_launch)
+        {
+            restart->resume_new_launch = false;
+            restart->killed = false;
+            auto const ready{control.execute(parse_console_command("wait"))};
+            if(ready.status == ::uwvm2::utils::control::error::none &&
+               ready.execution == execution_status::stopped && ready.reason == stop_reason::initial)
+            {
+                if(restart->action == console_launch_action::start_instruction || restart->action == console_launch_action::start_wasm)
+                { launch_first_instruction(restart->action == console_launch_action::start_instruction); }
+                else if(restart->action != console_launch_action::start || arm_main())
+                {
+                output(details::format_program_start(restart == nullptr ? ::fast_io::string_view{} : restart->program_name.subview(0u)).subview(0u));
+                management_wait_interrupt_observation interruption{{io.context, io.interrupt_pending}};
+                auto const resumed{control.execute(parse_console_command("continue"), interruption.borrow())};
+                auto const text{details::format_cli_reply(resumed, parse_console_command("continue"))};
+                output(::fast_io::string_view{text.data(), text.size()});
+                bool acknowledged{};
+                if(io.foreground_execution && !restart->background && resumed.status == ::uwvm2::utils::control::error::none)
+                {
+                    auto const foreground{wait_console_foreground(control, io, interruption, acknowledged)};
+                    if(foreground.interruption_timeout)
+                    { output("error: interruption deadline expired; complete pause is unavailable; actual request and owners retained\n"); }
+                    auto const report{details::format_cli_reply(foreground.reply, parse_console_command("wait"))};
+                    output(::fast_io::string_view{report.data(), report.size()});
+                    show_displays(foreground.reply);
+                }
+                }
+            }
+            else { output("error: fresh initial stop is not ready; use status/wait then run\n"); }
+        }
         for(;;)
         {
-            if(!visual.enabled()) { io.write(io.context,"(uwvm-debug) "); }
+            retire_start_hit();
+            if(!visual.enabled() && !io.interactive) { io.write(io.context,"(uwvm-debug) "); }
             auto const line{read_console_line(io, editor,visual.hooks())};
             if(line.status == line_status::failure) { return console_exit::input_failure; }
             if(line.status == line_status::end)
@@ -1538,16 +2056,50 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 auto const delivered{management_wait_interrupt{nullptr, +[](void*) noexcept { return true; }}};
                 auto const reply{command.operation == ::uwvm2::utils::control::operation::pause ?
                     control.execute(command, delivered) : actual};
-                auto const text{details::format_reply(reply, command)};
+                auto const text{details::format_cli_reply(reply, command)};
                 output(::fast_io::string_view{text.data(), text.size()}); show_displays(reply); continue;
             }
             if(line.status == line_status::oversized)
             { editor.forget_repeat(); output("error: command exceeds 8448 input bytes or contains an unsupported escape; entire line discarded\n"); continue; }
             auto const input{::fast_io::string_view{line.bytes.data(), line.size}};
             auto const trimmed{console_execution::trim(input)};
+            // History is what the user submitted, independent of parser or runtime success.
+            if(!trimmed.empty()) { editor.remember(input,false); }
             visual.submitted(input);
-            if(visual.command(trimmed)) { editor.remember(input,false); continue; }
-            if(trimmed == "quit force" || trimmed == "q force")
+            auto const documentation{console_aliases::normalize(trimmed)};
+            auto const documentation_words{console_aliases::split(documentation.view())};
+            if(auto const request{console_module_help::parse(trimmed)}; request.handled)
+            {
+
+                if(!request.valid)
+                { output("error: MODULE_ID must be an unsigned decimal number, not a filename or module name.\nUse \"info modules\" to find its numeric ID.\n"); }
+                else
+                {
+                    auto const size{console_tui::terminal_dimensions()};
+                    auto page{request.selected && request.module == (::std::numeric_limits<::std::uint64_t>::max)() ? module_help_page{} :
+                        control.source_module_page(request.selected ? request.module + 1u : 1u, request.selected ? 1u : 4u)};
+                    output(console_module_help::format(page, io.interactive, io.interactive ? size.columns : 80u,
+                        request.selected, request.source).subview(0u));
+                }
+                continue;
+            }
+            if(documentation.valid && documentation_words.word == "apropos")
+            {
+                auto const size{console_tui::terminal_dimensions()};
+                auto const found{console_help::search(documentation_words.tail, io.interactive,
+                    io.interactive ? size.columns : 80u,
+                    io.interactive && size.rows < 23u ? (size.rows > 5u ? size.rows - 5u : 4u) : 18u)};
+                output(found.subview(0u));  continue;
+            }
+            if(auto const menu{console_help::menu_request(trimmed)}; menu != nullptr)
+            {
+                auto const size{console_tui::terminal_dimensions()};
+                auto const help{console_help::format(menu->topic, io.interactive, io.interactive ? size.columns : 80u,
+                    io.interactive && size.rows < 23u ? (size.rows > 5u ? size.rows - 5u : 4u) : 18u)};
+                output(help.subview(0u));  continue;
+            }
+            if(visual.command(trimmed)) {  continue; }
+            if(documentation.valid && documentation.view() == "quit force")
             {
                 editor.forget_repeat();
                 if(shutdown == nullptr)
@@ -1557,13 +2109,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             }
             if(shutdown != nullptr && shutdown->requested())
             {
-                auto const safe{console_aliases::parse(input, 0u, 0u).command};
-                if(safe.kind != console_command_kind::help && safe.kind != console_command_kind::quit)
+                auto const safe_parse{console_aliases::parse(input, 0u, 0u)};
+                auto const& safe{safe_parse.command};
+                bool const retry_run{restart != nullptr && restart->pending && console_execution::classify_resume(input).from_entry};
+                bool const retry_kill{restart != nullptr && restart->pending && safe.launch_action == console_launch_action::kill};
+                if(restart != nullptr && restart->killed && safe.kind != console_command_kind::help &&
+                   safe.kind != console_command_kind::quit && !retry_run)
+                {
+                    editor.forget_repeat();
+                    if(safe.kind == console_command_kind::invalid && !safe_parse.current_thread_required)
+                    { output(console_messages::syntax_error(trimmed).subview(0u)); }
+                    else if(safe.operation == ::uwvm2::utils::control::operation::breakpoint_list)
+                    {
+                        controller_reply copied{}; copied.breakpoints = restart->breakpoints;
+                        auto const text{details::format_cli_reply(copied, safe)};
+                        output(::fast_io::string_view{text.data(), text.size()});
+                    }
+                    else { output("No program is running. Use startw, starti, start or run to launch it again.\n"); }
+                    continue;
+                }
+                if(!retry_run && !retry_kill &&
+                   safe.kind != console_command_kind::help && safe.kind != console_command_kind::quit)
                 {
                     editor.forget_repeat();
                     if(safe.kind == console_command_kind::protocol && safe.operation == ::uwvm2::utils::control::operation::status && !safe.wait_for_event)
                     { write_console_shutdown_result(io, shutdown->inspect()); }
-                    else { output("error: shutdown retains active owners; only status/help/quit retry/quit force are allowed\n"); }
+                    else { output("error: shutdown retains active owners; only status/help/quit retry/quit force or pending run retry are allowed\n"); }
                     continue;
                 }
             }
@@ -1571,7 +2142,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             auto const display_request{console_displays::parse(trimmed)};
             if(display_request.operation != console_displays::action::none)
             {
-                editor.remember(input,false);
+
                 if(display_request.operation == console_displays::action::list)
                 {
                     output("automatic source displays (frame0; current values are queried only at a genuine stop)\n");
@@ -1607,22 +2178,89 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             auto const resume_policy{console_execution::classify_resume(input)};
             // The ampersand is a CLI-only scheduling choice, never a new wire
             // operation. Controller/server/DAP resume grammar remains unchanged.
-            auto const parsed{console_aliases::parse(resume_policy.recognized ? ::fast_io::string_view{"continue"} : input,
+            auto const parsed{console_aliases::parse(resume_policy.recognized ?
+                (resume_policy.from_entry ? console_execution::launch_word(resume_policy.launch_action) : ::fast_io::string_view{"continue"}) : input,
                 current_thread, current_stop)};
             if(parsed.ambiguous)
-            { editor.forget_repeat(); output("error: ambiguous command abbreviation; type the full command or use Tab\n"); continue; }
+            { editor.forget_repeat(); output(console_aliases::ambiguity_error(input).subview(0u)); continue; }
             if(parsed.current_thread_required)
-            { editor.forget_repeat(); output("error: shorthand requires one currently stopped Wasm thread; use an explicit THREAD\n"); continue; }
+            {
+                editor.forget_repeat(); auto const actual{control.inspect()}; auto const message{console_messages::state_error(actual)};
+                if(!message.empty()) { output(message.subview(0u)); }
+                else { output("error: Select a stopped thread: use \"info threads\", then supply THREAD explicitly.\n"); }
+                continue;
+            }
             auto command{parsed.command};
+            if(command.launch_action == console_launch_action::kill)
+            {
+
+                if(restart == nullptr || shutdown == nullptr)
+                { output("error: kill requires the standalone owned LLVM-full launcher.\n"); continue; }
+                if(!restart->pending) { remember_breakpoints(); restart->pending = true; }
+                auto const retired{shutdown->attempt_until(::std::chrono::steady_clock::now() + ::std::chrono::seconds{2})};
+                write_console_shutdown_result(io, retired);
+                if(retired.phase != managed_cli_shutdown_phase::completed)
+                { output("kill pending: old owners retained; retry kill after cleanup can complete.\n"); continue; }
+                restart->killed = true; restart->resume_new_launch = false;
+                temporary_start = {}; visual.disable();
+                output("Program terminated.\n"); continue;
+            }
+            if(command.run_from_entry)
+            {
+
+                auto actual{control.inspect()};
+                if(actual.execution == execution_status::stopping && actual.reason == stop_reason::initial)
+                { actual = control.execute(parse_console_command("wait")); }
+                launch_layout(command.launch_action);
+                if((restart == nullptr || !restart->pending) && actual.execution == execution_status::stopped &&
+                   actual.reason == stop_reason::initial)
+                {
+                    if(command.launch_action == console_launch_action::start_instruction || command.launch_action == console_launch_action::start_wasm)
+                    { launch_first_instruction(command.launch_action == console_launch_action::start_instruction); continue; }
+                    if(command.launch_action == console_launch_action::start && !arm_main()) { continue; }
+                    command.run_from_entry = false; // Actual initial stop has executed no Wasm instruction.
+                    command.launch_action = console_launch_action::none;
+                    output(details::format_program_start(restart == nullptr ? ::fast_io::string_view{} : restart->program_name.subview(0u)).subview(0u));
+                }
+                else
+                {
+                    if(restart == nullptr || shutdown == nullptr)
+                    { output("error: run restart requires the standalone owned LLVM-full launcher; use continue to resume\n"); continue; }
+                    if(!restart->pending)
+                    { remember_breakpoints(); restart->pending = true; }
+                    auto const retired{shutdown->attempt_until(::std::chrono::steady_clock::now() + ::std::chrono::seconds{2})};
+                    write_console_shutdown_result(io, retired);
+                    if(retired.phase != managed_cli_shutdown_phase::completed)
+                    { output("run restart pending: old owners retained; retry run after cleanup can complete\n"); continue; }
+                    restart->resume_new_launch = true; restart->background = resume_policy.background;
+                    restart->action = command.launch_action; launch_layout(command.launch_action);
+                    return console_exit::restart;
+                }
+            }
             if(command.kind == console_command_kind::invalid && visual.function_breakpoint(trimmed,command) &&
                 command.kind == console_command_kind::invalid) { editor.forget_repeat(); continue; }
             if(command.kind != console_command_kind::invalid && command.kind != console_command_kind::unsupported && command.kind != console_command_kind::empty)
-            { editor.remember(input, console_aliases::repeatable(command)); }
+            { editor.set_repeat(input, console_aliases::repeatable(command)); }
             else if(command.kind != console_command_kind::empty) { editor.forget_repeat(); }
             switch(command.kind)
             {
+                case console_command_kind::module_list:
+                {
+                    auto const size{console_tui::terminal_dimensions()};
+                    output(console_module_help::format(control.source_module_page(command.module_help_page),
+                        io.interactive, io.interactive ? size.columns : 80u).subview(0u));
+                    continue;
+                }
                 case console_command_kind::empty: continue;
-                case console_command_kind::help: output(console_help); continue;
+                case console_command_kind::help:
+                {
+                    auto const size{console_tui::terminal_dimensions()};
+                    auto const help_text{console_help::format(
+                        ::fast_io::string_view{command.help_topic.data(), command.help_topic_size}, io.interactive,
+                        io.interactive ? (visual.enabled() && size.columns > 5u ? size.columns-5u : size.columns) : 80u,
+                        io.interactive && size.rows < 23u ? (size.rows > 5u ? size.rows - 5u : 4u) : 18u)};
+                    output(help_text.subview(0u)); continue;
+                }
                 case console_command_kind::quit:
                 {
                     visual.disable();
@@ -1633,11 +2271,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     continue;
                 }
                 case console_command_kind::unsupported: output(unsupported_step_message(command)); continue;
-                case console_command_kind::invalid: output("error: invalid command; type help\n"); continue;
+                case console_command_kind::invalid: editor.forget_repeat(); output(console_messages::syntax_error(trimmed).subview(0u)); continue;
                 case console_command_kind::source_step:
                 case console_command_kind::wasm_step:
                 case console_command_kind::source_breakpoint:
                 case console_command_kind::source_locals:
+                case console_command_kind::execution_relocate:
+                case console_command_kind::assembly_breakpoint:
                 case console_command_kind::assembly_step:
                 case console_command_kind::assembly_next:
                 case console_command_kind::assembly_finish:
@@ -1657,6 +2297,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 case console_command_kind::replacement_file:
                 case console_command_kind::protocol: break;
             }
+            if(resume_policy.recognized && !resume_policy.from_entry)
+            {
+                auto const actual{control.inspect()};
+                if(actual.execution == execution_status::stopped && actual.stop_identifier != 0u) { output("Continuing.\n"); }
+            }
             management_wait_interrupt_observation interruption{{io.context, io.interrupt_pending}};
             auto const reply{control.execute(command, interruption.borrow())};
             bool interrupt_acknowledged{};
@@ -1666,7 +2311,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 if(io.consume_interrupt != nullptr) { static_cast<void>(io.consume_interrupt(io.context)); }
                 interrupt_acknowledged = true;
             }
-            auto const text{details::format_reply(reply, command)};
+            auto const text{details::format_cli_reply(reply, command)};
             output(::fast_io::string_view{text.data(), text.size()});
             show_displays(reply);
             if(io.foreground_execution && resume_policy.recognized && !resume_policy.background &&
@@ -1676,7 +2321,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 auto const foreground{wait_console_foreground(control, io, interruption, interrupt_acknowledged)};
                 if(foreground.interruption_timeout)
                 { output("error: interruption deadline expired; complete pause is unavailable; actual request and owners retained\n"); }
-                auto const report{details::format_reply(foreground.reply, parse_console_command("wait"))};
+                auto const report{details::format_cli_reply(foreground.reply, parse_console_command("wait"))};
                 output(::fast_io::string_view{report.data(), report.size()});
                 show_displays(foreground.reply);
             }
@@ -1685,22 +2330,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
     // Explicit host adapter for tests/embedders that reserve stdin exclusively
     // for management. The production launcher must use isolated console_io when
     // guests have stdin: sharing stdin is not a secure command transport.
-    [[nodiscard]] inline console_exit run_console(controller& control,
-        managed_cli_shutdown* shutdown = nullptr, bool force_on_physical_eof = false)
+    // A standalone restart retains one physical terminal/signal owner while
+    // retiring and recreating only the guest/controller session.
+    [[nodiscard]] inline console_exit run_console(controller& control, console_keyboard::native_session& keyboard,
+        managed_cli_shutdown* shutdown = nullptr, bool force_on_physical_eof = false,
+        console_restart_request* restart = nullptr)
     {
-        console_keyboard::native_session keyboard{};
         if(!keyboard.ready()) { return console_exit::input_failure; }
-        // The adapter's scoped destructor restores terminal modes/handlers on
-        // console exit. Guest retirement and full VM owner cleanup are separate
-        // launcher obligations; no active guest may be joined indefinitely.
+        // The caller retains the keyboard owner across console restarts. Its
+        // scoped destructor restores terminal modes/handlers on final exit.
+        // Guest retirement and full VM owner cleanup are separate launcher
+        // obligations; no active guest may be joined indefinitely.
         return run_console(control, {::std::addressof(keyboard),
             [](void* context) noexcept { return static_cast<console_keyboard::native_session*>(context)->read_byte(); },
             [](void*, ::fast_io::string_view text) noexcept { ::fast_io::print(::fast_io::out(), text); },
             keyboard.interactive_display(),
             [](void* context) noexcept { return static_cast<console_keyboard::native_session*>(context)->interrupt_pending(); },
             keyboard.interactive(),
-            [](void* context) noexcept { return static_cast<console_keyboard::native_session*>(context)->consume_interrupt(); }},
-            shutdown, force_on_physical_eof);
+            [](void* context) noexcept { return static_cast<console_keyboard::native_session*>(context)->consume_interrupt(); },nullptr,nullptr,
+            [](void* context) noexcept { return static_cast<console_keyboard::native_session*>(context)->input_ready(); }},
+            shutdown, force_on_physical_eof, restart);
+    }
+    [[nodiscard]] inline console_exit run_console(controller& control,
+        managed_cli_shutdown* shutdown = nullptr, bool force_on_physical_eof = false,
+        console_restart_request* restart = nullptr)
+    {
+        console_keyboard::native_session keyboard{};
+        return run_console(control, keyboard, shutdown, force_on_physical_eof, restart);
     }
 #endif
 }

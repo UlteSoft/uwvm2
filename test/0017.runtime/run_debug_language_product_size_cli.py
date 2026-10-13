@@ -69,12 +69,12 @@ for bits in [32,64]:
      console=Console(prefix,O/(stem+'-'+policy+'-console.log'))
      def ask(command):
       text=re.sub(rb'\x1b\[[0-?]*[ -/]*[@-~]',b'',console.send(command)).decode(errors='replace');row['actions'].append({'command':command,'reply':text});save();return text
-     br=ask(f'break-source 0 {fixture}:{line}');assert 'error:' not in br and 'breakpoint' in br,br
+     br=ask(f'breaksource 0 {fixture}:{line}');assert 'error:' not in br and 'breakpoint' in br,br
      ask('continue')
      for attempt in range(64):
       stop=ask('wait')
       if 'stopped: breakpoint' in stop:break
-      assert 'guest exited:' not in stop,stop
+      assert 'Program exited' not in stop,stop
      else:raise AssertionError('No source breakpoint stop')
      thread=int(re.search(r'thread (\d+) module=0 function=',stop)[1]);bt=ask(f'bt {thread}');sid=int(re.search(r'(?m)^stop-id (\d+)',bt)[1])
      assert numeric(ask(f'print {thread} {sid} value'))==7
@@ -87,13 +87,13 @@ for bits in [32,64]:
      reply=ask(f'print-frame {thread} {sid} 0 sizeof(sizeof(value)+wider)');assert numeric(reply)==8
      assert 'error:' in ask(f'print {thread} {sid+1000000} value')
      ask('delete '+re.search(r'breakpoint (\d+)',br)[1])
-     stepped=ask(f'step wasm {thread}');assert 'guest exited:' not in stepped,stepped
+     stepped=ask(f'step wasm {thread}');assert 'Program exited' not in stepped,stepped
      stale=ask(f'print {thread} {sid} value');assert 'error:' in stale and 'source-value stop=' not in stale,stale
      ask('continue')
      for attempt in range(64):
       exited=ask('wait')
-      if 'guest exited:' in exited:
-       assert 'guest exited: 0' in exited,exited
+      if 'Program exited' in exited:
+       assert 'Program exited normally.' in exited,exited
        break
      else:raise AssertionError('Guest completion deadline')
      row['real_retired_stop_rejected']=True;row['guest_completed_without_trap']=True
@@ -103,7 +103,7 @@ for bits in [32,64]:
     finally:
      if console:
       try:
-       console.finish();row['quit_returncode']=console.child.returncode;row['managed_shutdown_complete']='managed shutdown complete' in bytes(console.transcript).decode(errors='replace')
+       console.finish();row['quit_returncode']=console.child.returncode;row['managed_shutdown_complete']=console.normal_quit_completed
        assert row['quit_returncode']==0 and row['managed_shutdown_complete'],'Debugger shutdown failed'
       except BaseException as error:row.update(passed=False,shutdown_error=repr(error));raise
       finally:save()

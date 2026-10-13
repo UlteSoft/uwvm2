@@ -23,6 +23,63 @@ owning observer before publication, using instruction safe-point granularity.
 `-m debug-jit` calls `arm_initial_pause` after `prepare_debug_host_api` and before
 starting its guest worker. This prepared state has no fabricated PC or stack.
 
+Launch with `uwvm -Rdbg --run app.wasm` (`--runtime-debug` is the long
+spelling; `R` is uppercase). At the initial Wasm stop, `run`/`r` starts
+execution. On subsequent use it retires the actual old guest/native/compiler
+workers, reloads the configured module/preload files and creates fresh Wasm
+memory, globals, tables, stacks and WASIp1 environments through the ordinary
+loader and initializer. `continue`/`c` resumes the current execution instead.
+`run` takes no filename or argument tail; it uses the original launch options.
+
+`start`/`st` installs an independent temporary breakpoint at an unambiguous
+published `main` in module 0, then runs; startup code and earlier user
+breakpoints may execute/stop first. The temporary point is removed when hit
+and never copied to a later launch. User conditions and ignore counts are preserved.
+
+`startw`/`stw` reloads and stops at a real generated instruction observer before
+the first Wasm opcode, with an actual current Wasm thread, location and state.
+`starti`/`sti` retains the first real kernel trap at that opcode's owned native
+JIT entry, without first executing a native instruction. JIT prologue and debug
+setup precede this native stop. Native display authenticates the runtime owner,
+activation and exact physical trap; VM/host entries and raw registers remain
+inaccessible. A missing native backend reports unavailable and suggests `startw`.
+All three commands reject arguments and `&`. Later launches retire old workers
+before loading fresh Wasm state. External I/O effects are not rolled back.
+
+`kill` physically retires the current standalone guest/native/compiler workers
+while keeping the debugger prompt. It does not construct another instance.
+Breakpoint settings remain cold data; `info breakpoints` can list them, and
+`startw`, `starti`, `start` or `run` reloads and revalidates them. Until then there is no
+running guest, value access or continuation. Pending cleanup retains the actual
+old owners and allows `kill` or launch retry, never a second worker cohort.
+
+The unsupported `restart ID` placeholder was removed. WASIp1 checkpoint
+commands cannot rewind Wasm memory or call stacks.
+
+Restart is available to the standalone owned LLVM-full launcher. Cleanup
+that cannot complete within its deadline retains all old owners and reports
+pending; `run` retries it without creating another guest. New code/source/stop
+owners replace the old session; previous stop IDs and checkpoint/native grants
+provide no authority in the new session. Valid Wasm breakpoints and their
+conditions/enable settings are reinstalled through normal target validation;
+new breakpoint IDs are printed. Other console displays/catch/trace policies
+and editing history belong to the old console session. Changes to external
+files, sockets and other host effects are not rolled back.
+The physical terminal and interrupt input session stays attached across
+restarts; its original terminal mode and signal handler are restored on exit.
+
+Interactive `run`/`r` waits for a breakpoint or exit; `run&`/`r&` executes in
+the background. Piped commands remain asynchronous, so use `wait` before
+querying a later stop. Empty Enter never repeats run/resume commands. Direct
+controller/server/DAP callers cannot use `run` to acquire restart authority.
+
+Left/Right (CSI or application-cursor SS3) move the input caret; Backspace
+and Delete edit at that caret. Home/End and Ctrl+A/E jump to the ends. Both
+the ordinary prompt and TUI use terminal display cells for UTF-8 input and
+scroll long commands horizontally on one row. Cursor redraw uses CR/CUF,
+without depending on optional CSI save/restore support.
+
+
 Linux `-m run --debug-jit-control-fd N` is a separate, explicit opt-in for
 commands after the guest starts. The full product also needs `-Rcc jit -Rcm full`;
 ROS selects its LLVM-full default when `-Rint` is absent. The host launcher creates
@@ -114,12 +171,12 @@ The host supervisor may expose its own listener; the VM itself does not.
 
 Commands:
 
-- `break MODULE FUNCTION BYTE_OFFSET` accepts only an expression-relative
+- `breakwasm MODULE FUNCTION BYTE_OFFSET` accepts only an expression-relative
   offset for which the current LLVM-full function generation retained an
   instruction safe point after LLVM optimization. Immediate bytes, constant-dead
   branches, structural non-executing opcodes,
   imported functions and out-of-range offsets are rejected at registration.
-  `break-source MODULE FILE:LINE` resolves the exact embedded DWARF path and
+  `breaksource MODULE FILE:LINE` resolves the exact embedded DWARF path and
   one-based line to the first emitted safe point in function/offset order.
   Source files are never opened; paths are compared byte-for-byte. The console
   remains limited to 512 command bytes. `delete ID` removes the breakpoint;
@@ -159,7 +216,7 @@ Commands:
   or caller byte offsets are explicit. Guest names have terminal controls escaped.
 - `locals THREAD` prints the first 256 typed Wasm parameters and locals from the
   selected stopped frame. The generated code snapshots current values at each
-  debug safe point; the owning thread copies them before parking. `i32`/`i64`
+  requested debug safe point; the owning thread copies them before parking. `i32`/`i64`
   appear as signed integers, `f32`/`f64` as exact bit patterns, `v128` as bytes,
   and reference values as null or non-null without exposing host handles.
   Larger local sets show an explicit truncation count.
@@ -181,7 +238,15 @@ Commands:
 - `memory MODULE MEMORY OFFSET LENGTH` copies at most 256 bytes from a stopped
   Wasm linear memory after checking its current bounds. It does not accept a
   native address.
-- `help` prints usage. `quit`/EOF returns `terminate_process` to the launcher, which
+- `help` opens a short topic index. `help asm`, `help wasm values` and
+  `help run` select a category or command; `help TOPIC N` explicitly reads page
+  N. Every command page explains its purpose, arguments and examples. Tab
+  completes the next topic/command, and command aliases select the same pages.
+  Ordinary interactive help uses the `uwvm -h` ANSI palette and diagnostic
+  color policy (`NO_COLOR`, `--log-color no`). TUI, piped input and authenticated
+  control transports receive plain text. Pages contain at most 18 body rows,
+  wrap to the terminal width and never dump the entire catalogue.
+- `quit`/EOF returns `terminate_process` to the launcher, which
   must enact an explicit process exit policy. The console does not close a domain
   and wait indefinitely for an infinite guest to drain.
 

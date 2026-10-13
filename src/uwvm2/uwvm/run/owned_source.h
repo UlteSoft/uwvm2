@@ -31,7 +31,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     // existing drained maintenance callback. Numeric eligibility is decided
     // later by the actual full validator/publisher, with native fallback.
     // Native administration/flags/preload mutations are externally serialized.
-    [[nodiscard]] inline int prepare_owned_full_cli_source(bool retain_immutable_image = false) noexcept
+    [[nodiscard]] inline int prepare_owned_full_cli_source(bool retain_immutable_image = false, bool restart_after_retirement = false) noexcept
     {
 #if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS)
         namespace mode = ::uwvm2::uwvm::runtime::runtime_mode;
@@ -53,8 +53,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             ::uwvm2::utils::control::owned_file_image::owner image{};
             ::std::vector<::uwvm2::uwvm::runtime::full::full_preload_input> preloads{};
             mode::runtime_llvm_jit_exception_dispatch_t dispatch{mode::global_runtime_llvm_jit_exception_dispatch};
+            bool restart{};
             int result{static_cast<int>(retval::parameter_error)};
         } state{};
+        state.restart = restart_after_retirement;
         try
         {
             auto const path{::uwvm2::uwvm::cmdline::wasm_file_ppos->str};
@@ -113,6 +115,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 auto& ctx{*static_cast<context*>(pointer)};
                 try
                 {
+                    if(ctx.restart && !::uwvm2::uwvm::runtime::full::builtin_wasip1_loader_identity::retire_actual_builtin_after_source_drain())
+                    { return false; }
                     auto candidate{::uwvm2::uwvm::runtime::full::full_source_instance::create_unparsed(
                         ::std::move(ctx.path), ::std::move(ctx.rename), ::std::move(ctx.preloads))};
                     if(!::uwvm2::uwvm::runtime::full::select_unparsed_full_source_after_drain(candidate)) { return false; }
@@ -169,6 +173,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         catch(...) { return state.result; }
 #else
         static_cast<void>(retain_immutable_image);
+        static_cast<void>(restart_after_retirement);
         return static_cast<int>(retval::parameter_error);
 #endif
     }

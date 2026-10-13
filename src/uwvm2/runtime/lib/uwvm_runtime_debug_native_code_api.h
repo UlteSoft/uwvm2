@@ -296,4 +296,152 @@ namespace
         (void)capture; (void)native_session_identity; return false;
 #endif
     }
+
+    extern "C++" bool llvm_jit_debug_query_native_activation_host_api(
+        llvm_jit_debug_activation_capture_owner const& supplied, void const* session,
+        llvm_jit_debug_activation_snapshot& out) noexcept
+    {
+        out={};
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && UWVM2_RUNTIME_NATIVE_STEP_PLATFORM
+        try
+        {
+            auto const capture{debug_activation_canonical_capture(supplied)};
+            if(!capture || !session || !capture->control_ || !capture->ticket_) { return false; }
+            llvm_jit_debug_native_function_image image{};
+            if(!llvm_jit_debug_copy_native_function_host_api(capture,session,image) || !image.native_instruction_stop) { return false; }
+            auto reader{::uwvm2::runtime::gc::runtime_gc_entry_admission.try_enter()};if(!reader) { return false; }
+            auto lease{g_runtime.execution_domain.try_enter()};if(!lease) { return false; }
+            auto candidate{capture->snapshot_};bool valid{};
+            static_cast<void>(capture->control_->with_parked_participant(capture->ticket_,capture->snapshot_.participant,
+                [&](auto actual,bool external)
+            {
+                runtime_state_publication_guard publication{};
+                if(!external || !capture->matches_native_publication_locked(actual,external)) { return; }
+                static_cast<void>(::uwvm2::uwvm::debugger::native_step::with_owned_registers(session,
+                    [&](auto thread,auto pc,auto begin,auto end,auto const& raw) noexcept
+                {
+                    if(pc!=image.stop_pc || begin!=image.owner_begin || end!=image.owner_end ||
+                       !capture->matches_native_cursor_locked(session,thread,pc,raw.sp(),begin,end)) { return; }
+                    out=::std::move(candidate);valid=true;
+                }));
+            }));
+            if(!valid) { out={}; }return valid;
+        }
+        catch(...) { out={};return false; }
+#else
+        (void)supplied;(void)session;return false;
+#endif
+    }
+
+    extern "C++" bool llvm_jit_debug_native_retirement_call_host_api(
+        llvm_jit_debug_activation_capture_owner const& capture, void const* session) noexcept
+    {
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && UWVM2_DEBUG_NATIVE_LEVEL_TRANSITIONS
+        try
+        {
+            llvm_jit_debug_activation_snapshot chain{};llvm_jit_debug_native_function_image image{};
+            if(!llvm_jit_debug_query_native_activation_host_api(capture,session,chain) || chain.frames.empty() ||
+               !llvm_jit_debug_copy_native_function_host_api(capture,session,image) || !image.complete_storage() ||
+               image.stop_pc<image.owner_begin || image.stop_pc>=image.owner_end) { return false; }
+            ::uwvm2::uwvm::debugger::native_owned_instruction_semantics::decoder decoder{image.target};
+            auto const offset{image.stop_pc-image.owner_begin};
+            auto const call{decoder.decode(image.stop_pc,{image.bytes.data()+offset,image.size-offset})};
+            if(!call.safe_for_call_continuation()) { return false; }
+            bool retires{};
+            static_cast<void>(::uwvm2::uwvm::debugger::native_step::with_owned_registers(session,
+                [&](auto,auto pc,auto begin,auto end,auto const& raw) noexcept
+            {
+                // These are the actual bridge's platform C-ABI arguments, not
+                // values inferred from a Wasm stack or an arbitrary host slot.
+#if defined(__aarch64__)
+                constexpr ::std::size_t frame_argument{0u},kind_argument{1u};
+#elif defined(_WIN32)
+                constexpr ::std::size_t frame_argument{2u},kind_argument{3u}; // RCX, RDX
+#else
+                constexpr ::std::size_t frame_argument{5u},kind_argument{4u}; // RDI, RSI
+#endif
+                if(pc!=image.stop_pc || begin!=image.owner_begin || end!=image.owner_end ||
+                   raw.values[frame_argument]!=chain.frames.back().incarnation) { return; }
+                auto const index{call.call_register_index()};
+                auto const target{index<raw.size() ? raw.values[index] : call.destination().display_pc};
+                // Compare only with exact registered bridge function identities;
+                // neither a decoded address nor a register is dereferenced.
+                // The specialised ordinary-return ABI has buffer as argument1,
+                // so its kind comes solely from this exact registered identity.
+                // The genuine hook independently joins that buffer to its LIFO
+                // owner. Other targets still require their actual kind argument.
+                retires=target==reinterpret_cast<::std::uintptr_t>(&details::llvm_jit_checkpoint_observer_return_abi_bridge) ||
+                    (raw.values[kind_argument]<=3u &&
+                     (target==reinterpret_cast<::std::uintptr_t>(&details::llvm_jit_debug_activation_leave_abi_bridge) ||
+                      target==reinterpret_cast<::std::uintptr_t>(&details::llvm_jit_checkpoint_activation_leave_abi_bridge) ||
+                      target==reinterpret_cast<::std::uintptr_t>(&details::llvm_jit_checkpoint_observer_activation_leave_abi_bridge)));
+            }));return retires;
+        }
+        catch(...) { return false; }
+#else
+        (void)capture;(void)session;return false;
+#endif
+    }
+
+    extern "C++" llvm_jit_debug_relocation_status llvm_jit_debug_relocate_native_pc_host_api(
+        llvm_jit_debug_activation_capture_owner const& supplied, void* session, ::std::uint64_t requested,
+        bool absolute, ::std::uintptr_t& from, ::std::uintptr_t& to) noexcept
+    {
+        using result=llvm_jit_debug_relocation_status;from=to=0u;
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_CPP_EXCEPTIONS) && defined(__APPLE__) && defined(__aarch64__) && TARGET_OS_OSX
+        namespace dbg=::uwvm2::uwvm::debugger;
+        try
+        {
+            auto const capture{debug_activation_canonical_capture(supplied)};
+            if(!capture || !session) { return result::current_stop_required; }
+            llvm_jit_debug_native_function_image image{};
+            if(!llvm_jit_debug_copy_native_function_host_api(capture,session,image) ||
+               !image.native_instruction_stop || !image.complete_storage()) { return result::current_stop_required; }
+            if((absolute && (requested<image.owner_begin || requested>=image.owner_end)) ||
+               (!absolute && requested>=image.size)) { return result::invalid_target; }
+            auto const target{absolute ? static_cast<::std::uintptr_t>(requested) : image.owner_begin+static_cast<::std::uintptr_t>(requested)};
+            dbg::native_disassembly::decoder display{image.target};
+            dbg::native_owned_instruction_semantics::decoder semantics{image.target};
+            auto bytes{::std::span<::std::uint8_t const>{image.bytes.data(),image.size}};
+            if(!dbg::native_wasm_step_boundary::exact_boundary(display,bytes,image.owner_begin,target,image.instruction_code) ||
+               !dbg::native_wasm_step_boundary::exact_boundary(display,bytes,image.owner_begin,image.stop_pc,image.instruction_code))
+            { return result::invalid_target; }
+            // Stay within one frame-neutral straight-line interval. No call,
+            // branch, return, SP/FP/link/TLS operand or unmodelled effect can be
+            // skipped or replayed. Bytes and MC facts are owned copies only.
+            auto pc{::std::min(image.stop_pc,target)};auto const last{::std::max(image.stop_pc,target)};
+            while(pc<=last)
+            {
+                auto const offset{static_cast<::std::size_t>(pc-image.owner_begin)};
+                if(!semantics.relocation_neutral(pc,bytes.subspan(offset))) { return result::incompatible_frame; }
+                if(pc==last) { break; }auto instruction{semantics.decode(pc,bytes.subspan(offset))};
+                if(instruction.semantics().size==0u || instruction.semantics().size>last-pc) { return result::invalid_target; }
+                pc+=instruction.semantics().size;
+            }
+            auto reader{::uwvm2::runtime::gc::runtime_gc_entry_admission.try_enter()};if(!reader) { return result::unavailable; }
+            auto lease{g_runtime.execution_domain.try_enter()};if(!lease) { return result::unavailable; }
+            bool moved{};
+            static_cast<void>(capture->control_->with_parked_participant(capture->ticket_,capture->snapshot_.participant,
+                [&](auto actual,bool external)
+            {
+                runtime_state_publication_guard publication{};
+                if(!external || !capture->matches_native_publication_locked(actual,external)) { return; }
+                bool matches{};
+                static_cast<void>(dbg::native_step::with_owned_registers(session,[&](auto thread,auto current,auto begin,auto end,auto const& raw) noexcept
+                {
+                    matches=current==image.stop_pc && begin==image.owner_begin && end==image.owner_end &&
+                        capture->matches_native_cursor_locked(session,thread,current,raw.sp(),begin,end);
+                }));
+                // Metadata and the actual pause remain locked. The adapter
+                // rechecks the exact origin and kernel context before writing PC.
+                if(matches) { moved=dbg::native_step::relocate_owned_pc(*static_cast<dbg::native_step::session*>(session),image.stop_pc,target); }
+            }));
+            if(!moved) { return result::unavailable; }from=image.stop_pc;to=target;return result::moved;
+        }
+        catch(...) { return result::unavailable; }
+#else
+        (void)supplied;(void)session;(void)requested;(void)absolute;return result::unavailable;
+#endif
+    }
+
 #endif

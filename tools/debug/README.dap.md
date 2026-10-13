@@ -12,7 +12,7 @@ Source and Wasm instruction breakpoints accept the finite DAP hit conditions
 rejected because the saturating counter cannot represent a greater hit count.
 For example, `>=4` ignores the
 first three matching executable safe-point visits and stops on every later
-visit. The adapter sends one `break-source ... ignore 3` or `break ... ignore 3`
+visit. The adapter sends one `breaksource ... ignore 3` or `break ... ignore 3`
 command; the controller installs the breakpoint and initial policy under one
 lock. Explicit reconfiguration of an existing target resets its hit counter,
 reenables it and installs the new ignore count. Empty fields preserve an

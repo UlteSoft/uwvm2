@@ -53,14 +53,14 @@ def main():
             assert len(values) == 1, reply
             return int(values[0])
         line = next(i for i, text in enumerate(a.source.read_text().splitlines(), 1) if 'GO_COLLECTION_READY' in text)
-        br = ask(f'break-source 0 {a.source}:{line}')
+        br = ask(f'breaksource 0 {a.source}:{line}')
         bid = int(re.search(r'breakpoint (\d+)', br)[1])
         ask('continue')
         for _ in range(64):
             stop = ask('wait')
             if 'stopped: breakpoint' in stop:
                 break
-            assert 'guest exited:' not in stop, stop
+            assert 'Program exited' not in stop, stop
         else:
             raise AssertionError('No real TinyGo source breakpoint')
         thread = int(re.search(r'thread (\d+) module=0 function=', stop)[1])
@@ -119,14 +119,14 @@ def main():
             assert 'error:' in ask(f'print {thread} {sid+1000000} len(box.Numbers)')
         ask(f'delete {bid}')
         stepped = ask(f'step wasm {thread}')
-        assert 'guest exited:' not in stepped, stepped
+        assert 'Program exited' not in stepped, stepped
         stale = ask(f'print {thread} {sid} len(box.Numbers)')
         assert 'error:' in stale and 'source-value stop=' not in stale, stale
         ask('continue')
         for _ in range(64):
             exited = ask('wait')
-            if 'guest exited:' in exited:
-                assert 'guest exited: 0' in exited, exited
+            if 'Program exited' in exited:
+                assert 'Program exited normally.' in exited, exited
                 break
         else:
             raise AssertionError('Guest did not finish its compiler result check')
@@ -139,7 +139,7 @@ def main():
             try:
                 console.finish()
                 record['quit_returncode'] = console.child.returncode
-                record['managed_shutdown_complete'] = b'managed shutdown complete' in console.transcript
+                record['managed_shutdown_complete'] = console.normal_quit_completed
                 assert record['quit_returncode'] == 0 and record['managed_shutdown_complete']
             except BaseException as error:
                 record.update(passed=False, shutdown_error=repr(error))

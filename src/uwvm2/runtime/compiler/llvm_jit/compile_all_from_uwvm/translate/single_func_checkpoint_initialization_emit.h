@@ -37,6 +37,21 @@
     {
         auto const flags{state.checkpoint_observer_workspace};
         if(flags == nullptr) { return false; }
+#if defined(__linux__) && defined(__x86_64__)
+        if(checkpoint_canonical_local_owner(state))
+        {
+            // The checked initial declaration determines EVERY byte. Write
+            // exactly N little-endian bytes once, instead of clearing N bytes
+            // and then overwriting each initialized byte separately. Executed
+            // local.set/tee still update their individual flags later.
+            ::std::uint64_t packed{};
+            for(::std::size_t i{}; i != entry.local_count; ++i)
+            { if(entry.slots[i].initialized) { packed |= ::std::uint64_t{1u} << (i * CHAR_BIT); } }
+            auto const type{builder.getIntNTy(static_cast<unsigned>(entry.local_count * CHAR_BIT))};
+            builder.CreateStore(::llvm::ConstantInt::get(type,packed),flags)->setAlignment(::llvm::Align{1u});
+            return true;
+        }
+#endif
         builder.CreateMemSet(flags, builder.getInt8(0u), entry.local_count, ::llvm::MaybeAlign{1u});
         for(::std::size_t i{}; i != entry.local_count; ++i)
         {
@@ -85,7 +100,7 @@
         auto const cell{builder.CreateInBoundsGEP(builder.getInt8Ty(), state.checkpoint_observer_workspace,
             builder.getInt64(original_local))};
         builder.CreateStore(builder.getInt8(1u), cell)->setAlignment(::llvm::Align{1u});
-        return true;
+        return update_runtime_local_func_llvm_jit_canonical_numeric_local(state,original_local);
     }
     if(original_local >= count || original_local >= state.local_pointers.size() || actual_flags == nullptr ||
        actual_flags->getFunction() != state.llvm_function ||
@@ -128,7 +143,7 @@
             auto const cell{builder.CreateInBoundsGEP(builder.getInt8Ty(), flags, builder.getInt64(i))};
             builder.CreateStore(builder.getInt8(1u), cell)->setAlignment(::llvm::Align{1u});
         }
-        return true;
+        return reset_runtime_local_func_llvm_jit_canonical_numeric_locals(state);
     }
     if(actual_flags == nullptr || actual_flags->getFunction() != state.llvm_function ||
        !actual_flags->isStaticAlloca() || actual_flags->isArrayAllocation() || actual_flags->getAlign().value() > ::uwvm2::runtime::checkpoint::native_slot_bytes ||

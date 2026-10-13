@@ -170,7 +170,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # if defined(_WIN32) && !defined(__CYGWIN__)
             if(::uwvm2::utils::control::console_input_sealed()) [[unlikely]]
             {
-                auto opened{::fast_io::native_file{at(directory), name, mode}};
+                // A retained debugger descriptor must not lock the filename.
+                // Windows needs delete sharing for rename/unlink while open;
+                // live path observations still query this same kernel handle.
+                auto opened{::fast_io::native_file{at(directory), name, mode | ::fast_io::open_mode::shared_delete}};
                 // Authenticate the actual opened kernel object before it
                 // becomes guest-visible; device aliases are not path-stable.
                 if(::uwvm2::utils::control::inspect_guest_native_handle_host_api(opened.native_handle()) !=
@@ -1582,6 +1585,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         // checked before
         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64_unchecked(memory, fd_ptrsz, new_fd);
+        if(env.debug_fd_created!=nullptr) { env.debug_fd_created(new_fd); }
 
         return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
     }

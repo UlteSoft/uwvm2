@@ -171,7 +171,7 @@ def main():
                         "-WFE-reference-types", "-WFE-exceptions", "--run", str(wasm)]
                 console = Console(argv, a.out / (stack + "-" + operation + ".log")); console.prompt()
                 assert b"prepared; no Wasm instruction executed" in console.send("status")
-                assert b"registered" in console.send(f"break 0 {exports['_start']} 0")
+                assert b"registered" in console.send(f"breakwasm 0 {exports['_start']} 0")
                 console.send("continue")
                 until = time.monotonic() + 20
                 while b"stopped:" not in console.send("status"):
@@ -195,7 +195,7 @@ def main():
                         assert console.location()[1:] == (exports["_start"], after)
                     console.send("continue")
                 elif operation == "breakpoint":
-                    console.send(f"break 0 {exports['leaf']} 0")
+                    console.send(f"breakwasm 0 {exports['leaf']} 0")
                     answer = console.send(f"step wasm {thread} over")
                     assert b"breakpoint" in answer and console.location()[1] == exports["leaf"], answer
                     console.send("delete 2"); console.send(f"step wasm {thread} out")

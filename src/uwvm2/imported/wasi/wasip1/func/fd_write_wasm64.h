@@ -383,7 +383,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
 
-            switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
+            if(env.debug_console_write!=nullptr &&
+               env.debug_console_write(curr_fd.wasi_fd.ptr->checkpoint_stdio_index,scatter_base,scatter_length))
+            { for(::std::size_t i{}; i<scatter_length; ++i) { total_bytes_write+=scatter_base[i].len; } }
+            else switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
             {
                 [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
                 {

@@ -219,7 +219,7 @@ class SourceSession(source_cli.Session):
 
     def begin(self, function):
         self.send("pause")
-        point = self.send(f"break 0 {function} 0")
+        point = self.send(f"breakwasm 0 {function} 0")
         identifier = re.search(rb"breakpoint ([0-9]+)", point)
         require(identifier is not None, "actual broker executable breakpoint", point)
         self.breakpoint = int(identifier[1])

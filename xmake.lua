@@ -43,6 +43,13 @@ local function uwvm_target_supports_llvm_jit()
 	return true
 end
 
+-- Xmake's project-description scope has error(), but no global Lua assert().
+local function uwvm_require_build_config(condition, message)
+	if not condition then
+		error(message)
+	end
+end
+
 function def_build(opt)
 	opt = opt or {}
 	if is_mode("debug") then
@@ -174,11 +181,15 @@ function def_build(opt)
 		add_defines("UWVM2_ENABLE_DEBUG_NATIVE_STEP_WINDOWS_PRODUCT")
 	end
 
+	-- A stock LLVM must not be required to emit the downstream owner table.
+	-- The LLVM SDK option supplies its authenticated producer define to every
+	-- consumer (runtime and CLI), after resolving the exact SDK version.
+
 	if get_config("linux-native-debug") or get_config("linux-x64-native-debug") then
-		assert(enable_llvm_jit and is_plat("linux") and get_config("use-llvm-compiler"),
+		uwvm_require_build_config(enable_llvm_jit and is_plat("linux") and get_config("use-llvm-compiler"),
 			"linux-native-debug requires a Linux LLVM/Clang JIT build and the native-owner-table-v2 SDK")
 		if get_config("linux-x64-native-debug") then
-			assert(is_arch("x86_64", "x64", "amd64"), "linux-x64-native-debug requires Linux x86-64; use linux-native-debug for other supported Linux targets")
+			uwvm_require_build_config(is_arch("x86_64", "x64", "amd64"), "linux-x64-native-debug requires Linux x86-64; use linux-native-debug for other supported Linux targets")
 		end
 		-- Runtime and CLI share the same authenticated owner/trap contract.
 		-- An SDK without the actual emitted owner table remains unavailable.
@@ -201,7 +212,7 @@ function def_build(opt)
 	end
 
 	if get_config("macos-x64-native-step") then
-		assert(enable_llvm_jit and is_plat("macosx") and is_arch("x86_64", "x64", "amd64") and
+		uwvm_require_build_config(enable_llvm_jit and is_plat("macosx") and is_arch("x86_64", "x64", "amd64") and
 			get_config("use-llvm-compiler"), "macos-x64-native-step requires a macOS x86-64 LLVM/Clang JIT build")
 		add_defines("UWVM2_ENABLE_DEBUG_NATIVE_STEP_MACOS_X64_PRODUCT=1")
 	end
@@ -234,7 +245,7 @@ function def_build(opt)
 			end
 			local builtins = os.getenv("UWVM_WINDOWS_QUALIFIED_BUILTINS")
 			if builtins and builtins ~= "" then
-				assert(is_plat("mingw") and is_arch("x86_64") and
+				uwvm_require_build_config(is_plat("mingw") and is_arch("x86_64") and
 					path.is_absolute(builtins) and os.isfile(builtins),
 					"Qualified Windows builtins require an explicit existing Win64 archive")
 				-- The qualification builder checks every COFF member and required
@@ -301,16 +312,39 @@ function def_build(opt)
 	end
 
 	if get_config("numeric-exception-fused") then
-		assert(enable_llvm_jit and is_plat("linux") and is_arch("x86_64", "x64", "amd64"),
+		uwvm_require_build_config(enable_llvm_jit and is_plat("linux") and is_arch("x86_64", "x64", "amd64"),
 			"numeric-exception-fused requires Linux x86-64 LLVM JIT")
 		add_defines("UWVM_EXPERIMENTAL_PENDING_NUMERIC_FUSED_CATCH=1")
 	end
 
+	local gc_jit_access_profile = get_config("gc-jit-access-profile") or "default"
+	if gc_jit_access_profile == "typed-array-load" or gc_jit_access_profile == "typed-array-access" or gc_jit_access_profile == "typed-array-access-inline" or gc_jit_access_profile == "typed-array-access-private" then
+		uwvm_require_build_config(enable_llvm_jit and is_plat("linux") and is_arch("x86_64", "x64", "amd64"),
+			"typed array access requires Linux x86-64 LLVM JIT")
+		-- Keep the store and generated native ABI consistent in every translation unit.
+		add_defines("UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS=1")
+		add_defines("UWVM_EXPERIMENTAL_SCALAR_ARRAY_LENGTH=1")
+		add_defines("UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES=1")
+		add_defines("UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD=1")
+		if gc_jit_access_profile == "typed-array-access" or gc_jit_access_profile == "typed-array-access-inline" or gc_jit_access_profile == "typed-array-access-private" then
+			add_defines("UWVM_EXPERIMENTAL_TYPED_ARRAY_STORE=1")
+		end
+		if gc_jit_access_profile == "typed-array-access-inline" or gc_jit_access_profile == "typed-array-access-private" then
+			add_defines("UWVM_EXPERIMENTAL_INLINE_ARRAY_AUTH=1")
+		end
+		if gc_jit_access_profile == "typed-array-access-private" then
+			-- Elide locks only for constructor-local arrays in a whole function without publication.
+			add_defines("UWVM_EXPERIMENTAL_PRIVATE_NUMERIC_ARRAY_LOCK=1")
+		end
+	elseif gc_jit_access_profile ~= "default" then
+		error("unsupported gc-jit-access-profile: " .. tostring(gc_jit_access_profile))
+	end
+
 	local gc_allocation_profile = get_config("gc-allocation-profile") or "default"
 	if gc_allocation_profile == "general-slab" then
-		assert(enable_llvm_jit and is_plat("linux") and is_arch("x86_64", "x64", "amd64"),
+		uwvm_require_build_config(enable_llvm_jit and is_plat("linux") and is_arch("x86_64", "x64", "amd64"),
 			"general-slab is currently qualified for Linux x86-64 LLVM JIT")
-		assert(get_config("use-thread-local"), "general-slab requires use-thread-local")
+		uwvm_require_build_config(get_config("use-thread-local"), "general-slab requires use-thread-local")
 		-- One storage/publication policy in every runtime and CLI translation unit.
 		add_defines("UWVM_EXPERIMENTAL_GENERAL_GC_SLAB=1")
 		add_defines("UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS=1")
@@ -590,7 +624,10 @@ target("uwvm")
 		if is_plat("mingw") and is_arch("x86_64") then
 			-- Static LLVM on GNU Win64 needs MinGW compiler helpers and Crypt32.
 			-- System links follow the LLVM archives in the executable link.
-			add_syslinks("gcc", "crypt32")
+			add_syslinks("crypt32")
+			if not get_config("use-llvm-compiler") or get_config("rtlib") ~= "compiler-rt" then
+				add_syslinks("gcc")
+			end
 		end
 	end
 

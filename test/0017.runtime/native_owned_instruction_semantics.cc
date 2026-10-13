@@ -111,6 +111,14 @@ int main()
     CHECK(!mismatched); // Unmatched target data still refuses.
     constexpr ::std::array<::std::uint8_t, 2u> plain{0x31u, 0xc0u}; // xor eax, eax
     auto const ordinary{decode(plain)};
+    CHECK(decoder.linear_run_safe(0x1000u,plain));
+    CHECK(decoder.linear_run_safe(0x1000u,::std::array<::std::uint8_t,5u>{0x48u,0x8bu,0x44u,0x24u,0x08u})); // mov rax,[rsp+8]
+    CHECK(!decoder.linear_run_safe(0x1000u,::std::array<::std::uint8_t,4u>{0x48u,0x83u,0xecu,0x20u})); // sub rsp,32
+    CHECK(!decoder.linear_run_safe(0x1000u,::std::array<::std::uint8_t,3u>{0x48u,0x89u,0xe5u})); // mov rbp,rsp
+    CHECK(!decoder.linear_run_safe(0x1000u,::std::array<::std::uint8_t,1u>{0x50u})); // push rax: implicit SP
+    CHECK(!decoder.linear_run_safe(0x1000u,::std::array<::std::uint8_t,2u>{0xffu,0xd0u})); // call rax
+    CHECK(!decoder.linear_run_safe(0x1000u,::std::array<::std::uint8_t,2u>{0x75u,0x02u})); // jne
+
     auto const direct_call{decode(::std::array<::std::uint8_t, 5u>{0xe8u, 0u, 0u, 0u, 0u})};
     auto const indirect_call{decode(::std::array<::std::uint8_t, 2u>{0xffu, 0xd0u})};
     auto const returned{decode(::std::array<::std::uint8_t, 1u>{0xc3u})};
@@ -170,6 +178,18 @@ int main()
     { CHECK(value && value.semantics().size == 4u && value.safe_for_single_instruction()); }
     CHECK(vector_move.safe_for_public_display() && vector_xor.safe_for_public_display() && vector_unpack.safe_for_public_display());
     CHECK(!vector_load.safe_for_public_display() && !vector_store.safe_for_public_display());
+
+    // The optimized JIT emits this exact ABI transition before host calls.
+    // Real MC evidence admits ONE instruction, never a callee/branch/public
+    // arithmetic row. Zero-all and additional prefixes remain conservative.
+    auto const upper_clear{decode(::std::array<::std::uint8_t,3u>{0xc5u,0xf8u,0x77u})};
+    auto const all_clear{decode(::std::array<::std::uint8_t,3u>{0xc5u,0xfcu,0x77u})};
+    auto const repeated_clear{decode(::std::array<::std::uint8_t,4u>{0xf3u,0xc5u,0xf8u,0x77u})};
+    CHECK(upper_clear && upper_clear.safe_for_single_instruction() &&
+          !upper_clear.safe_for_public_display() && !upper_clear.safe_for_call_continuation() &&
+          !upper_clear.safe_for_same_owner_direct_branch());
+    CHECK(!all_clear || !all_clear.safe_for_single_instruction());
+    CHECK(!repeated_clear || !repeated_clear.safe_for_single_instruction());
 
     // Additional REAL native-x64 MC forms. LLVM decodes their width/opcode;
     // this fixture never executes a selector load or restores machine flags.
@@ -240,6 +260,14 @@ int main()
 # else
     constexpr ::std::array<::std::uint8_t, 4u> plain{0x20u, 0u, 0x80u, 0x52u}; // mov w0, #1
     auto const ordinary{decode(plain)};
+    CHECK(decoder.linear_run_safe(0x1000u,plain));
+    CHECK(decoder.linear_run_safe(0x1000u,::std::array<::std::uint8_t,4u>{0xe0u,0x07u,0x40u,0xf9u})); // ldr x0,[sp,#8]
+    CHECK(!decoder.linear_run_safe(0x1000u,::std::array<::std::uint8_t,4u>{0xffu,0x83u,0x00u,0xd1u})); // sub sp,sp,#32
+    CHECK(!decoder.linear_run_safe(0x1000u,::std::array<::std::uint8_t,4u>{0xfdu,0x03u,0x00u,0x91u})); // mov fp,sp
+    CHECK(!decoder.linear_run_safe(0x1000u,::std::array<::std::uint8_t,4u>{0xe0u,0x87u,0x40u,0xf8u})); // ldr x0,[sp],#8
+    CHECK(!decoder.linear_run_safe(0x1000u,::std::array<::std::uint8_t,4u>{0u,0u,0x3fu,0xd6u})); // blr x0
+    CHECK(!decoder.linear_run_safe(0x1000u,::std::array<::std::uint8_t,4u>{0x40u,0u,0u,0x54u})); // b.eq
+
     auto const direct_call{decode(::std::array<::std::uint8_t, 4u>{0u, 0u, 0u, 0x94u})};
     auto const indirect_call{decode(::std::array<::std::uint8_t, 4u>{0u, 0u, 0x3fu, 0xd6u})};
     auto const returned{decode(::std::array<::std::uint8_t, 4u>{0xc0u, 0x03u, 0x5fu, 0xd6u})};
@@ -247,7 +275,7 @@ int main()
     auto const indirect_branch{decode(::std::array<::std::uint8_t, 4u>{0u, 0u, 0x1fu, 0xd6u})};
     auto const trap{decode(::std::array<::std::uint8_t, 4u>{0u, 0u, 0x20u, 0xd4u})};
     CHECK(!decode(::std::array<::std::uint8_t, 3u>{0u, 0u, 0u}));
-    CHECK(!decode(::std::array<::std::uint8_t, 4u>{0u, 0u, 0u, 0u}));
+    CHECK(!decode(::std::array<::std::uint8_t, 4u>{0u, 0u, 0u, 0u}).safe_for_single_instruction()); // UDF on current A64 MC
     CHECK(!decoder.decode(0x1001u, plain));
     CHECK(decoder.decode(4u, plain).safe_for_single_instruction());
 
@@ -262,7 +290,8 @@ int main()
     CHECK(raw_target != nullptr);
     auto raw_registers{owned_mc::details::make_registers(*raw_target, raw_triple)};
     CHECK(raw_registers != nullptr);
-    auto raw_assembly{owned_mc::details::make_assembly(*raw_target, *raw_registers, raw_triple)};
+    ::llvm::MCTargetOptions raw_options{};
+    auto raw_assembly{owned_mc::details::make_assembly(*raw_target, *raw_registers, raw_triple, raw_options)};
     auto raw_subtarget{owned_mc::details::make_subtarget(*raw_target, raw_triple)};
     CHECK(raw_assembly != nullptr && raw_subtarget != nullptr);
     auto raw_context{owned_mc::details::make_context(raw_triple, *raw_assembly, *raw_registers, *raw_subtarget)};

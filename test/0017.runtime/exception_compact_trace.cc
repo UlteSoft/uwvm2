@@ -142,8 +142,8 @@ int main()
     auto alias_trace{exn::diagnostic_trace::make_compact(genuine_alias, {{0uz, 0uz}})};
     require(alias_trace && alias_trace->frames().size() == 1uz,
         "genuine factory control-block aliases still retain their actual table");
-    require(!exn::diagnostic_symbols::make({{.function_count = 4uz, .functions = {{2uz, u8"a"}, {2uz, u8"b"}}}}) &&
-        !exn::diagnostic_symbols::make({{.function_count = 4uz, .functions = {{2uz, u8"a"}, {1uz, u8"b"}}}}) &&
+    require(!exn::diagnostic_symbols::make({{.function_count = 4uz, .functions = {{2uz, u8"a"}, {2uz, u8"bw"}}}}) &&
+        !exn::diagnostic_symbols::make({{.function_count = 4uz, .functions = {{2uz, u8"a"}, {1uz, u8"bw"}}}}) &&
         !exn::diagnostic_symbols::make({{.function_count = 1uz, .functions = {{1uz, u8"bad"}}}}),
         "duplicate, unsorted and out-of-range symbols never become immutable lookup tables");
     auto zero{exn::diagnostic_trace::make_compact(valid, {})};

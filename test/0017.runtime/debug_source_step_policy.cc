@@ -24,6 +24,16 @@ static void expect(step::origin const& origin, step::position const& current, st
   if(result != step::action::stop) { check(out.stopped_path.empty(), "decline/continue never publishes partial stop tokens"); } }
 int main()
 {
+    auto unmapped{fixture()};unmapped.status=step::position_status::unmapped;unmapped.file.clear();unmapped.line=0;
+    unmapped.scope_path.clear();unmapped.metadata_ready=true;step::origin seeking{};
+    check(step::prepare_unmapped(unmapped,step::policy::over,seeking)==step::error::none,"next starts at genuine unmapped activation");
+    expect(seeking,unmapped,step::action::keep_running,step::error::none);
+    auto mapped_child{fixture()};mapped_child.source_owner=unmapped.source_owner;mapped_child.function=9u;
+    mapped_child.physical_depth=4u;mapped_child.activation=step::activation_relation::deeper;
+    expect(seeking,mapped_child,step::action::stop,step::error::none);
+    mapped_child.runtime_epoch++;expect(seeking,mapped_child,step::action::decline,step::error::stale_generation);
+    unmapped.trace=step::trace_status::missing;
+    check(step::prepare_unmapped(unmapped,step::policy::into,seeking)==step::error::missing_trace,"missing actual activation refused");
     auto base{fixture()}; auto into{prepare(base, step::policy::into)}; auto over{prepare(base, step::policy::over)};
     auto out{prepare(base, step::policy::out)}; auto current{base};
     expect(into, current, step::action::keep_running, step::error::none);

@@ -220,6 +220,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_scalar_expression
             { if(text == name) { return builtin_type(text,type); } }
             return false;
         }
+        template<typename Float>
+        inline bool parse_rust_float(char const* first,char const* last,Float& number) noexcept
+        {
+            // fast_io reports correctly rounded-to-zero underflow as overflow.
+            // A NaN sentinel rejects parse failures that never assign a value.
+            number=::std::numeric_limits<Float>::quiet_NaN();
+            auto const parsed{::fast_io::parse_by_scan(first,last,number)};
+            return parsed.iter==last && ::std::isfinite(number) &&
+                (parsed.code==::fast_io::parse_code::ok ||
+                 (parsed.code==::fast_io::parse_code::overflow && number==Float{}));
+        }
         inline constexpr bool unicode_scalar(::std::uint64_t c) noexcept
         { return c <= 0x10ffffu && (c < 0xd800u || c > 0xdfffu); }
         inline error rust_character_literal(::std::string_view text, ::std::size_t& cursor, ::std::uint64_t& value) noexcept
@@ -429,14 +440,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_scalar_expression
                     value.floating_literal=true; value.literal_width=suffix == "f32" ? 32u : 64u;
                     if(value.literal_width == 32u)
                     {
-                        float number{};auto const parsed{::fast_io::parse_by_scan(first,last,number)};
-                        if(parsed.code != ::fast_io::parse_code::ok || parsed.iter != last || !::std::isfinite(number)) { status=error::malformed; return 0u; }
+                        float number{};
+                        if(!parse_rust_float(first,last,number)) { status=error::malformed; return 0u; }
                         value.literal=::std::bit_cast<::std::uint32_t>(number);
                     }
                     else
                     {
-                        double number{};auto const parsed{::fast_io::parse_by_scan(first,last,number)};
-                        if(parsed.code != ::fast_io::parse_code::ok || parsed.iter != last || !::std::isfinite(number)) { status=error::malformed; return 0u; }
+                        double number{};
+                        if(!parse_rust_float(first,last,number)) { status=error::malformed; return 0u; }
                         value.literal=::std::bit_cast<::std::uint64_t>(number);
                     }
                 }
@@ -1001,14 +1012,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_scalar_expression
                 if(first == last) { return error::unavailable; }
                 if(type.width == 32u)
                 {
-                    float number{};auto const parsed{::fast_io::parse_by_scan(first,last,number)};
-                    if(parsed.code != ::fast_io::parse_code::ok || parsed.iter != last || !::std::isfinite(number)) { return error::arithmetic; }
+                    float number{};
+                    if(!parse_rust_float(first,last,number)) { return error::arithmetic; }
                     out={::std::bit_cast<::std::uint32_t>(negative ? -number : number),32u,false,true};
                 }
                 else
                 {
-                    double number{};auto const parsed{::fast_io::parse_by_scan(first,last,number)};
-                    if(parsed.code != ::fast_io::parse_code::ok || parsed.iter != last || !::std::isfinite(number)) { return error::arithmetic; }
+                    double number{};
+                    if(!parse_rust_float(first,last,number)) { return error::arithmetic; }
                     out={::std::bit_cast<::std::uint64_t>(negative ? -number : number),64u,false,true};
                 }
                 return error::none;
@@ -1445,7 +1456,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_scalar_expression
                 case operation::left: case operation::right:
                     if(a.floating || b.floating) { return error::unsupported; }
                     out = a; return error::none;
-                case operation::remainder: case operation::bit_and: case operation::bit_clear: case operation::bit_xor: case operation::bit_or:
+                case operation::remainder:
+                    if((a.floating || b.floating) && language != language_semantics::rust) { return error::unsupported; }
+                    out = common_numeric_type(a,b,language); return valid_numeric(out) ? error::none : error::unavailable;
+                case operation::bit_and: case operation::bit_clear: case operation::bit_xor: case operation::bit_or:
                     if(a.floating || b.floating) { return error::unsupported; }
                     [[fallthrough]];
                 case operation::add: case operation::subtract: case operation::multiply: case operation::divide:
@@ -1747,8 +1761,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_scalar_expression
                 {
                     auto const number{::std::trunc(floating_number(a))};
                     auto const upper{::std::ldexp(1.0,static_cast<int>(width-(n.literal_unsigned ? 0u : 1u)))};
-                    if(!::std::isfinite(number) || number >= upper || number < (n.literal_unsigned ? 0.0 : -upper)) { return error::arithmetic; }
-                    out = {n.literal_unsigned ? static_cast<::std::uint64_t>(number) : static_cast<::std::uint64_t>(static_cast<::std::int64_t>(number)),width,n.literal_unsigned,false,value_category::integer};
+                    ::std::uint64_t bits{};
+                    // Rust as rounds toward zero, maps NaN to zero and
+                    // saturates before any host integer conversion. The open
+                    // upper bound is exact even when i/u64::MAX is not a double.
+                    if(language == language_semantics::rust && ::std::isnan(number)) { bits=0u; }
+                    else if(language == language_semantics::rust && number >= upper)
+                    { bits=n.literal_unsigned ? mask(width) : mask(width)>>1u; }
+                    else if(language == language_semantics::rust && number < (n.literal_unsigned ? 0.0 : -upper))
+                    { bits=n.literal_unsigned ? 0u : ::std::uint64_t{1u}<<(width-1u); }
+                    else
+                    {
+                        if(!::std::isfinite(number) || number >= upper || number < (n.literal_unsigned ? 0.0 : -upper))
+                        { return error::arithmetic; }
+                        bits=n.literal_unsigned ? static_cast<::std::uint64_t>(number) :
+                            static_cast<::std::uint64_t>(static_cast<::std::int64_t>(number));
+                    }
+                    out = {bits,width,n.literal_unsigned,false,value_category::integer};
                 }
                 else { out = {(a.unsigned_value ? a.bits : static_cast<::std::uint64_t>(signed_bits(a))) & mask(width),width,n.literal_unsigned,false,value_category::integer}; }
                 out.builtin_identity = n.builtin_identity; out.utf_character_width = n.utf_character_width; out.rust_character = n.rust_character;out.rust_pointer_sized=language==language_semantics::rust && !n.literal_width; if(native_integer_language(language)) { out.wide_identity = n.wide_identity; } out.bits &= mask(width); return error::none;
@@ -1803,6 +1832,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_scalar_expression
                     case operation::subtract: number = width == 32u ? static_cast<float>(av)-static_cast<float>(bv) : av-bv; break;
                     case operation::multiply: number = width == 32u ? static_cast<float>(av)*static_cast<float>(bv) : av*bv; break;
                     case operation::divide: number = width == 32u ? static_cast<float>(av)/static_cast<float>(bv) : av/bv; break;
+                    case operation::remainder:
+                        if(language != language_semantics::rust) { return error::unsupported; }
+                        if(::std::isnan(av) || ::std::isnan(bv) || ::std::isinf(av) || bv==0.0)
+                        { number=::std::numeric_limits<double>::quiet_NaN(); }
+                        else if(::std::isinf(bv)) { number=av; }
+                        else { number=width==32u ? ::std::fmod(static_cast<float>(av),static_cast<float>(bv)) : ::std::fmod(av,bv); }
+                        break;
                     default: return error::unsupported;
                 }
                 out = comparison ? predicate_value(predicate,language) : real_value(number,width); return error::none;

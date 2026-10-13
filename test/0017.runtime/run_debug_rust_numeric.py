@@ -23,7 +23,8 @@ def main():
   log=a.out/(label+'.log');log.write_bytes(done.stdout)
   result['commands'].append(dict(label=label,argv=cmd,returncode=done.returncode,expected=want,
                                 log_sha256=sha(log),seconds=time.monotonic()-started))
-  assert done.returncode==want,(label,done.stdout[-6000:])
+  (a.out/'progress.json').write_text(json.dumps(result,indent=2)+'\n')
+  assert done.returncode==want,(label,done.returncode,done.stdout[-6000:])
   return done.stdout
  fixed=json.loads(casefile.read_text());witnesses=[]
  for expr,value,kind in fixed['valid']:
@@ -84,8 +85,42 @@ def main():
   cases.append((expr,bits,width,uns,kind))
  witnesses.append('const _: () = { let actual: f32 = (1.0000000596046448 + 0.0) + 0f32; assert!(actual.to_bits() == 1065353217); };')
  cases.append(('(1.0000000596046448 + 0.0) + 0f32',1065353217,32,False,'float'))
- source=a.out/'valid.rs';source.write_text('\n'.join(witnesses)+'\n')
- run('rust-valid-type-value-build',[str(a.rustc),'--edition=2024','--target=wasm32-unknown-unknown','--crate-type=lib','--emit=metadata',str(source),'-o',str(a.out/'valid.rmeta')])
+
+ # Independent numeric witnesses: Python integer bounds/Fraction remainder
+ # and actual Rust const evaluation. Both f32/f64 are exercised.
+ import math,struct
+ from fractions import Fraction
+ float_start=len(cases)
+ for i in range(2000):
+  width=rng.choice((8,16,32,64));uns=bool(rng.getrandbits(1));pointer=i%11==0
+  if pointer:width=32
+  typ=('usize' if uns else 'isize') if pointer else ('u' if uns else 'i')+str(width)
+  ft=rng.choice(('f32','f64'));v=math.ldexp(rng.randrange(-(1<<52),1<<52)/(1<<52),rng.randrange(-150,125))
+  operand=repr(v)+ft
+  if i%23==0:operand=f'(0{ft} / 0{ft})';v=math.nan
+  elif i%23==1:operand=f'(1{ft} / 0{ft})';v=math.inf
+  elif i%23==2:operand=f'(-1{ft} / 0{ft})';v=-math.inf
+  elif ft=='f32':v=struct.unpack('<f',struct.pack('<f',v))[0]
+  lo=0 if uns else -(1<<(width-1));hi=(1<<width)-1 if uns else (1<<(width-1))-1
+  want=0 if math.isnan(v) else hi if v>=hi else lo if v<=lo else math.trunc(v)
+  expr=f'({operand}) as {typ}'
+  witnesses.append(f'const _: () = {{ let actual: {typ} = {expr}; assert!(actual == {want}); }};')
+  cases.append((expr,want&((1<<width)-1),width,uns,'unsigned integer' if uns else 'signed integer'))
+ for i in range(500):
+  ft=rng.choice(('f32','f64'));width=int(ft[1:])
+  x=rng.randrange(-10000,10001)/8;y=rng.choice((-1,1))*rng.randrange(1,4001)/16
+  q=abs(Fraction(x))//abs(Fraction(y));q=-q if (x<0)!=(y<0) else q
+  want=float(Fraction(x)-q*Fraction(y))
+  if want==0.0:want=math.copysign(0.0,x)
+  expr=f'({x}{ft}) % ({y}{ft})'
+  bits=struct.unpack('<I' if width==32 else '<Q',struct.pack('<f' if width==32 else '<d',want))[0]
+  witnesses.append(f'const _: () = {{ let actual: {ft} = {expr}; assert!(actual.to_bits() == {bits}); }};')
+  cases.append((expr,bits,width,False,'float' if width==32 else 'double'))
+ # Keep every rustc metadata file below the unchanged 8MiB test limit.
+ for start in range(0,len(witnesses),1000):
+  batch=start//1000;source=a.out/f'valid-{batch:02}.rs'
+  source.write_text('\n'.join(witnesses[start:start+1000])+'\n')
+  run(f'rust-valid-type-value-build-{batch:02}',[str(a.rustc),'--edition=2024','--target=wasm32-unknown-unknown','--crate-type=lib','--emit=metadata',str(source),'-o',str(a.out/f'valid-{batch:02}.rmeta')])
  invalid=[x for x in fixed['invalid'] if x not in ('1u128','1i128')]
  for i,expr in enumerate(invalid):
   source=a.out/f'invalid-{i:02}.rs';source.write_text('const _: () = { let _ = '+expr+'; };\n')
@@ -97,7 +132,7 @@ def main():
    fs=row.split('\t');actual=(int(fs[0]),int(fs[1]),int(fs[2]),int(fs[3]),fs[4]=='1',fs[5])
    expected=(i,0,c[1],c[2],c[3],c[4]);assert actual==expected,(c,actual,expected)
  result.update(passed=True,cases=len(cases),valid_compiler_type_value_witnesses=len(witnesses),
-               invalid_compiler_witnesses=len(invalid),literal_cases=literal_count,shift_cases=len(shift_inputs),compound_cases=len(cases)-compound_start,exhaustive_i8_shift_cases=4096,pins_after={p:sha(p) for p in pins})
+               invalid_compiler_witnesses=len(invalid),literal_cases=literal_count,shift_cases=len(shift_inputs),compound_cases=float_start-compound_start,float_cast_cases=2000,float_remainder_cases=500,exhaustive_i8_shift_cases=4096,pins_after={p:sha(p) for p in pins})
  assert pins==result['pins_after']
  (a.out/'results.json').write_text(json.dumps(result,indent=2)+'\n')
  print('PASS Rust numeric compiler/parser',len(cases),'seeded cases',flush=True)

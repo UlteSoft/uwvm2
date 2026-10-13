@@ -459,3 +459,85 @@ can set the link register; this does not claim the whole function is call-free.
 The cases preserve changing prototypes, stack/vector parameters, tuple results,
 mixed spilled FP/v128/i64 bits and live GC references in direct and indirect
 tails. This remains Linux N64EL R2 proof, not all MIPS ABIs or all ISAs.
+
+The [paired R16 O0 PHI/codegen receipt](mips64el_o0_phi_codegen.qualification.json)
+records 66 uncached numeric processes, 396 signed-cache processes with 264
+authenticated fresh-process hits, and 88 complete generated Wasm functions.
+It covers full O0/O1/O2/O3 in both repositories and the three main lazy policies.
+Two vector/mixed-spill fixtures execute two million tail transitions per process;
+their recursion edges are linkless. Other helper calls can still set the link
+register. The no-MSA MIPS64 O0 join uses temporary two-word vector PHIs and
+lossless bitcasts while preserving byte-vector operations, call types and Wasm
+bytes. Full/lazy O0 sign functions now use 22–27 instructions, without byte loads
+or helper calls. Separate big/little-endian O0/O1/O2/O3 component executions
+check 4,718,592 bytes; they do not qualify a complete big-endian VM.
+
+[mips_debug_long_branch_mcjit.cc](mips_debug_long_branch_mcjit.cc) executes a
+160,088-byte marked static function through the genuinely rebuilt SDK12 MIPS
+backend. Both paths pass; inspection finds a full-width linkless `JR` with its
+NOP delay slot and no `R_MIPS_26` relocation. Only one archive member is newly
+compiled; other members and 63 archives retain their exact qualified bytes.
+The actual SDK version stays `.12`. This component grants no VM/native debugger
+access. Large Wasm debug snapshots have a separate product qualification;
+`simd_phi_control.py` accepts an explicit QEMU JIT startup timeout while keeping
+ordinary command deadlines and saving completed optimization-level checkpoints.
+
+The [paired R16 large Wasm debug receipt](mips64el_debug_long_branches.qualification.json)
+records eight ordinary and eight actual `-Rdbg` processes on those same products.
+Full O0/O1/O2/O3 pass the 7,712-byte-check fixture in both repositories, for
+61,696 ordinary and 61,696 debug byte checks. Sixteen typed v128 operand stops
+match the literal bytes, and 32 reads repeat identically at the same stop.
+The last-Wasm-safepoint note remains visible. The old PC16 crash and the first
+120-second QEMU O1 startup timeout are retained as failures; the qualified rerun
+uses a 600-second initial compilation deadline and the usual 120-second command
+deadline. These results do not grant access beyond generated Wasm context.
+
+The [R16 actual T2 receipt](mips64el_r16_simd_sign_t2.qualification.json)
+adds 42 main-only processes on the new product: six uncached and 36 signed-cache
+executions, with 24 authenticated fresh-process hits. Lazy and verified-lazy
+O1/O2/O3 observe full T2 entry into hot function 1 and full-module readiness.
+The 2,016,000,000 exact bit checks include T1 warmup calls. Inspection covers
+twelve complete full-T2 hot/loop functions. A stale inspector's missing
+SIMD-sign case census is retained as a failure; the corrected inspection uses
+the unchanged actually executed objects. Across the separate R16 cohorts,
+520 runtime processes and 100 bounded Wasm functions are qualified. Remaining
+ISA/ABI products, complete Core3/threads coverage, interpreter selected
+fusion/delay lowering and host O3, SIMD rounding efficiency, the full big-endian
+MIPS product and hardware throughput remain separate work.
+
+
+The [paired R17 SIMD rounding receipt](mips64el_r17_simd_rounding.qualification.json)
+records 1,014 actual runtime processes on fresh genuine N64EL R2 products:
+48 interpreter, 132 uncached full O0–O3/main lazy JIT, 792 signed-cache,
+and 42 actual main T2 processes. There are 552 authenticated fresh-process
+hits across the cache cohorts and 144 bounded Wasm function extents. ROS keeps
+full-only execution. The twelve unary fixtures include nearest, signed zero,
+subnormals, legal NaNs, both sides of the conversion guard and odd/even ties.
+The actual T2 fixture completes four million calls per process with 24 lane
+checks, for 4,032,000,000 checks including T1 warmup. Each process separately
+proves hot function 1 entry and full-module readiness; those counters do not
+credit every checked call to T2.
+
+For hard-float N64 without MSA, the emitter uses explicit ceil/floor/trunc/round
+integer conversion instructions only below 2^mantissa. Conversion back is exact;
+other inputs are sanitized before conversion, then selected from their original
+bits. Integer sign restoration and NaN quieting preserve the Wasm contract.
+Soft/single-float uses integer rounding; other ABIs and MSA retain their prior
+paths. The same `simd-round-lowering=mips-n64-no-msa-bounded-native-v1` cache
+revision is appended on every target, without a platform-dependent default.
+
+[mips_simd_rounding_ir.cc](mips_simd_rounding_ir.cc) and
+[mips_simd_rounding_harness.cc](mips_simd_rounding_harness.cc) exercise the exact
+production emitter against integer/rational IEEE witnesses: both endiannesses,
+O0–O3, every exponent, seeded arbitrary bits and four FCSR rounding modes.
+The 16,289,792 lane checks and 128 generated component extents are separate from
+the complete CLI products and do not qualify a complete big-endian VM.
+All inspected actual unary functions have zero helper calls. Optimized f32
+functions use 85 instructions versus the older 71-instruction bodies with four
+helper calls; optimized f64 bodies stay at 47 while removing two calls.
+Lazy debug f32/f64 shrink from 153/143 to 102/60 instructions. These counts do
+not establish hardware throughput; further f32 guard/mask compression and
+hardware measurements remain pending alongside other ISA/ABI products,
+complete Core3/threads, interpreter fusion/delay codegen and host O3, and the
+complete big-endian MIPS VM/cache/tail work. Native debugger permissions remain
+confined to generated Wasm context.

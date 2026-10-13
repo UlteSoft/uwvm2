@@ -231,7 +231,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         {
             ::uwvm2::uwvm::wasm::storage::execute_wasm_mode = ::uwvm2::uwvm::wasm::base::mode::run;
         }
-        else if(auto const currp1_str{currp1->str}; currp1_str == u8"debug-jit")
+        else if(auto const currp1_str{currp1->str}; currp1_str == u8"debug")
         {
             ::uwvm2::uwvm::wasm::storage::execute_wasm_mode = ::uwvm2::uwvm::wasm::base::mode::debug_jit;
         }

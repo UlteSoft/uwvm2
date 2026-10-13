@@ -52,7 +52,7 @@
             auto const saved_flags{builder.CreateInBoundsGEP(builder.getInt8Ty(), state.checkpoint_observer_workspace,
                 builder.getInt64(site.local_count))};
             if(!emit_runtime_local_func_llvm_jit_snapshot_copy(state, site.local_count, packet, saved_flags,
-                state.checkpoint_observer_workspace, false)) { return false; }
+                state.checkpoint_observer_workspace, false, false, ::std::addressof(site))) { return false; }
         }
         else
         {
@@ -79,6 +79,7 @@
         }
         address = builder.CreatePtrToInt(packet, integer);
     }
+    if(publish_runtime_local_func_llvm_jit_observer_site(state,site)) { return true; }
     auto const type{::llvm::FunctionType::get(builder.getVoidTy(),
         {builder.getInt64Ty(), builder.getInt64Ty(), integer, integer}, false)};
     // Internal control hook, not a host import: do not suspend the live Wasm

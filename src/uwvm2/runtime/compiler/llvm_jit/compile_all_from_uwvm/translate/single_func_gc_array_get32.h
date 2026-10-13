@@ -89,6 +89,10 @@ template<bool SignExtend>
     if(state.llvm_module->getDataLayoutStr().empty() ||
        layout.getPointerSize() != sizeof(::std::uintptr_t) ||
        layout.isLittleEndian() != (::std::endian::native == ::std::endian::little)) { return false; }
+#if defined(UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD) && UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD == 1 && defined(__x86_64__) && defined(__linux__) && defined(__clang__) && defined(__SIZEOF_INT128__)
+    if(llvm_jit_typed_array_load_eligible(state))
+    { return try_emit_runtime_local_func_llvm_jit_gc_typed_array_load(state,decoded,result_type); }
+#endif
     auto const intptr{builder.getIntNTy(static_cast<unsigned>(sizeof(::std::uintptr_t) * CHAR_BIT))};
     auto const i32{builder.getInt32Ty()};
     auto const i64{builder.getInt64Ty()};

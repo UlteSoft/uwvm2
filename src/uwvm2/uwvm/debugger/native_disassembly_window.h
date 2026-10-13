@@ -21,7 +21,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_disassembly
     inline constexpr ::std::size_t max_window_count{32u};
     // Bound one wire request, independently of the full function size or
     // decoded instruction count. Later pages remain relative to a real stop.
-    inline constexpr ::std::int64_t max_window_instruction_offset{8704};
+    inline constexpr ::std::int64_t max_window_instruction_offset{INT64_MAX / 2};
     struct window
     {
         bool available{};
@@ -69,28 +69,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_disassembly
         }
         if constexpr(requires { decoder.fixed_instruction_bytes(); })
         {
-            if(decoder.fixed_instruction_bytes() == 4u && instruction_code.empty() &&
-               byte_offset == 0 && instruction_offset == 0)
+            if(decoder.fixed_instruction_bytes() == 4u && instruction_code.empty())
             {
-                // A64's exact four-byte ISA proves an aligned stopped slot
-                // without printing a potentially huge initialization prefix.
-                // This is OWNED DATA only. Actual MC still decodes every
-                // returned slot; unknown/truncated bytes stop this page and
-                // never become a resynchronization or execution permission.
-                if(owner_begin % 4u != 0u || stop_pc % 4u != 0u || owned.size() % 4u != 0u) { return {}; }
-                auto cursor{static_cast<::std::size_t>(stop_pc - owner_begin)};
+                // A64 has exact aligned four-byte slots. Paginate owned copied
+                // bytes directly, including pages before the current stop; MC
+                // still validates every returned slot. No host PC is read.
+                if(owner_begin % 4u || stop_pc % 4u || owned.size() % 4u || byte_offset % 4)
+                { return {}; }
+                auto const first{static_cast<::std::int64_t>((stop_pc-owner_begin)/4u) + byte_offset/4 + instruction_offset};
                 for(::std::size_t index{}; index != requested; ++index)
                 {
-                    if(owned.size() - cursor < 4u) { break; }
-                    auto const pc{owner_begin + cursor};
-                    auto const decoded{decoder.decode(pc,{owned.data() + cursor,4u})};
-                    if(!decoded || decoded.pc != pc || decoded.size != 4u)
-                    { if(index == 0u) { return {}; } break; }
-                    result.instructions[index] = decoded; cursor += 4u;
-                    if(cursor == owned.size()) { break; }
+                    auto const ordinal{first+static_cast<::std::int64_t>(index)};
+                    if(ordinal<0) { continue; }
+                    if(static_cast<::std::uint64_t>(ordinal)>=owned.size()/4u) { break; }
+                    auto const cursor{static_cast<::std::size_t>(ordinal)*4u};
+                    auto const pc{owner_begin+cursor};
+                    auto const decoded{decoder.decode(pc,{owned.data()+cursor,4u})};
+                    if(!decoded || decoded.pc!=pc || decoded.size!=4u) { break; }
+                    result.instructions[index]=decoded;
                 }
-                result.available = true; result.count = requested;
-                return result;
+                result.available=true;result.count=requested;return result;
             }
         }
         auto const target{static_cast<::std::int64_t>(stop_pc - owner_begin) + byte_offset};
@@ -186,5 +184,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_disassembly
     {
         decoder context{};
         return decode_window_with(context, owned, owner_begin, stop_pc, byte_offset, instruction_offset, requested, instruction_code);
+    }
+
+    // Policy over OWNED copied function bytes only. Never dereference the PC or
+    // user offset. Forward decode proves variable-width instruction boundaries;
+    // the full runtime provenance mask must qualify every target byte.
+    template<typename Decoder, typename Image>
+    [[nodiscard]] inline instruction guest_breakpoint_with(Decoder& decoder, Image const& image,
+        ::std::uint64_t offset) noexcept
+    {
+        if(offset > 65536u || offset >= image.size || !image.complete_storage() ||
+           image.owner_begin == 0u || image.owner_end <= image.owner_begin ||
+           image.owner_end - image.owner_begin != image.size) { return {}; }
+        auto const page{decode_window_with(decoder, {image.bytes.data(), image.size},
+            image.owner_begin, image.owner_begin, static_cast<::std::int64_t>(offset), 0, 1u, image.instruction_code)};
+        if(!page.available || page.count != 1u || !page.instructions[0u]) { return {}; }
+        auto const candidate{page.instructions[0u]};
+        if(candidate.pc != image.owner_begin + offset || candidate.size > image.size - offset) { return {}; }
+        for(::std::size_t i{}; i != candidate.size; ++i)
+        { if(image.guest_code[static_cast<::std::size_t>(offset) + i] != 1u) { return {}; } }
+        return candidate;
     }
 }

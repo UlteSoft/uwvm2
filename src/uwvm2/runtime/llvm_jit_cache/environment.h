@@ -517,6 +517,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         details::append_cache_key_value(out, u8"simd-sign-lowering", u8"mips64-scalar-mask-v1");
         details::append_cache_key_value(out, u8"simd-phi-lowering", u8"mips64-no-msa-word-vector-o0-v1");
         details::append_cache_key_value(out, u8"mips-debug-long-branch", u8"static-pcrel-range-and-contained-absolute-v1");
+        details::append_cache_key_value(out, u8"simd-round-lowering", u8"mips-n64-no-msa-bounded-native-v1");
         // Explicit table initializers add a borrowed expression pointer to local table records. Cached native
         // code must never use the previous record stride/owner offset, even with an unchanged embedder source ID.
         details::append_cache_key_value(out, u8"local-table-layout", u8"typed-u64-limits-initializer-expression-v2");
@@ -658,6 +659,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         // Generated status CFG changes in every GC profile. Native bridge ABI
         // is unchanged, but old multi-guard objects cannot bypass this version.
         details::append_cache_key_value(out, u8"llvm-gc-status-dispatch", u8"zero-fast-cold-v1");
+#if defined(UWVM_EXPERIMENTAL_INLINE_ARRAY_AUTH) && UWVM_EXPERIMENTAL_INLINE_ARRAY_AUTH == 1
+        // The native domain getter ABI and published-index lifetime contract
+        // must also distinguish caches without an embedded build/source ID.
+        details::append_cache_key_value(out, u8"llvm-gc-inline-array-auth",
+            u8"entry-u128-index-domain-acquire-xorshift17-9-bound8-owner-type-kind-static-packed32-v3");
+#endif
+#if defined(UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES) && UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES == 1 && \
+    ((defined(UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD) && UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD == 1) || \
+     (defined(UWVM_EXPERIMENTAL_TYPED_ARRAY_STORE) && UWVM_EXPERIMENTAL_TYPED_ARRAY_STORE == 1))
+        // Typed element bounds now consume the existing logical length fact.
+        // Invalidate old code even for source-ID-free signed cache builds.
+        details::append_cache_key_value(out, u8"llvm-gc-typed-array-bounds",
+            u8"logical-length-after-auth-unknown-retains-header-v1");
+#endif
+#if defined(UWVM_EXPERIMENTAL_PRIVATE_NUMERIC_ARRAY_LOCK) && UWVM_EXPERIMENTAL_PRIVATE_NUMERIC_ARRAY_LOCK == 1
+        details::append_cache_key_value(out, u8"llvm-gc-private-numeric-array-lock",
+            u8"whole-function-no-publication-local-constructor-fact-v1");
+#endif
         details::append_cache_key_value(out,u8"gc-field-classification",u8"immutable-any-reference-bit-v1");
 #if defined(UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS) && UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS == 1
         details::append_cache_key_value(out,u8"gc-array-construction-fill",u8"hybrid-native-seed512-libc-copy-v2");

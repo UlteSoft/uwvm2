@@ -68,7 +68,7 @@ def main():
             initial_stop = mod.stop_id(initial)
             def observed(label):
                 row['observations'].append({'case':label,'passed':True})
-            start = len(con.log); con.write(b'b 0 completion_t\t\n')
+            start = len(con.log); con.write(b'bw 0 completion_t\t\n')
             breakpoint = con.wait(lambda b:b'registered at executable Wasm expression byte offset' in b,start)
             assert b'completion_target' in breakpoint and b'error:' not in breakpoint
             bp = int(re.search(rb'breakpoint (\d+) registered',breakpoint).group(1)); observed('real DWARF function completion and breakpoint')
@@ -78,7 +78,7 @@ def main():
             thread = int(re.search(rb'thread (\d+) module=0',stopped).group(1))
             con.send(f'delete {bp}',b'(uwvm-debug) ')
             ready_line = next(i for i,line in enumerate(source.read_text().splitlines(),1) if 'COMPLETION_READY' in line)
-            br = con.send(f'break-source 0 {source}:{ready_line}',b'byte-offset=')
+            br = con.send(f'breaksource 0 {source}:{ready_line}',b'byte-offset=')
             bp = int(re.search(rb'breakpoint (\d+) source=',br).group(1))
             start = len(con.log); con.write(b'continue\n')
             stopped = con.wait(lambda b:b'stopped: breakpoint' in b and b'stop-id ' in b,start)

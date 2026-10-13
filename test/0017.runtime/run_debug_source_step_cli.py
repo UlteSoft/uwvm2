@@ -193,15 +193,15 @@ class Session:
                 if predicate(current):
                     return current
             step = self.send(f'step wasm {self.thread}')
-            require(b'guest exited:' not in step, 'fixture exited before required real origin', description)
+            require(b'Program exited' not in step, 'fixture exited before required real origin', description)
         raise AssertionError(('bounded origin search failed', description))
 
     def finish_guest(self) -> None:
         self.send('continue')
         for _ in range(20):
             result = self.send('wait')
-            if b'guest exited:' in result:
-                require(b'guest exited: 0' in result, 'fixture computed an incorrect result or trapped', result)
+            if b'Program exited' in result:
+                require(b'Program exited normally.' in result, 'fixture computed an incorrect result or trapped', result)
                 return
         raise AssertionError('actual fixture exit was not observed')
 
@@ -254,7 +254,7 @@ def qualify(prefix: list[str], wasm: Path, source: Path, sequences: list[list[di
                                 sites.add(marker)
                 if len(sites) == 2:
                     break
-                require(b'guest exited:' not in session.send(f'step wasm {session.thread}'), 'repeated callsite fixture exited early')
+                require(b'Program exited' not in session.send(f'step wasm {session.thread}'), 'repeated callsite fixture exited early')
             require(len(sites) == 2, 'two actual same-name inline concrete call sites required', sites)
         elif kind == 'recursive':
             before = session.seek(lambda p: p['function'] == origin and p['physical_functions'].count(origin) >= 3 and p['is_statement'],

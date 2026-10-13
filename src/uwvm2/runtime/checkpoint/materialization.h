@@ -15,7 +15,9 @@
 # include <vector>
 # include <fast_io.h>
 # include <uwvm2/parser/wasm/standard/wasm3/type/recursive_type.h>
+# include <uwvm2/object/global/ref.h>
 #endif
+#include "observation_probe_hints.h"
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
@@ -38,9 +40,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::checkpoint
     // table never crosses the host snapshot API or public ASM projection.
     // This bounds arithmetic only; the observer profile bounds allocation.
     inline constexpr ::std::size_t observer_local_metadata_bytes{2u + sizeof(::std::uintptr_t)};
+    // Private activation-owned site cell precedes the original workspace.
+    // It is not a serialized PC or a stop/restore credential.
+    inline constexpr ::std::size_t observer_site_bytes{sizeof(::std::uint64_t)};
+    // Compiler/native bridge packet format tag; the public local view strips
+    // it after matching the current activation-owned workspace. No count/PC
+    // from debugger commands can nominate one of these private buffers.
+    inline constexpr ::std::size_t observation_local_snapshot_tag{
+        ::std::size_t{1u} << (::std::numeric_limits<::std::size_t>::digits - 1u)};
+    inline constexpr ::std::size_t observation_fused_snapshot_tag{observation_local_snapshot_tag >> 1u};
+    inline constexpr unsigned observation_local_count_bits{9u};
+    inline constexpr ::std::size_t observation_local_count_mask{(::std::size_t{1u} << observation_local_count_bits)-1u};
+    inline constexpr ::std::uint64_t observation_fused_max_site{
+        (observation_fused_snapshot_tag-1u) >> observation_local_count_bits};
     [[nodiscard]] inline constexpr bool observer_workspace_fits(::std::size_t locals, ::std::size_t slots) noexcept
     {
-        auto const limit{static_cast<::std::size_t>((::std::numeric_limits<::std::ptrdiff_t>::max)())};
+        auto const limit{static_cast<::std::size_t>((::std::numeric_limits<::std::ptrdiff_t>::max)()) - observer_site_bytes};
         return slots >= locals && locals <= limit / observer_local_metadata_bytes &&
             slots <= (limit - locals * observer_local_metadata_bytes) / native_slot_bytes;
     }
@@ -166,12 +181,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::checkpoint
         [[nodiscard]] cache_identity_type cache_identity() const noexcept
         {
             // Explicit codegen policy versions distinguish identical caps:
-            // observation v13 uses activation-owned heap packets and flags;
+            // Observation v34 uses exact nonallocating GC access callback gates.
+            // All live GC/extern and GC-access typed packets are published before
+            // that gate; numeric/non-GC-reference sites may skip unrequested
+            // packets. Stable activation-owned slots retain executed local flags.
+            // Cold inspection and GC census validate every carrier before reads
+            // or visits. Entry cache/retirement bridge remain as v30;
+            // unbound and resumable packets keep full synchronous decoding.
+            // Existing gates use real byte
+            // atomics, favors the no-hit continuation in native block layout, and
+            // directly captures bounded numeric prefixes for entry-storage SSA bounded by actual Wasm GP writes.
+            // Complete terminal/trace/step observation and conditional packet
+            // reuse with continuous FULL collection epochs remain unchanged;
             // resumable v17 combines actual retirement, nested native call/EH and
             // owned saved-control tuples, returned-reference root handoff and
             // the exact original-prototype continuation ABI2.
             // Fixed ten-field wire identity remains complete and bounded.
-            auto const policy{purpose_ == compilation_purpose::observe_values ? 13u : 17u};
+            // Observation v40 uses a fused x86 byte acquire gate for eligible
+            // non-GC sites; live GC/extern keeps the original post-packet gate.
+            // One actual byte read and the complete cold packet remain.
+            // Observation v52 emits one exact zero-padded whole-cell operand
+            // store on Linux x86_64; all reference/epoch refresh rules remain.
+            // Observation v57 selects exact nonreentrant checked scalar GC reads
+            // as internal leaves; managed pages and resumable v17 keep host scopes.
+            // Observation v58 keeps small owned entry captures nonescaping
+            // before the opcode control map is bound and uses already checked
+            // initial declaration flags; later captures keep executed flags.
+            // GP arguments retain their original stack cell across real entry
+            // calls; small initial flags are one exact bounded packed store.
+            // Observation v59 applies non-CFG scalar cleanup after the admitted
+            // numeric-local SSA pass. Every side-effecting observation and
+            // exception cleanup remains; old generated cache entries expire.
+            auto const policy{purpose_ == compilation_purpose::observe_values ? 64u : 17u};
             return {0x554357504c4f4731u, policy, state_schema_revision, native_resume_abi_revision, native_slot_bytes, cap_.frames, cap_.slots_per_frame, cap_.controls_per_frame, cap_.handlers_per_frame, native_workspace_limit};
         }
         // One canonical serializer visits the ENTIRE declared tuple, including
@@ -392,11 +433,107 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::checkpoint
     class sealed_function_plan
     {
         function_plan plan_{};
-        explicit sealed_function_plan(function_plan&& plan) : plan_{::std::move(plan)} {}
+    public:
+        // Immutable decoding DATA derived only after complete plan validation.
+        // It supplies no activation, memory, root or continuation authority.
+        struct compiler_reference_slot
+        {
+            ::std::size_t index{};
+            unsigned accepted_kinds{};
+        };
+        struct compiler_packet_shape
+        {
+            ::std::vector<compiler_reference_slot> reference_slots{};
+            bool all_locals_required{true};
+        };
+    private:
+        ::std::vector<compiler_packet_shape> packet_shapes_{};
+        ::std::vector<::std::uint8_t> initialized_flags_{};
+        bool invariant_local_types_{true};
+        // Immutable owned DATA size, capped once at sealing. Only bounded
+        // observer metadata may occupy an inactive runtime cache; no state,
+        // native root or code/continuation permission survives retirement.
+        ::std::size_t observer_retention_bytes_{};
+        // Conservative carrier envelope only. Canonical subtype/store/GC
+        // ownership still belongs to the actual runtime census. This derives
+        // immutable decoding DATA once; it never authenticates a live value.
+        [[nodiscard]] static constexpr unsigned reference_carrier_mask(types::core_value_type type) noexcept
+        {
+            using kind=::uwvm2::object::global::wasm_ref_kind;
+            auto const bit{[](kind value) constexpr -> unsigned
+            { return 1u << static_cast<unsigned>(value); }};
+            static_assert(static_cast<unsigned>(kind::wasm_i31) < ::std::numeric_limits<unsigned>::digits);
+            auto const functions{bit(kind::wasm_func_imported)|bit(kind::wasm_func_defined)};
+            auto const aggregates{bit(kind::wasm_struct)|bit(kind::wasm_array)};
+            unsigned accepted{};
+            if(type.heap.is_defined()) { accepted=functions|aggregates; }
+            else switch(static_cast<types::abstract_heap_type>(type.heap.code))
+            {
+                case types::abstract_heap_type::any: accepted=aggregates|bit(kind::wasm_i31)|bit(kind::wasm_extern);break;
+                case types::abstract_heap_type::eq: accepted=aggregates|bit(kind::wasm_i31);break;
+                case types::abstract_heap_type::i31: accepted=bit(kind::wasm_i31);break;
+                case types::abstract_heap_type::struct_: accepted=bit(kind::wasm_struct);break;
+                case types::abstract_heap_type::array: accepted=bit(kind::wasm_array);break;
+                case types::abstract_heap_type::func: accepted=functions;break;
+                case types::abstract_heap_type::extern_: accepted=bit(kind::wasm_extern);break;
+                case types::abstract_heap_type::exn: accepted=bit(kind::wasm_exn);break;
+                case types::abstract_heap_type::none: case types::abstract_heap_type::nofunc:
+                case types::abstract_heap_type::noextern: case types::abstract_heap_type::noexn: break;
+            }
+            return accepted | (type.nullable ? bit(kind::wasm_null):0u);
+        }
+        explicit sealed_function_plan(function_plan&& plan) : plan_{::std::move(plan)}
+        {
+            packet_shapes_.reserve(plan_.sites.size());
+            ::std::size_t maximum_locals{};
+            for(auto const& site : plan_.sites)
+            {
+                compiler_packet_shape shape{};
+                for(::std::size_t i{}; i != site.slots.size(); ++i)
+                {
+                    if(site.slots[i].type.kind == types::value_kind::reference)
+                    { shape.reference_slots.push_back({i,reference_carrier_mask(site.slots[i].type)}); }
+                    if(i < site.local_count && !site.slots[i].initialized)
+                    { shape.all_locals_required = false; }
+                }
+                if(site.local_count > maximum_locals) { maximum_locals = site.local_count; }
+                if(site.local_count != plan_.sites.front().local_count) { invariant_local_types_ = false; }
+                else if(invariant_local_types_)
+                {
+                    for(::std::size_t i{}; i != site.local_count; ++i)
+                    { if(site.slots[i].type != plan_.sites.front().slots[i].type) { invariant_local_types_ = false; break; } }
+                }
+                packet_shapes_.push_back(::std::move(shape));
+            }
+            initialized_flags_.assign(maximum_locals, 1u);
+            constexpr ::std::size_t cap{16384u};
+            ::std::size_t retained{sizeof(sealed_function_plan)}; bool bounded{retained <= cap};
+            auto const add{[&](auto const& values)
+            {
+                constexpr auto width{sizeof(*values.data())};
+                if(!bounded || values.capacity() > (cap-retained)/width) { bounded=false; return; }
+                retained += values.capacity()*width;
+            }};
+            add(plan_.sites);add(plan_.resume_sites);add(plan_.retirement_sites);
+            add(packet_shapes_);add(initialized_flags_);
+            for(auto const& site : plan_.sites)
+            {
+                add(site.slots);add(site.controls);add(site.handlers);
+                for(auto const& control : site.controls) { add(control.declared_parameters);add(control.declared_results); }
+                for(auto const& handler : site.handlers) { add(handler.parameters); }
+            }
+            for(auto const& shape : packet_shapes_) { add(shape.reference_slots); }
+            if(bounded) { observer_retention_bytes_=retained; }
+        }
     public:
         using owner = ::std::shared_ptr<sealed_function_plan const>;
         [[nodiscard]] static owner seal_compiler_metadata(function_plan plan)
         { if(validate_plan(plan) != status::ok) { return {}; } return owner{new sealed_function_plan{::std::move(plan)}}; }
         [[nodiscard]] function_plan const& get() const noexcept { return plan_; }
+        [[nodiscard]] compiler_packet_shape const& packet_shape(::std::size_t index) const noexcept
+        { return packet_shapes_[index]; } // Caller checked index against the same immutable site's extent.
+        [[nodiscard]] ::std::span<::std::uint8_t const> initialized_flags() const noexcept { return initialized_flags_; }
+        [[nodiscard]] bool invariant_local_types() const noexcept { return invariant_local_types_; }
+        [[nodiscard]] ::std::size_t observer_retention_bytes() const noexcept { return observer_retention_bytes_; }
     };
 }

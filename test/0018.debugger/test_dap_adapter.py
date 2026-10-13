@@ -52,9 +52,9 @@ class FakeBroker:
                            "thread 1 module=0 function=1 byte-offset=4 generation=1\n"
                            "  source src/main.c:4:2\n")
             return self.status
-        if command.startswith("break-source "):
+        if command.startswith("breaksource "):
             return "breakpoint 7 source=src/main.c:4 function=1 byte-offset=4\n"
-        if command == "break 0 1 4":
+        if command == "breakwasm 0 1 4":
             return "breakpoint 8 registered at executable Wasm expression byte offset\n"
         if command == "delete 7":
             return "breakpoint deleted\n"
@@ -184,7 +184,7 @@ class DapAdapterTests(unittest.TestCase):
         result = self.send("setBreakpoints", source={"path": "src/main.c"},
                            breakpoints=[{"line": 4}])[0]["body"]["breakpoints"]
         self.assertEqual(result, [{"id": 7, "verified": True, "line": 4}])
-        self.assertEqual(fake.commands, ["break-source 0 src/main.c:4"])
+        self.assertEqual(fake.commands, ["breaksource 0 src/main.c:4"])
         self.send("setBreakpoints", source={"path": "src/main.c"}, breakpoints=[])
         self.assertEqual(fake.commands[-1], "delete 7")
         rejected = self.send("setBreakpoints", source={"path": "src/evil\nstatus"},
@@ -197,7 +197,7 @@ class DapAdapterTests(unittest.TestCase):
             {"instructionReference": "wasm:0:1:4", "offset": -(1 << 80)},
         ])[0]["body"]["breakpoints"]
         self.assertEqual([item["verified"] for item in points], [True, False, False])
-        self.assertEqual(fake.commands[-1], "break 0 1 4")
+        self.assertEqual(fake.commands[-1], "breakwasm 0 1 4")
         self.send("setInstructionBreakpoints", breakpoints=[])
         self.assertEqual(fake.commands[-1], "delete 8")
 

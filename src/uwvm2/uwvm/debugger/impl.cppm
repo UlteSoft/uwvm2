@@ -1,6 +1,9 @@
 module;
 export module uwvm2.uwvm.debugger;
 export import uwvm2.uwvm.debugger.wasip1_calls;
+export import :console_help_catalog;
+export import :console_help;
+export import :console_messages;
 export import :command;
 export import :management_wait_interrupt;
 export import :wasm_events;

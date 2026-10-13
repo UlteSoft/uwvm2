@@ -392,7 +392,18 @@ int main(int argc, char** argv)
         " engine=",::fast_io::mnp::dec(denied.preparation.engine_diagnostic)," frame=",::fast_io::mnp::dec(denied.preparation.frame_diagnostic),"\n");
     REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::worker_root_preparation_declined && !denied.operation && !denied.candidate_world_retained);
     REQUIRE(state->control->capture(state->ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch);
+    invalid=prepare_request;invalid.maximum_private_closed_workers=1u;
+    denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
+    REQUIRE(denied.status==outcome::preparation_declined &&
+        denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::closed_worker_preparation_declined &&
+        !denied.operation && !denied.candidate_world_retained &&
+        denied.preparation.started_private_closed_workers==0u && !denied.preparation.private_closed_worker_cohort_held);
+    REQUIRE(state->control->capture(state->ticket).result==threads::cooperative_pause_result::paused &&
+        lib::observe_compiler_runtime_generation_host_api()==epoch);
     auto pending{begin(captured,short_deadline())};
+    REQUIRE(pending.preparation.started_private_closed_workers==2u &&
+        pending.preparation.held_private_closed_workers==2u && pending.preparation.private_closed_worker_cohort_held &&
+        !pending.private_closed_workers_rechecked_after_physical_join && !pending.private_closed_workers_cancelled_and_joined);
     ::fast_io::print(::fast_io::out(),"NATIVE_COHORT stage=execution status=",::fast_io::mnp::dec(static_cast<unsigned>(pending.status)),
         " cohort=",::fast_io::mnp::dec(pending.cohort_diagnostic),"\n");
     REQUIRE(pending.status == outcome::pending_execution && pending.operation && pending.workers == 2u &&
@@ -402,6 +413,9 @@ int main(int argc, char** argv)
         pending.preparation.modules==1u && pending.preparation.engines==1u && pending.preparation.prepared_threads==2u &&
         pending.preparation.started_private_root_workers==2u && pending.preparation.joined_private_root_workers==2u);
     REQUIRE(pending.preparation.runtime_full_code_owners_transferred_privately && pending.preparation.runtime_full_code_targets_allocation_preserved &&
+        pending.preparation.runtime_full_root_identities_prepared_privately &&
+        pending.preparation.prepared_full_root_code_identities==pending.preparation.modules &&
+        pending.preparation.prepared_full_root_code_identity_functions==pending.preparation.functions &&
         pending.preparation.prepared_full_code_owner_modules==pending.preparation.modules && pending.preparation.prepared_full_code_owner_functions==pending.preparation.functions &&
         !pending.full_code_owners_rechecked_after_physical_join && pending.preparation.runtime_full_publication_records_prepared && pending.preparation.prepared_full_publication_modules==1u &&
         pending.preparation.prepared_full_publication_functions==pending.preparation.functions && !pending.full_publication_records_rechecked_after_physical_join);
@@ -497,6 +511,8 @@ int main(int argc, char** argv)
     ::fast_io::print(::fast_io::out(),"NATIVE_COHORT stage=join status=",::fast_io::mnp::dec(static_cast<unsigned>(joined.status)),"\n");
     REQUIRE(joined.status==outcome::prepared_world_ready_closed && joined.operation==operation && joined.source_initializer_bindings_rechecked_after_physical_join && joined.full_publication_records_rechecked_after_physical_join && joined.full_code_owners_rechecked_after_physical_join &&
         joined.execution_drained && joined.native_workers_joined && joined.candidate_world_retained && joined.workers==2u);
+    REQUIRE(joined.private_closed_workers_rechecked_after_physical_join &&
+        !joined.private_closed_workers_cancelled_and_joined);
     legacy_refused(); // physical join alone must NOT reopen the retained original world.
     REQUIRE(lib::llvm_jit_checkpoint_discard_prepared_instance_host_api(wrong_address,deadline()).status==outcome::stale_owner);
     REQUIRE(lib::llvm_jit_checkpoint_discard_prepared_instance_host_api(wrong_block,deadline()).status==outcome::stale_owner);
@@ -505,6 +521,9 @@ int main(int argc, char** argv)
     auto discarded{lib::llvm_jit_checkpoint_discard_prepared_instance_host_api(operation,deadline())};
     REQUIRE(discarded.status==outcome::retired_and_joined && discarded.all_frames_signalled && !discarded.candidate_world_retained &&
         discarded.preparation.status==lib::llvm_jit_checkpoint_prepare_status::prepared_and_discarded);
+    REQUIRE(discarded.private_closed_workers_cancelled_and_joined &&
+        discarded.private_closed_workers_rechecked_after_physical_join);
+    ::fast_io::io::println("CLOSED_COHORT workers=2 held_before_old_retirement=1 rechecked_after_old_join=1 cancel_actual_os_tls_join_before_open=1 guest_execution=0 PASS");
     REQUIRE(lib::observe_compiler_runtime_generation_host_api() == epoch);
     { ::std::lock_guard lock{windows->mutex}; REQUIRE(windows->tls_finished == 2u); }
     for(::std::size_t index{}; index != workers.size(); ++index)

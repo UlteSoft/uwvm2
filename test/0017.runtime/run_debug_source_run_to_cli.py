@@ -174,7 +174,7 @@ def main():
                             command = 'advance' if kind_to_run in ('advance-call','advance-recursive','return-bound') else 'until'
                             breakpoint_id = None
                             if kind_to_run == 'breakpoint':
-                                reply = session.send(f'break 0 {indices["leaf"]} 0'); match = re.search(rb'breakpoint (\d+)',reply)
+                                reply = session.send(f'breakwasm 0 {indices["leaf"]} 0'); match = re.search(rb'breakpoint (\d+)',reply)
                                 require(match is not None,'real interrupting breakpoint'); breakpoint_id = int(match[1])
                             # Exercise both native-style aliases and explicit stop-bound grammar.
                             text = f'{command} {session.thread} {before["stop_id"]} {before["file"]}:{target}' if version==4 else (f'{command} {target}' if kind_to_run in ('until-call','advance-call','until-recursive','advance-recursive') else f'{command} {before["file"]}:{target}')
@@ -196,7 +196,7 @@ def main():
                             session.finish_guest(); row['passed'] = True
                         finally:
                             session.console.finish(); row['quit_returncode'] = session.console.child.returncode
-                            row['managed_shutdown_complete'] = b'managed shutdown complete' in session.console.transcript
+                            row['managed_shutdown_complete'] = session.console.normal_quit_completed
                             row['log_sha256'] = sha(session.console.logpath)
                             require(row['quit_returncode']==0 and row['managed_shutdown_complete'],'actual managed shutdown')
                             publish()

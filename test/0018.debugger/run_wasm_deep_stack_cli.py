@@ -66,7 +66,7 @@ def main():
             row = {"total": total, "policy": policy, "actual_VM": True, "observations": []}
             try:
                 console.prompt()
-                assert b"registered" in console.send(f"break 0 0 {sites[0][0]}")
+                assert b"registered" in console.send(f"breakwasm 0 0 {sites[0][0]}")
                 console.send("continue")
                 deadline = time.monotonic() + args.stop_timeout
                 while b"stopped:" not in console.send("status"):

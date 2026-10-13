@@ -4971,12 +4971,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
             ::std::uint_least32_t type_index, ::std::size_t length) const noexcept
         {
             // A native scheduling hint from this store's immutable schema.
-            // References/narrow arrays keep the original count policy; earlier
-            // tracing increases their scan cost without a cache footprint win.
+            // Wide numeric arrays retain their existing scheduling policy.
+            // The separately selected extension also charges large packed
+            // narrow and reference arrays; its small-array count path is intact.
 #if defined(UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS) && UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS == 1
             if(length < 256uz) { return 0uz; }
             auto const* layout{checked_type(type_index, gc_type::composite_kind::array)};
-            return numeric_array_width(layout) >= 8uz ? length : 0uz;
+            auto const width{numeric_array_width(layout)};
+            if(width >= 8uz) { return length; }
+# if defined(UWVM_EXPERIMENTAL_ALL_ARRAY_BYTE_PRESSURE) && UWVM_EXPERIMENTAL_ALL_ARRAY_BYTE_PRESSURE == 1
+            // Only immutable checked schema contributes to this scheduling hint.
+            // Actual constructor validation, roots, lease and collection gates
+            // remain in the original bridge. A charge never proves liveness,
+            // native payload extent or a successful allocation.
+            if(layout == nullptr) { return 0uz; }
+            if(width == 0uz) { return layout->has_reference_fields ? length : 0uz; }
+            // Packed narrow payloads use 1/2/4 bytes, while the existing budget
+            // consumes 16-byte carrier units. Round UP without multiplication
+            // or an overflow-prone length+divisor-1. Small charges still take
+            // the original count poll, bounding extra work on small arrays.
+            static_assert(sizeof(gc_object_value) == 16uz);
+            switch(width)
+            {
+                case 1uz: return length / 16uz + (length % 16uz != 0uz);
+                case 2uz: return length / 8uz + (length % 8uz != 0uz);
+                case 4uz: return length / 4uz + (length % 4uz != 0uz);
+                default: return 0uz;
+            }
+# else
+            return 0uz;
+# endif
 #else
             return 0uz;
 #endif
@@ -5742,6 +5766,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 #endif
 #if defined(UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS) && UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS == 1
 # include "numeric_array_get32.h"
+#if defined(UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD) && UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD == 1 && defined(__x86_64__) && defined(__linux__) && defined(__clang__) && defined(__SIZEOF_INT128__)
+# include "jit_numeric_array_borrow.h"
+#endif
 #endif
         [[nodiscard]] inline gc_object_status array_get(gc_reference reference, ::std::size_t index,
             bool sign_extend, gc_object_value& result) const noexcept

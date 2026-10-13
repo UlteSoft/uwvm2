@@ -36,11 +36,11 @@ for origin in selected:
   invalid=ask(f'replace 0 {target} 1 {bad}');assert 'error:' in invalid or 'rejected' in invalid,invalid
   replaced=ask(f'replace 0 {target} 1 {valid}');assert 'function replaced; generation 2' in replaced,replaced
   stale=ask(f'replace 0 {target} 1 {valid}');assert 'error:' in stale or 'rejected' in stale,stale
-  br=ask(f'break 0 {target} 0');bid=int(re.search(r'breakpoint (\d+)',br)[1]);ask('continue')
+  br=ask(f'breakwasm 0 {target} 0');bid=int(re.search(r'breakpoint (\d+)',br)[1]);ask('continue')
   for _ in range(64):
    stop=ask('wait')
    if 'stopped: breakpoint' in stop:break
-   assert 'guest exited:' not in stop,stop
+   assert 'Program exited' not in stop,stop
   else:raise AssertionError('Actual replaced function entry did not stop')
   thread=int(re.search(r'thread (\d+) module=0 function=',stop)[1]);trace=ask(f'bt {thread}');sid=int(re.search(r'(?m)^stop-id (\d+)',trace)[1])
   for command in [f'print {thread} {sid} value',f'ptype {thread} {sid} value']:
@@ -49,14 +49,14 @@ for origin in selected:
   ask(f'delete {bid}');ask('continue')
   for _ in range(64):
    ended=ask('wait')
-   if 'guest exited:' in ended:assert 'guest exited: 0' in ended;break
+   if 'Program exited' in ended:assert 'Program exited normally.' in ended;break
   else:raise AssertionError('Replaced guest did not finish')
   row['passed']=True;save();print(repository,stem,'PASS actual validator/generation/source boundaries',flush=True)
  except BaseException as error:row['error']=repr(error);save();raise
  finally:
   if console:
    try:
-    console.finish();row['quit_returncode']=console.child.returncode;row['managed_shutdown_complete']='managed shutdown complete' in bytes(console.transcript).decode(errors='replace')
+    console.finish();row['quit_returncode']=console.child.returncode;row['managed_shutdown_complete']=console.normal_quit_completed
     assert row['quit_returncode']==0 and row['managed_shutdown_complete'],'Debugger shutdown failed'
    except BaseException as error:row.update(passed=False,shutdown_error=repr(error));raise
    finally:save()

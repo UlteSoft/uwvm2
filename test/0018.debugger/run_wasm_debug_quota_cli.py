@@ -207,7 +207,7 @@ def main():
                 console.prompt_timeout = 600 if case['kind']=='reply' and runner else 120
                 console.prompt(); assert b'prepared; no Wasm instruction executed' in console.send('status')
                 for offset in sites[0]:
-                    assert b'registered' in console.send(f'break 0 0 {offset}')
+                    assert b'registered' in console.send(f'breakwasm 0 0 {offset}')
                 console.send('continue'); stopped(console, 60); before, _ = status(console)
                 assert (before['function'], before['offset']) == (0, sites[0][0]), before
                 observed = inspect(console, case, before, args.old_path_diagnostic)

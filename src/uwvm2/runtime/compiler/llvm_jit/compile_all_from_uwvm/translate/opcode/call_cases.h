@@ -262,6 +262,21 @@ case wasm1_code::call:
 #if defined(UWVM_EXPERIMENTAL_NATIVE_EH_LEAF_OBSERVER) && UWVM_EXPERIMENTAL_NATIVE_EH_LEAF_OBSERVER == 1
     if(native_eh_work) { native_eh_work->prepare_call(func_index, control_flow_stack); }
 #endif
+#if defined(__linux__) && defined(__x86_64__)
+    if(emit_llvm_jit_active && llvm_jit_emit_state.checkpoint_observer_controls != nullptr)
+    {
+        // Signature/index validation is complete but neither semantic nor LLVM
+        // operands have been consumed. Only a defined full typed target may
+        // gate this optional before-call observation. Awaiting and returned
+        // caller packets below are unconditional; imports/host waits never opt in.
+        bool const local_typed_call_demand{
+            static_cast<::std::size_t>(func_index) >= import_func_count &&
+            llvm_jit_emit_state.debug_full_patchable_typed_target_base_address != 0u &&
+            !llvm_jit_emit_state.route_wasm_calls_through_runtime_bridge};
+        if(!emit_runtime_local_func_llvm_jit_instruction_debug_safe_point(llvm_jit_emit_state,local_typed_call_demand))
+        { disable_inline_llvm_jit_emission(); }
+    }
+#endif
     // Consume parameters if present.
     if(param_count != 0uz) { operand_stack_pop_n(param_count); }
 
@@ -801,6 +816,39 @@ case static_cast<wasm1_code>(0x15u):
     if(!is_polymorphic && (param_count == max_size || concrete_operand_count() < required)) [[unlikely]]
     { report_operand_stack_underflow(op_begin, op_name, required); }
 
+    llvm_jit_local_reference_dispatch_witness checked_reference{};
+#if defined(__linux__) && defined(__x86_64__)
+    if(!tail && emit_llvm_jit_active && llvm_jit_emit_state.checkpoint_observer_controls != nullptr)
+    {
+        // Signature-index and stack-extent validation is complete. Stage the
+        // SAME before-op point while BOTH semantic and LLVM operands are intact.
+        // Remaining reference/argument validation below must succeed before any
+        // module is published, just as for the original eager observation.
+        // Probe the existing genuine record/range/stride/type/ABI/entry proof;
+        // this result controls observation ONLY, never the subsequent call.
+        // The call emitter reloads its published target AFTER any actual stop,
+        // so all-park replacement cannot reuse a stale pre-stop code address.
+        ::llvm::Value* observation_target{};
+        auto& state{llvm_jit_emit_state};
+        if(!state.control_stack.empty() && state.control_stack.back().is_reachable &&
+           runtime_llvm_jit_local_reference_dispatch_selected(state) && !state.operand_stack.empty())
+        {
+            auto const runtime{state.local_func_storage_ptr->runtime_module_ptr};
+            auto const type{runtime == nullptr ? nullptr : resolve_runtime_type_section_function_type(*runtime,type_index)};
+            auto const abi{type == nullptr ? nullptr : get_llvm_function_type_from_wasm_function_type(*state.llvm_context_holder,*type)};
+            auto const reference{state.operand_stack.back()};
+            if(runtime != nullptr && type != nullptr && abi != nullptr &&
+               reference.type == runtime_operand_stack_value_type::funcref)
+            {
+                observation_target=emit_runtime_llvm_jit_local_reference_dispatch(state,reference.value,
+                    resolve_runtime_canonical_type_id(*runtime,type_index),resolve_runtime_call_type_match_width(*runtime,type_index),abi,::std::addressof(checked_reference));
+                if(observation_target == nullptr) { disable_inline_llvm_jit_emission(); }
+            }
+        }
+        if(emit_llvm_jit_active && !emit_runtime_local_func_llvm_jit_instruction_debug_safe_point(state,false,observation_target))
+        { disable_inline_llvm_jit_emission(); }
+    }
+#endif
     // The reference is the last evaluated operand. An erased funcref is a supertype and
     // cannot statically prove `(ref null typeidx)`; ref.func/ref.null carry an exact witness.
     auto const reference{try_pop_concrete_operand()};
@@ -895,7 +943,7 @@ case static_cast<wasm1_code>(0x15u):
         if(emit_llvm_jit_active)
         {
             auto const emitted{tail ? try_emit_runtime_local_func_llvm_jit_call_ref<true>(llvm_jit_emit_state, type_index) :
-                                      try_emit_runtime_local_func_llvm_jit_call_ref<false>(llvm_jit_emit_state, type_index)};
+                                      try_emit_runtime_local_func_llvm_jit_call_ref<false>(llvm_jit_emit_state, type_index,::std::addressof(checked_reference))};
             if(!emitted || (!tail && !finish_runtime_local_func_llvm_jit_checkpoint_direct_call(llvm_jit_emit_state)))
             [[unlikely]] { disable_inline_llvm_jit_emission(); }
         }

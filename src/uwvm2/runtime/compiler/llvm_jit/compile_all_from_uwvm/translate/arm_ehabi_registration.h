@@ -20,6 +20,13 @@
 #  include <fast_io.h>
 #  include <vector>
 #  include <dlfcn.h>
+#  if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_USE_LLVM_JIT) || defined(UWVM_USE_DEFAULT_JIT)
+// Parse the real LLVM ELF object declarations before glibc link.h publishes
+// its unscoped ELF macros. Loading these later breaks both the ELF enums and
+// ELFObjectFile templates during a genuine ARM EHABI + registered-CFI build.
+// Keep all platform macros intact; standalone registry tests need no LLVM.
+#   include <llvm/Object/ELFObjectFile.h>
+#  endif
 #  include <link.h>
 #  include <unwind.h>
 

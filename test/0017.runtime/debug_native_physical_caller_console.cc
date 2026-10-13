@@ -47,7 +47,7 @@ int main(int argc, char** argv)
     check(lib::llvm_jit_configure_debug_session_host_api(owner->domain(), ::std::move(observer),
         lib::llvm_jit_debug_safe_point_granularity::instruction) == lib::llvm_jit_debug_configure_result::ok, "real observer");
     check(lib::llvm_jit_prepare_debug_host_api() && owner->arm_initial_pause(), "actual compiled initial pause");
-    check(command(*owner, ::fast_io::concat_fast_io("break 0 1 0")).status == control::error::none, "real recursive callee breakpoint");
+    check(command(*owner, ::fast_io::concat_fast_io("breakwasm 0 1 0")).status == control::error::none, "real recursive callee breakpoint");
     check(command(*owner, ::fast_io::concat_fast_io("continue")).status == control::error::none, "open launch gate");
     ::std::uint32_t result{}; ::std::atomic_bool finished{};
     ::std::thread guest{[&]

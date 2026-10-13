@@ -12,6 +12,10 @@ module;
 #include <cstdio>
 #include <limits>
 #include <memory>
+#include <map>
+#if defined(UWVM_USE_LLVM_JIT) || defined(UWVM_USE_DEFAULT_JIT)
+#include <llvm/Demangle/Demangle.h>
+#endif
 #include <mutex>
 #include <optional>
 #include <span>
@@ -42,6 +46,7 @@ import uwvm2.utils.thread;
 import uwvm2.runtime;
 import uwvm2.runtime.exception;
 import :command;
+import :breakpoint_index;
 import :management_wait_interrupt;
 import :source_map;
 import :source_dwarf_query;

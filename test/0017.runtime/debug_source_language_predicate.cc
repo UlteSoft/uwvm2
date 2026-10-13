@@ -35,7 +35,7 @@ int main()
         {
             ++reads;if(size) { return false; }
             if(leaf.root_name=="a") { out=a;return true; }
-            if(leaf.root_name=="b") { out=b;return true; }
+            if(leaf.root_name=="bw") { out=b;return true; }
             if(leaf.root_name=="flag" || leaf.root_name=="android" || leaf.root_name=="ordinary") { out={1u,drift ? 32u : 8u,true,false,kind::boolean};return true; }
             return false;
         }};
@@ -43,7 +43,7 @@ int main()
         {
             ++types;if(size) { return false; }
             if(leaf.root_name=="a") { out=a;out.bits=0u;return true; }
-            if(leaf.root_name=="b") { out=b;out.bits=0u;return true; }
+            if(leaf.root_name=="bw") { out=b;out.bits=0u;return true; }
             if(leaf.root_name=="flag" || leaf.root_name=="android" || leaf.root_name=="ordinary") { out={0u,8u,true,false,kind::boolean};return true; }
             return false;
         }};

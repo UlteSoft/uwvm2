@@ -28,12 +28,11 @@ inline constexpr ::std::size_t llvm_jit_snapshot_copy_local_limit{256u};
     auto const array{::llvm::ArrayType::get(::llvm::PointerType::getUnqual(context),table_count)};
     auto const heap_owner{::llvm::dyn_cast_or_null<::llvm::IntToPtrInst>(state.checkpoint_observer_workspace)};
     auto const allocation{state.checkpoint_observer_workspace_allocation};
-    auto const extent{allocation != nullptr && allocation->arg_size() == 1u ?
-        ::llvm::dyn_cast<::llvm::ConstantInt>(allocation->getArgOperand(0u)) : nullptr};
+    auto const extent{checkpoint_observer_allocation_extent(state)};
     if(heap_table && (heap_owner == nullptr || allocation == nullptr || extent == nullptr ||
         heap_owner->getFunction() != state.llvm_function || allocation->getFunction() != state.llvm_function ||
         heap_owner->getParent() != ::std::addressof(state.llvm_function->getEntryBlock()) ||
-        allocation->getParent() != heap_owner->getParent() || heap_owner->getOperand(0u) != allocation ||
+        allocation->getParent() != heap_owner->getParent() || !checkpoint_observer_workspace_result_matches(state,heap_owner->getOperand(0u)) ||
         !allocation->comesBefore(heap_owner) ||
         !::uwvm2::runtime::checkpoint::observer_workspace_fits(table_count,table_count) ||
         extent->getZExtValue() < table_count *
@@ -106,6 +105,16 @@ inline constexpr ::std::size_t llvm_jit_snapshot_copy_local_limit{256u};
     auto& cached{public_locals ? state.debug_local_snapshot_copy : state.checkpoint_local_snapshot_copy};
     auto& cached_count{public_locals ? state.debug_local_snapshot_copy_count : state.checkpoint_local_snapshot_copy_count};
     auto& context{state.llvm_function->getContext()};
+
+    // Only tiny numeric observer copies are cloned. References stay shared. Keep large declarations and
+    // chunks shared so opcode count cannot multiply their lowering footprint.
+#if defined(__linux__) && defined(__x86_64__)
+    bool const tiny{state.emit_debug_safe_points && state.debug_activation_enabled &&
+        checkpoint_observer_workspace_selected(state) && shared_numeric && count <= 4u};
+#else
+    constexpr bool tiny{false};
+#endif
+    auto const copy_attribute{tiny ? ::llvm::Attribute::AlwaysInline : ::llvm::Attribute::NoInline};
     auto const expected_kind{shared_numeric ? "numeric" : (public_locals ? "public-reference" : "raw-reference")};
     auto const pointer_type{::llvm::PointerType::getUnqual(context)};
     auto const signature{::llvm::FunctionType::get(::llvm::Type::getVoidTy(context),
@@ -113,7 +122,7 @@ inline constexpr ::std::size_t llvm_jit_snapshot_copy_local_limit{256u};
     if(cached != nullptr)
     {
         return cached_count == count && cached->getParent() == state.llvm_module && cached->getFunctionType() == signature &&
-               cached->hasLocalLinkage() && cached->hasFnAttribute(::llvm::Attribute::NoInline) &&
+               cached->hasLocalLinkage() && cached->hasFnAttribute(copy_attribute) &&
                cached->hasFnAttribute("uwvm.debug.private.local-copy") && cached->getSubprogram() == nullptr &&
                cached->hasFnAttribute("uwvm.debug.private.local-copy.kind") &&
                cached->getFnAttribute("uwvm.debug.private.local-copy.kind").getValueAsString() == expected_kind ?
@@ -126,13 +135,15 @@ inline constexpr ::std::size_t llvm_jit_snapshot_copy_local_limit{256u};
         auto const width{get_runtime_wasm_value_type_abi_size(state.local_types.index_unchecked(i))};
         if(width == 0u || width > ::uwvm2::runtime::lib::details::llvm_jit_debug_local_slot_bytes) { return nullptr; }
     }
-    auto const name{::llvm::Twine{state.llvm_function->getName()} +
+    // Materialize while every child Twine is alive; a stored concatenation
+    // otherwise retains references to temporaries from this full expression.
+    auto const name{(::llvm::Twine{state.llvm_function->getName()} +
         (shared_numeric ? ".uwvm.private.numeric.locals" :
             (public_locals ? ".uwvm.private.debug.locals" : ".uwvm.private.checkpoint.locals")) +
-        ".count." + ::llvm::Twine{static_cast<::std::uint64_t>(count)}};
+        ".count." + ::llvm::Twine{static_cast<::std::uint64_t>(count)}).str()};
     auto const function{::llvm::Function::Create(signature,::llvm::GlobalValue::InternalLinkage,name,state.llvm_module)};
     if(function == nullptr) { return nullptr; }
-    function->addFnAttr(::llvm::Attribute::NoInline); function->setDoesNotThrow();
+    function->addFnAttr(copy_attribute); function->setDoesNotThrow();
     function->addFnAttr("uwvm.debug.private.local-copy");
     function->addFnAttr("uwvm.debug.private.local-copy.kind",expected_kind);
     // No DISubprogram, Wasm provenance, activation or safepoint is attached:
@@ -164,7 +175,6 @@ inline constexpr ::std::size_t llvm_jit_snapshot_copy_local_limit{256u};
             copy.CreateStore(flag,saved_cell)->setAlignment(::llvm::Align{1u});
             auto const slot{copy.CreateInBoundsGEP(copy.getInt8Ty(),values,
                 copy.getInt64(i * ::uwvm2::runtime::lib::details::llvm_jit_debug_local_slot_bytes))};
-            copy.CreateStore(::llvm::ConstantAggregateZero::get(clear_type),slot)->setAlignment(::llvm::Align{1u});
             auto const available{copy.CreateICmpEQ(flag,copy.getInt8(1u))};
             auto const address_cell{copy.CreateInBoundsGEP(table_type,addresses,{copy.getInt32(0u),copy.getInt32(static_cast<unsigned>(i))})};
             auto const address{copy.CreateLoad(pointer_type,address_cell)}; address->setAlignment(::llvm::Align{1u});
@@ -172,6 +182,23 @@ inline constexpr ::std::size_t llvm_jit_snapshot_copy_local_limit{256u};
             auto const local_type{state.local_types.index_unchecked(i)};
             auto const native_type{get_llvm_type_from_wasm_value_type(context,local_type)};
             auto const kind{get_runtime_wasm_value_type_encoding(local_type)};
+            bool const numeric{kind == 0x7fu || kind == 0x7eu || kind == 0x7du || kind == 0x7cu || kind == 0x7bu};
+            if(numeric)
+            {
+                // Load ONLY the declared carrier's real extent. Integer bit
+                // carriers preserve sNaNs without a float conversion or ABI.
+                // One complete store replaces clear-16 + copy-4/8; absent
+                // flags still select immutable zero bytes before the load.
+                auto const width{get_runtime_wasm_value_type_abi_size(local_type)};
+                auto const bits{copy.CreateLoad(copy.getIntNTy(static_cast<unsigned>(width*CHAR_BIT)),readable_address)};
+                bits->setAlignment(::llvm::Align{1u});
+                ::llvm::Value* packed{width == 16u ? bits : copy.CreateZExt(bits,copy.getInt128Ty())};
+                if(width != 16u && state.llvm_module->getDataLayout().isBigEndian())
+                { packed = copy.CreateShl(packed,::llvm::ConstantInt::get(copy.getInt128Ty(),(16u-width)*CHAR_BIT)); }
+                copy.CreateStore(packed,slot)->setAlignment(::llvm::Align{1u});
+                continue;
+            }
+            copy.CreateStore(::llvm::ConstantAggregateZero::get(clear_type),slot)->setAlignment(::llvm::Align{1u});
             if(public_locals && native_type->isIntegerTy() &&
                (kind == get_runtime_wasm_value_type_encoding(runtime_operand_stack_value_type::funcref) ||
                 kind == get_runtime_wasm_value_type_encoding(runtime_operand_stack_value_type::externref)))
@@ -226,16 +253,199 @@ inline constexpr ::std::size_t llvm_jit_snapshot_copy_local_limit{256u};
 [[nodiscard]] inline bool emit_runtime_local_func_llvm_jit_snapshot_copy(
     runtime_local_func_llvm_jit_emit_state_t& state, ::std::size_t count,
     ::llvm::Value* values, ::llvm::Value* saved_flags, ::llvm::Value* available_flags,
-    bool public_locals) noexcept
+    bool public_locals, bool retain_canonical_scalars = false,
+    ::uwvm2::runtime::checkpoint::safepoint_layout const* initial_entry = nullptr) noexcept
 {
+    if(initial_entry != nullptr)
+    {
+        namespace cp = ::uwvm2::runtime::checkpoint;
+        auto const plan{state.checkpoint_plan};
+        // Only the actual initial producer can use declaration-time flags.
+        // Later opcode/call/restore captures must read their executed flags.
+        if(public_locals || retain_canonical_scalars || !checkpoint_observer_workspace_selected(state) ||
+           plan->producer_availability != cp::status::ok || plan->compiler_failure != cp::status::ok ||
+           state.checkpoint_observer_controls != nullptr || plan->sites.size() != 1u ||
+           initial_entry != ::std::addressof(plan->sites.front()) ||
+           initial_entry->phase != cp::frame_phase::before_opcode || initial_entry->local_count != count ||
+           initial_entry->slots.size() != count || initial_entry->operand_count != 0u ||
+           initial_entry->saved_parameter_count != 0u || available_flags != state.checkpoint_observer_workspace ||
+           cp::validate_site(*initial_entry,*plan) != cp::status::ok) { return false; }
+    }
+    if(retain_canonical_scalars && (public_locals || !state.checkpoint_observer_canonical_numeric_locals ||
+       count != state.local_types.size() || !checkpoint_canonical_local_owner(state))) { return false; }
+    if(retain_canonical_scalars)
+    {
+        auto const exact_prefix{[&](::llvm::Value* pointer, ::std::size_t offset) noexcept
+        {
+            auto const cell{::llvm::dyn_cast_or_null<::llvm::GetElementPtrInst>(pointer)};
+            auto const index{cell != nullptr && cell->getNumIndices() == 1u ?
+                ::llvm::dyn_cast<::llvm::ConstantInt>(cell->getOperand(1u)) : nullptr};
+            return cell != nullptr && cell->getFunction() == state.llvm_function && cell->isInBounds() &&
+                cell->getSourceElementType()->isIntegerTy(8u) && cell->getPointerOperand() == state.checkpoint_observer_workspace &&
+                index != nullptr && index->getZExtValue() == offset;
+        }};
+        if(available_flags != state.checkpoint_observer_workspace ||
+           !exact_prefix(values,count*::uwvm2::runtime::checkpoint::observer_local_metadata_bytes) ||
+           !exact_prefix(saved_flags,count)) { return false; }
+    }
     if(values == nullptr || saved_flags == nullptr || available_flags == nullptr ||
        !values->getType()->isPointerTy() || !saved_flags->getType()->isPointerTy() || !available_flags->getType()->isPointerTy())
     { return false; }
+#if defined(__linux__) && defined(__x86_64__)
+    // Small complete mixed observation prefixes need no address table or
+    // private copier call. Every capture still writes fresh flags and ALL
+    // sixteen bytes. Numeric locals may remain nonescaping; reference locals
+    // retain an initialization-selected address and are never marked numeric.
+    // Entry capture precedes binding the opcode control map. Its immutable
+    // observer profile already selects this owned workspace; an address table
+    // there would escape every local before later inline captures can promote
+    // them. The same extent/entry-owner/type checks apply to both captures.
+    // Large/non-observer/other-target copies retain the bounded copier below.
+    auto const heap_owner{::llvm::dyn_cast_or_null<::llvm::IntToPtrInst>(state.checkpoint_observer_workspace)};
+    auto const allocation{state.checkpoint_observer_workspace_allocation};
+    auto const extent{checkpoint_observer_allocation_extent(state)};
+    bool inline_small{(state.checkpoint_observer_controls != nullptr || checkpoint_observer_workspace_selected(state)) &&
+        heap_owner != nullptr &&
+        allocation != nullptr && extent != nullptr && state.llvm_function != nullptr &&
+        state.llvm_module != nullptr && state.ir_builder != nullptr && count != 0u && count <= 8u &&
+        count == state.local_types.size() && count == state.local_pointers.size() &&
+        state.llvm_function->getParent() == state.llvm_module &&
+        state.ir_builder->GetInsertBlock() != nullptr && state.ir_builder->GetInsertBlock()->getParent() == state.llvm_function &&
+        heap_owner->getFunction() == state.llvm_function && allocation->getFunction() == state.llvm_function &&
+        heap_owner->getParent() == ::std::addressof(state.llvm_function->getEntryBlock()) &&
+        allocation->getParent() == heap_owner->getParent() && checkpoint_observer_workspace_result_matches(state,heap_owner->getOperand(0u)) &&
+        allocation->comesBefore(heap_owner) &&
+        ::uwvm2::runtime::checkpoint::observer_workspace_fits(count,count) &&
+        extent->getZExtValue() >= count * (::uwvm2::runtime::checkpoint::observer_local_metadata_bytes + 16u) &&
+        !state.llvm_module->getDataLayout().isDefault() && state.llvm_module->getDataLayout().isLittleEndian() &&
+        state.llvm_module->getDataLayout().getPointerSizeInBits() == 64u};
+    bool has_reference{}, has_non_gp{};
+    for(::std::size_t i{}; inline_small && i != count; ++i)
+    {
+        auto const kind{get_runtime_wasm_value_type_encoding(state.local_types.index_unchecked(i))};
+        auto const type{get_llvm_type_from_wasm_value_type(state.llvm_function->getContext(),state.local_types.index_unchecked(i))};
+        auto const local{::llvm::dyn_cast_or_null<::llvm::AllocaInst>(state.local_pointers.index_unchecked(i))};
+        bool const numeric{kind == 0x7fu || kind == 0x7eu || kind == 0x7du || kind == 0x7cu || kind == 0x7bu};
+        auto const width{get_runtime_wasm_value_type_abi_size(state.local_types.index_unchecked(i))};
+        bool const reference{(kind == 0x70u || kind == 0x6fu) && type != nullptr && type->isIntegerTy() &&
+            width != 0u && width <= 16u && type->getIntegerBitWidth() == width * CHAR_BIT};
+        inline_small = (numeric || reference) &&
+            local != nullptr && local->getFunction() == state.llvm_function && local->isStaticAlloca() &&
+            !local->isArrayAllocation() && local->getAllocatedType() == type;
+        if(reference) { has_reference = true; }
+        has_non_gp = has_non_gp || reference || kind == 0x7du || kind == 0x7cu || kind == 0x7bu;
+    }
+    // The existing tiny GP entry copier already folds its initial flags and
+    // retains the original argument storage. Keep that native layout for
+    // call-heavy scalar functions; mixed/FP/vector prefixes benefit from
+    // removing their outlined entry copy and address table.
+    if(initial_entry != nullptr && !has_non_gp) { inline_small = false; }
+    if(inline_small)
+    {
+        auto& copy{*state.ir_builder};
+        auto const clear_type{copy.getInt128Ty()};
+        if(has_reference)
+        {
+            auto& zero{state.debug_inline_snapshot_zero};
+            if(zero == nullptr)
+            {
+                zero = new ::llvm::GlobalVariable(*state.llvm_module,clear_type,true,
+                    ::llvm::GlobalValue::PrivateLinkage,::llvm::ConstantInt::get(clear_type,0u),
+                    ::llvm::Twine{state.llvm_function->getName()} + ".uwvm.private.inline.local.zero");
+                zero->setUnnamedAddr(::llvm::GlobalValue::UnnamedAddr::Global);zero->setAlignment(::llvm::Align{1u});
+            }
+            if(zero->getParent()!=state.llvm_module || zero->getValueType()!=clear_type ||
+               !zero->hasPrivateLinkage() || !zero->isConstant() || !zero->hasInitializer() ||
+               !zero->getInitializer()->isNullValue()) { return false; }
+        }
+        for(::std::size_t i{}; i != count; ++i)
+        {
+            if(retain_canonical_scalars && checkpoint_canonical_scalar(state.local_types.index_unchecked(i))) { continue; }
+            ::llvm::Value* flag{};
+            if(initial_entry != nullptr)
+            {
+                // Real entry initialization already checked parameters and
+                // nullable/defaultable declarations and stored these flags.
+                // No host call intervenes; keep absent references unreadable.
+                flag = copy.getInt8(initial_entry->slots[i].initialized ? 1u : 0u);
+            }
+            else
+            {
+                auto const actual{copy.CreateLoad(copy.getInt8Ty(),copy.CreateInBoundsGEP(copy.getInt8Ty(),available_flags,copy.getInt64(i)))};
+                actual->setAlignment(::llvm::Align{1u});flag = actual;
+            }
+            copy.CreateStore(flag,copy.CreateInBoundsGEP(copy.getInt8Ty(),saved_flags,copy.getInt64(i)))->setAlignment(::llvm::Align{1u});
+            auto const type{get_llvm_type_from_wasm_value_type(copy.getContext(),state.local_types.index_unchecked(i))};
+            auto const bits_type{copy.getIntNTy(static_cast<unsigned>(get_runtime_wasm_value_type_abi_size(state.local_types.index_unchecked(i))*8u))};
+            auto const kind{get_runtime_wasm_value_type_encoding(state.local_types.index_unchecked(i))};
+            bool const numeric{kind == 0x7fu || kind == 0x7eu || kind == 0x7du || kind == 0x7cu || kind == 0x7bu};
+            auto const available{copy.CreateICmpEQ(flag,copy.getInt8(1u))};
+            auto const local{state.local_pointers.index_unchecked(i)};
+            // Numeric declarations are initialized at real entry. References
+            // may be nondefaultable: choose immutable zero storage BEFORE any
+            // value load. An invalid flag is preserved for the runtime to reject.
+            if(numeric)
+            {
+                local->setMetadata("uwvm.debug.numeric.local",::llvm::MDNode::get(copy.getContext(),{}));
+                // Actual GP arguments must survive the real activation-entry
+                // call. Keeping their original stack cell avoids introducing
+                // another callee-saved register in tiny call-heavy functions.
+                // Other declarations/internal temporaries still admit SSA.
+                if(initial_entry != nullptr && (kind == 0x7fu || kind == 0x7eu) &&
+                   local->getMetadata("uwvm.debug.numeric.mutable.gp") != nullptr)
+                { local->setMetadata("uwvm.debug.entry.stack.gp",::llvm::MDNode::get(copy.getContext(),{})); }
+            }
+            auto const readable{numeric ? static_cast<::llvm::Value*>(local) :
+                copy.CreateSelect(available,local,state.debug_inline_snapshot_zero)};
+            if(!numeric && !public_locals && bits_type->isIntegerTy(128u))
+            {
+                // Raw references are sixteen physical bytes, not a C++/Wasm
+                // vector value. One unaligned integer-vector move avoids i128
+                // scalar expansion at debug codegen levels. The selected
+                // address already yields sixteen zero bytes for flag != 1;
+                // a second value-select would only duplicate that clearing.
+                // Every capture still refreshes payload, tag and padding.
+                auto const carrier{::llvm::FixedVectorType::get(copy.getInt64Ty(),2u)};
+                auto const bytes{copy.CreateLoad(carrier,readable,"debug.reference.bytes")};
+                bytes->setAlignment(::llvm::Align{1u});
+                copy.CreateStore(bytes,copy.CreateInBoundsGEP(copy.getInt8Ty(),values,copy.getInt64(i*16u)))->setAlignment(::llvm::Align{1u});
+                continue;
+            }
+            auto const live{copy.CreateLoad(type,readable)};live->setAlignment(::llvm::Align{1u});
+            auto const bits{copy.CreateBitCast(live,bits_type)};
+            ::llvm::Value* whole{copy.CreateZExtOrBitCast(bits,copy.getInt128Ty())};
+            if(!numeric && public_locals)
+            {
+                auto const is_null{copy.CreateICmpEQ(live,::llvm::ConstantInt::get(type,0u))};
+                whole = copy.CreateZExt(copy.CreateAnd(available,is_null),copy.getInt128Ty());
+            }
+            auto const saved{copy.CreateSelect(available,whole,::llvm::ConstantInt::get(copy.getInt128Ty(),0u))};
+            copy.CreateStore(saved,copy.CreateInBoundsGEP(copy.getInt8Ty(),values,copy.getInt64(i*16u)))->setAlignment(::llvm::Align{1u});
+        }
+        return true;
+    }
+#endif
+    if(retain_canonical_scalars) { return false; } // retained prefixes require the fully checked inline owner above
     auto const function{prepare_runtime_local_func_llvm_jit_snapshot_copy(state,count,public_locals)};
     if(function == nullptr) { return false; }
     auto const call{state.ir_builder->CreateCall(function,{values,saved_flags,state.snapshot_local_pointers,available_flags})};
     if(call == nullptr) { return false; }
-    call->setDoesNotThrow(); return true;
+    call->setDoesNotThrow();
+    if(function->hasFnAttribute(::llvm::Attribute::AlwaysInline))
+    {
+        // This private copier contains only the same flag/value/padding stores.
+        // InlineFunction preserves its absent-address select BEFORE each load;
+        // it never inlines a guest/native bridge or removes an observation site.
+        // Keep an explicit continuation as the builder's insertion owner:
+        // cloning can split the old block and erase the original call iterator.
+        auto const continuation{::llvm::BasicBlock::Create(state.ir_builder->getContext(),
+            "debug.tiny.copy.continue",state.llvm_function)};
+        state.ir_builder->CreateBr(continuation);
+        state.ir_builder->SetInsertPoint(continuation);
+        ::llvm::InlineFunctionInfo information{};
+        if(!::llvm::InlineFunction(*call,information).isSuccess()) { return false; }
+    }
+    return true;
 }
 
 [[nodiscard]] inline ::llvm::GlobalVariable* prepare_runtime_local_func_llvm_jit_debug_snapshot_flags(

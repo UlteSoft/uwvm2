@@ -38,14 +38,14 @@ runtime identity proof. A replaced function's retired DWARF is not reused.
 Tab retains static command completion and adds:
 
 - Live directory completion for `replace MODULE FUNCTION GENERATION PATH` and
-  `tui source PATH` and `break-source MODULE PATH:LINE`; directory candidates end with `/`. Spaces are literal path
+  `tui source PATH` and `breaksource MODULE PATH:LINE`; directory candidates end with `/`. Spaces are literal path
   bytes, matching these commands' existing whole-tail grammar.
 - Current scoped source variables for `print`, `p`, `ptype`, `source-value`,
   `source-type` and `frame variable`. Explicit THREAD STOP [FRAME] selectors
   remain in the authenticated query. `packet.fi<Tab>` and
   `pointer->se<Tab>` query the corresponding scoped type for member names.
-- Live embedded DWARF function names for `b MODULE PREFIX<Tab>` and
-  `break MODULE PREFIX<Tab>`. `b MODULE SYMBOL` requires an exact, unambiguous
+- Live embedded DWARF function names for `bw MODULE PREFIX<Tab>` and
+  `breakwasm MODULE PREFIX<Tab>`. `bw MODULE SYMBOL` requires an exact, unambiguous
   concrete function and resolves to an existing emitted Wasm safe point. The
   normal controller still authenticates the resulting numeric breakpoint.
 
@@ -77,3 +77,32 @@ results explicitly set `native_positive_coverage=false` and do not qualify a
 genuine native trap or successful asm/register pane. Omit that flag only for an
 independently qualified enabled native-owner build; the positive checks remain
 mandatory and fail if no genuine trap is reached.
+
+### Color, source highlighting and transient Tab candidates
+
+TUI uses the same `diagnostic_color` palette and `NO_COLOR`/`--log-color` policy
+as UWVM verbose diagnostics. Each code pane and the commands pane has a border;
+the focused pane has a colored `*`. Keywords are purple, types blue, numeric
+literals cyan, strings green, comments gray, and the stopped source marker yellow.
+
+A bounded linear lexical scanner supports C/C++, Rust, Go, Zig, JavaScript,
+TypeScript/AssemblyScript and WAT/WAST by filename extension. It carries block
+comment and multiline/raw-string state from the beginning of the file into the
+visible window. Rust and WAT nested comments are supported. This is lexical
+coloring, not a language parser: script template interpolation is colored as
+string text, and unknown file extensions remain plain. Existing regular-file,
+1 MiB, stable-read and terminal-control sanitization checks still apply.
+
+Ambiguous Tab candidates are temporary UI data, never command-log/history entries.
+In TUI they cover the commands pane until the next key. With TUI disabled they
+open a temporary alternate-screen popup so the primary screen and scrollback
+remain intact. The next key, Enter, Ctrl+C, EOF, new output, `tui enable/disable`,
+or Ctrl+X A dismisses them and restores the actual input/caret. Long candidate
+lists show a bounded preview and ask for a longer prefix.
+
+`debug_console_tui_color.cc` checks lexical state, palette, sanitization and
+log separation. `run_debug_console_tui_color.py` checks physical PTYs in both
+modes with/without NO_COLOR, static and real DWARF variable completion, split
+panes, arrow/toggle/cancel cleanup and terminal restoration. Its real LLVM-full
+Wasm test verifies UI/completion actions retain the same authenticated stop.
+All executions require the original Linux 64 GiB cgroup.

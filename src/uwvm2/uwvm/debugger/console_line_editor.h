@@ -10,6 +10,10 @@
 # include <fast_io_dsal/string_view.h>
 # include <cstddef>
 # include <memory>
+# include <fast_io_dsal/string.h>
+# include <fast_io.h>
+# include "console_help_catalog.h"
+# include "console_aliases.h"
 #endif
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
@@ -19,23 +23,57 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_editing
     inline constexpr unsigned key_up{256u}, key_down{257u}, key_home{258u}, key_end{259u}, key_delete{260u}, key_word_left{261u}, key_word_right{262u}, key_word_delete{263u}, key_word_backspace{264u};
     inline constexpr ::std::size_t maximum_bytes{8448u}, maximum_history{32u}, maximum_kills{8u};
     inline constexpr unsigned maximum_argument{1024u};
-    enum class action { changed, unchanged, redraw, candidates, complete, end, interrupted, oversized, invalid,
-        completion, tui_toggle, tui_single, tui_split, page_up, page_down };
+    enum class action { changed, unchanged, idle, redraw, candidates, complete, end, interrupted, oversized, invalid,
+        completion, tui_toggle, tui_single, tui_split, page_up, page_down, mouse };
+    struct mouse_event { unsigned button{}, column{}, row{}; bool released{}; };
+    // Accessed only by the console management thread (including Windows input).
+    inline bool mouse_reporting{};
     struct completion_word { ::fast_io::string_view text{}; bool arguments{}; };
     // HOST command vocabulary. Argument completion is delegated to the normal
     // management thread; this editor has no filesystem or stop authority.
-    inline constexpr ::fast_io::array<completion_word, 102u> completion_words{{
+    inline constexpr completion_word completion_words[]{
+        {"apropos", true},
+        {"path create", true}, {"path extend", true}, {"path members", true}, {"path clear", false},
         {"advance", true}, {"until", true}, {"condition", true}, {"display", true}, {"info display", false}, {"undisplay", true},
         {"enable display", true}, {"disable display", true}, {"delete display", true},
-        {"tui enable", false}, {"tui disable", false}, {"tui source", true},
-        {"layout src", false}, {"layout asm", false}, {"layout split", false},
+        {"selection range", true}, {"selection copy", false}, {"selection show", false}, {"selection clear", false},
+        {"io clear", false}, {"io show", false}, {"io save", true}, {"io input", true}, {"io follow on", false}, {"io follow off", false},
+        {"layout add", true}, {"layout remove", true}, {"layout config save", true}, {"layout config load", true}, {"layout move", true}, {"layout tree", true},
+        {"jump src", true}, {"jump wasm", true}, {"jump asm", true},
+        {"inspect src", true}, {"inspect wasm local", true}, {"inspect wasm stack", true}, {"inspect asm", true},
+        {"memory select", true},
+        {"memory format all", false},
+        {"memory format char", false},
+        {"memory format wc", false},
+        {"memory format utf8", false},
+        {"memory format utf16", false},
+        {"memory format utf32", false},
+        {"memory format i8", false},
+        {"memory format u8", false},
+        {"memory format i16", false},
+        {"memory format u16", false},
+        {"memory format i32", false},
+        {"memory format u32", false},
+        {"memory format i64", false},
+        {"memory format u64", false},
+        {"memory format f32", false},
+        {"memory format f64", false},
+        {"window show", false}, {"window reset", false}, {"window resize", true}, {"scroll", true},
+        {"mouse on", false}, {"mouse off", false}, {"info wasip1 fd all", false},
+        {"info wasip1 fd", true}, {"list src", false}, {"list wasm", false}, {"list asm", false},
+        {"tui enable", false}, {"tui disable", false}, {"set source", true},
+        {"layout src", false}, {"layout asm", false},
         {"layout regs", false}, {"layout wasm", false}, {"layout wasip1", false},
+        {"layout locals", false}, {"layout stack", false}, {"layout operands", false},
+        {"layout memory", false}, {"layout io", false}, {"layout horizontal", true}, {"layout vertical", true},
         {"layout next", false}, {"focus next", false}, {"focus prev", false},
+        {"focus src", false}, {"focus wasm", false}, {"focus asm", false}, {"focus regs", false},
+        {"focus locals", false}, {"focus stack", false}, {"focus memory", false}, {"focus wasip1", false}, {"focus io", false},
         {"focus cmd", false}, {"focus code", false},
         {"backtrace", false},
         {"breakpoint delete", true},
         {"breakpoint list", false},
-        {"breakpoint set", true},
+        {"breakpoint enable", true}, {"breakpoint disable", true},
         {"frame select", true},
         {"frame variable", true},
         {"process continue", false},
@@ -49,8 +87,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_editing
         {"thread step-inst-over", false},
         {"thread step-out", false},
         {"thread step-over", false},
-        {"break", true},
-        {"break-source", true},
+        {"breakwasm", true},
+        {"breakasm", true}, {"bi", true}, {"bw", true},
+        {"breaksource", true},
+        {"bs", true},
+        {"info modules", true},
         {"bt", false},
         {"catch wasm", true},
         {"continue", false},
@@ -65,8 +106,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_editing
         {"frame", false},
         {"frames", false},
         {"globals", true},
-        {"help", false},
+        {"help", true},
         {"info breakpoints", false},
+        {"info locals", false}, {"info all-registers", false}, {"info saved", true},
+        {"info controls", true}, {"info handlers", true}, {"info control-params", true},
+        {"info control-results", true}, {"info handler-params", true},
         {"info globals", true},
         {"info operands", true},
         {"info registers", false},
@@ -95,7 +139,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_editing
         {"ptype-frame", true},
         {"quit", false},
         {"replace", true},
+        {"run", false},
+        {"start", false}, {"st", false}, {"startw", false}, {"stw", false},
+        {"starti", false}, {"sti", false}, {"kill", false},
+        {"saved", true}, {"controls", true}, {"handlers", true}, {"control-params", true},
+        {"control-results", true}, {"handler-params", true}, {"ignore", true}, {"frames wasm", true},
+        {"set wasm memory", true}, {"set wasm global", true}, {"set wasm table", true}, {"set wasm member", true},
         {"set wasip1 arg", true},
+        {"set wasip1 arg-insert", true}, {"set wasip1 file", true}, {"set wasip1 fd-dup", true},
+        {"set wasip1 checkpoint", true}, {"set wasip1 restore", true},
+        {"set wasip1 export", true}, {"set wasip1 import", true},
+        {"set wasip1 export-group", true}, {"set wasip1 import-group", true},
         {"set wasip1 env", true},
         {"set wasip1 rights", true},
         {"si", false},
@@ -103,15 +157,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_editing
         {"step", false},
         {"step asm", true},
         {"step source", true},
-        {"step wasm", true},
+        {"step wasm", true}, {"next wasm", true}, {"finish wasm", true},
+        {"step src", true}, {"next src", true}, {"finish src", true}, {"next asm", true},
+        {"sw", true}, {"nw", true}, {"fw", true}, {"fi", true}, {"ss", true}, {"ns", true}, {"fs", true},
+        {"input", true},
         {"table", true},
         {"trace wasm", true},
+        {"trace wasm on", true}, {"trace wasm off", false}, {"trace wasm clear", false}, {"trace wasm read", true},
+        {"trace wasip1 on", true}, {"trace wasip1 off", false}, {"trace wasip1 clear", false}, {"trace wasip1 read", true},
+        {"unset wasip1 arg", true}, {"unset wasip1 fd", true}, {"unset wasip1 checkpoint", true},
         {"unset wasip1 env", true},
         {"up", false},
         {"wait", false},
         {"wasm-script", true},
         {"where", false},
-    }};
+    };
     [[nodiscard]] inline bool safe_completion_text(::fast_io::string_view text) noexcept
     {
         for(::std::size_t i{}; i<text.size();)
@@ -129,14 +189,120 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_editing
         }
         return true;
     }
+    inline constexpr ::std::size_t maximum_static_candidates{sizeof(completion_words) / sizeof(completion_word)};
+    struct command_choices
+    {
+        ::fast_io::array<completion_word, maximum_static_candidates> words{};
+        ::std::size_t size{}, begin{}, end{};
+    };
+    [[nodiscard]] inline constexpr bool word_space(char c) noexcept { return ::fast_io::char_category::c_space::char_is(c); }
+    struct help_choices : command_choices { bool recognized{}; };
+    // Match a normalized documentation prefix, but edit only the current raw
+    // token. Earlier separators, trailing selectors and the caret stay owned
+    // by the line editor; candidates remain views into the static catalogue.
+    [[nodiscard]] inline help_choices help_matches(::fast_io::string_view line, ::std::size_t cursor)
+    {
+        help_choices result{};
+        if(cursor > line.size() || line.size() > maximum_bytes) { return result; }
+        ::std::size_t head{}; while(head < line.size() && word_space(line[head])) { ++head; }
+        auto end{head}; while(end < line.size() && !word_space(line[end])) { ++end; }
+        auto const root{line.subview(head, end - head)};
+        if((root != "help" && root != "h") || end == line.size() || cursor <= end) { return result; }
+        result.recognized = true; result.begin = result.end = cursor;
+        while(result.begin > end && !word_space(line[result.begin - 1u])) { --result.begin; }
+        while(result.end < line.size() && !word_space(line[result.end])) { ++result.end; }
+        if(cursor == result.begin && cursor != result.end) { return result; }
+        auto const parent{console_help::completion_spelling(line.subview(end, result.begin - end), true)};
+        auto const typed{line.subview(result.begin, cursor - result.begin)};
+        auto const selector{::fast_io::concat_fast_io(parent, typed)};
+        if(selector.size() > console_help::maximum_selector_bytes) { return result; }
+        if(cursor == result.end && !typed.empty())
+        {
+            auto const exact{console_help::find(console_help::canonical(selector.subview(0u)))};
+            if(exact != nullptr && exact->group())
+            {
+                // Root category aliases (source -> language) keep their old
+                // navigation behavior without rewriting unrelated separators.
+                auto word{exact->key};
+                if(!parent.empty())
+                {
+                    if(exact->key.starts_with(parent.subview(0u))) { word = exact->key.subview(parent.size()); }
+                    else { for(auto const& alias : console_help::aliases)
+                        { if(alias.name == selector.subview(0u)) { word = alias.name.subview(parent.size()); break; } } }
+                }
+                result.words[result.size++] = {word, true}; return result;
+            }
+        }
+        console_help::visit_completions(selector.subview(0u), [&](::fast_io::string_view name)
+        {
+            auto const word{name.subview(parent.size())};
+            for(::std::size_t i{}; i < result.size; ++i) { if(result.words[i].text == word) { return; } }
+            if(result.size == result.words.size()) { return; }
+            auto const page{console_help::find(console_help::canonical(name))};
+            result.words[result.size++] = {word, page != nullptr && page->group()};
+        });
+        return result;
+    }
+    // Resolve only the completed command prefix. Candidate views point into
+    // static vocabulary; argument bytes are never parsed as a completion name.
+    [[nodiscard]] inline command_choices command_matches(::fast_io::string_view line, ::std::size_t cursor)
+    {
+        command_choices result{};
+        if(cursor > line.size() || line.size() > maximum_bytes) { return result; }
+        result.begin = result.end = cursor;
+        while(result.begin != 0u && !word_space(line[result.begin - 1u])) { --result.begin; }
+        while(result.end < line.size() && !word_space(line[result.end])) { ++result.end; }
+        if(cursor == result.begin && result.end != result.begin) { return result; }
+        auto const prefix{line.subview(result.begin, cursor - result.begin)};
+        auto const previous{console_aliases::trim(line.subview(0u, result.begin))};
+        ::fast_io::string parent{};
+        if(!previous.empty())
+        {
+            auto const normalized{console_aliases::normalize(previous)};
+            if(normalized.ambiguous) { return result; }
+            auto const parts{console_aliases::split(previous)};
+            auto root{normalized.head};
+            if(root.empty())
+            {
+                // TUI/editing commands also have a static vocabulary, although
+                // they need not belong to the runtime command parser.
+                for(auto const& word : completion_words)
+                { if(console_aliases::split(word.text).word == parts.word) { root = parts.word; break; } }
+                if(root.empty()) { return result; }
+            }
+            if(root == "info" && normalized.valid) { parent = ::fast_io::concat_fast_io(normalized.view()); }
+            else
+            {
+                parent = ::fast_io::concat_fast_io(root);
+                auto tail{parts.tail};
+                while(!tail.empty())
+                { auto const next{console_aliases::split(tail)}; parent.append(" "); parent.append(next.word); tail = next.tail; }
+            }
+            parent.append(" ");
+        }
+        for(auto const& word : completion_words)
+        {
+            if(!word.text.starts_with(parent.subview(0u))) { continue; }
+            auto const tail{word.text.subview(parent.size())};
+            auto const boundary{tail.find(" ")};
+            auto const child{tail.subview(0u, boundary == ::fast_io::containers::npos ? tail.size() : boundary)};
+            if(child.empty() || !child.starts_with(prefix)) { continue; }
+            bool const arguments{boundary != ::fast_io::containers::npos || word.arguments};
+            ::std::size_t i{};
+            while(i != result.size && result.words[i].text != child) { ++i; }
+            if(i == result.size) { result.words[result.size++] = {child, arguments}; }
+            else { result.words[i].arguments = result.words[i].arguments || arguments; }
+        }
+        return result;
+    }
     struct buffer
     {
         ::fast_io::array<char, maximum_bytes> bytes{};
         ::std::size_t size{};
         [[nodiscard]] ::fast_io::string_view view() const noexcept { return ::fast_io::string_view{bytes.data(), size}; }
     };
-    // Host-input editing only. Fixed owned buffers, no heap, filesystem,
-    // evaluation, runtime identity, signal handler or guest/native memory.
+    // Host-input editing only. Fixed owned edit buffers; completion may allocate
+    // host text. No filesystem, evaluation, runtime identity or guest memory.
     class editor final
     {
         buffer line_{}, draft_{}, repeat_{}, search_query_{}, search_draft_{};
@@ -145,7 +311,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_editing
         ::std::size_t cursor_{}, count_{}, selected_{};
         ::std::size_t kill_count_{}, yank_selected_{}, yank_begin_{}, yank_size_{};
         unsigned escape_{};
-        ::fast_io::array<char, 16u> csi_{};
+        ::fast_io::array<char, 32u> csi_{};
+        mouse_event mouse_{};
         ::std::size_t csi_size_{}, paste_end_size_{};
         bool pasting_{}, quoted_{}, next_history_pending_{};
         buffer next_history_{};
@@ -337,32 +504,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_editing
         }
         [[nodiscard]] action complete_word() noexcept
         {
-            if(cursor_ != line_.size) { return action::unchanged; }
             auto const prefix{line_.view()};
-            ::std::size_t matches{}, common{}; completion_word const* first{};
-            for(auto const& word : completion_words)
+            auto const help{help_matches(prefix, cursor_)};
+            if(help.recognized)
             {
-                if(!word.text.starts_with(prefix)) { continue; }
-                if(word.text == prefix && word.arguments && line_.size < maximum_bytes)
+                if(help.size == 0u) { return action::unchanged; }
+                auto const& first{help.words[0u]}; auto common{first.text.size()};
+                for(::std::size_t n{1u}; n < help.size; ++n)
+                { ::std::size_t i{}; while(i < common && i < help.words[n].text.size() && first.text[i] == help.words[n].text[i]) { ++i; } common = i; }
+                if(help.size == 1u || common > cursor_ - help.begin)
                 {
-                    save_undo(); line_.bytes[line_.size++] = ' '; cursor_ = line_.size;
-                    return action::changed;
+                    auto const completed{::fast_io::concat_fast_io(first.text.subview(0u, common),
+                        help.size == 1u && first.arguments && help.end == line_.size ? ::fast_io::string_view{" "} : ::fast_io::string_view{})};
+                    auto const changed{replace_completion(help.begin, help.end, completed.subview(0u))};
+                    if(changed == action::changed) { return changed; }
                 }
-                if(matches++ == 0u) { first = ::std::addressof(word); common = word.text.size(); }
-                else
-                {
-                    ::std::size_t shared{};
-                    while(shared < common && shared < word.text.size() && first->text[shared] == word.text[shared]) { ++shared; }
-                    common = shared;
-                }
+                return help.size > 1u ? action::candidates : action::unchanged;
             }
-            if(first == nullptr) { return action::unchanged; }
-            if(common > line_.size || (matches == 1u && first->arguments && line_.size < maximum_bytes)) { save_undo(); }
-            if(common > line_.size)
-            { copy(line_, first->text.subview(0u, common)); cursor_ = line_.size; }
-            if(matches == 1u && first->arguments && line_.size < maximum_bytes)
-            { line_.bytes[line_.size++] = ' '; cursor_ = line_.size; }
-            return matches > 1u && common == prefix.size() ? action::candidates : action::changed;
+            auto const matches{command_matches(prefix, cursor_)};
+            if(matches.size == 0u) { return action::unchanged; }
+            auto const typed{prefix.subview(matches.begin, cursor_ - matches.begin)};
+            for(::std::size_t i{}; i != matches.size; ++i)
+            {
+                if(matches.words[i].text != typed) { continue; }
+                auto const replacement{::fast_io::concat_fast_io(typed,
+                    matches.words[i].arguments && matches.end == line_.size ? ::fast_io::string_view{" "} : ::fast_io::string_view{})};
+                auto const changed{replace_completion(matches.begin, matches.end, replacement.subview(0u))};
+                // A sole complete literal still requests the existing redraw;
+                // it adds neither an undo entry nor a command submission.
+                return changed == action::unchanged && matches.size == 1u ? action::changed : changed;
+            }
+            auto const& first{matches.words[0u]}; auto common{first.text.size()};
+            for(::std::size_t i{1u}; i != matches.size; ++i)
+            { ::std::size_t n{}; while(n != common && n != matches.words[i].text.size() && first.text[n] == matches.words[i].text[n]) { ++n; } common = n; }
+            if(matches.size == 1u || common > cursor_ - matches.begin)
+            {
+                auto const replacement{::fast_io::concat_fast_io(first.text.subview(0u, common),
+                    matches.size == 1u && first.arguments && matches.end == line_.size ? ::fast_io::string_view{" "} : ::fast_io::string_view{})};
+                auto const changed{replace_completion(matches.begin, matches.end, replacement.subview(0u))};
+                if(changed == action::changed) { return changed; }
+            }
+            return matches.size > 1u ? action::candidates : action::unchanged;
         }
     public:
         [[nodiscard]] action transpose() noexcept
@@ -416,8 +598,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_editing
         [[nodiscard]] bool searching_forward() const noexcept { return searching_ && search_forward_; }
         [[nodiscard]] ::fast_io::string_view search_query() const noexcept { return search_query_.view(); }
         template<typename Display> void display_candidates(Display display) const
-        { for(auto const& word : completion_words) { if(word.text.starts_with(line_.view())) { display(word.text); } } }
+        {
+            auto const text{line_.view()};
+            auto const help{help_matches(text, cursor_)};
+            if(help.recognized)
+            {
+                auto const prefix{console_help::completion_spelling(text.subview(0u, help.begin), true)};
+                for(::std::size_t i{}; i < help.size; ++i)
+                { auto const candidate{::fast_io::concat_fast_io(prefix, help.words[i].text)}; display(candidate.subview(0u)); }
+                return;
+            }
+            auto const matches{command_matches(text, cursor_)};
+            for(::std::size_t i{}; i != matches.size; ++i)
+            { auto const name{::fast_io::concat_fast_io(text.subview(0u, matches.begin), matches.words[i].text)}; display(name.subview(0u)); }
+        }
         [[nodiscard]] buffer const& line() const noexcept { return line_; }
+        [[nodiscard]] mouse_event mouse() const noexcept { return mouse_; }
         [[nodiscard]] ::std::size_t cursor() const noexcept { return cursor_; }
         // Atomic, single-undo replacement of a checked host-input span. A
         // provider can insert printable DATA only, never submit a command.
@@ -447,9 +643,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_editing
             copy(history_[count_++], text); selected_ = count_;
             if(repeatable) { copy(repeat_, text); } else { repeat_ = {}; }
         }
+        void set_repeat(::fast_io::string_view text,bool eligible) noexcept
+        { if(eligible) { copy(repeat_,text); }else { repeat_={}; } }
         void forget_repeat() noexcept { repeat_ = {}; }
         [[nodiscard]] action feed(int byte) noexcept
         {
+            if(byte==-5) { return action::idle; }
             if(swallow_lf_) { swallow_lf_ = false; if(byte == '\n') { return action::unchanged; } }
             if(byte == -3 || byte == 3) { next_history_pending_ = false; begin(); repeat_ = {}; return action::interrupted; }
             if(byte == -1)
@@ -540,10 +739,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_editing
             {
                 auto const result{complete_word()};
                 if(result != action::unchanged) { return result; }
-                auto text{line_.view()}; while(text.starts_with(" ")) { text=text.subview(1u); }
-                constexpr ::fast_io::array<::fast_io::string_view,18u> contexts{{"until ","advance ","display ","condition ","replace ","tui source ","break-source ",
-                    "b ","break ","break-name ","print ","print-frame ","p ","ptype ","ptype-frame ","source-value ","source-type ","frame variable "}};
-                for(auto prefix : contexts) { if(text.starts_with(prefix)) { return action::completion; } }
+                auto const text{line_.view()}; auto const parts{console_aliases::split(text)};
+                // Decide from command words, retaining original argument bytes
+                // and caret offsets for the path/symbol provider.
+                if(!parts.tail.empty() || (!text.empty() && word_space(text.back())))
+                {
+                    auto const normalized{console_aliases::normalize(text)};
+                    constexpr ::fast_io::string_view roots[]{"until", "advance", "display", "condition", "replace", "set", "breaksource", "bs",
+                        "breakwasm", "bw", "breakasm", "bi", "window", "scroll", "io", "inspect", "layout", "focus", "info", "print", "p", "print-frame", "ptype", "ptype-frame", "source-value", "source-type", "frame"};
+                    auto const command{normalized.head.empty() ? parts.word : normalized.head};
+                    if(command=="set" && console_aliases::split(parts.tail).word!="source") { return action::unchanged; }
+                    if(!normalized.ambiguous)
+                    { for(auto root : roots) { if(command == root) { return action::completion; } } }
+                }
                 return action::unchanged;
             }
             if(byte == '\n' || byte == '\r' || byte == 15)
@@ -604,6 +812,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_editing
                         csi_[csi_size_++] = static_cast<char>(key); return action::unchanged;
                     }
                     auto const parameters{::fast_io::string_view{csi_.data(), csi_size_}};
+                    if(parameters.starts_with("<") && (key=='M' || key=='m'))
+                    {
+                        escape_=0u;  unsigned values[3]{}; ::std::size_t field{}; bool digit{}, valid{true};
+                        for(char c : parameters.subview(1u))
+                        {
+                            if(c==';' && digit && field<2u) { ++field; digit=false; }
+                            else if(c>='0' && c<='9' && values[field]<=6553u)
+                            { values[field]=values[field]*10u+static_cast<unsigned>(c-'0'); digit=true; if(values[field]>65535u) { valid=false; } }
+                            else { valid=false; break; }
+                        }
+                        // A malformed mouse report is never inserted into a command.
+                        if(!valid || !digit || field!=2u || values[0]>255u || values[1]==0u || values[2]==0u) { return action::unchanged; }
+                        mouse_={values[0],values[1],values[2],key=='m'}; return action::mouse;
+                    }
                     bool const word{parameters == "1;5" || parameters == "1;3" || parameters == "5"};
                     bool const ordinary{parameters.empty() || parameters == "1" || parameters == "1;2"};
                     if(key == '~' && parameters == "200")

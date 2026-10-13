@@ -280,4 +280,7 @@ import uwvm2.uwvm.runtime.runtime_mode;
 import uwvm2.uwvm.wasm.storage;
 #include "uwvm_runtime_wasip1_native_file.h"
 
+// Implementation-private cache uses imported checkpoint types.
+#include "uwvm_runtime_checkpoint_entry_cache.h"
+#include "uwvm_runtime_function_identity_cache.h"
 #include "uwvm_runtime.default.cpp"

@@ -176,7 +176,7 @@ def interactive(name, cmd, marker=None, terminal=False):
     try:
         console.send('continue')
         reply = console.send('wait')
-        assert b'guest exited: 0' in reply and b'timed out' not in reply, reply
+        assert b'Program exited normally.' in reply and b'timed out' not in reply, reply
         assert (console.marker if terminal else marker) in console.log, console.log[-6000:]
     except BaseException:
         console.close(False)
@@ -199,7 +199,7 @@ cmd = command(regular, work)
 with input_file.open('rb') as source:
     result = subprocess.run(cmd, stdin=source, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=40)
 (a.out/'regular-hardlink.log').write_bytes(result.stdout)
-passed = (result.returncode == 0 and marker in result.stdout and b'guest exited: 0' in result.stdout
+passed = (result.returncode == 0 and marker in result.stdout and b'Program exited normally.' in result.stdout
           and b'timed out' not in result.stdout and input_file.read_bytes() == commands
           and alias.read_bytes() == commands and (work/'benign').exists())
 record('regular-hardlink', cmd, result.returncode, passed, commands.decode().splitlines())

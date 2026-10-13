@@ -172,7 +172,7 @@ public:
         }
         return true;
     }
-    [[nodiscard]] bool validate_and_join(llvm_jit_checkpoint_prepare_result& out) noexcept
+    [[nodiscard]] bool start_and_validate(llvm_jit_checkpoint_prepare_result& out) noexcept
     {
         bool all{};
         out.prepared_private_debug_workers=packets_.size();
@@ -228,6 +228,11 @@ public:
             }
         }
         catch(...) { all=false; } // Includes genuine OS create/allocation failure.
+        return all;
+    }
+    [[nodiscard]] bool validate_and_join(llvm_jit_checkpoint_prepare_result& out) noexcept
+    {
+        bool const all{start_and_validate(out)};
         release_and_join();
         out.started_private_root_workers=started_;out.joined_private_root_workers=joined_;
         bool restored{joined_==started_};
@@ -244,7 +249,63 @@ public:
         restored=restored && wasip1_restored;
         return all && restored;
     }
+    [[nodiscard]] bool held_actual_cohort() const noexcept
+    {
+        if(release_.load(::std::memory_order_acquire) || started_==0u || joined_!=0u ||
+           started_!=packets_.size() || packets_.size()!=world_.prepared_threads_.size()) { return false; }
+        for(auto const& owned:packets_)
+        {
+            // Arrival publishes immutable packet/TLS ownership while this SAME
+            // private gate remains closed. No manager reads another thread's TLS.
+            if(owned->arrival.load(::std::memory_order_acquire)!=1u || !owned->native || !owned->native->joinable() ||
+               !owned->debug_installed || !owned->participant || owned->participant_id==0u ||
+               !control_->owns_current_participant(owned->participant) ||
+               owned->thread->root_records.empty() ||
+               owned->installed_head!=::std::addressof(owned->thread->root_records.back()) ||
+               owned->wasip1_held!=prepared_world_worker_wasip1_scope::expects_held(world_,*owned->thread) ||
+               owned->wasip1_visits!=prepared_world_worker_wasip1_scope::expected_visits(world_,*owned->thread)) { return false; }
+        }
+        return true;
+    }
+    [[nodiscard]] bool start_closed_cohort(llvm_jit_checkpoint_prepare_result& out) noexcept
+    {
+        llvm_jit_checkpoint_prepare_result observed{};
+        observed.installed_private_root_carriers=out.installed_private_root_carriers;
+        bool const started{start_and_validate(observed)};
+        out.started_private_closed_workers=started_;
+        if(!started || !held_actual_cohort()) { return false; }
+        out.held_private_closed_workers=started_;
+        out.private_closed_worker_cohort_held=true;
+        return true;
+    }
+    [[nodiscard]] bool cancel_and_join() noexcept
+    {
+        release_and_join();
+        if(joined_!=started_) { return false; }
+        for(::std::size_t n{};n<started_;++n)
+        {
+            auto const& owned{*packets_[n]};
+            if(!owned.native || owned.native->joinable() || !owned.restored || !owned.debug_restored ||
+               owned.debug_installed || owned.participant || !owned.wasip1_restored) { return false; }
+        }
+        return true;
+    }
 };
+// Declared after every borrowed world resource: reverse destruction joins ALL
+// held OS/TLS workers before caches, frames, code, GC stores or source retire.
+::std::unique_ptr<prepared_world_root_workers> private_closed_workers_{};
+[[nodiscard]] bool prepare_private_closed_workers(::std::size_t maximum_workers,
+    llvm_jit_checkpoint_prepare_result& out)
+{
+    if(phase_!=preparation_status::resources_prepared || private_closed_workers_ ||
+       !full_code_handoff_complete_ || !charge_native(1u,sizeof(prepared_world_root_workers))) { return false; }
+    auto actual{::std::make_unique<prepared_world_root_workers>(*this)};
+    if(!actual->prepare(maximum_workers)) { out.native_payload_bytes=native_bytes_;return false; }
+    out.native_payload_bytes=native_bytes_;
+    if(!actual->start_closed_cohort(out)) { return false; }
+    private_closed_workers_=::std::move(actual); // Nonfallible ownership before return.
+    return true;
+}
 
 [[nodiscard]] bool validate_private_world_root_workers(::std::size_t maximum_workers,
     llvm_jit_checkpoint_prepare_result& out)

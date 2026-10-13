@@ -132,7 +132,7 @@ def main():
                 console.prompt(); assert b'prepared; no Wasm instruction executed' in console.send('status')
                 breaks = []
                 for module in range(len(binaries)):
-                    reply = request(console, f'break {module} {function} {offset}')
+                    reply = request(console, f'breakwasm {module} {function} {offset}')
                     if reply.startswith(b'error:'):
                         assert b'breakpoint target is not a defined LLVM-full Wasm function' in reply, reply
                     else:

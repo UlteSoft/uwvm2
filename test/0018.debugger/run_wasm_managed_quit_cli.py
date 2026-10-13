@@ -56,7 +56,7 @@ def main():
             console = OperandConsole(argv, args.out / (name + '.log'))
             try:
                 console.prompt()
-                assert b'registered' in console.send('break 0 0 0')
+                assert b'registered' in console.send('breakwasm 0 0 0')
                 console.send('continue')
                 deadline = time.monotonic() + args.stop_timeout
                 while True:

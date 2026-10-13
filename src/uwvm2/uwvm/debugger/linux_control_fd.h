@@ -226,7 +226,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         void serve(controller& control) noexcept
         {
             close_on_serve_exit close_after_guest_detach{*this, control};
-            using command_view = ::std::remove_cv_t<decltype(console_help)>;
+            using command_view = ::fast_io::string_view;
             for(;;)
             {
                 auto const state{control.inspect().execution};
@@ -245,7 +245,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 {
                     case console_command_kind::empty: if(!send_literal("error: empty command\n")) { return; } continue;
                     case console_command_kind::help:
-                        if(!send_text(console_help.data(), console_help.size())) { return; }
+                        {
+                            auto const text{console_help::format(command_view{command.help_topic.data(), command.help_topic_size})};
+                            if(!send_text(text.data(), text.size())) { return; }
+                        }
                         continue;
                     case console_command_kind::quit:
                         static_cast<void>(send_literal("debug control detached; guest continues\n"));
@@ -264,6 +267,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     case console_command_kind::wasm_state:
                     case console_command_kind::wasm_path:
                     case console_command_kind::wasm_mutation:
+                    case console_command_kind::assembly_breakpoint:
+                    case console_command_kind::execution_relocate:
                     case console_command_kind::source_breakpoint:
                     case console_command_kind::source_locals:
                     case console_command_kind::source_type:
@@ -280,6 +285,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     case console_command_kind::wasm_event:
                     case console_command_kind::wasm_script:
                     case console_command_kind::replacement_file:
+                    case console_command_kind::module_list:
                     case console_command_kind::protocol: break;
                 }
                 auto const reply{control.execute(command)};

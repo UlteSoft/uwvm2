@@ -20,6 +20,10 @@ def trap_examples():
         ['i64 = -9223372036854775808', 'i64 = -1'], 'integer overflow')
     add('trap-memory-bounds', '(memory 1)', 'i32.const 65536', 'i32.load',
         ['i32 = 65536'], 'memory access out of bounds')
+    add('trap-convert-nan32', '', 'f32.const nan:0x400042', 'i32.trunc_f32_s',
+        ['f32 = bits=0x7fc00042'], 'invalid conversion to integer')
+    add('trap-convert-overflow64', '', 'f64.const 0x1p+64', 'i64.trunc_f64_u',
+        ['f64 = bits=0x43f0000000000000'], 'integer overflow')
     for wide in (False, True):
         width = 'i64' if wide else 'i32'
         add('trap-empty-table-' + width, '(table ' + ('i64 ' if wide else '') + '0 funcref)',

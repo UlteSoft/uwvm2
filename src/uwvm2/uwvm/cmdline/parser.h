@@ -47,6 +47,8 @@
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
+#include "parser_state.h"
+
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 {
     enum class parsing_return_val : unsigned
@@ -55,11 +57,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
         return0,  // Instructs the main function to return 0
         returnm1  // Instructs the main function to return -1
     };
-
-    // globals: There is no data contention because command line parsing is always done when the main thread is created.
-    inline ::uwvm2::utils::container::vector<::uwvm2::utils::cmdline::parameter_parsing_results> parsing_result{};  // [global]
-    inline char8_t const* argv0_dir{};                                                                              // [global]
-    inline ::uwvm2::utils::cmdline::parameter_parsing_results* wasm_file_ppos{};                                    // [global]
 
     /// @brief parsing cmdline
     inline constexpr parsing_return_val parsing(::std::size_t argc, char8_t const* const* argv) noexcept

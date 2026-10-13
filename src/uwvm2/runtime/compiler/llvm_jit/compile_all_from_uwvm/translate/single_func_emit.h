@@ -7021,6 +7021,20 @@ struct llvm_jit_gc_root_frame_emit_state_t
 #include "single_func_checkpoint_resume_state.h"
 #include "single_func_checkpoint_observer_control_map.h"
 
+#if defined(UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES) && UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES == 1
+struct llvm_jit_array_length_value_fact_t
+{
+    ::llvm::WeakTrackingVH reference{};
+    ::llvm::WeakTrackingVH length{};
+    ::llvm::WeakTrackingVH valid{};
+};
+struct llvm_jit_array_length_value_local_t
+{
+    ::llvm::AllocaInst* length{};
+    ::llvm::AllocaInst* valid{};
+};
+#endif
+
 struct runtime_local_func_llvm_jit_emit_state_t
 {
     // True after preparation succeeds and before finalization consumes the control stack.
@@ -7031,6 +7045,17 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
     // Forces Wasm calls through the runtime raw bridge instead of direct typed declarations.
     bool route_wasm_calls_through_runtime_bridge{};
+
+#if (defined(UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES) && UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES == 1) || \
+    (defined(UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD) && UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD == 1)
+    // Set from the real preparation mode, never inferred from call routing.
+    bool gc_array_access_ordinary_full{};
+#if defined(UWVM_EXPERIMENTAL_INLINE_ARRAY_AUTH) && UWVM_EXPERIMENTAL_INLINE_ARRAY_AUTH == 1
+    // Native index/store domain only. No authenticated object survives an op.
+    ::llvm::Value* gc_numeric_array_index_domain{};
+#endif
+#endif
+
 
     // Only the original fused admission factory stages cold import alternatives.
     // Default full/ROS keeps this false and creates no additional LLVM IR.
@@ -7083,6 +7108,9 @@ struct runtime_local_func_llvm_jit_emit_state_t
     ::std::vector<debug_numeric_definition> debug_native_numeric_definitions{};
     ::llvm::BasicBlock* debug_native_numeric_block{};
     unsigned debug_native_numeric_line{};
+    // Private compiler SSA for the process-lifetime hint array. It is never
+    // a Wasm value, a native numeric witness or observation authority.
+    ::llvm::WeakTrackingVH debug_observation_hint_base{};
     bool debug_activation_enabled{};
     ::std::uint64_t debug_compiled_function_generation{1u};
     ::llvm::Value* debug_activation_token{}; // private entry witness; not a guest carrier
@@ -7136,6 +7164,17 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
     // Entry-block allocas for every local slot.
     ::uwvm2::utils::container::vector<::llvm::AllocaInst*> local_pointers{};
+#if defined(UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES) && UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES == 1
+    bool array_length_values_enabled{};
+#if defined(UWVM_EXPERIMENTAL_PRIVATE_NUMERIC_ARRAY_LOCK) && UWVM_EXPERIMENTAL_PRIVATE_NUMERIC_ARRAY_LOCK == 1
+    bool private_numeric_function_safe{true};
+    bool private_numeric_gc_opcode_observed{};
+    ::llvm::AllocaInst* private_numeric_function_slot{};
+    ::llvm::StoreInst* private_numeric_function_decision{};
+#endif
+    ::uwvm2::utils::container::vector<llvm_jit_array_length_value_fact_t> array_length_value_facts{};
+    ::uwvm2::utils::container::vector<llvm_jit_array_length_value_local_t> array_length_value_locals{};
+#endif
     // Debug-only, frame-owned slots. Each captured Wasm local occupies 16 bytes;
     // this alloca and every snapshot store are absent from ordinary LLVM full.
     ::llvm::ArrayType* debug_local_snapshot_type{};
@@ -7146,6 +7185,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     // identity, source value or ASM authority is stored in these lexical cells.
     ::llvm::Value* snapshot_local_pointers{}; // entry alloca or activation-owned private heap table
     ::std::size_t snapshot_local_pointers_count{};
+    ::llvm::GlobalVariable* debug_inline_snapshot_zero{}; // private immutable fallback; not local/root storage
     ::llvm::Function* debug_local_snapshot_copy{};
     ::std::size_t debug_local_snapshot_copy_count{};
     ::llvm::Function* checkpoint_local_snapshot_copy{};
@@ -7163,10 +7203,13 @@ struct runtime_local_func_llvm_jit_emit_state_t
     ::llvm::AllocaInst* checkpoint_packet_flags{};
     ::llvm::Value* checkpoint_observer_workspace{}; // activation-owned heap, observer profile only
     ::llvm::CallInst* checkpoint_observer_workspace_allocation{}; // final constant extent, before optimization
+    ::llvm::AllocaInst* checkpoint_observer_packet_epoch{}; // private activation-local FULL collection stamp
+    bool checkpoint_observer_canonical_numeric_locals{}; // actual executed scalar stores update owned cells
+    ::llvm::AllocaInst* checkpoint_observer_local_epoch{}; // private canonical-locals policy stamp
     // Compiler-only numeric packet witnesses for the actual fused observer.
-    // Earlier stores dominate this append-only block, including the explicitly
-    // proven private shutdown successor. Wasm CFG/owner changes invalidate it.
-    // No guest cache, runtime branch, snapshot address or resume rights.
+    // Stores dominate this append-only block/private shutdown successor, or a
+    // private FULL collection stamp guards their reuse across observation edges.
+    // Wasm CFG/owner changes invalidate it. No snapshot or resume authority.
     ::llvm::BasicBlock* checkpoint_observer_nonlocal_block{};
     ::llvm::Value* checkpoint_observer_nonlocal_workspace{};
     ::llvm::Instruction* checkpoint_observer_nonlocal_anchor{};
@@ -7212,6 +7255,12 @@ struct runtime_local_func_llvm_jit_emit_state_t
     ::std::size_t unreachable_control_depth{};
 };
 
+#if defined(UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES) && UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES == 1
+#include "single_func_gc_array_length_values.h"
+#endif
+
+#include "single_func_checkpoint_workspace_owner.h"
+#include "single_func_checkpoint_canonical_numeric_locals.h"
 #include "single_func_checkpoint_control_storage_emit.h"
 #include "single_func_gc_roots_emit.h"
 
@@ -7448,7 +7497,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
 // Emit a cooperative full-JIT debug point. Bounds are checked in the compiler;
 // only three scalar source identities enter generated code, never native pointers.
 [[nodiscard]] inline constexpr bool emit_runtime_local_func_llvm_jit_debug_safe_point(
-    runtime_local_func_llvm_jit_emit_state_t& state, ::std::size_t wasm_expr_byte_offset) noexcept
+    runtime_local_func_llvm_jit_emit_state_t& state, ::std::size_t wasm_expr_byte_offset,
+    bool local_typed_call_demand = false, ::llvm::Value* local_reference_target = nullptr) noexcept
 {
     if(state.ir_builder == nullptr || state.local_func_storage_ptr == nullptr ||
        !emit_runtime_local_func_llvm_jit_native_provenance(state, wasm_expr_byte_offset)) [[unlikely]] { return false; }
@@ -7469,13 +7519,230 @@ struct runtime_local_func_llvm_jit_emit_state_t
     // This current opcode site was staged from the same fused validator's
     // exact semantic stack before it pops/merges. Copy actual execution values
     // synchronously before the genuine cooperative park callback can run.
-    if(!emit_runtime_local_func_llvm_jit_checkpoint_current_opcode(state, wasm_expr_byte_offset))
-    [[unlikely]] { return false; }
     auto const integer{::llvm::Type::getIntNTy(builder.getContext(), static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
     auto const captured_count{(::std::min)(state.local_pointers.size(),
         ::uwvm2::runtime::lib::details::llvm_jit_debug_max_captured_locals)};
+    // Empty prefixes have no public local copy to remove. Keep their single
+    // checkpoint bridge instead of paying another workspace/activation join.
+    bool shared_checkpoint_locals{captured_count != 0u && state.checkpoint_plan != nullptr &&
+        state.checkpoint_plan->producer_availability == ::uwvm2::runtime::checkpoint::status::ok &&
+        state.checkpoint_observer_controls != nullptr && state.checkpoint_observer_workspace != nullptr &&
+        state.checkpoint_current_site != 0u && state.checkpoint_current_site <= state.checkpoint_plan->sites.size()};
+    if(shared_checkpoint_locals)
+    {
+        auto const& site{state.checkpoint_plan->sites[static_cast<::std::size_t>(state.checkpoint_current_site-1u)]};
+        shared_checkpoint_locals = site.opcode_offset == wasm_expr_byte_offset && site.local_count == state.local_types.size();
+        for(::std::size_t i{}; shared_checkpoint_locals && i != captured_count; ++i)
+        {
+            auto const kind{get_runtime_wasm_value_type_encoding(state.local_types.index_unchecked(i))};
+            shared_checkpoint_locals = kind == 0x7fu || kind == 0x7eu || kind == 0x7du || kind == 0x7cu || kind == 0x7bu;
+        }
+    }
+    ::llvm::BasicBlock* observation_resume{};
+    ::llvm::Value* post_packet_demand{};
+    // Exact single-byte GC subopcodes: field/element reads, writes and length.
+    // No allocation, bulk helper, conversion, call or host wait is admitted.
+    // The complete typed packet is still published even when no stop is wanted.
+    // Check the remaining expression extent before borrowing the subopcode.
+    [[maybe_unused]] bool gc_access{};
+    if(local.code_begin[wasm_expr_byte_offset] == ::std::byte{0xfbu} &&
+       end_address - begin_address - wasm_expr_byte_offset > 1u)
+    {
+        auto const sub{static_cast<::std::uint8_t>(local.code_begin[wasm_expr_byte_offset+1u])};
+        gc_access=(sub >= 0x02u && sub <= 0x05u) || (sub >= 0x0bu && sub <= 0x0fu);
+    }
+    [[maybe_unused]] bool simd_arithmetic{};
+    if(local.code_begin[wasm_expr_byte_offset] == ::std::byte{0xfdu})
+    {
+        auto const remaining{end_address-begin_address-wasm_expr_byte_offset-1u};
+        simd_arithmetic=::uwvm2::runtime::checkpoint::observation_probe_hints::demand_simd_encoding(
+            {local.code_begin+wasm_expr_byte_offset+1u,static_cast<::std::size_t>(remaining)});
+    }
+    auto const emit_observation_gate{[&](::llvm::Value* requested, [[maybe_unused]] ::llvm::Value* demand_address=nullptr)
+    {
+        auto* const capture{::llvm::BasicBlock::Create(builder.getContext(),"debug.observe.capture",state.llvm_function)};
+        observation_resume=::llvm::BasicBlock::Create(builder.getContext(),"debug.observe.resume",state.llvm_function);
+        auto const weights{::llvm::MDNode::get(builder.getContext(),
+            {::llvm::MDString::get(builder.getContext(),"branch_weights"),
+             ::llvm::ConstantAsMetadata::get(builder.getInt32(1u)),
+             ::llvm::ConstantAsMetadata::get(builder.getInt32(1024u))})};
+#if defined(__linux__) && defined(__x86_64__)
+        if(demand_address != nullptr)
+        {
+            // Compiler-owned x86 acquire read of ONE admitted atomic byte.
+            // CMP's byte read is atomic in normal process memory; x86 orders
+            // subsequent reads/writes after it. The side-effecting memory
+            // clobber also prevents LLVM moving memory operations across it.
+            // No packed alias, RMW, cached decision or guest address is used.
+            // Keep the cold successor explicit in LLVM's CFG (asm goto), so
+            // both successors retain the original complete state protocol.
+            auto* const signature{::llvm::FunctionType::get(builder.getVoidTy(),
+                {::llvm::PointerType::getUnqual(builder.getContext())},false)};
+            auto* const probe{::llvm::InlineAsm::get(signature,"cmpb $$0, $0; jne ${1:l}",
+                "*m,!i,~{memory},~{dirflag},~{fpsr},~{flags}",true)};
+            auto* const branch{builder.CreateCallBr(signature,probe,observation_resume,{capture},{demand_address})};
+            branch->addParamAttr(0u,::llvm::Attribute::get(builder.getContext(),
+                ::llvm::Attribute::ElementType,builder.getInt8Ty()));
+            branch->setDoesNotThrow();
+            // This private read has no guest numeric/source authority. Do not
+            // attach branch-only weights to an asm-goto terminator.
+        }
+        else
+#endif
+        { builder.CreateCondBr(requested,capture,observation_resume,weights); }
+        if(state.checkpoint_observer_packet_epoch!=nullptr &&
+           state.checkpoint_observer_nonlocal_block==builder.GetInsertBlock())
+        { state.checkpoint_observer_nonlocal_block=capture; }
+        builder.SetInsertPoint(capture);
+    }};
+    // These witnesses refer to semantic Wasm SSA defined before this private
+    // probe, rather than stores inside its capture edge. Those values dominate
+    // both successors. Wasm CFG/owner changes still invalidate ordinary reuse.
+    bool const carry_numeric_definitions{state.debug_native_numeric_block == builder.GetInsertBlock() &&
+        builder.GetInsertPoint() == builder.GetInsertBlock()->end()};
+#if defined(__linux__) && defined(__x86_64__)
+    // A hint chooses whether to collect; it grants no stop, register, root or
+    // continuation authority. Every real observation still enters the same
+    // authenticated packet/bridge path. Unsupported observers publish all bits.
+    // Initial entry/stepping/trap catchpoints publish full demand. Only a
+    // same-walk validated full local typed call may also use this gate: its
+    // complete awaiting-caller packet remains unconditional before the child.
+    // Imports, indirect/tail calls, waits, allocation, bulk operations and
+    // unknown prefixed operations stay unconditional. Exact pure SIMD arithmetic
+    // follows the same typed-site gate; vector memory operations stay full.
+    // Live GC/extern packets
+    // and these exact GC accesses remain unconditional too;
+    // their observer callback alone may be cold on scalar/reference opcodes.
+    // Exception and unknown references retain the complete original path.
+    if(checkpoint_observer_workspace_selected(state) &&
+       state.checkpoint_observer_controls != nullptr && state.checkpoint_current_site != 0u &&
+       state.checkpoint_current_site <= state.checkpoint_plan->sites.size() &&
+       (::uwvm2::runtime::checkpoint::observation_probe_hints::demand_numeric_opcode(
+           static_cast<::std::uint8_t>(local.code_begin[wasm_expr_byte_offset])) ||
+        (local_typed_call_demand && local.code_begin[wasm_expr_byte_offset] == ::std::byte{0x10u}) ||
+        (local_reference_target != nullptr && local.code_begin[wasm_expr_byte_offset] == ::std::byte{0x14u}) ||
+        (local.code_begin[wasm_expr_byte_offset] >= ::std::byte{0xd0u} &&
+         local.code_begin[wasm_expr_byte_offset] <= ::std::byte{0xd6u}) || gc_access || simd_arithmetic))
+    {
+        auto const& site{state.checkpoint_plan->sites[static_cast<::std::size_t>(state.checkpoint_current_site-1u)]};
+        bool eligible{site.opcode_offset == wasm_expr_byte_offset &&
+            site.phase == ::uwvm2::runtime::checkpoint::frame_phase::before_opcode};
+        bool live_references{};
+        // Function records live in the pinned module; i31/null have no GC
+        // object. These exact types can omit an unrequested packet. Live
+        // GC/extern types must update that packet BEFORE the callback gate.
+        // Exception/unknown types stay unconditional. A defined heap requires its immutable
+        // parser table's function-kind proof, never a native carrier guess.
+        namespace core = ::uwvm2::runtime::checkpoint::types;
+        for(auto const& slot : site.slots)
+        {
+            if(slot.type.kind != core::value_kind::reference)
+            { if(!slot.initialized) { eligible=false;break; }continue; }
+            bool non_gc{}, live_gc{};
+            if(slot.type.heap.is_defined())
+            {
+                auto const* module{local.runtime_module_ptr};
+                auto const index{static_cast<::std::uint_least64_t>(slot.type.heap.code)};
+                if(module != nullptr && index < get_runtime_type_section_count(*module))
+                {
+                    auto const& types{module->type_section_storage};
+                    auto const* context{types.core3_context_ptr};
+                    if(context != nullptr && context->contains(index))
+                    {
+                        auto const kind{context->records.index_unchecked(static_cast<::std::size_t>(index)).kind};
+                        non_gc=kind==core::composite_kind::function;
+                        live_gc=kind==core::composite_kind::struct_ || kind==core::composite_kind::array;
+                    }
+                    else if(context == nullptr) { non_gc=!types.requires_gc && index < types.type_section_count; }
+                }
+            }
+            else
+            {
+                auto const heap{static_cast<core::abstract_heap_type>(slot.type.heap.code)};
+                non_gc = heap == core::abstract_heap_type::func || heap == core::abstract_heap_type::nofunc ||
+                    heap == core::abstract_heap_type::i31 || heap == core::abstract_heap_type::none;
+                live_gc = heap == core::abstract_heap_type::any || heap == core::abstract_heap_type::eq ||
+                    heap == core::abstract_heap_type::struct_ || heap == core::abstract_heap_type::array ||
+                    heap == core::abstract_heap_type::extern_;
+            }
+            if(!non_gc && !live_gc) { eligible=false;break; }
+            live_references = live_references || live_gc;
+        }
+        using hints=::uwvm2::runtime::checkpoint::observation_probe_hints;
+        auto const b{hints::bucket(local.module_id,local.function_index,wasm_expr_byte_offset)};
+        auto const address{hints::byte_address(b)};
+        auto const shutdown{::uwvm2::runtime::lib::details::llvm_jit_debug_shutdown_flag_address_host_api()};
+        if(eligible && address != nullptr && shutdown != nullptr)
+        {
+            auto const pointer{::llvm::PointerType::getUnqual(builder.getContext())};
+            // The actual managed-shutdown publisher latches full collection
+            // before requesting stop. The cold poll still authenticates that
+            // owner; the hot path only needs one effective-demand byte load.
+            auto* hint_base{static_cast<::llvm::Value*>(state.debug_observation_hint_base)};
+            if(hint_base == nullptr)
+            {
+                auto const base{hints::byte_address(0u)};
+                if(base == nullptr || state.llvm_function == nullptr || state.llvm_function->empty()) { return false; }
+                // One compiler-owned tied identity pins the immutable base in
+                // entry SSA. Without it LLVM folds each GEP back into a distinct
+                // 64-bit absolute address. Entry dominates every Wasm successor;
+                // no branch-local value or loaded demand byte is retained.
+                auto& entry{state.llvm_function->getEntryBlock()};
+                ::llvm::IRBuilder<> entry_builder{::std::addressof(entry),entry.getFirstInsertionPt()};
+                auto* const signature{::llvm::FunctionType::get(integer,{integer},false)};
+                auto* const identity{::llvm::InlineAsm::get(signature,"","=r,0",true)};
+                auto* const held{entry_builder.CreateCall(signature,identity,
+                    {::llvm::ConstantInt::get(integer,reinterpret_cast<::std::uintptr_t>(base))})};
+                held->setDoesNotThrow();
+                // No source location/numeric metadata: this is private dispatch
+                // machinery, never an inspectable guest pointer/register value.
+                hint_base=entry_builder.CreateIntToPtr(held,pointer);
+                state.debug_observation_hint_base=hint_base;
+            }
+            // byte_address admitted exactly these contiguous one-byte atomic
+            // objects. Keep the original acquire load and per-site bucket;
+            // sharing an address does not share or cache collection decisions.
+            auto const flag{builder.CreateInBoundsGEP(builder.getInt8Ty(),hint_base,builder.getInt64(b))};
+            // Live GC/extern references still publish the complete current
+            // typed packet unconditionally. Preserve their original acquire
+            // load position and post-packet callback gate. Only non-GC sites
+            // use the fused compiler-owned CMP/Jcc before the cold packet.
+            // A dynamic call ALWAYS publishes its complete pre-call packet.
+            // Only the optional callback is cold when the checked target is an
+            // actual same-module published typed entry. Host/cross-module/null/
+            // absent/incompatible targets retain the original callback/poll.
+            if(live_references || gc_access || local_reference_target != nullptr)
+            {
+                auto* const demand{builder.CreateLoad(builder.getInt8Ty(),flag)};
+                demand->setAtomic(::llvm::AtomicOrdering::Acquire);demand->setAlignment(::llvm::Align{1u});
+                post_packet_demand=builder.CreateICmpNE(demand,builder.getInt8(0u));
+                if(local_reference_target != nullptr)
+                {
+                    if(local_reference_target->getType() != integer) { return false; }
+                    auto const unavailable{builder.CreateICmpEQ(local_reference_target,::llvm::ConstantInt::get(integer,0u))};
+                    post_packet_demand=builder.CreateOr(post_packet_demand,unavailable);
+                }
+            }
+            else { emit_observation_gate(nullptr,flag); }
+        }
+    }
+#endif
+    ::std::uint64_t fused_site{};
+    if(!emit_runtime_local_func_llvm_jit_checkpoint_current_opcode(state,wasm_expr_byte_offset,
+        shared_checkpoint_locals ? ::std::addressof(fused_site) : nullptr)) [[unlikely]] { return false; }
+    shared_checkpoint_locals = fused_site != 0u;
+    if(post_packet_demand != nullptr) { emit_observation_gate(post_packet_demand); }
     ::llvm::Value* snapshot_address{::llvm::ConstantInt::get(integer, 0u)};
-    if(captured_count != 0u)
+    if(shared_checkpoint_locals)
+    {
+        // The complete current-opcode packet contains these exact numeric
+        // bytes and flags. The following fused host boundary materializes it
+        // before the real park; the cold capture matches its actual owner.
+        auto const payload{builder.CreateInBoundsGEP(builder.getInt8Ty(),state.checkpoint_observer_workspace,
+            builder.getInt64(state.local_types.size()*::uwvm2::runtime::checkpoint::observer_local_metadata_bytes))};
+        snapshot_address = builder.CreatePtrToInt(payload,integer);
+    }
+    else if(captured_count != 0u)
     {
         if(state.debug_local_snapshot == nullptr || state.debug_local_snapshot_type == nullptr ||
            state.debug_local_snapshot_packet_type == nullptr || captured_count > state.local_types.size() ||
@@ -7498,7 +7765,10 @@ struct runtime_local_func_llvm_jit_emit_state_t
     auto const call{apply_llvm_jit_host_calling_conv(builder.CreateCall(type, bridge,
         {::llvm::ConstantInt::get(integer, local.module_id), ::llvm::ConstantInt::get(integer, local.function_index),
          ::llvm::ConstantInt::get(integer, wasm_expr_byte_offset), snapshot_address,
-         ::llvm::ConstantInt::get(integer, captured_count)}))};
+         ::llvm::ConstantInt::get(integer, captured_count | (shared_checkpoint_locals ?
+             ((captured_count != 0u ? ::uwvm2::runtime::checkpoint::observation_local_snapshot_tag : 0u) |
+              ::uwvm2::runtime::checkpoint::observation_fused_snapshot_tag |
+              (static_cast<::std::size_t>(fused_site) << ::uwvm2::runtime::checkpoint::observation_local_count_bits)) : 0u))}))};
     // The host may cooperatively block and touches synchronization state. Keep
     // its side effects; nounwind does not imply readonly, nosync or speculatable.
     call->setDoesNotThrow();
@@ -7521,6 +7791,28 @@ struct runtime_local_func_llvm_jit_emit_state_t
     // old noexcept/naked wrapper and never a Wasm typed exception handler.
     if(!emit_runtime_local_func_llvm_jit_debug_shutdown_poll(state, wasm_expr_byte_offset, call)) { return false; }
     if(!emit_runtime_local_func_llvm_jit_checkpoint_retirement_poll(state, wasm_expr_byte_offset)) { return false; }
+    if(observation_resume != nullptr)
+    {
+        bool const guarded_packet{state.checkpoint_observer_packet_epoch!=nullptr &&
+            state.checkpoint_observer_nonlocal_block==builder.GetInsertBlock()};
+        builder.CreateBr(observation_resume);builder.SetInsertPoint(observation_resume);
+        if(guarded_packet) { state.checkpoint_observer_nonlocal_block=observation_resume; }
+        else
+        {
+            state.checkpoint_observer_nonlocals.clear();
+            state.checkpoint_observer_nonlocal_block=nullptr;
+            state.checkpoint_observer_nonlocal_workspace=nullptr;
+            state.checkpoint_observer_nonlocal_anchor=nullptr;
+            state.checkpoint_observer_nonlocal_locals=0u;
+        }
+        if(carry_numeric_definitions) { state.debug_native_numeric_block=observation_resume; }
+        else
+        {
+            state.debug_native_numeric_definitions.clear();
+            state.debug_native_numeric_block=nullptr;
+            state.debug_native_numeric_line=0u;
+        }
+    }
     if(!emit_runtime_local_func_llvm_jit_native_provenance(state, wasm_expr_byte_offset)) { return false; }
     if(!emit_runtime_local_func_llvm_jit_native_numeric_values(state)) { return false; }
     return true;
@@ -7536,6 +7828,37 @@ struct runtime_local_func_llvm_jit_emit_state_t
        state.debug_compiled_function_generation == 0u) { return false; }
     auto& builder{*state.ir_builder};
     auto const integer{builder.getIntNTy(static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+#if defined(__linux__) && defined(__x86_64__)
+    // One SysV aggregate result joins the real entry and observer allocation.
+    // Both existing authenticated runtime transitions still execute in order.
+    // Other targets and resumable/ordinary entries retain their original ABI.
+    if(state.llvm_module != nullptr && !state.llvm_module->getDataLayout().isDefault() &&
+       state.llvm_module->getDataLayout().isLittleEndian() && state.llvm_module->getDataLayout().getPointerSizeInBits() == 64u &&
+       state.llvm_module->getTargetTriple().getArch() == ::llvm::Triple::x86_64 && state.llvm_module->getTargetTriple().isOSLinux() &&
+       state.emit_debug_safe_points && checkpoint_observer_workspace_selected(state) &&
+       state.checkpoint_plan->producer_availability == ::uwvm2::runtime::checkpoint::status::ok)
+    {
+        namespace cp=::uwvm2::runtime::checkpoint;
+        auto const locals{state.local_pointers.size()};
+        if(state.checkpoint_observer_workspace != nullptr || state.checkpoint_observer_workspace_allocation != nullptr ||
+           !cp::observer_workspace_fits(locals,locals)) { return false; }
+        auto const bytes{locals*(cp::observer_local_metadata_bytes+cp::native_slot_bytes)};
+        auto const result{::llvm::StructType::get(builder.getContext(),{builder.getInt64Ty(),integer})};
+        auto const type{::llvm::FunctionType::get(result,{integer,integer,integer,builder.getInt64Ty()},false)};
+        auto const bridge{get_llvm_runtime_bridge_function_symbol_value_unwrapped<
+            ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_observer_activation_enter_abi_bridge>(builder,type)};
+        if(bridge == nullptr) { return false; }
+        auto const& local{*state.local_func_storage_ptr};
+        auto const call{apply_llvm_jit_host_calling_conv(builder.CreateCall(type,bridge,
+            {::llvm::ConstantInt::get(integer,bytes==0u?1u:bytes),::llvm::ConstantInt::get(integer,local.module_id),
+             ::llvm::ConstantInt::get(integer,local.function_index),builder.getInt64(state.debug_compiled_function_generation)}))};
+        call->setDoesNotThrow();state.checkpoint_observer_workspace_allocation=call;
+        state.debug_activation_token=builder.CreateExtractValue(call,{0u},"checkpoint.entry.activation");
+        auto const workspace{builder.CreateExtractValue(call,{1u},"checkpoint.entry.workspace")};
+        state.checkpoint_observer_workspace=builder.CreateIntToPtr(workspace,builder.getPtrTy());
+        return true;
+    }
+#endif
     auto const type{::llvm::FunctionType::get(builder.getInt64Ty(), {integer, integer, builder.getInt64Ty()}, false)};
     auto const bridge{state.checkpoint_plan == nullptr ? get_llvm_runtime_bridge_function_symbol_value<
         ::uwvm2::runtime::lib::details::llvm_jit_debug_activation_enter_abi_bridge>(builder, type) :
@@ -7564,13 +7887,28 @@ struct runtime_local_func_llvm_jit_emit_state_t
     auto const integer{builder.getIntNTy(static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
     if(state.checkpoint_observer_workspace != nullptr)
     {
-        auto const release_type{::llvm::FunctionType::get(builder.getVoidTy(), {integer}, false)};
-        auto const release{get_llvm_runtime_bridge_function_symbol_value_unwrapped<
-            ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_observer_workspace_leave_abi_bridge>(builder, release_type)};
-        if(release == nullptr) { return false; }
-        auto const retired{apply_llvm_jit_host_calling_conv(builder.CreateCall(release_type, release,
-            {builder.CreatePtrToInt(state.checkpoint_observer_workspace, integer)}))};
-        retired->setDoesNotThrow();
+        if(state.checkpoint_plan == nullptr) { return false; }
+#if defined(__linux__) && defined(__x86_64__)
+        if(kind == 0u && state.emit_debug_safe_points && state.checkpoint_plan->profile &&
+           state.checkpoint_plan->profile->purpose() == ::uwvm2::runtime::checkpoint::compilation_purpose::observe_values)
+        {
+            auto const type{::llvm::FunctionType::get(builder.getVoidTy(), {builder.getInt64Ty(),integer}, false)};
+            auto const bridge{get_llvm_runtime_bridge_function_symbol_value_unwrapped<
+                ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_observer_return_abi_bridge>(builder,type)};
+            if(bridge == nullptr) { return false; }
+            auto const call{apply_llvm_jit_host_calling_conv(builder.CreateCall(type,bridge,
+                {state.debug_activation_token,builder.CreatePtrToInt(state.checkpoint_observer_workspace,integer)}))};
+            call->setDoesNotThrow(); return true;
+        }
+#endif
+        auto const type{::llvm::FunctionType::get(builder.getVoidTy(), {builder.getInt64Ty(),integer,integer}, false)};
+        auto const bridge{get_llvm_runtime_bridge_function_symbol_value_unwrapped<
+            ::uwvm2::runtime::lib::details::llvm_jit_checkpoint_observer_activation_leave_abi_bridge>(builder,type)};
+        if(bridge == nullptr) { return false; }
+        auto const call{apply_llvm_jit_host_calling_conv(builder.CreateCall(type,bridge,
+            {state.debug_activation_token,::llvm::ConstantInt::get(integer,kind),
+             builder.CreatePtrToInt(state.checkpoint_observer_workspace,integer)}))};
+        call->setDoesNotThrow(); return true;
     }
     auto const type{::llvm::FunctionType::get(builder.getVoidTy(), {builder.getInt64Ty(), integer}, false)};
     auto const bridge{state.checkpoint_plan == nullptr ? get_llvm_runtime_bridge_function_symbol_value<
@@ -7590,7 +7928,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
 // handlers can delegate to the generic emitter; this offset deduplication keeps
 // one IR call per source opcode and adds no guest-execution state or checks.
 [[nodiscard]] inline constexpr bool emit_runtime_local_func_llvm_jit_instruction_debug_safe_point(
-    runtime_local_func_llvm_jit_emit_state_t& state) noexcept
+    runtime_local_func_llvm_jit_emit_state_t& state, bool local_typed_call_demand = false,
+    ::llvm::Value* local_reference_target = nullptr) noexcept
 {
     if(!state.emit_debug_safe_points || state.debug_safe_point_granularity != llvm_jit_debug_safe_point_granularity::instruction)
     { return true; }
@@ -7615,7 +7954,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     // The scalar offset was captured before any immediate decoder advanced its
     // cursor. The shared emitter rechecks its half-open bounds; no source pointer
     // is advanced or dereferenced here.
-    if(!emit_runtime_local_func_llvm_jit_debug_safe_point(state, state.current_wasm_op_offset)) [[unlikely]] { return false; }
+    if(!emit_runtime_local_func_llvm_jit_debug_safe_point(state, state.current_wasm_op_offset, local_typed_call_demand, local_reference_target)) [[unlikely]] { return false; }
     state.last_debug_instruction_offset = state.current_wasm_op_offset;
     return true;
 }
@@ -7658,6 +7997,13 @@ namespace sealed_compact_codegen {
                                                                                        ::uwvm2::runtime::checkpoint::function_plan* checkpoint_plan = nullptr) noexcept
 {
     state = {};
+#if (defined(UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES) && UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES == 1) || \
+    (defined(UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD) && UWVM_EXPERIMENTAL_TYPED_ARRAY_LOAD == 1)
+    state.gc_array_access_ordinary_full = compilation_mode == llvm_jit_compilation_mode::full &&
+        lazy_defined_raw_call_target_base_address == 0u && lazy_defined_typed_entry_target_base_address == 0u &&
+        !emit_tiered_loop_reentry_entries;
+#endif
+
     state.compilation_mode = compilation_mode;
     if(pending_numeric_plan != nullptr &&
        (!pending_numeric_plan->shape_valid_for_compilation() || pending_numeric_plan->module != local_func_storage.runtime_module_ptr ||
@@ -7976,6 +8322,10 @@ namespace sealed_compact_codegen {
     // the logical activation. OSR bypasses normal-init and inherits the existing
     // interpreter activation. Non-tailcc cores retain wrapper ownership.
 
+#if defined(UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES) && UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES == 1
+    if(!llvm_jit_prepare_array_length_value_locals(state, *runtime_module_ptr)) { return false; }
+#endif
+
     state.local_pointers.reserve(state.local_types.size());
     for(::std::size_t local_index{}; local_index != state.local_types.size(); ++local_index)
     {
@@ -7994,6 +8344,11 @@ namespace sealed_compact_codegen {
             auto const core_arg_index{emit_tiered_loop_reentry_entries ? local_index + 2uz :
                 (pending_numeric_plan != nullptr ? local_index + 1uz : local_index)};
             state.ir_builder->CreateStore(state.llvm_function->getArg(core_arg_index), local_pointer);
+            // Compiler-private pressure hint: actual Wasm GP parameters, not
+            // cold ABI/checkpoint reloads. This grants no capture authority.
+            if(state.emit_debug_safe_points && (local_type == runtime_operand_stack_value_type::i32 ||
+                local_type == runtime_operand_stack_value_type::i64))
+            { local_pointer->setMetadata("uwvm.debug.numeric.mutable.gp",::llvm::MDNode::get(llvm_context,{})); }
         }
         else
         {
@@ -8126,7 +8481,12 @@ template<typename ExceptionalCleanup>
     }
 
     if(!state.control_stack.empty()) [[unlikely]] { return false; }
-
+#if defined(UWVM_EXPERIMENTAL_PRIVATE_NUMERIC_ARRAY_LOCK) && UWVM_EXPERIMENTAL_PRIVATE_NUMERIC_ARRAY_LOCK == 1
+    // Revoke the WHOLE function even for publication after an access or on a back edge.
+    if(state.private_numeric_function_decision != nullptr)
+    { state.private_numeric_function_decision->setOperand(0u,
+        ::llvm::ConstantInt::getBool(*state.llvm_context_holder, state.private_numeric_function_safe)); }
+#endif
     auto& ir_builder{*state.ir_builder};
 
     // Native metadata must not attribute synthetic cleanup/returns to the previous opcode.
@@ -10358,6 +10718,9 @@ get_llvm_jit_local_imported_global_byte_buffer_alignment(runtime_operand_stack_v
     if(llvm_local_type == nullptr || local_pointer == nullptr) [[unlikely]] { return false; }
 
     auto loaded_value{ir_builder.CreateLoad(llvm_local_type, local_pointer, get_llvm_string_ref(u8"local.get"))};
+#if defined(UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES) && UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES == 1
+    llvm_jit_array_length_value_local_get(state, local_index_uz, loaded_value);
+#endif
     if(loaded_value == nullptr) [[unlikely]] { return false; }
 
     state.operand_stack.push_back({.type = local_type, .value = loaded_value});
@@ -10382,6 +10745,15 @@ get_llvm_jit_local_imported_global_byte_buffer_alignment(runtime_operand_stack_v
     if(value.type != local_type || value.value == nullptr || local_pointer == nullptr) [[unlikely]] { return false; }
 
     state.ir_builder->CreateStore(value.value, local_pointer);
+#if defined(UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES) && UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES == 1
+    llvm_jit_array_length_value_local_set(state, local_index_uz, value.value);
+#endif
+    if(state.emit_debug_safe_points && (local_type == runtime_operand_stack_value_type::i32 ||
+        local_type == runtime_operand_stack_value_type::i64) && !::llvm::isa<::llvm::Constant>(value.value))
+    {
+        if(auto const local{::llvm::dyn_cast<::llvm::AllocaInst>(local_pointer)})
+        { local->setMetadata("uwvm.debug.numeric.mutable.gp",::llvm::MDNode::get(state.ir_builder->getContext(),{})); }
+    }
     if(!emit_runtime_local_func_llvm_jit_checkpoint_assignment_flag(
         state, state.checkpoint_executed_local_flags, local_index_uz)) { return false; }
     return true;
@@ -10404,6 +10776,15 @@ get_llvm_jit_local_imported_global_byte_buffer_alignment(runtime_operand_stack_v
     if(value.type != local_type || value.value == nullptr || local_pointer == nullptr) [[unlikely]] { return false; }
 
     state.ir_builder->CreateStore(value.value, local_pointer);
+#if defined(UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES) && UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES == 1
+    llvm_jit_array_length_value_local_set(state, local_index_uz, value.value);
+#endif
+    if(state.emit_debug_safe_points && (local_type == runtime_operand_stack_value_type::i32 ||
+        local_type == runtime_operand_stack_value_type::i64) && !::llvm::isa<::llvm::Constant>(value.value))
+    {
+        if(auto const local{::llvm::dyn_cast<::llvm::AllocaInst>(local_pointer)})
+        { local->setMetadata("uwvm.debug.numeric.mutable.gp",::llvm::MDNode::get(state.ir_builder->getContext(),{})); }
+    }
     if(!emit_runtime_local_func_llvm_jit_checkpoint_assignment_flag(
         state, state.checkpoint_executed_local_flags, local_index_uz)) { return false; }
     return true;
@@ -10579,6 +10960,10 @@ get_llvm_jit_local_imported_global_byte_buffer_alignment(runtime_operand_stack_v
         if(value == nullptr) { return false; }
         state.ir_builder->CreateStore(value, state.local_pointers[i]);
     }
+#if defined(UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES) && UWVM_EXPERIMENTAL_ARRAY_LENGTH_VALUES == 1
+    // Self-tail resets bypass ordinary local.set/tee; every parameter fact is unknown.
+    llvm_jit_invalidate_array_length_value_tail_locals(state);
+#endif
     if(!emit_runtime_local_func_llvm_jit_checkpoint_reset_initialization_flags(
         state, state.checkpoint_executed_local_flags)) { return false; }
     state.ir_builder->CreateBr(state.self_tail_entry_block);
@@ -11381,12 +11766,15 @@ template <bool Tail = false>
     return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, result_value);
 }
 
+#include "single_func_call_ref_typed_dispatch.h"
+
 // Core 3 call_ref receives an opaque native funcref object after its arguments. The runtime bridge authenticates
 // the VM-owned function record, copies one complete raw/typed target, and canonicalizes its signature; generated
 // code never treats a guest-provided payload as an executable address. This path is emitted only for call_ref opcodes.
 template <bool Tail = false>
 [[nodiscard]] inline constexpr bool try_emit_runtime_local_func_llvm_jit_call_ref(
-    runtime_local_func_llvm_jit_emit_state_t& state, validation_module_traits_t::wasm_u32 type_index) noexcept
+    runtime_local_func_llvm_jit_emit_state_t& state, validation_module_traits_t::wasm_u32 type_index,
+    llvm_jit_local_reference_dispatch_witness const* checked_reference = nullptr) noexcept
 {
     if(!state.valid || state.local_func_storage_ptr == nullptr || state.llvm_context_holder == nullptr ||
        state.llvm_module == nullptr || state.ir_builder == nullptr || state.control_stack.empty()) [[unlikely]] { return false; }
@@ -11445,8 +11833,6 @@ template <bool Tail = false>
     if(ref_slot == nullptr || target_slot == nullptr) [[unlikely]] { return false; }
     ref_slot->setAlignment(::llvm::Align{alignof(runtime_wasm_funcref)});
     target_slot->setAlignment(::llvm::Align{alignof(::uwvm2::uwvm::runtime::storage::llvm_jit_raw_call_target_t)});
-    auto const ref_store{builder.CreateStore(reference.value, ref_slot)};
-    ref_store->setAlignment(::llvm::Align{alignof(runtime_wasm_funcref)});
     auto const module_name{get_llvm_runtime_module_object_symbol_name(*runtime_module)};
     auto const module_address{get_llvm_external_host_object_address(builder,
         reinterpret_cast<::std::uintptr_t>(runtime_module),
@@ -11457,6 +11843,25 @@ template <bool Tail = false>
     auto const ref_address{builder.CreatePtrToInt(ref_slot, intptr, get_llvm_string_ref(u8"call_ref.value.address"))};
     auto const target_address{builder.CreatePtrToInt(target_slot, intptr, get_llvm_string_ref(u8"call_ref.target.address"))};
     auto const resolver_type{::llvm::FunctionType::get(intptr, {intptr, intptr, intptr}, false)};
+    ::llvm::Value* local_target{};
+    ::llvm::BasicBlock* local_fast{};
+    if(runtime_llvm_jit_local_reference_dispatch_selected(state))
+    {
+        if(checked_reference != nullptr)
+        {
+            local_target = emit_runtime_llvm_jit_local_reference_dispatch_after_observation(
+                state,reference.value,expected_id,expected_width,typed_type,*checked_reference);
+        }
+        if(local_target == nullptr)
+        { local_target = emit_runtime_llvm_jit_local_reference_dispatch(state,reference.value,expected_id,expected_width,typed_type); }
+        if(local_target == nullptr) { return false; }
+        local_fast = ::llvm::BasicBlock::Create(context,"call_ref.local.fast",state.llvm_function);
+        auto const slow{::llvm::BasicBlock::Create(context,"call_ref.checked.resolve",state.llvm_function)};
+        builder.CreateCondBr(builder.CreateICmpNE(local_target,::llvm::ConstantInt::get(intptr,0u)),local_fast,slow);
+        builder.SetInsertPoint(slow);
+    }
+    auto const ref_store{builder.CreateStore(reference.value, ref_slot)};
+    ref_store->setAlignment(::llvm::Align{alignof(runtime_wasm_funcref)});
     auto const status{emit_runtime_local_func_llvm_jit_runtime_bridge_call<
         ::uwvm2::runtime::lib::details::llvm_jit_resolve_call_ref_target_abi_bridge>(
             state, resolver_type, {module_address, ref_address, target_address})};
@@ -11467,22 +11872,38 @@ template <bool Tail = false>
 
     // The successful bridge wrote all fields of the aligned alloca before returning. Runtime mutation
     // cannot change this copy, so signature, entry and context are one coherent call target.
-    auto const entry_address{builder.CreateLoad(intptr, builder.CreateStructGEP(raw_type, target_slot, 0u),
+    auto const slow_entry{builder.CreateLoad(intptr, builder.CreateStructGEP(raw_type, target_slot, 0u),
         get_llvm_string_ref(u8"call_ref.entry"))};
-    auto const context_address{builder.CreateLoad(intptr, builder.CreateStructGEP(raw_type, target_slot, 1u),
+    auto const slow_context{builder.CreateLoad(intptr, builder.CreateStructGEP(raw_type, target_slot, 1u),
         get_llvm_string_ref(u8"call_ref.context"))};
     auto const encoded_type_id{builder.CreateLoad(i32, builder.CreateStructGEP(raw_type, target_slot, 2u),
         get_llvm_string_ref(u8"call_ref.type.id"))};
-    auto const typed_entry_address{builder.CreateLoad(intptr, builder.CreateStructGEP(raw_type, target_slot, 3u),
+    auto const slow_typed{builder.CreateLoad(intptr, builder.CreateStructGEP(raw_type, target_slot, 3u),
         get_llvm_string_ref(u8"call_ref.typed.entry"))};
     emit_llvm_conditional_trap(*state.llvm_module, builder,
-        builder.CreateICmpEQ(entry_address, ::llvm::ConstantInt::get(intptr, 0u)),
+        builder.CreateICmpEQ(slow_entry, ::llvm::ConstantInt::get(intptr, 0u)),
         ::uwvm2::runtime::lib::llvm_jit_trap_kind::null_reference);
     auto const type_mismatch{emit_runtime_call_type_mismatch(builder, encoded_type_id, expected_id, expected_width)};
     if(type_mismatch == nullptr) [[unlikely]] { return false; }
     emit_llvm_conditional_trap(*state.llvm_module, builder,
         type_mismatch,
         ::uwvm2::runtime::lib::llvm_jit_trap_kind::call_indirect_type_mismatch);
+
+    ::llvm::Value* entry_address{slow_entry};
+    ::llvm::Value* context_address{slow_context};
+    ::llvm::Value* typed_entry_address{slow_typed};
+    if(local_target != nullptr)
+    {
+        auto const slow_end{builder.GetInsertBlock()};
+        auto const ready{::llvm::BasicBlock::Create(context,"call_ref.target.ready",state.llvm_function)};
+        builder.CreateBr(ready);builder.SetInsertPoint(local_fast);builder.CreateBr(ready);builder.SetInsertPoint(ready);
+        auto const entry{builder.CreatePHI(intptr,2u,"call_ref.resolved.entry")};
+        entry->addIncoming(slow_entry,slow_end);entry->addIncoming(local_target,local_fast);entry_address=entry;
+        auto const context_value{builder.CreatePHI(intptr,2u,"call_ref.resolved.context")};
+        context_value->addIncoming(slow_context,slow_end);context_value->addIncoming(::llvm::ConstantInt::get(intptr,0u),local_fast);context_address=context_value;
+        auto const typed{builder.CreatePHI(intptr,2u,"call_ref.resolved.typed")};
+        typed->addIncoming(slow_typed,slow_end);typed->addIncoming(local_target,local_fast);typed_entry_address=typed;
+    }
 
     if constexpr(Tail)
     {

@@ -649,6 +649,53 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_owned_instruction_sem
         decoder& operator=(decoder&&) = delete;
         [[nodiscard]] explicit operator bool() const noexcept { return disassembler_ != nullptr; }
 
+        // Straight-line RUN interval, not relocation. Preserve the physical
+        // frame/stack witness while executing ordinary instructions normally.
+        // Memory operands may READ SP/FP; any explicit or implicit definition
+        // of a stack/frame/link/TLS register refuses this batching proof.
+        [[nodiscard]] bool linear_run_safe(::std::uintptr_t pc, ::std::span<::std::uint8_t const> bytes) noexcept
+        {
+            if((triple_.getArch()!=::llvm::Triple::aarch64 && triple_.getArch()!=::llvm::Triple::x86_64) ||
+               !decode(pc,bytes).safe_for_single_instruction()) { return false; }
+            ::llvm::MCInst instruction{}; ::std::uint64_t size{};
+            if(disassembler_->getInstruction(instruction,size,{bytes.data(),::std::min(bytes.size(),maximum_)},pc,::llvm::nulls())!=::llvm::MCDisassembler::Success)
+            { return false; }
+            auto const& descriptor{instructions_->get(instruction.getOpcode())};
+            if(descriptor.getNumDefs()>instruction.getNumOperands() || descriptor.isVariadic() || descriptor.hasUnmodeledSideEffects()) { return false; }
+            auto const permitted{[&](unsigned reg)
+            {
+                if(reg==0u || reg>=registers_->getNumRegs()) { return false; }
+                auto const name{::llvm::StringRef{registers_->getName(reg)}};
+                return name!="RSP" && name!="ESP" && name!="SP" && name!="SPL" && name!="RBP" && name!="EBP" && name!="BP" && name!="BPL" &&
+                    name!="WSP" && name!="FP" && name!="LR" && name!="X29" && name!="W29" && name!="X30" && name!="W30" && name!="X18" && name!="W18";
+            }};
+            for(unsigned i{};i!=descriptor.getNumDefs();++i)
+            { auto const& operand{instruction.getOperand(i)}; if(!operand.isReg() || !permitted(operand.getReg())) { return false; } }
+            for(auto reg:descriptor.implicit_defs()) { if(!permitted(reg)) { return false; } }
+            return true;
+        }
+
+        // Conservative relocation interval DATA. AArch64 frame/link/stack/TLS
+        // operands and every control transfer or unmodelled side effect refuse.
+        // This is not an execution permission: the controller must hold an
+        // authenticated current JIT image and the real parked-thread state.
+        [[nodiscard]] bool relocation_neutral(::std::uintptr_t pc,::std::span<::std::uint8_t const> bytes) noexcept
+        {
+            if(triple_.getArch()!=::llvm::Triple::aarch64 || !decode(pc,bytes).safe_for_single_instruction()) { return false; }
+            ::llvm::MCInst instruction{};::std::uint64_t size{};
+            if(disassembler_->getInstruction(instruction,size,{bytes.data(),::std::min(bytes.size(),maximum_)},pc,::llvm::nulls())!=::llvm::MCDisassembler::Success || size!=4u)
+            { return false; }
+            auto const& descriptor{instructions_->get(instruction.getOpcode())};
+            if(descriptor.hasUnmodeledSideEffects()) { return false; }
+            auto const allowed{[&](unsigned reg) { if(!reg || reg>=registers_->getNumRegs()) { return false; }auto name{::llvm::StringRef{registers_->getName(reg)}};
+                return name!="SP" && name!="WSP" && name!="FP" && name!="LR" && name!="X29" && name!="W29" &&
+                    name!="X30" && name!="W30" && name!="X18" && name!="W18"; }};
+            for(auto const& operand:instruction) { if(operand.isReg() && operand.getReg() && !allowed(operand.getReg())) { return false; } }
+            for(auto reg:descriptor.implicit_defs()) { if(!allowed(reg)) { return false; } }
+            for(auto reg:descriptor.implicit_uses()) { if(!allowed(reg)) { return false; } }
+            return true;
+        }
+
         // display_pc affects relative decoding only. It is NEVER converted to
         // a pointer. The bounded owned copy must come from the caller's genuine
         // private code query; this DATA API cannot authenticate that caller.
@@ -662,7 +709,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_owned_instruction_sem
             // including compressed instructions. Do not decode an odd PC even
             // when that SDK estimate is present in an owned target description.
             if((display_pc & (alignment_ - 1u)) != 0u || (triple_.isRISCV() && (display_pc & 1u) != 0u) ||
-               ((triple_.isARM() || triple_.getArch() == ::llvm::Triple::loongarch64 ||
+               ((triple_.isARM() || triple_.getArch() == ::llvm::Triple::aarch64 || triple_.getArch() == ::llvm::Triple::loongarch64 ||
                  triple_.getArch() == ::llvm::Triple::loongarch32 || standard_mips_) && (display_pc & 3u) != 0u)) { return {}; }
             auto const available{::std::min<::std::size_t>(maximum_, owned.size())};
             if(available > UINTPTR_MAX - display_pc) { return {}; }
@@ -821,6 +868,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_owned_instruction_sem
                 instructions_->getName(instruction.getOpcode()), instruction, descriptor, *registers_)};
             auto const vector_configuration{size==4u && details::bounded_riscv_vector_configuration(triple_,
                 instructions_->getName(instruction.getOpcode()), instruction, descriptor, *registers_)};
+            // LLVM's AVX/SSE ABI transition clears only upper vector lanes.
+            // The canonical instruction does not change PC, stack, flags or
+            // MXCSR. Qualify its exact encoding AND complete MC effect shape;
+            // no other zero/control/state-management opcode gains an exception.
+            bool avx_upper_clear{triple_.getArch()==::llvm::Triple::x86_64 && size==3u &&
+                bytes[0u]==0xc5u && bytes[1u]==0xf8u && bytes[2u]==0x77u && early_name=="VZEROUPPER" &&
+                instruction.getFlags()==0u && instruction.getNumOperands()==0u && descriptor.getNumOperands()==0u &&
+                descriptor.getNumDefs()==0u && !descriptor.isPseudo() && !descriptor.isMetaInstruction() &&
+                !descriptor.isVariadic() && !descriptor.mayLoad() && !descriptor.mayStore() &&
+                !descriptor.isCall() && !descriptor.isReturn() && !descriptor.isBranch() && !descriptor.isTrap() &&
+                !descriptor.isTerminator() && !descriptor.isBarrier() && !descriptor.hasDelaySlot() &&
+                descriptor.implicit_uses().empty() && descriptor.implicit_defs().size()==16u};
+            if(avx_upper_clear)
+            {
+                constexpr ::llvm::StringLiteral names[]{"YMM0","YMM1","YMM2","YMM3","YMM4","YMM5","YMM6","YMM7",
+                    "YMM8","YMM9","YMM10","YMM11","YMM12","YMM13","YMM14","YMM15"};
+                ::std::size_t index{};
+                for(auto reg:descriptor.implicit_defs())
+                {
+                    if(reg==0u || reg>=registers_->getNumRegs() ||
+                       ::llvm::StringRef{registers_->getName(reg)}!=names[index++])
+                    { avx_upper_clear=false;break; }
+                }
+            }
             // Empty TD patterns conservatively mark PPC NOP as loading,
             // storing and having unknown effects. Its complete fixed encoding
             // plus the Success-decoded operand-free NOP identity proves the
@@ -865,7 +936,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_owned_instruction_sem
             if(result.kind == native_instruction_semantics::flow::ordinary &&
                ((instruction.getFlags() != 0u && !benign_width_prefix) || descriptor.isTerminator() ||
                 (triple_.isARM() && instructions_->getName(instruction.getOpcode())=="HINT" && !arm_nop) ||
-                (descriptor.hasUnmodeledSideEffects() && !ordered_memory && !harmless_nop && !bounded_numeric && !vector_configuration) || trap_state_change))
+                (descriptor.hasUnmodeledSideEffects() && !ordered_memory && !harmless_nop && !bounded_numeric && !vector_configuration && !avx_upper_clear) || trap_state_change))
             {
                 result.kind = native_instruction_semantics::flow::other_control;
                 result.may_change_pc = true; // conservative uncertainty, not a resolved branch target
@@ -991,7 +1062,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_owned_instruction_sem
                 {
                     case ::llvm::Triple::aarch64:
                     case ::llvm::Triple::aarch64_be:
-                        call_continuation_safe=(name=="BL" || name=="BLR") && size==4u; break;
+                        call_continuation_safe=(name=="BL" || name=="BLR") && size==4u;
+                        if(name=="BLR" && instruction.getNumOperands()==1u && instruction.getOperand(0u).isReg())
+                        {
+                            auto const reg{instruction.getOperand(0u).getReg()};
+                            if(reg && reg<registers_->getNumRegs())
+                            {
+                                auto n{::llvm::StringRef{registers_->getName(reg)}};
+                                if(n=="FP") { call_register_index=29u; }
+                                else if(n=="LR") { call_register_index=30u; }
+                                else if(n.size()>=2u && n.size()<=3u && n.front()=='X')
+                                { unsigned value{};bool valid{true};for(char c:n.drop_front())
+                                  { if(c<'0' || c>'9') { valid=false;break; }value=value*10u+static_cast<unsigned>(c-'0'); }
+                                  if(valid && value<31u) { call_register_index=value; } }
+                            }
+                        }
+                        break;
                     case ::llvm::Triple::arm:
                     case ::llvm::Triple::armeb:
                         call_continuation_safe=(name=="BL" || name=="BL_pred" || name=="BLX" || name=="BLX_pred") && size==4u; break;
@@ -1041,7 +1127,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_owned_instruction_sem
                     break; // actual CALL opcode, never scan its operand bytes
                 }
             }
-            bool public_display_safe{(result.kind == native_instruction_semantics::flow::ordinary || direct_branch_step_safe) &&
+            bool public_display_safe{!avx_upper_clear && (result.kind == native_instruction_semantics::flow::ordinary || direct_branch_step_safe) &&
                 !(triple_.getArch()==::llvm::Triple::loongarch64 && ordered_memory) &&
                 (!triple_.isARM() || instructions_->getName(instruction.getOpcode())!="HINT" || arm_nop) &&
                 (instruction.getFlags() == 0u || benign_width_prefix) &&
@@ -1127,6 +1213,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::native_owned_instruction_sem
         constexpr decoder() noexcept = default;
         template<typename Description> explicit constexpr decoder(Description const&) noexcept {}
         [[nodiscard]] explicit constexpr operator bool() const noexcept { return false; }
+        [[nodiscard]] constexpr bool relocation_neutral(::std::uintptr_t,::std::span<::std::uint8_t const>) noexcept { return false; }
         [[nodiscard]] constexpr decoded_instruction decode(::std::uintptr_t,
             ::std::span<::std::uint8_t const>) noexcept { return {}; }
     };

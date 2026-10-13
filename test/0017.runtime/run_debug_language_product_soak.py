@@ -39,11 +39,11 @@ while time.monotonic()-started<a.seconds and len(record['sessions'])<a.max_sessi
  try:
   console=Console(origin['argv'],log)
   def ask(command):return re.sub(rb'\x1b\[[0-?]*[ -/]*[@-~]',b'',console.send(command)).decode(errors='replace')
-  br=ask(f'break-source 0 {fixture}:{line}');bid=int(re.search(r'breakpoint (\d+)',br)[1]);ask('continue')
+  br=ask(f'breaksource 0 {fixture}:{line}');bid=int(re.search(r'breakpoint (\d+)',br)[1]);ask('continue')
   for _ in range(64):
    stop=ask('wait')
    if 'stopped: breakpoint' in stop:break
-   assert 'guest exited:' not in stop,stop
+   assert 'Program exited' not in stop,stop
   else:raise AssertionError('No actual source stop')
   thread=int(re.search(r'thread (\d+) module=0 function=',stop)[1]);sid=int(re.search(r'(?m)^stop-id (\d+)',ask(f'bt {thread}'))[1])
   for i,check in enumerate(origin['checks']):
@@ -51,19 +51,19 @@ while time.monotonic()-started<a.seconds and len(record['sessions'])<a.max_sessi
    assert value==oracle==check['target_compiler_oracle'],(check['expression'],value,oracle)
    row['checks']+=1;record['checks']+=1
   stale=ask(f'print {thread} {sid+1000000} value');assert 'error:' in stale and 'source-value stop=' not in stale
-  ask(f'delete {bid}');assert 'guest exited:' not in ask(f'step wasm {thread}')
+  ask(f'delete {bid}');assert 'Program exited' not in ask(f'step wasm {thread}')
   stale=ask(f'print {thread} {sid} value');assert 'error:' in stale and 'source-value stop=' not in stale
   ask('continue')
   for _ in range(64):
    ended=ask('wait')
-   if 'guest exited:' in ended:assert 'guest exited: 0' in ended;break
+   if 'Program exited' in ended:assert 'Program exited normally.' in ended;break
   else:raise AssertionError('Guest exit deadline')
   row['passed']=True
  except BaseException as error:row['error']=repr(error);save();raise
  finally:
   if console:
    try:
-    console.finish();row['quit_returncode']=console.child.returncode;row['managed_shutdown_complete']='managed shutdown complete' in bytes(console.transcript).decode(errors='replace');assert row['quit_returncode']==0 and row['managed_shutdown_complete']
+    console.finish();row['quit_returncode']=console.child.returncode;row['managed_shutdown_complete']=console.normal_quit_completed;assert row['quit_returncode']==0 and row['managed_shutdown_complete']
    except BaseException as error:row.update(passed=False,shutdown_error=repr(error));save();raise
    finally:
     if log.exists():row.update(log_sha256=sha(log),log_bytes=log.stat().st_size)

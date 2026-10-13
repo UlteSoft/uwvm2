@@ -29,10 +29,11 @@ def main():
   ask('continue');reply=''
   for _ in range(16):
    reply=ask('wait')
-   if 'guest exited:' in reply:break
+   if 'Program exited' in reply:break
    if 'error:' in reply:raise AssertionError(reply)
-  if not re.search(r'(?m)^guest exited: '+str(a.code)+r'$',reply):raise AssertionError(('wrong guest exit',reply))
-  if 'guest exited: '+str(a.code) not in ask('status'):raise AssertionError('exit status was not retained')
+  exit_message='Program exited normally.' if a.code==0 else 'Program exited with code 0'+format(a.code,'o')+'.'
+  if not re.search(r'(?m)^'+re.escape(exit_message)+r'\r?$',reply):raise AssertionError(('wrong guest exit',reply))
+  if exit_message not in ask('status'):raise AssertionError('exit status was not retained')
   if not any('proc_exit('+str(a.code)+')' in item['reply'] for item in d['actions']):raise AssertionError('builtin exit trace was lost')
   d['passed']=True
  except BaseException as e:d['error']=repr(e);raise
@@ -40,7 +41,7 @@ def main():
   if c:
    try:c.finish();d['quit_returncode']=c.child.returncode
    except BaseException as e:d['passed']=False;d['close_error']=repr(e);raise
-   finally:d['managed_shutdown_complete']=b'managed shutdown complete' in c.transcript;save()
+   finally:d['managed_shutdown_complete']=c.normal_quit_completed;save()
   save()
 
 if __name__=='__main__':main()

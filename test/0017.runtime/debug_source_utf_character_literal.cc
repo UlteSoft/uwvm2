@@ -28,7 +28,7 @@ static constexpr witness corpus[]{
  W(+u8'\xff'),W(+u'\uffff'),W(+U'\U0001F642'),W(-U'\U0001F642'),
  W(u8'\x80'+1),W(u'\u03bb'+1),W(U'\U0001F642'+1),W(u'\uffff'>>4),W(U'\xffffffff'>>4),
  W(u'\u03bb'==u'\u03bb'),W(U'\U0001F642'>U'\u03bb'),
- W(1?u8'a':u8'b'),W(1?u'\u03bb':u'\u0041'),W(0?U'a':U'\U0001F642'),
+ W(1?u8'a':u8'bw'),W(1?u'\u03bb':u'\u0041'),W(0?U'a':U'\U0001F642'),
  W(1?u8'a':(unsigned char)65),W(1?u'\u03bb':(unsigned short)955),
  W(1?u'\u03bb':U'\U0001F642'),W(1?U'\U0001F642':42u),
  W(static_cast<char8_t>(128)),W(static_cast<char16_t>(955)),W(static_cast<char32_t>(128578)),

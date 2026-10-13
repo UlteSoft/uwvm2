@@ -537,18 +537,15 @@ def validate_source_evaluation_expression(expression):
                     number = float(content)
                     if not math.isfinite(number):
                         raise ValueError("finite Rust floating literal required")
-                    significand = re.split("[eE]", content, maxsplit=1)[0]
-                    nonzero = any(c in "123456789" for c in significand)
-                    if number == 0.0 and nonzero:
-                        raise ValueError("source Rust float literal underflows its target")
+                    # Rust permits a floating literal to round to signed zero.
+                    # This suffix union admits syntax; the selected CU and
+                    # target-precision value remain authoritative in the VM.
                     if suffix == "f32":
                         try:
                             packed = struct.pack("!f", number)
                         except OverflowError:
                             raise ValueError("finite Rust float32 literal required") from None
                         narrowed = struct.unpack("!f", packed)[0]
-                        if narrowed == 0.0 and nonzero:
-                            raise ValueError("source Rust float32 literal underflows its target")
                         if not math.isfinite(narrowed):
                             raise ValueError("finite Rust float32 literal required")
                 elif int(content[2:] if radix != 10 else content, radix) >= 1 << 64:
@@ -4036,7 +4033,7 @@ class Adapter:
                     try:
                         ignore = breakpoint_ignore_count(point)
                         suffix = ("" if ignore is None else f" ignore {ignore}") + breakpoint_condition_suffix(point)
-                        reply = self.command(f"break-source {self.module_id} {path}:{line}{suffix}")
+                        reply = self.command(f"breaksource {self.module_id} {path}:{line}{suffix}")
                         match = BREAK_RE.match(reply)
                         if not match:
                             raise RuntimeError(reply.strip())
@@ -4074,7 +4071,7 @@ class Adapter:
                     try:
                         ignore = breakpoint_ignore_count(point)
                         suffix = ("" if ignore is None else f" ignore {ignore}") + breakpoint_condition_suffix(point)
-                        reply = self.command(f"break {module} {function} {byte_offset}{suffix}")
+                        reply = self.command(f"breakwasm {module} {function} {byte_offset}{suffix}")
                         breakpoint = BREAK_RE.match(reply)
                         if breakpoint is None:
                             raise RuntimeError(reply.strip())

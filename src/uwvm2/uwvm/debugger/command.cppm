@@ -4,6 +4,7 @@ module;
 #include <limits>
 export module uwvm2.uwvm.debugger:command;
 import fast_io;
+import :console_help_catalog;
 import uwvm2.utils.control;
 import :wasm_events;
 import uwvm2.uwvm.debugger.wasm_state;

@@ -19,7 +19,7 @@ int main()
         {
             if(size) { return false; }
             if(leaf.root_name=="a") { value={a,32u,true}; return true; }
-            if(leaf.root_name=="b") { value={b,32u,true}; return true; }
+            if(leaf.root_name=="bw") { value={b,32u,true}; return true; }
             if(leaf.root_name=="count") { value={count,32u,true}; return true; }
             return false;
         }};

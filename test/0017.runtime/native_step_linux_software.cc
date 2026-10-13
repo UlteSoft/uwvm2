@@ -154,7 +154,7 @@ int main()
         // Seed first/last physical vector registers immediately before the
         // fixture-owned entry. These are ABI controls, not Wasm provenance.
         __asm__ volatile("lvx 0,0,%0\n\tlvx 31,0,%1" : :
-            "b"(vector_0.bytes.data()),"b"(vector_31.bytes.data()) : "v0","v31","memory");
+            "bw"(vector_0.bytes.data()),"bw"(vector_31.bytes.data()) : "v0","v31","memory");
 #endif
 #if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
         CHECK(invoke_descriptor(callable,42.0) == 44u);
@@ -228,6 +228,46 @@ int main()
     CHECK(!step::stage_plan(s,next)); // A prior real trap revision cannot resume this episode.
     CHECK(step::release(s)); wait(s,step::phase::released); worker.join();
     CHECK(step::clear(s) && queries==2u);
+    // Retain the actual first kernel trap as a zero-instruction stop, then
+    // either release directly or step exactly once from the retained first gate.
+    for(bool advance : {false, true})
+    {
+        step::session entry{}; thread.store(0u); go.store(false);
+        ::std::atomic_bool returned{};
+        ::std::thread entry_worker{[&]
+        {
+            thread.store(step::details::raw_system_call(SYS_gettid), ::std::memory_order_release);
+            while(!go.load(::std::memory_order_acquire)) { ::std::this_thread::yield(); }
+            CHECK(step::arm_at_return(begin));
+#if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+            ::std::uintptr_t descriptor[]{begin, 0u, 0u};
+            CHECK(invoke_descriptor(reinterpret_cast<::std::uintptr_t>(descriptor), 42.0) == 44u);
+#else
+            CHECK(reinterpret_cast<unsigned long (*)(double)>(begin)(42.0) == 44u);
+#endif
+            returned.store(true, ::std::memory_order_release);
+        }};
+        while(thread.load(::std::memory_order_acquire) == 0u) { ::std::this_thread::yield(); }
+        auto const entry_tid{thread.load(::std::memory_order_acquire)};
+        CHECK(!step::retain_initial_trap(entry));
+        CHECK(step::request(entry, entry_tid, begin, end, begin, cursor::provider(owner,entry,entry_tid,begin,end),
+              cursor::plan(owner,entry,entry_tid,begin,end,begin,entry.trap_revision,true,begin+first_size)));
+        go.store(true, ::std::memory_order_release); wait(entry, step::phase::at_guest_pc);
+        CHECK(!step::with_owned_registers(&entry, [](auto...) noexcept { CHECK(false); }));
+        CHECK(step::retain_initial_trap(entry) && !step::retain_initial_trap(entry));
+        CHECK(!returned.load(::std::memory_order_acquire) && entry.state.load() == step::phase::at_guest_pc);
+        CHECK(step::with_owned_registers_and_revision(&entry, [&](auto t,auto pc,auto b,auto e,auto const& r,auto revision) noexcept
+        { CHECK(t==entry_tid && pc==begin && b==begin && e==end && r.pc()==begin && r.sp()!=0u && revision==1u); }));
+        CHECK(!step::with_owned_registers(reinterpret_cast<void const*>(::std::uintptr_t{1u}), [](auto...) noexcept { CHECK(false); }));
+        if(advance)
+        {
+            CHECK(step::stage_plan(entry,cursor::plan(owner,entry,entry_tid,begin,end,begin,entry.trap_revision,false,begin+first_size)));
+            CHECK(step::continue_from_trap(entry)); wait(entry, step::phase::trapped);
+            CHECK(entry.next_pc==begin+first_size && entry.trap_revision==2u && entry.register_snapshot.values[value_index]==42u);
+        }
+        CHECK(step::release(entry)); wait(entry,step::phase::released); entry_worker.join();
+        CHECK(returned.load() && step::clear(entry) && ::std::memcmp(bytes,words,sizeof(words))==0);
+    }
     // Cancellation before the selected worker leaves its cooperative poll
     // restores the entry patch without granting a physical register query.
     step::session pending{};
@@ -257,6 +297,6 @@ int main()
     CHECK(!step::with_owned_registers(&exited,[](auto...) noexcept { CHECK(false); }));
     CHECK(step::clear(exited) && step::uninstall());
     CHECK(::std::memcmp(bytes,words,sizeof(words))==0); CHECK(::munmap(page,page_size)==0);
-    ::fast_io::io::println("PASS genuine Linux native breakpoint stops=3 executed_instructions=2 actual_kernel_register_values=42,43 actual_kernel_float64=",abi_float_seed ? ::fast_io::string_view{"42.0"} : ::fast_io::string_view{"unqualified-soft-float-ABI"}," actual_kernel_numeric_projection=true unqualified_register_bytes_cleared=true stale_revision_denied=true original_code_restored=true ready_cancel_and_worker_exit_retired=true pointer_bits=",sizeof(void*)*8u,
+    ::fast_io::io::println("PASS genuine Linux native breakpoint stops=3 executed_instructions=2 actual_kernel_register_values=42,43 actual_kernel_float64=",abi_float_seed ? ::fast_io::string_view{"42.0"} : ::fast_io::string_view{"unqualified-soft-float-ABI"}," actual_kernel_numeric_projection=true unqualified_register_bytes_cleared=true stale_revision_denied=true retained_initial_zero_instruction_trap=true first_gate_resume_and_release=true original_code_restored=true ready_cancel_and_worker_exit_retired=true pointer_bits=",sizeof(void*)*8u,
         " actual_kernel_vmx128=",abi_vmx_seed ? ::fast_io::string_view{"true"} : ::fast_io::string_view{"unqualified-compiler-mode"});
 }

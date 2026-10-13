@@ -329,13 +329,13 @@ def main():
                 row['argv']=argv
                 c=OperandConsole(argv,a.out/(case['name']+'-'+policy+'.log'));c.prompt()
                 for function,offsets in sites.items():
-                    for offset in offsets:assert b'registered' in c.send(f'break 0 {function} {offset}')
+                    for offset in offsets:assert b'registered' in c.send(f'breakwasm 0 {function} {offset}')
                 for expected in case['expected']:
                     c.send('continue');limit=time.monotonic()+a.stop_timeout
                     while True:
                         reply=c.send('status')
                         if b'stopped:' in reply:break
-                        assert b'guest exited' not in reply and time.monotonic()<limit,reply
+                        assert b'guest exited' not in reply and b'Program exited' not in reply and time.monotonic()<limit,reply
                         time.sleep(.01)
                     thread,function,offset=c.location()
                     assert (function,offset)==(expected['function'],sites[expected['function']][expected['ordinal']]),(expected,reply)
@@ -371,9 +371,13 @@ def main():
                 c.send('continue');limit=time.monotonic()+a.stop_timeout
                 while True:
                     reply=c.send('status')
+                    if b'Program exited normally.' in reply:
+                        row['terminal_status']=reply.decode();break
                     if b'guest exited:' in reply:
-                        assert b'guest exited: 0' in reply,reply;break
-                    assert b'stopped:' not in reply and time.monotonic()<limit,reply;time.sleep(.01)
+                        assert b'guest exited: 0' in reply,reply
+                        row['terminal_status']=reply.decode();break
+                    assert b'Program exited' not in reply and b'stopped:' not in reply and time.monotonic()<limit,reply
+                    time.sleep(.01)
                 row['passed']=True
             except Exception as error:row.update(passed=False,error=repr(error))
             finally:

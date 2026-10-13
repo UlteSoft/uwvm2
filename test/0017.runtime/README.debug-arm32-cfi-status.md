@@ -81,11 +81,115 @@ The existing toolchain repair in documents/toolchain/
 arm-native-debug-calling-convention.md must be present in the linked real SDK;
 a host-target compiler metadata test cannot establish that qualification.
 
+ARM A32 frame-boundary qualification (2026-10-08)
+-----------------------------------------------
+
+The [current frame-guard record](native_arm32_frame_guards.qualification.json)
+qualifies the extended private guard, separate from full ARM VM integration.
+Original ELF mapping symbols must be local STT_NOTYPE, zero-sized, in the same
+text section. An exact $a region must cover the beginning of each function.
+Thumb, missing mappings or an initial data region refuse. An interior $d/$t
+marker ends the usable lexical prefix before that region, including subsequent
+$a code. Literal bytes never enter the A32 word classifier. Only SP/r11 CFA
+bases are retained for ARM.
+
+The conservative A32 integer veto now includes single loads, MOV/arithmetic,
+conditional writes, memory base writeback, multiply/DSP/media destination
+fields, double-load implicit r11 and LDM lists. Only the first unconditional
+MOV/ADD r11,sp in a straight prologue may install the frame. A second identical
+installation also refuses the suffix. This overapproximation may make additional
+instructions unavailable; it is not a complete ISA decoder or live-state proof.
+Fifteen mutation encodings are independently assembled from symbolic instructions
+and compared byte-for-byte with the object fixture's inputs inside the cgroup.
+
+An earlier negative test reused another ObjectFile's LoadedObjectInfo. Because
+LLVM binds this map to object identity, those assertions did not isolate CFI
+parser refusal. Historical negative counts remain archived but are superseded
+by this record. Each current mutation receives a fresh real RuntimeDyld loader
+and its own section map. A pristine clone must first produce the exact r11 CFA;
+each r11 mutation must still provide the pre-write row and refuse all subsequent
+rows. Ten malformed/mapping mutations, fifteen r11 mutations, genuine assembler
+$d boundaries, real TailCC restored-frame suffixes and retirement are checked.
+
+Both repositories pass six final ARM compiler-object/owned-DATA runs: O0/O3
+AAPCS and O3 SelectionDAG TailCC per repository. Those runs verify six fresh-loader
+controls, 60 malformed/mapping objects, 90 stale-r11 objects, 20 literal/data
+instruction positions and 12 restored-frame positions. Four existing x86-64/i386
+registered-CFI regressions also pass against the same paired final header.
+
+The original emitted objects are separately linked into real ARMhf Linux ELF
+executables and run with QEMU cortex-a15 in the original 64 GiB cgroup. A genuine
+C entry calls the 64-argument AAPCS/TailCC caller, which calls the leaf; TailCC
+callees pop their actual 240-byte stack-argument area. All six executables each
+complete 1,024 chains with result 64 and unchanged SP/r11, for 6,144 chains. The
+literal test function is never executed. FastIO handles the fixture's file,
+print and argument parsing I/O. This proves actual generated ARM ordinary-call
+execution, not an ARM-native LLVM SDK, live Wasm frame, kernel stop, ni or finish.
+No module compilation claim is made. Full evidence, failed/transitional runs,
+source/tool/dependency hashes and PIDFD retirement are retained separately.
+
+Real ARM native LLVM component qualification (2026-10-08)
+--------------------------------------------------------
+
+The [real ARM MCJIT record](native_arm32_real_mcjit.qualification.json)
+supersedes the earlier lack of an ARM-host component SDK. The rebuilt Linux
+ARMv7 A32 EABI hard-float LLVM 23.1.1 library executes on QEMU cortex-a15;
+its actual ARM FastISel TailCC fallback and RuntimeDyld TARGET2 repair are
+linked, not inferred from headers. O0 and O3 TailCC both pass. This plain
+23.1.1 component SDK does not satisfy the current ROS .13 full-product
+version/capability contract; that guard remains unchanged.
+
+A genuine ARM EHABI/registered-CFI compilation exposed glibc link.h ELF macro
+collisions with later LLVM ELF declarations. The paired registry header now
+loads LLVM's actual ELFObjectFile declarations before link.h when LLVM JIT is
+selected, including the default-selection global-fragment path. Platform ELF
+macros remain intact; standalone registry users without a JIT selection do not
+acquire an LLVM dependency. A header-first fixture compiles and runs in both
+repositories with default LLVM selection. This checks the include ordering,
+not compilation of a complete C++ module or a new ROS runtime mode.
+
+Twenty final ARM executable runs pass across the two repositories:
+
+* Real ARM-host MCJIT normal TailCC integer/void calls at O0 and optimized
+  code generation use 64 distinct arguments and exact weighted numeric
+  results. Sixteen C-entry call chains check unchanged private SP/r11 across
+  the actual 240-byte callee-popped argument area. Six additional direct,
+  indirect and cross-engine musttail chains each execute 4,096 steps.
+* Real recursive EHABI unwinding reports three recursive JIT frames and one
+  JIT root, excludes host PCs and refuses queries after engine drain/retirement.
+  Two binaries with the lookup hook genuinely absent from dynamic exports
+  refuse JIT execution. Merely omitting --export-dynamic was insufficient
+  because lld can auto-export a symbol referenced by a shared library; the
+  negative fixture localizes that hook with an actual linker version map.
+* Actual TARGET2/GOT_PREL DATA relocations and the linked loader ABI query
+  pass. Eight ARM-native compiler-object/owned-DATA CFI runs cover O0/O3
+  AAPCS and O0/O3 TailCC. Eight fresh object-bound loader controls pass;
+  80 malformed/mapping objects and 120 stale-r11 objects refuse.
+* Two header-first/default-selection executables retain glibc ELF macros.
+
+The native unwind fixture is compiled with asynchronous unwind tables, as
+already required by the product build. Its private stack/frame witnesses and
+owned-DATA observer create no public register, pointer or stack display.
+All compilation, QEMU execution, ELF/dependency audit and retirement ran in
+the original 64 GiB cgroup; final test peak group memory was 28,142,264,320
+bytes and all memory.events counters stayed zero. Current local consumed
+source files were separately matched against the frozen tested inputs.
+
+The [retention record](native_arm32_real_mcjit.retention.json) binds the
+80,794,376-byte cold archive to its exact hash and local acknowledgment.
+Original LLVM source, the actual ARM library/generated inputs, runtime
+library dependencies, failed/transitional runs and final evidence are
+retained. Recomputable SDK .a/.o/.pch caches remain online; they are not
+represented as cold-retained raw bytes. The [audit receipt](native_arm32_real_mcjit.audit_receipt.json)
+records independent ELF/source/dependency checks and PIDFD retirement.
+
 Remaining ARM integration
 -------------------------
 
-Actual ARM target SDK integration, every instruction's live unwind state,
-physical Wasm callers, return-stop and native ni/finish remain unqualified.
+The exact current ROS .13 full-product ARM SDK, every instruction's live
+unwind state, physical Wasm callers, return-stop and native ni/finish remain
+unqualified. The ARM-native component SDK and calls above do not qualify
+those complete Wasm runtime paths.
 Default .ARM.exidx cannot stand in for instruction-precise state. Thumb/
 interworking, alternate ARM DWARF EH products, big-endian private reads,
 VFP/NEON caller reconstruction and complete ARM Wasm debugger coverage remain

@@ -6,7 +6,15 @@ extern "C++"
 {
     bool runtime_checkpoint_coherent_manager::check_actual_candidate_source_bindings(
         ::std::shared_ptr<runtime_checkpoint_world_transaction> const& actual) noexcept
-    { return actual && actual->preflight_private_full_publication_records(); }
+    {
+        return actual && actual->preflight_private_full_publication_records() &&
+            actual->private_closed_workers_ && actual->private_closed_workers_->held_actual_cohort();
+    }
+    bool runtime_checkpoint_coherent_manager::cancel_actual_candidate_workers(
+        ::std::shared_ptr<runtime_checkpoint_world_transaction> const& actual) noexcept
+    {
+        return actual && actual->private_closed_workers_ && actual->private_closed_workers_->cancel_and_join();
+    }
     void runtime_checkpoint_coherent_manager::prepare_and_discard_actual_world(
         ::uwvm2::uwvm::debugger::checkpoint::state const& saved,source_owner const& source,
         ::std::uint_least64_t epoch,::uwvm2::runtime::checkpoint::compilation_profile::owner const& current_profile,
@@ -115,16 +123,20 @@ extern "C++"
 #endif
             if(retained)
             {
-                // Control block allocation is fallible BEFORE any old execution
-                // retirement is armed. New private scopes have already joined.
+                // All OS creation, packet/ledger allocation and root/TLS
+                // installation happens BEFORE old retirement. This real cohort
+                // remains held; it has no execution lease or LIVE code authority.
+                out.status=llvm_jit_checkpoint_prepare_status::closed_worker_preparation_declined;
+                if(!prepared->prepare_private_closed_workers(request.maximum_private_closed_workers,out)) { return; }
+                // Control block allocation is also fallible before retirement.
                 if(!prepared->charge_native(1u,sizeof(::std::shared_ptr<world>)+2u*sizeof(::std::atomic<::std::size_t>)))
                 { out.status=llvm_jit_checkpoint_prepare_status::resource_preparation_declined;return; }
                 *retained=::std::shared_ptr<world>{::std::move(prepared)};
                 out.native_payload_bytes=(*retained)->native_bytes_;
                 out.status=llvm_jit_checkpoint_prepare_status::prepared_and_retained;
             }
-            // Genuine caller/worker root scopes have left and all private OS
-            // workers were joined before engine/source/store destruction. No
+            // Rehearsal scopes have joined. A retained world's separate closed
+            // cohort joins FIRST in the world's reverse member destruction. No
             // restored execution activation or live world was published.
             // Engine/range destruction precedes source/stores. Never commit,
             // drain original workers, change VM epoch/initializer or execute.
@@ -156,6 +168,8 @@ extern "C++"
 #else
 #if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS)
 extern "C++" bool runtime_checkpoint_coherent_manager::check_actual_candidate_source_bindings(
+    ::std::shared_ptr<runtime_checkpoint_world_transaction> const&) noexcept { return false; }
+extern "C++" bool runtime_checkpoint_coherent_manager::cancel_actual_candidate_workers(
     ::std::shared_ptr<runtime_checkpoint_world_transaction> const&) noexcept { return false; }
 extern "C++" void runtime_checkpoint_coherent_manager::prepare_and_discard_actual_world(
     ::uwvm2::uwvm::debugger::checkpoint::state const&,source_owner const&,

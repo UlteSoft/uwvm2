@@ -24,7 +24,7 @@ def main():
     assert qualification['passed']
     rows = []
     for row in qualification['rows']:
-        match = re.fullmatch(r'(f32x4|f64x2)-(abs|neg|ceil|floor|trunc)-special-bits', row['fixture'])
+        match = re.fullmatch(r'(f32x4|f64x2)-(abs|neg|ceil|floor|trunc|nearest)-special-bits', row['fixture'])
         assert match and len(row['functions']) == 1
         function = row['functions'][0]
         assert function['function'].endswith('_func_0')

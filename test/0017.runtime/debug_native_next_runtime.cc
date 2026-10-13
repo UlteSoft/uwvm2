@@ -108,7 +108,7 @@ int main(int argc, char** argv)
           "actual runtime observer owns controller until execution drain");
     check(lib::llvm_jit_prepare_debug_host_api(), "actual full fused validation/native publication");
     check(owner->arm_initial_pause(), "empty-domain launch pause");
-    auto added{command(*owner, ::fast_io::concat_std("break 0 1 0"))};
+    auto added{command(*owner, ::fast_io::concat_std("breakwasm 0 1 0"))};
     check(added.status == control::error::none && added.breakpoint_identifier != 0u,
           "real emitted instruction breakpoint admitted");
     check(command(*owner, ::fast_io::concat_std("continue")).status == control::error::none,

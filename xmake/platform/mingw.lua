@@ -9,6 +9,7 @@ function mingw_target()
     local use_llvm_compiler = get_config("use-llvm-compiler")
     if use_llvm_compiler then	
         set_toolchains("clang")
+        add_options("rtlib", "unwindlib")
         add_ldflags("-fuse-ld=lld", {force = true})
         -- Keep the MinGW unwinder in the standalone PE. A dynamic libgcc_s_seh import can make an otherwise valid
         -- LLVM-full debugger/JIT executable fail at process startup on a Windows host without that DLL.

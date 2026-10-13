@@ -321,6 +321,27 @@ namespace details
         }
         return true;
     }
+    [[nodiscard]] bool native_owner_publication_bridge::has_actual_sealed_full_root(compiled_module_record const& supplied) noexcept
+    {
+        if(get_runtime_state_publication_depth()!=1u) { return false; }
+        auto selected=g_runtime.modules.end();
+        for(auto it=g_runtime.modules.begin();it!=g_runtime.modules.end();++it)
+        { if(::std::addressof(*it)==::std::addressof(supplied)) { selected=it;break; } }
+        if(selected==g_runtime.modules.end()) { return false; }
+        auto const& record=*selected;auto const* publication=record.llvm_jit_full_publication.get();
+        if(!publication || !publication->engine || !publication->context || !publication->actual_native_endpoints ||
+           !::uwvm2::uwvm::runtime::full::full_source_instance::has_canonical_owner(publication->source)) { return false; }
+        auto const& image=*publication->actual_native_endpoints;auto const epoch=current_runtime_generation();
+        return epoch!=0u && image.valid_ && image.sealed_ && !image.staged_only_ && !image.attached_ &&
+            image.engine_==publication->engine.get() && image.code_publication_==publication &&
+            image.module_==record.runtime_module && image.runtime_epoch_==epoch &&
+            image.module_id_<g_runtime.modules.size() &&
+            ::std::addressof(g_runtime.modules.index_unchecked(image.module_id_))==::std::addressof(record) &&
+            image.source_.get()==publication->source.get() && !image.source_.owner_before(publication->source) &&
+            !publication->source.owner_before(image.source_) && publication->debug_source_runtime_epoch==epoch &&
+            record.llvm_jit_debug_source_fused_epoch==epoch &&
+            image.source_->actual_validated_file(image.module_id_,epoch,record.runtime_module)!=nullptr;
+    }
     [[nodiscard]] bool native_owner_publication_bridge::resolve_actual_full(compiled_module_record const& supplied,
         ::std::size_t function,::std::uint_least64_t generation,::std::uintptr_t pc,
         ::std::uintptr_t& begin,::std::uintptr_t& end) noexcept
@@ -346,7 +367,13 @@ namespace details
         if(rec.actual_native_generation_positions.size()!=count || rec.llvm_jit_debug_full_entry_generations.size()!=count ||
            rec.llvm_jit_local_entry_addresses.size()!=count || rec.llvm_jit_local_raw_entry_addresses.size()!=count ||
            local>=rec.llvm_jit_compiled.local_funcs.size() || rec.llvm_jit_debug_full_entry_generations[local]!=generation) { return false; }
-        if(generation!=1u)
+        // Checkpoint roots use their real compiler/adoption identity. With no
+        // checkpoint profile, the genuine native owner table already owns the
+        // cold body; select it by the actual retained-owner slot, then perform
+        // the same sealed source/engine/expected body checks below.
+        if(publication->checkpoint_profile ?
+           !checkpoint_root_generation_publication_bridge::matches_current_root(rec,local,generation) :
+           rec.actual_native_generation_positions[local]!=SIZE_MAX)
         {
             auto const position{rec.actual_native_generation_positions[local]};
             if(position>=rec.llvm_jit_debug_full_retained_generations.size()) { return false; }

@@ -26,7 +26,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasip1_calls
         ::fast_io::array<unsigned char, 16u> widths{};
         ::std::size_t name_size{}, count{};
         bool returned{}, has_errno{};
-        ::std::uint64_t result{};
+        ::std::uint64_t result{}, participant{}, module{}, session{}, environment{}, created_descriptor{};
+        bool context_available{}, descriptor_created{};
     };
     struct view
     {
@@ -42,6 +43,51 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasip1_calls
     inline ::fast_io::array<char, 64u> filter{};
     inline ::std::size_t filter_size{}, size{}, begin{};
     inline ::std::uint64_t sequence{}, overwritten{}, episode{1u};
+    struct thread_labels { ::std::uint64_t participant{}, module{}, session{}; };
+    inline thread_local thread_labels current_labels{};
+    inline thread_local record* active_record{};
+    inline ::std::atomic<::std::uint64_t> session_id{1u};
+    inline bool session_started{};
+    inline ::std::atomic<::std::uint64_t> environment_sequence{1u};
+    [[nodiscard]] inline ::std::uint64_t new_environment() noexcept
+    {
+        auto value{environment_sequence.load(::std::memory_order_relaxed)};
+        while(value != UINT64_MAX)
+        { if(environment_sequence.compare_exchange_weak(value,value+1u,::std::memory_order_relaxed)) { return value; } }
+        return 0u;
+    }
+    // Only the genuine observer on the execution thread supplies these labels.
+    // They are diagnostics, never a stopped-state or host-access capability.
+    inline void observe_thread(::std::uint64_t participant,::std::uint64_t module) noexcept
+    { current_labels={participant,module,session_id.load(::std::memory_order_acquire)}; }
+    inline void begin_debug_session() noexcept
+    {
+        ::std::lock_guard lock{mutex}; size=begin=0u;overwritten=0u;
+        if(episode==UINT64_MAX) { enabled.store(false,::std::memory_order_release);return; }
+        ++episode;session_id.store(episode,::std::memory_order_release);
+        if(!session_started) { session_started=true;enabled.store(true,::std::memory_order_release); }
+    }
+    struct call_scope
+    {
+        record* previous{};
+        explicit call_scope(token& call) noexcept : previous{active_record} { active_record=call.call ? ::std::addressof(call.entered) : nullptr; }
+        ~call_scope() { active_record=previous; }
+        call_scope(call_scope const&)=delete;
+    };
+    inline void created_descriptor(::std::uint64_t fd) noexcept
+    { if(active_record!=nullptr) { active_record->created_descriptor=fd;active_record->descriptor_created=true; } }
+    [[nodiscard]] inline bool uses_descriptor(record const& row,::std::uint64_t fd) noexcept
+    {
+        auto name{::fast_io::string_view{row.name.data(),row.name_size}};
+        if(name.ends_with("_wasm64")) { name=name.subview(0u,name.size()-7u); }
+        auto arg{[&](::std::size_t i) { return i<row.count && row.arguments[i]==fd; }};
+        if(row.descriptor_created && row.created_descriptor==fd) { return true; }
+        if(name=="path_symlink") { return arg(2u); }
+        if(name=="path_link") { return arg(0u) || arg(4u); }
+        if(name=="path_rename") { return arg(0u) || arg(3u); }
+        if(name=="fd_renumber") { return arg(0u) || arg(1u); }
+        return (name.starts_with("fd_") || name.starts_with("path_") || name.starts_with("sock_")) && arg(0u);
+    }
     [[nodiscard]] inline constexpr bool is_trace(wasip1_state::action action) noexcept
     {
         using enum wasip1_state::action;
@@ -75,6 +121,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasip1_calls
         row.name_size = name.size();
         for(::std::size_t i{}; i != name.size(); ++i) { row.name[i] = static_cast<char>(name[i]); }
         row.call = sequence + 1u; row.returned = row.has_errno = false;
+        row.session=episode;row.context_available=current_labels.session==episode && current_labels.participant!=0u;
+        if(row.context_available) { row.participant=current_labels.participant;row.module=current_labels.module; }
         append_locked(row); return {row.call, episode, row};
     }
     inline void leave(token const& call, bool has_errno, ::std::uint64_t result) noexcept
@@ -84,9 +132,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasip1_calls
         if(call.episode != episode) { return; } // clear retires in-flight diagnostic pairs
         auto row{call.entered}; row.returned = true; row.has_errno = has_errno; row.result = result; append_locked(row);
     }
-    [[nodiscard]] inline view apply(wasip1_state::request const& request)
+    [[nodiscard]] inline view apply(wasip1_state::request const& request, ::std::uint64_t environment_id = 0u)
     {
-        if(!wasip1_state::valid(request) || !is_trace(request.operation)) { return {}; }
+        if(!wasip1_state::valid(request) || (!is_trace(request.operation) && request.operation!=wasip1_state::action::descriptor_detail)) { return {}; }
         ::std::lock_guard lock{mutex};
         using enum wasip1_state::action;
         if(request.operation == trace_enable)
@@ -99,20 +147,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasip1_calls
         else if(request.operation == trace_clear)
         {
             size = begin = 0u; overwritten = 0u;
-            if(episode != UINT64_MAX) { ++episode; }
+            if(episode != UINT64_MAX) { ++episode;session_id.store(episode,::std::memory_order_release); }
             else { enabled.store(false, ::std::memory_order_release); }
         }
         view out{}; out.enabled = enabled.load(::std::memory_order_relaxed);
         out.filter = filter; out.filter_size = filter_size; out.overwritten = overwritten;
         out.oldest = size == 0u ? 0u : records[begin].sequence; out.newest = sequence; out.next = request.first;
         out.gap = size != 0u && request.first < out.oldest - 1u;
-        if(request.operation == trace_read)
+        if(request.operation == trace_read || request.operation==descriptor_detail)
         {
             out.records.reserve(static_cast<::std::size_t>(request.count));
             for(::std::size_t i{}; i != size; ++i)
             {
                 auto const& row{records[(begin + i) % records.size()]};
                 if(row.sequence <= request.first) { continue; }
+                if(request.operation==descriptor_detail && ((environment_id!=0u ? row.environment!=environment_id : !row.context_available || row.module!=request.module) || !uses_descriptor(row,request.descriptor))) { continue; }
                 if(out.records.size() == request.count) { ++out.remaining; continue; }
                 out.records.push_back(row); out.next = row.sequence;
             }
@@ -137,6 +186,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::wasip1_calls
         {
             ::fast_io::io::print(output, "  seq=", ::fast_io::mnp::dec(row.sequence), " call=", ::fast_io::mnp::dec(row.call),
                 " phase=", row.returned ? ::fast_io::string_view{"return"} : ::fast_io::string_view{"entry"}, " name=", ::fast_io::string_view{row.name.data(), row.name_size});
+            if(row.context_available) { ::fast_io::io::print(output," thread=",row.participant," module=",row.module," session=",row.session); }
+            else { ::fast_io::io::print(output," thread=unavailable module=unavailable"); }
+            if(row.descriptor_created) { ::fast_io::io::print(output," created-fd=",row.created_descriptor); }
             if(row.returned)
             {
                 if(row.has_errno) { ::fast_io::io::print(output, " errno=", ::fast_io::mnp::dec(row.result), " errno-name=", errno_name(row.result)); }

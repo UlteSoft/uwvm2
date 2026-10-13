@@ -154,14 +154,14 @@ def main() -> None:
             record['actions'].append({'command': command, 'reply': text})
             save()
             return text
-        reply = ask(f'break 0 {target} {offset}')
+        reply = ask(f'breakwasm 0 {target} {offset}')
         bid = int(re.search(r'breakpoint (\d+)', reply)[1])
         ask('continue')
         for _ in range(64):
             stop = ask('wait')
             if 'stopped: breakpoint' in stop:
                 break
-            if 'guest exited:' in stop:
+            if 'Program exited' in stop:
                 raise AssertionError('guest exited before original breakpoint')
         else:
             raise AssertionError('actual breakpoint did not stop')
@@ -207,7 +207,7 @@ def main() -> None:
             for _ in range(64):
                 if 'error:' in settled:
                     raise AssertionError(('source out failed', settled))
-                if re.search(r'(?m)^stop-id \d+', settled) or 'guest exited:' in settled:
+                if re.search(r'(?m)^stop-id \d+', settled) or 'Program exited' in settled:
                     break
                 settled = ask('wait')
             else:
@@ -215,7 +215,7 @@ def main() -> None:
             now, trace = current()
             steps.append({'reply': reply, 'completion': settled, 'trace': trace})
             save()
-            if 'guest exited:' in settled or 'guest exited:' in trace:
+            if 'Program exited' in settled or 'Program exited' in trace:
                 break
             if now is None or now == previous or not re.search(r'(?m)^  source .+:\d+:\d+', trace):
                 raise AssertionError(('source out did not reach a fresh mapped stop', settled, trace))
@@ -234,7 +234,7 @@ def main() -> None:
                 record['close_error'] = repr(error)
                 raise
             finally:
-                record['managed_shutdown_complete'] = b'managed shutdown complete' in console.transcript
+                record['managed_shutdown_complete'] = console.normal_quit_completed
                 save() # preserve error/cleanup evidence even when finish raises
         save()
 

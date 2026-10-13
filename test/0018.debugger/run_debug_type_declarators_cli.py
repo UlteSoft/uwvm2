@@ -58,7 +58,7 @@ def main():
                 assert value, label
                 row["checks"].append({"case": label, "passed": True})
             initial = query("status"); prepared = mod.stop_id(initial)
-            registered = query(f"break-source 0 {source}:{line}")
+            registered = query(f"breaksource 0 {source}:{line}")
             check("genuine source breakpoint registration", b"error:" not in registered)
             stop = query("continue"); sid = mod.stop_id(stop)
             check("genuine producer stopped scope", sid != prepared and b"stopped: breakpoint" in stop)

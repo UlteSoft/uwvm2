@@ -17,7 +17,7 @@ sites,_=markers(a.wasm_tools,wasm);results=[]
 for policy in ('instruction','unwind'):
  c=OperandConsole([str(a.binary),'-Rdbg','-Rct','0','-Rllvm-cache-path','disable','-Rllvm-call-stack',policy,'--run',str(wasm)],a.out/(policy+'.log'))
  try:
-  c.prompt();c.send(f'break 0 0 {sites[0][0]}');c.send('continue');deadline=time.monotonic()+30
+  c.prompt();c.send(f'breakwasm 0 0 {sites[0][0]}');c.send('continue');deadline=time.monotonic()+30
   while b'stopped:' not in c.send('status'):assert time.monotonic()<deadline;time.sleep(.01)
   thread,_,_=c.location();output=io.BytesIO();adapter=dap.Adapter(output);adapter.step_level='wasm'
   class ActualConsole:

@@ -76,7 +76,7 @@ def main():
         assert b'prepared; no Wasm instruction executed' in send('status')
         reply = send(f'replace 0 {target} 1 {replacement}')
         assert b'function replaced; generation 2' in reply, reply
-        reply = send(f'break 0 {target} 0')
+        reply = send(f'breakwasm 0 {target} 0')
         breakpoint = re.search(rb'breakpoint (\d+)', reply); assert breakpoint, reply
         send('continue')
         for _ in range(20):
@@ -102,8 +102,8 @@ def main():
         send('delete ' + breakpoint[1].decode()); send('continue')
         for _ in range(20):
             reply = send('wait')
-            if b'guest exited:' in reply:
-                assert b'guest exited: 0' in reply, reply
+            if b'Program exited' in reply:
+                assert b'Program exited normally.' in reply, reply
                 break
         else:
             raise AssertionError('actual unchanged replacement workload did not exit')
@@ -118,7 +118,7 @@ def main():
                 row.update(passed=False, close_error=repr(error)); raise
             finally:
                 row.update(quit_returncode=c.child.returncode,
-                           managed_shutdown_complete=b'managed shutdown complete' in c.transcript)
+                           managed_shutdown_complete=c.normal_quit_completed)
                 if row['quit_returncode'] != 0 or not row['managed_shutdown_complete']:
                     row['passed'] = False
         row['inputs_after'] = {str(p): sha(p) for p in paths}

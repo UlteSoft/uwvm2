@@ -125,6 +125,48 @@ int main(int argc,char** argv)
  {s::integer v{};check(probe("(1.0000000596046448 + 0.0) + 0f32",v)==s::error::none &&
    v.width==32u && v.bits==1065353217u,"context f32 single rounding");}
 
+
+ // Rust literal underflow rounds to zero; unary negation preserves its sign.
+ for(unsigned guest:{32u,64u})
+ {
+  for(auto expr:{"5.463000546873376e-46f32","1e-400f64","(5.463000546873376e-46 + 0f32)"})
+  {s::integer v{};check(probe(expr,v,guest)==s::error::none && v.floating && s::details::floating_number(v)==0.0,"Rust literal underflow accepted");}
+  for(auto expr:{"-5.463000546873376e-46f32","-1e-400f64"})
+  {s::integer v{};check(probe(expr,v,guest)==s::error::none && v.floating && ::std::signbit(s::details::floating_number(v)),"Rust literal underflow retains negative zero");}
+ }
+ // R67 cast saturation and floating remainder follow Rust, not the C cast profile.
+ for(auto guest:{32u,64u})for(auto width:{8u,16u,32u,64u})for(bool uns:{false,true})for(auto floating:{32u,64u})
+ {
+  auto const suffix{::fast_io::concat_fast_io(::fast_io::mnp::os_c_str(uns?"u":"i"),width)};
+  auto const ftype{::fast_io::concat_fast_io("f",floating)};
+  auto verify=[&](::fast_io::string const& operand,::std::uint64_t expected)
+  {auto text=::fast_io::concat_fast_io("(",operand,") as ",suffix);s::integer v{};
+   check(probe({text.data(),text.size()},v,guest)==s::error::none,"Rust float cast boundary status");
+   check(v.width==width && v.unsigned_value==uns && v.bits==expected,"Rust float cast boundary value/type");};
+  verify(::fast_io::concat_fast_io("1",ftype," / 0",ftype),uns?s::details::mask(width):s::details::mask(width)>>1u);
+  verify(::fast_io::concat_fast_io("-1",ftype," / 0",ftype),uns ? 0u : ::std::uint64_t{1u}<<(width-1u));
+  verify(::fast_io::concat_fast_io("0",ftype," / 0",ftype),0u);
+  verify(::fast_io::concat_fast_io("-0.75",ftype),0u);
+  verify(::fast_io::concat_fast_io("1.75",ftype),1u);
+  verify(::fast_io::concat_fast_io("-1.75",ftype),uns?0u:s::details::mask(width));
+ }
+ for(auto guest:{32u,64u})
+ {
+  for(auto text:{"-0f32 % 2f32","-0f64 % 2f64"})
+  {s::integer v{};check(probe(text,v,guest)==s::error::none && v.floating && ::std::signbit(s::details::floating_number(v)),"Rust remainder retains negative zero");}
+  for(auto text:{"0f32 % 0f32","1f64 % 0f64","(1f32 / 0f32) % 2f32","2f64 % (0f64 / 0f64)"})
+  {s::integer v{};check(probe(text,v,guest)==s::error::none && ::std::isnan(s::details::floating_number(v)),"Rust remainder NaN cases");}
+  for(auto text:{"-1.5f32 % (1f32 / 0f32)","-1.5f64 % (-1f64 / 0f64)"})
+  {s::integer v{};check(probe(text,v,guest)==s::error::none && s::details::floating_number(v)==-1.5,"finite remainder infinity divisor");}
+  for(auto text:{"(1f32 / 0f32) as usize","(-1f64 / 0f64) as isize"})
+  {s::integer v{};check(probe(text,v,guest)==s::error::none && v.rust_pointer_sized && v.width==guest,"Rust saturating guest pointer-sized cast");}
+ }
+ for(auto language:{L::c,L::cpp,L::c23,L::shared_numeric})
+ for(auto text:{"(unsigned char)-1.5","(signed char)300.0","(unsigned long long)(1.0 / 0.0)","(int)(0.0 / 0.0)"})
+ {s::integer v{};check(probe(text,v,32u,language)==s::error::arithmetic,"C cast bounds preserved");}
+ for(auto language:{L::c,L::cpp,L::c23,L::go,L::zig,L::shared_numeric})
+ {s::integer v{};check(probe("7.5 % 2.0",v,32u,language)!=s::error::none,"non-Rust floating remainder unchanged");}
+
  // Shift boundaries use all primitive widths and both authenticated guest ABIs.
  // The right-shift witness is floor division of the signed magnitude, independently
  // of the implementation's sign-fill path. rustc const/type checks supply a second oracle.

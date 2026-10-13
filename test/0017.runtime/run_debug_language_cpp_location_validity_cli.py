@@ -31,7 +31,7 @@ def main():
         target,_=step.metadata_cli.function(a.wasm,'numeric_probe');s.begin(target)
         wanted=next(i for i,line in enumerate(a.source.read_text().splitlines(),1) if '/* NUMERIC_READY */' in line)
         origin=language.own_seek(s,lambda p:p['function']==target and p['is_statement'] and p['line']<wanted,'actual source before invalid-location stop')
-        reply=language.query(s,f'break-source 0 {origin["file"]}:{wanted}');bid=re.search(rb'breakpoint (\d+)',reply);assert bid
+        reply=language.query(s,f'breaksource 0 {origin["file"]}:{wanted}');bid=re.search(rb'breakpoint (\d+)',reply);assert bid
         s.send('continue')
         for _ in range(20):
             reply=s.send('wait')
@@ -60,7 +60,7 @@ def main():
         if s is not None:
             try:s.console.finish()
             except BaseException as e:d.update(passed=False,close_error=repr(e));raise
-            finally:d.update(quit_returncode=s.console.child.returncode,managed_shutdown_complete=b'managed shutdown complete' in s.console.transcript)
+            finally:d.update(quit_returncode=s.console.child.returncode,managed_shutdown_complete=s.console.normal_quit_completed)
         d['inputs_after']={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
         if d['inputs_after']!=before:d.update(passed=False,inputs_changed=True)
         (a.out/'summary.json').write_text(json.dumps(d,indent=2)+'\n')

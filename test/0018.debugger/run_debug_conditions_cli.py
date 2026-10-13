@@ -61,9 +61,9 @@ def main():
             initial = query("status"); prepared = mod.stop_id(initial)
             baseline = query("info breakpoints")
             for expression in ("counter = 4", "run()", "counter; continue", "counter +"):
-                reply = query(f"break-source 0 {source}:{line} if {expression}")
+                reply = query(f"breaksource 0 {source}:{line} if {expression}")
                 check("syntax rejects before registration: " + expression, b"error:" in reply and query("info breakpoints") == baseline)
-            registered = query(f"break-source 0 {source}:{line} if counter == 4 && parameter == 7")
+            registered = query(f"breaksource 0 {source}:{line} if counter == 4 && parameter == 7")
             check("condition registers atomically before guest execution", b"error:" not in registered and b"breakpoint " in registered)
             bp = int(re.search(rb"breakpoint (\d+) source=", registered).group(1))
             stop = query("continue"); sid = mod.stop_id(stop)
@@ -72,7 +72,7 @@ def main():
             check("condition policy listed without retaining captured values", b"condition=counter == 4 && parameter == 7" in query("info breakpoints"))
             for draft, spelling in (
                 (f"condition {bp} cou", f"condition {bp} counter"),
-                (f"break-source 0 {source}:{line} if cou", f"break-source 0 {source}:{line} if counter"),
+                (f"breaksource 0 {source}:{line} if cou", f"breaksource 0 {source}:{line} if counter"),
             ):
                 start = len(con.log); con.write(draft.encode() + b"\t")
                 completed = con.wait(lambda b: b"(uwvm-debug) " + spelling.encode() in b, start)
@@ -94,7 +94,7 @@ def main():
             query(f"condition {bp} 1 / 0")
             stop = query("continue")
             check("arithmetic error never auto-resumes", b"actual stop retained" in stop and mod.stop_id(query("status")) == mod.stop_id(stop))
-            rearm = query(f"break-source 0 {source}:{line} ignore 2 if counter >= 14")
+            rearm = query(f"breaksource 0 {source}:{line} ignore 2 if counter >= 14")
             check("combined ignore/condition rearm retains identifier", re.search(rb"breakpoint "+str(bp).encode()+rb" source=", rearm) is not None)
             check("combined rearm installs both atomically", b"hits=0 ignore=2 condition=counter >= 14" in query("info breakpoints"))
             stop = query("continue")

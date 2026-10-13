@@ -9,8 +9,12 @@ transfer; the trampoline must never become a code, register or memory grant.
 The debug provenance producer attaches `uwvm.native.debug.pcrel` only to
 its instrumented functions. The MIPS branch-expansion pass converts one-MBB
 local `J` instructions to PC-relative `B` before the existing range pass.
-Long-branch expansion, the static C host-call ABI, calls, unmarked functions,
-MIPS16, microMIPS and R6 paths retain their existing behavior. This change
+Static `B` instructions must also enter the range-expansion pass. For a marked
+function, a target beyond the PC16 range uses the existing full-width absolute
+address construction and a local `JR`, with an explicit delay-slot NOP. It
+must not reintroduce an `R_MIPS_26` jump and its function-external trampoline.
+The static C host-call ABI, calls, unmarked functions, MIPS16, microMIPS and R6
+paths retain their existing behavior. This change
 does not authorize indirect jumps, returns, delay-slot control transfers,
 native stack reads or function-external stubs.
 
@@ -27,6 +31,12 @@ patch --dry-run -p1 < "$UWVM_SOURCE/tools/ci/patches/llvm23-linux-mips64-debug-p
 patch -p1 < "$UWVM_SOURCE/tools/ci/patches/llvm23-linux-mips64-debug-pcrel-branches.patch"
 ```
 
+Apply the follow-up [long-branch patch](patches/llvm-mips-debug-long-branches.patch)
+to that repaired LLVM source before rebuilding. It fixes static `B` range
+checking and keeps marked long-jump instructions inside the function. The
+runtime emits the same `mips-debug-long-branch` cache-key version on every
+target; an older backend's objects must not satisfy the new contract.
+
 Rebuild the target's actual LLVM library and relink uwvm2 against it. Patching
 Clang, copying headers or changing a capability macro does not repair the JIT
 backend. Keep the other required native-owner/loader/ABI repairs in that same
@@ -41,7 +51,8 @@ add a native trap/owner backend.
 
 uwvm2-ros already carries this change in its bundled
 `llvm/lib/Target/Mips/MipsBranchExpansion.cpp`. Build that source through the
-normal bundled-LLVM path; do not apply the external patch twice.
+normal bundled-LLVM path; its static long-branch follow-up is also included.
+Do not apply these external patches twice.
 
 ## Regression checks
 
@@ -62,3 +73,10 @@ transitions, positive i64/f32/f64 register values, the large i64 constant and
 result, hidden stack/runtime storage, and retained stops on refused transfers.
 An all-unavailable view, component-only result or successful assembly listing
 does not satisfy that product check.
+
+`test/0072.core3_codegen_cross/mips_debug_long_branch_mcjit.cc` separately
+executes both paths of a 160 KiB marked static long-branch probe and retains
+its complete generated object. The paired large Wasm/debug regression is
+recorded in [mips64el_debug_long_branches.qualification.json](../../test/0072.core3_codegen_cross/mips64el_debug_long_branches.qualification.json).
+It verifies real opcode-stop v128 values for full O0/O1/O2/O3 in both products.
+The component and Wasm-level results do not widen native stepping permissions.

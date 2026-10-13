@@ -212,6 +212,19 @@
         "scope": "Finite Rust i/u8..64/isize/usize shift expressions and actual stopped-frame conditions",
         "qualification": "debug_rust_shift_qualification_r65_20261008.json",
         "native_full_equivalence": false
+      },
+      "rust_context_r66_20261008": {
+        "passed": true,
+        "scope": "Finite Rust compound numeric constraints, guest-sized nominal integers and actual stopped-frame conditions",
+        "qualification": "debug_rust_context_qualification_r66_20261008.json",
+        "native_full_equivalence": false
+      },
+      "rust_float_cast_r67_20261008": {
+        "passed": true,
+        "scope": "Finite Rust saturating floating as, same-type floating remainder, rounded-to-zero literals and actual stopped-frame conditions",
+        "qualification": "debug_rust_float_cast_qualification_r67_20261008.json",
+        "native_full_equivalence": false,
+        "source_status_preserved": true
       }
     },
     {
@@ -1321,6 +1334,19 @@
         "scope": "Finite Rust i/u8..64/isize/usize shift expressions and actual stopped-frame conditions",
         "qualification": "debug_rust_shift_qualification_r65_20261008.json",
         "native_full_equivalence": false
+      },
+      "rust_context_r66_20261008": {
+        "passed": true,
+        "scope": "Finite Rust compound numeric constraints, guest-sized nominal integers and actual stopped-frame conditions",
+        "qualification": "debug_rust_context_qualification_r66_20261008.json",
+        "native_full_equivalence": false
+      },
+      "rust_float_cast_r67_20261008": {
+        "passed": true,
+        "scope": "Finite Rust saturating floating as, same-type floating remainder, rounded-to-zero literals and actual stopped-frame conditions",
+        "qualification": "debug_rust_float_cast_qualification_r67_20261008.json",
+        "native_full_equivalence": false,
+        "source_status_preserved": true
       }
     },
     {
@@ -6031,5 +6057,137 @@
     "current_raw_objects_bytes": 356302128,
     "report_sha256": "fc7c95713c53c41c6f2b0324dcafda891e9c3f99e15f230c59cc772b7352d352",
     "qualification_sha256": "0c2c01e90d52581546a7675025cec750211132aa804679a4dadf20062fb12d81"
+  },
+  "rust_context_followup_r66_20261008": {
+    "passed": true,
+    "round": "R66",
+    "scope": "Rust compound unsuffixed literal constraints, guest isize/usize nominal types, type-only dead branch validation and direct f32 precision; Linux ELF macro compatibility; complete frozen LLVM-JIT full products and original Rust/C++ DWARF4/5 DAP; finite scalar components on 16 Linux architectures",
+    "documentation": "README.debug-rust-context-r66-20261008.md",
+    "qualification": "debug_rust_context_qualification_r66_20261008.json",
+    "full_native_equivalence": false,
+    "uwvm_int_full_live_debugger_qualified": false,
+    "full_cross_architecture_VM_JIT_DAP": false,
+    "totals": {
+      "real_DAP_sessions": 1572,
+      "numeric_DAP_sessions": 820,
+      "conditional_DAP_sessions": 752,
+      "Rust_context_condition_sessions": 192,
+      "baseline_sessions": 16,
+      "compiler_parser_cases": 22194,
+      "compiler_positive_witnesses": 22376,
+      "compiler_negative_witnesses": 154,
+      "compound_cases": 4002,
+      "shift_cases": 12192,
+      "all_waits_PIDFD_EOF_passed": true,
+      "all_guard_memory_events_zero": true
+    },
+    "case_matrix": {
+      "valid": 107,
+      "invalid": 79,
+      "valid_context_added": 29,
+      "invalid_context_added": 20
+    },
+    "source_ids": {
+      "uwvm2": "sha256:584fd639f35818b66266ea82c6b6b4a712cd918caa320954077248a365e823f7",
+      "uwvm2-ros": "sha256:5fcab331115b111466401e26f1022bdc1031e635364145b19ccb1721afbbd230"
+    },
+    "source_review": {
+      "path": "/home/macromodel/Documents/uwvm3-implementation/rust-context-full-a4-r66/source-review.json",
+      "bytes": 1875,
+      "sha256": "358526bc54e0433677f7caa06dac130924ea8484c0a328f385fe73650c1d24cb"
+    },
+    "evidence_archive": {
+      "passed": true,
+      "archive": "/home/macromodel/Documents/uwvm3-implementation/retained-rust-context-r66-final/evidence.tar.xz",
+      "bytes": 137377668,
+      "sha256": "19e0c02f6fba7872c03815fc95ddc3c1fbbef37f3ed02b9c7e93cc533915a937",
+      "logical_files": 72932,
+      "regular_files": 19534,
+      "prior_internal_hardlinks": 53398,
+      "logical_member_bytes": 1693439963,
+      "all_member_stream_verified": true,
+      "all_original_before_after_bytes_verified": true,
+      "fsync_completed": true,
+      "current_R66_full_VM_binaries_in_main_archive": true,
+      "all_six_fresh_R66_objects_in_main_archive": true,
+      "source_transports_and_old_recovery_archives_separately_pinned": true
+    },
+    "current_raw_objects_kept": true,
+    "current_raw_objects_bytes": 356788760,
+    "report_sha256": "2ffe9219b2a29bb2b770cdd2f04cd8dff8a4e4c9c2811ec84052f5c1f08da325",
+    "qualification_sha256": "f226f3d39c35e0f2f402d82b76932bb95aa8e3ae6d7a5adb1efbbad1199aa7b1"
+  },
+  "rust_float_cast_followup_r67_20261008": {
+    "passed": true,
+    "round": "R67",
+    "scope": "Rust saturating f32/f64 to i/u8/16/32/64 and guest isize/usize casts, floating remainder, signed zero/NaN/infinity and literal underflow with real Rust/C++ DWARF4/5 DAP; fresh LLVM-JIT full products, actual canonical ROS .13 X86 provider; 16-architecture scalar component execution",
+    "documentation": "README.debug-rust-float-cast-r67-20261008.md",
+    "qualification": "debug_rust_float_cast_qualification_r67_20261008.json",
+    "full_native_equivalence": false,
+    "uwvm_int_full_live_debugger_qualified": false,
+    "full_cross_architecture_VM_JIT_DAP": false,
+    "totals": {
+      "real_DAP_sessions": 1312,
+      "numeric_DAP_sessions": 592,
+      "conditional_DAP_sessions": 720,
+      "Rust_float_cast_condition_sessions": 160,
+      "baseline_sessions": 16,
+      "compiler_parser_cases": 27194,
+      "compiler_positive_witnesses": 27440,
+      "compiler_negative_witnesses": 166,
+      "float_cast_cases": 4000,
+      "float_remainder_cases": 1000,
+      "all_waits_PIDFD_EOF_passed": true,
+      "all_guard_memory_events_zero": true
+    },
+    "case_matrix": {
+      "valid": 143,
+      "invalid": 85,
+      "valid_float_added": 36,
+      "invalid_float_added": 6
+    },
+    "source_ids": {
+      "uwvm2": "sha256:62b6cead0b4dd56235081600b90e0ad49d8a59645c6b396632093a0ec8699f6a",
+      "uwvm2-ros": "sha256:98540b6215763e5f0e1e2186dc625ec6ec2c2993af98c62bb962495d0065dd68"
+    },
+    "provider13": {
+      "receipt": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/current-language-llvm13-a1-r67/out-uwvm2-ros/product-a2/results.json",
+        "bytes": 5425361,
+        "sha256": "dbe4b1e975752de0d1cb1c6922597bcb57d244af8db2d20b1786b258eea9bf7e"
+      },
+      "version": "23.1.1-uwvm-ros.13",
+      "fresh_archives": 64,
+      "source_manifest": {
+        "path": "/home/macromodel/Documents/uwvm3-implementation/current-language-llvm13-a1-r67/source-verification.json",
+        "bytes": 2323100,
+        "sha256": "ce9439df4228a076ae3dc12ee7d1a67ecef253ac4b4bbbeed43cdb036fe0cf9f"
+      },
+      "X86_only": true
+    },
+    "evidence_archive": {
+      "passed": true,
+      "archive": "/home/macromodel/Documents/uwvm3-implementation/retained-rust-float-cast-r67-final/evidence.tar.xz",
+      "bytes": 365219236,
+      "sha256": "b409e02ae1575231150c16d00c86b518c9303ce686f49370a4d211795d2766bd",
+      "logical_files": 109745,
+      "regular_files": 38205,
+      "prior_internal_hardlinks": 71540,
+      "logical_member_bytes": 2860010977,
+      "all_member_stream_verified": true,
+      "all_original_before_after_bytes_verified": true,
+      "fsync_completed": true,
+      "current_R67_full_VM_binaries_in_main_archive": true,
+      "all_six_fresh_R67_objects_in_main_archive": true,
+      "ordinary_object_members_streamed_from_exact_verified_fragment": true,
+      "canonical_ROS13_source_headers_and_64_fresh_X86_archives_in_main_archive": true,
+      "source_transports_provider_object_archive_and_old_baselines_separately_pinned": true
+    },
+    "generated_source_caches_excluded_and_complete_DAP_soaks_rerun": true,
+    "paired_owned_sources_match_tested_cut": true,
+    "current_whole_workspace_qualified": false,
+    "prior_r65_r66_duplicate_objects_archived_only": true,
+    "report_sha256": "0a49084b54eae799a6c0107cb27880a788386e1aacbf41b2813840f4d2b9e587",
+    "qualification_sha256": "e9d565db1d76fbcec0c1cc1a6393e576bbcde308e14b3e426bac6341421b55cb"
   }
 }

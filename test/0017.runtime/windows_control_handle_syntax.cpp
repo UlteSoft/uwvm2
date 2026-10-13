@@ -29,15 +29,15 @@ namespace uwvm2::utils::control
 namespace uwvm2::uwvm::debugger
 {
     inline constexpr ::std::size_t max_command_bytes{512u};
-    inline ::std::string console_help{"help\n"};
+    namespace console_help { inline ::std::string format(::fast_io::string_view) { return "help\n"; } }
     enum class execution_status { running, exited, closed };
     struct inspection { execution_status execution{}; };
     enum class console_command_kind
-    { empty, help, quit, unsupported, invalid, source_step, source_breakpoint, source_locals, source_type, source_value,
-      assembly_next, assembly_step, assembly_disassemble, assembly_disassemble_range, assembly_registers,
+    { empty, help, quit, unsupported, invalid, source_step, wasm_step, wasm_state, wasm_path, wasm_mutation, source_frame, wasip1_state, breakpoint_control, source_breakpoint, source_locals, source_type, source_value,
+      assembly_next, assembly_finish, assembly_step, assembly_disassemble, assembly_disassemble_range, assembly_registers,
       wasm_event, wasm_script, replacement_file, protocol };
-    struct command { console_command_kind kind{}; };
-    inline command parse_console_command(::std::string const&) { return {}; }
+    struct command { console_command_kind kind{}; ::std::array<char,128u> help_topic{}; ::std::size_t help_topic_size{}; };
+    inline command parse_console_command(::fast_io::string_view) { return {}; }
     inline ::std::string unsupported_step_message(command const&) { return {}; }
     struct controller
     {

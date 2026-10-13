@@ -90,7 +90,7 @@ for case in cases:
   try:
    c=Console(case,policy);c.prompt();entry=exported(TD/(case["name"]+".wasm"))
    assert b"prepared; no Wasm instruction executed" in c.send("status")
-   assert b"registered" in c.send("break 0 "+str(entry)+" 0")
+   assert b"registered" in c.send("breakwasm 0 "+str(entry)+" 0")
    assert b"error:" not in c.send("trace wasm on")
    c.send("continue");r=c.stopped()
    who=re.search(rb"thread ([0-9]+) module=0 function="+str(entry).encode()+rb" ",r);assert who,r

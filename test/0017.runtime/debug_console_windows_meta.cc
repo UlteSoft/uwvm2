@@ -130,14 +130,14 @@ int main()
             // A zero UnicodeChar with the matching letter VK is a separate
             // Windows representation of an Alt-modified letter key.
             if(failure == 0 && !expect_meta(session, input, u'f', 'F', 'f')) { failure = 21; }
-            if(failure == 0 && !expect_meta(session, input, 0u, 'B', 'b')) { failure = 22; }
+            if(failure == 0 && !expect_meta(session, input, 0u, 'B', 'bw')) { failure = 22; }
             if(failure == 0 && !expect_meta(session, input, u'd', 'D', 'd')) { failure = 23; }
             if(failure == 0 && !expect_meta(session, input, 0u, 'Y', 'y')) { failure = 24; }
             if(failure == 0 && !expect_meta(session, input, u'\b', VK_BACK, 127)) { failure = 25; }
             if(failure == 0 && !expect_meta(session, input, 0u, VK_BACK, 127)) { failure = 26; }
             // Ctrl+Alt/AltGr must remain ordinary translated Unicode input.
-            if(failure == 0 && (!inject(input, u'b', RIGHT_ALT_PRESSED | LEFT_CTRL_PRESSED, 1u, 'B') ||
-                                session.read_byte() != 'b')) { failure = 27; }
+            if(failure == 0 && (!inject(input, u'bw', RIGHT_ALT_PRESSED | LEFT_CTRL_PRESSED, 1u, 'B') ||
+                                session.read_byte() != 'bw')) { failure = 27; }
             // Shift+Alt uppercase and Alt+NumPad Unicode are not editor Meta.
             if(failure == 0 && (!inject(input, u'F', LEFT_ALT_PRESSED | SHIFT_PRESSED, 1u, 'F') ||
                                 session.read_byte() != 'F')) { failure = 28; }

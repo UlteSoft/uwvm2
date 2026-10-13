@@ -38,7 +38,6 @@
     auto const& local{*state.local_func_storage_ptr};
     auto const integer{builder.getIntNTy(static_cast<unsigned>(sizeof(::std::uintptr_t)*CHAR_BIT))};
     ::llvm::BasicBlock* fast_resume{};
-#if defined(__linux__)
     if(auto const address{::uwvm2::runtime::lib::details::llvm_jit_debug_shutdown_flag_address_host_api()}; address != nullptr)
     {
         // Same process-lifetime lock-free atomic byte as the real host poll.
@@ -59,7 +58,6 @@
         builder.CreateCondBr(builder.CreateICmpNE(pending, builder.getInt8(0u)), requested, fast_resume);
         builder.SetInsertPoint(requested);
     }
-#endif
     auto const poll{apply_llvm_jit_host_calling_conv(emit_runtime_local_func_llvm_jit_may_throw_call(state, type, bridge,
         {state.debug_activation_token, ::llvm::ConstantInt::get(integer, local.module_id),
          ::llvm::ConstantInt::get(integer, local.function_index), ::llvm::ConstantInt::get(integer, opcode_offset)}, false))};

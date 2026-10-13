@@ -13,3 +13,17 @@ https://sourceware.org/gdb/current/onlinedocs/gdb.html/Continuing-and-Stepping.h
 https://sourceware.org/gdb/current/onlinedocs/gdb.html/Background-Execution.html
 
 SOURCE peer correction in current-rebase R2: a successful resume may already report stopping when a breakpoint observer requests pause before inspect and another genuine participant remains unparked. Foreground waits through BOTH running and stopping; only actual complete stop/exit/closed completes normally. The narrow original hunks were rebased against ROOT applied Deep46R7 console/impl/cppm, preserving wasm_path and consolidated state routes. This is still source-only and not a native product result.
+
+CLI presentation uses GDB's `Starting program: FILE`, `Continuing.` and
+`Program exited normally.` messages. Nonzero exit codes use the conventional
+octal form. Resume acknowledgements do not print controller `running`/`stopping`
+status; explicit status/wait and errors retain their reports. Guest stdout is
+unmodified. Successful restart cleanup and quit are silent, and the debugger
+startup banner appears once per physical console session. The authenticated
+text transport retains `running` and `guest exited: N` for server/DAP parsers.
+`debug_console_output.cc` qualifies presentation on copied reply data;
+`run_debug_run_cli.py` exercises these rules during actual standalone restarts.
+
+CLI test helpers set `normal_quit_completed` only after an ordinary `quit` and
+a successful OS process wait. Forced cleanup never sets it; existing result
+fields use that fact instead of waiting for a deleted success message.
