@@ -113,14 +113,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t fd,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t stat_ptrsz) noexcept
     {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-        if(env.wasip1_memory == nullptr) [[unlikely]]
-        {
-            // Security issues inherent to virtual machines
-            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-        }
-# endif
-        auto& memory{*env.wasip1_memory};
+        auto const memory_pointer{env.get_memory()};
+        if(memory_pointer == nullptr) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault; }
+        auto& memory{*memory_pointer};
 
         check_wasip1_guest_pointer_alignment<8uz>(stat_ptrsz, u8"fd_fdstat_get_wasm64.stat (fdstat)");
 
@@ -310,16 +305,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 if(oflags & O_APPEND) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_append; }
 #  endif
 #  ifdef O_DSYNC
-                if(oflags & O_DSYNC) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_dsync; }
+                // Some native sync flags are composite masks; require every bit.
+                if(O_DSYNC != 0 && (oflags & O_DSYNC) == O_DSYNC) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_dsync; }
 #  endif
 #  ifdef O_NONBLOCK
                 if(oflags & O_NONBLOCK) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_nonblock; }
 #  endif
 #  ifdef O_RSYNC
-                if(oflags & O_RSYNC) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_rsync; }
+                if(O_RSYNC != 0 && (oflags & O_RSYNC) == O_RSYNC) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_rsync; }
 #  endif
 #  ifdef O_SYNC
-                if(oflags & O_SYNC) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_sync; }
+                if(O_SYNC != 0 && (oflags & O_SYNC) == O_SYNC) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_sync; }
 #  endif
 # endif
 
@@ -489,16 +485,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 if(oflags & O_APPEND) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_append; }
 #  endif
 #  ifdef O_DSYNC
-                if(oflags & O_DSYNC) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_dsync; }
+                // Some native sync flags are composite masks; require every bit.
+                if(O_DSYNC != 0 && (oflags & O_DSYNC) == O_DSYNC) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_dsync; }
 #  endif
 #  ifdef O_NONBLOCK
                 if(oflags & O_NONBLOCK) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_nonblock; }
 #  endif
 #  ifdef O_RSYNC
-                if(oflags & O_RSYNC) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_rsync; }
+                if(O_RSYNC != 0 && (oflags & O_RSYNC) == O_RSYNC) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_rsync; }
 #  endif
 #  ifdef O_SYNC
-                if(oflags & O_SYNC) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_sync; }
+                if(O_SYNC != 0 && (oflags & O_SYNC) == O_SYNC) { fs_flags |= ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_sync; }
 #  endif
 # endif
 

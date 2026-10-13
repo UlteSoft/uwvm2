@@ -1,8 +1,21 @@
 ﻿#pragma once
 
 #include <concepts>
+#include <cstdint>
 #include <memory>
 #include <type_traits>
+
+namespace fast_io
+{
+// Cold owner-retirement API. A body-exit flag never supplies joined: only the
+// platform's actual termination/join and handle retirement may return joined.
+enum class thread_join_status : unsigned char { joined, pending, not_joinable, unsupported, failed };
+struct thread_join_result
+{
+	thread_join_status status{thread_join_status::unsupported};
+	::std::uint_least32_t native_error{}; // errno, NTSTATUS or Win32 error/unsuccessful wait status
+};
+} // namespace fast_io
 
 namespace fast_io::details
 {

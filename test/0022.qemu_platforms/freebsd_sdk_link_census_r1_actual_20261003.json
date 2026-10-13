@@ -1,0 +1,58 @@
+{
+  "ROS_product_qualified": false,
+  "SDK_qualified": false,
+  "VM_performed": false,
+  "actual_CG_init_only_after": [
+    10154
+  ],
+  "actual_members": 30469,
+  "actual_memory_events_after": {
+    "high": 0,
+    "low": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_group_kill": 0,
+    "oom_kill": 0
+  },
+  "actual_peak_RSS_bytes": 69267456,
+  "actual_selected_links": 281,
+  "actual_selected_regular_bytes": 484593691,
+  "actual_ticket_retired": true,
+  "all_original_known_PIDFDs_ready": true,
+  "all_original_stages_returncode_zero": true,
+  "archive_bytes": 164624792,
+  "archive_sha256": "3768988b151c20f965679062b065c63a977d6bbb9f47fd83695ec2c40790c18f",
+  "census_actual_sha256": "af78b60a1478e59816a7990526af42de95b5331f1247b50db8cf853988194e7d",
+  "cgroup_memory_max_bytes": 68719476736,
+  "cgroup_swap_max_bytes": 0,
+  "compiler_performed": false,
+  "executed_stages": 1,
+  "local_all_nine_raw_byte_hashes_independently_verified": true,
+  "network_performed": false,
+  "new_file_extraction_performed": false,
+  "original_R2_failure_preserved": true,
+  "original_child": {
+    "actual_reaped_returncode": 0,
+    "birth": 3914306,
+    "original_PIDFD_ready": true,
+    "pid": 342827
+  },
+  "original_receipts_sha256": "e5f0fee90742aa3416d7d6478d5a726755777838a57ee7028c6b61f93e1f8dfc",
+  "original_retirement_bridge_sha256": "addf94ece101745a6b8536aebacdfb0f619b10523d104098684855e62d94d1ea",
+  "planned_stages": 1,
+  "schema": "uwvm-freebsd-SDK-link-census-actual-evidence-v1",
+  "scope": "Exact official archive selected-link census only",
+  "small_evidence_archive_sha256": "308e93be2d25f234221c2d93a7075053679fb9e785f832362b18db7d6f40190a",
+  "small_evidence_manifest_sha256": "9fbcb1e8054bcb9f01532866e05f37bc89183939105073b1dc121414d388ba1f",
+  "strict_R2_refused_links": [
+    {
+      "kind": "symlink",
+      "path": "usr/lib/libxo/encoder/test.enc",
+      "selected_private_target": null,
+      "strict_R2_refusal": "SDK link points outside the selected provider subset",
+      "upstream_target": "/usr/tests/lib/libxo/libenc_test.so"
+    }
+  ],
+  "ticket_id": "97ef5bb033aa43439b28b03d63167a23",
+  "wall_seconds": 7.011116408000817
+}

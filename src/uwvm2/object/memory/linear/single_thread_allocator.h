@@ -71,6 +71,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
         unsigned custom_page_size_log2{};
 
+        // Owner identity is read only after a bounds check fails. Keep the
+        // existing base/length/page/lock member offsets unchanged.
+        ::std::size_t diagnostic_owner_memory_index{};
+
         // constexpr data
         inline static constexpr bool can_mmap{false};
         inline static constexpr bool support_multi_thread{false};
@@ -99,12 +103,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         /// @note       Maximum value checks are not provided; maximum value checks should be performed outside of memory management.
         /// @note       This function is intended for single-thread usage and must not be called concurrently.
         /// @note       You can use it after clear().
-        inline constexpr void init_by_page_count(::std::size_t init_page_count) noexcept
+        inline constexpr void init_by_page_count(::std::size_t init_page_count, ::std::size_t memory_index = 0uz) noexcept
         {
             if(init_page_count > ::std::numeric_limits<::std::size_t>::max() >> this->custom_page_size_log2) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             if(this->memory_begin == nullptr) [[likely]]
             {
+                this->diagnostic_owner_memory_index = memory_index;
                 // UB will never appear; it has been preemptively checked.
                 this->memory_length = init_page_count << this->custom_page_size_log2;
 
@@ -316,11 +321,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             this->memory_begin = other.memory_begin;
             this->memory_length = other.memory_length;
             this->custom_page_size_log2 = other.custom_page_size_log2;
+            this->diagnostic_owner_memory_index = other.diagnostic_owner_memory_index;
 
             // clear destroy other
             other.memory_begin = nullptr;
             other.memory_length = 0uz;
             other.custom_page_size_log2 = 0u;
+            other.diagnostic_owner_memory_index = 0uz;
         }
 
         inline constexpr basic_single_thread_allocator_memory_t& operator= (basic_single_thread_allocator_memory_t&& other) noexcept
@@ -332,11 +339,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             this->memory_begin = other.memory_begin;
             this->memory_length = other.memory_length;
             this->custom_page_size_log2 = other.custom_page_size_log2;
+            this->diagnostic_owner_memory_index = other.diagnostic_owner_memory_index;
 
             // clear destroy other
             other.memory_begin = nullptr;
             other.memory_length = 0uz;
             other.custom_page_size_log2 = 0u;
+            other.diagnostic_owner_memory_index = 0uz;
 
             return *this;
         }
@@ -345,6 +354,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         /// @note       Simply clearing the memory without altering the page size.
         inline constexpr void clear() noexcept
         {
+            this->diagnostic_owner_memory_index = 0uz;
             Alloc::deallocate_aligned_n(this->memory_begin, alignment, this->memory_length);  // dealloc includes built-in nullptr checking
 
             this->memory_length = 0uz;
@@ -355,6 +365,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         /// @note       After calling this, you must reinitialize it according to the initialization process.
         inline constexpr void clear_destroy() noexcept
         {
+            this->diagnostic_owner_memory_index = 0uz;
             Alloc::deallocate_aligned_n(this->memory_begin, alignment, this->memory_length);  // dealloc includes built-in nullptr checking
 
             this->memory_length = 0uz;

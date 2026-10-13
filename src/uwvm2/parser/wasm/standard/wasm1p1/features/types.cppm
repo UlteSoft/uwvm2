@@ -38,6 +38,14 @@ import uwvm2.parser.wasm.concepts;
 import uwvm2.parser.wasm.binfmt.binfmt_ver1;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.parser.wasm.standard.wasm1p1.type;
+import uwvm2.parser.wasm.standard.wasm3.type.function_signature;
+import uwvm2.validation.standard.wasm3.constant_expression;
+import uwvm2.validation.standard.wasm3.address_limits;
+import uwvm2.validation.standard.wasm3.function_signature;
+import uwvm2.validation.standard.wasm3.heap_immediate;
+import uwvm2.validation.standard.wasm3.value_immediate;
+import uwvm2.validation.standard.wasm3.recursive_type_binary;
+import uwvm2.validation.standard.wasm3.recursive_type_validation;
 import :def;
 import :feature_def;
 

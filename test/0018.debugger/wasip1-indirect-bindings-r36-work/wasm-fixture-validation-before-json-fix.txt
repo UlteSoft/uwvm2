@@ -1,0 +1,154 @@
+[
+  {
+    "repo": "uwvm2",
+    "fixture": "debug_checkpoint_indirect_retirement_cohort",
+    "stage": "assemble",
+    "argv": [
+      "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/assets/wasm-tools/wasm-tools",
+      "parse",
+      "/home/macromodel/Documents/uwvm3-implementation/wasip1-recovery-20261006-r17/rounds/wasip1-indirect-bindings-20261008-r36/syntax-overlay-v1/uwvm2/test/0017.runtime/fixtures/debug_checkpoint_indirect_retirement_cohort.wat",
+      "-o",
+      "/home/macromodel/Documents/uwvm3-implementation/wasip1-recovery-20261006-r17/rounds/wasip1-indirect-bindings-20261008-r36/uwvm2-debug_checkpoint_indirect_retirement_cohort.wasm"
+    ],
+    "passed": true,
+    "exit": 0,
+    "source_sha256": "e13454143892be962ddd8d20bf9de1be47b4975b3c10a3241f70cb68e7b83eb2",
+    "wasm_sha256": "6d6bad55cde4c1930bf3db6e4b886ed764a7befb5625709628a49a0b50296664",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "seconds": 0.00410368999291677,
+    "actual_native_runtime_execution": false
+  },
+  {
+    "repo": "uwvm2",
+    "fixture": "debug_checkpoint_indirect_retirement_cohort",
+    "stage": "validate",
+    "argv": [
+      "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/assets/wasm-tools/wasm-tools",
+      "validate",
+      "/home/macromodel/Documents/uwvm3-implementation/wasip1-recovery-20261006-r17/rounds/wasip1-indirect-bindings-20261008-r36/uwvm2-debug_checkpoint_indirect_retirement_cohort.wasm",
+      "--features",
+      "all"
+    ],
+    "passed": true,
+    "exit": 0,
+    "source_sha256": "e13454143892be962ddd8d20bf9de1be47b4975b3c10a3241f70cb68e7b83eb2",
+    "wasm_sha256": "6d6bad55cde4c1930bf3db6e4b886ed764a7befb5625709628a49a0b50296664",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "seconds": 0.0038779879978392273,
+    "actual_native_runtime_execution": false
+  },
+  {
+    "repo": "uwvm2",
+    "fixture": "debug_wasip1_indirect_prepared_retirement",
+    "stage": "assemble",
+    "argv": [
+      "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/assets/wasm-tools/wasm-tools",
+      "parse",
+      "/home/macromodel/Documents/uwvm3-implementation/wasip1-recovery-20261006-r17/rounds/wasip1-indirect-bindings-20261008-r36/syntax-overlay-v1/uwvm2/test/0017.runtime/fixtures/debug_wasip1_indirect_prepared_retirement.wat",
+      "-o",
+      "/home/macromodel/Documents/uwvm3-implementation/wasip1-recovery-20261006-r17/rounds/wasip1-indirect-bindings-20261008-r36/uwvm2-debug_wasip1_indirect_prepared_retirement.wasm"
+    ],
+    "passed": true,
+    "exit": 0,
+    "source_sha256": "0e7418438b787d62a7d855296d375e6b13497c8b9c973eb6b06c10a92f8dd6ab",
+    "wasm_sha256": "c66c3919fface88a493566ca9ddec3c514d8489b27bbc5daf1b53b7b94f90426",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "seconds": 0.0037493550044018775,
+    "actual_native_runtime_execution": false
+  },
+  {
+    "repo": "uwvm2",
+    "fixture": "debug_wasip1_indirect_prepared_retirement",
+    "stage": "validate",
+    "argv": [
+      "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/assets/wasm-tools/wasm-tools",
+      "validate",
+      "/home/macromodel/Documents/uwvm3-implementation/wasip1-recovery-20261006-r17/rounds/wasip1-indirect-bindings-20261008-r36/uwvm2-debug_wasip1_indirect_prepared_retirement.wasm",
+      "--features",
+      "all"
+    ],
+    "passed": true,
+    "exit": 0,
+    "source_sha256": "0e7418438b787d62a7d855296d375e6b13497c8b9c973eb6b06c10a92f8dd6ab",
+    "wasm_sha256": "c66c3919fface88a493566ca9ddec3c514d8489b27bbc5daf1b53b7b94f90426",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "seconds": 0.003821037011221051,
+    "actual_native_runtime_execution": false
+  },
+  {
+    "repo": "uwvm2-ros",
+    "fixture": "debug_checkpoint_indirect_retirement_cohort",
+    "stage": "assemble",
+    "argv": [
+      "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/assets/wasm-tools/wasm-tools",
+      "parse",
+      "/home/macromodel/Documents/uwvm3-implementation/wasip1-recovery-20261006-r17/rounds/wasip1-indirect-bindings-20261008-r36/syntax-overlay-v1/uwvm2-ros/test/0017.runtime/fixtures/debug_checkpoint_indirect_retirement_cohort.wat",
+      "-o",
+      "/home/macromodel/Documents/uwvm3-implementation/wasip1-recovery-20261006-r17/rounds/wasip1-indirect-bindings-20261008-r36/uwvm2-ros-debug_checkpoint_indirect_retirement_cohort.wasm"
+    ],
+    "passed": true,
+    "exit": 0,
+    "source_sha256": "e13454143892be962ddd8d20bf9de1be47b4975b3c10a3241f70cb68e7b83eb2",
+    "wasm_sha256": "6d6bad55cde4c1930bf3db6e4b886ed764a7befb5625709628a49a0b50296664",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "seconds": 0.0036722430086228997,
+    "actual_native_runtime_execution": false
+  },
+  {
+    "repo": "uwvm2-ros",
+    "fixture": "debug_checkpoint_indirect_retirement_cohort",
+    "stage": "validate",
+    "argv": [
+      "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/assets/wasm-tools/wasm-tools",
+      "validate",
+      "/home/macromodel/Documents/uwvm3-implementation/wasip1-recovery-20261006-r17/rounds/wasip1-indirect-bindings-20261008-r36/uwvm2-ros-debug_checkpoint_indirect_retirement_cohort.wasm",
+      "--features",
+      "all"
+    ],
+    "passed": true,
+    "exit": 0,
+    "source_sha256": "e13454143892be962ddd8d20bf9de1be47b4975b3c10a3241f70cb68e7b83eb2",
+    "wasm_sha256": "6d6bad55cde4c1930bf3db6e4b886ed764a7befb5625709628a49a0b50296664",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "seconds": 0.003708413991262205,
+    "actual_native_runtime_execution": false
+  },
+  {
+    "repo": "uwvm2-ros",
+    "fixture": "debug_wasip1_indirect_prepared_retirement",
+    "stage": "assemble",
+    "argv": [
+      "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/assets/wasm-tools/wasm-tools",
+      "parse",
+      "/home/macromodel/Documents/uwvm3-implementation/wasip1-recovery-20261006-r17/rounds/wasip1-indirect-bindings-20261008-r36/syntax-overlay-v1/uwvm2-ros/test/0017.runtime/fixtures/debug_wasip1_indirect_prepared_retirement.wat",
+      "-o",
+      "/home/macromodel/Documents/uwvm3-implementation/wasip1-recovery-20261006-r17/rounds/wasip1-indirect-bindings-20261008-r36/uwvm2-ros-debug_wasip1_indirect_prepared_retirement.wasm"
+    ],
+    "passed": true,
+    "exit": 0,
+    "source_sha256": "0e7418438b787d62a7d855296d375e6b13497c8b9c973eb6b06c10a92f8dd6ab",
+    "wasm_sha256": "c66c3919fface88a493566ca9ddec3c514d8489b27bbc5daf1b53b7b94f90426",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "seconds": 0.003749057010281831,
+    "actual_native_runtime_execution": false
+  },
+  {
+    "repo": "uwvm2-ros",
+    "fixture": "debug_wasip1_indirect_prepared_retirement",
+    "stage": "validate",
+    "argv": [
+      "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/assets/wasm-tools/wasm-tools",
+      "validate",
+      "/home/macromodel/Documents/uwvm3-implementation/wasip1-recovery-20261006-r17/rounds/wasip1-indirect-bindings-20261008-r36/uwvm2-ros-debug_wasip1_indirect_prepared_retirement.wasm",
+      "--features",
+      "all"
+    ],
+    "passed": true,
+    "exit": 0,
+    "source_sha256": "0e7418438b787d62a7d855296d375e6b13497c8b9c973eb6b06c10a92f8dd6ab",
+    "wasm_sha256": "c66c3919fface88a493566ca9ddec3c514d8489b27bbc5daf1b53b7b94f90426",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "seconds": 0.003686150987050496,
+    "actual_native_runtime_execution": false
+  }
+]\n

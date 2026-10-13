@@ -289,6 +289,47 @@ namespace
             ::std::cerr << "misaligned in-range runtime-storage pointer did not fail closed\n";
             return false;
         }
+
+        // The imported function may resolve to a provider module's defined-function vector.
+        // Its pointer must be classified before current-module index computation.
+        using namespace ::uwvm2::uwvm::runtime::storage;
+        wasm_binfmt1_final_function_type_t function_type{};
+        wasm_module_storage_t consumer{};
+        wasm_module_storage_t provider{};
+        consumer.imported_function_vec_storage.resize(1uz);
+        provider.local_defined_function_vec_storage.resize(1uz);
+        auto& provider_function{provider.local_defined_function_vec_storage.index_unchecked(0uz)};
+        provider_function.function_type_ptr = ::std::addressof(function_type);
+        auto& alias{consumer.imported_function_vec_storage.index_unchecked(0uz)};
+        alias.link_kind = imported_function_link_kind::defined;
+        alias.target.defined_ptr = ::std::addressof(provider_function);
+        auto const foreign{llvm_details::resolve_runtime_direct_callee(consumer, 0u)};
+        if(!foreign.state_valid || foreign.direct_callable || foreign.function_type_ptr != ::std::addressof(function_type)) [[unlikely]]
+        {
+            ::std::cerr << "cross-module defined-function alias was incorrectly treated as local\n";
+            return false;
+        }
+
+        consumer.local_defined_function_vec_storage.resize(1uz);
+        auto& local_function{consumer.local_defined_function_vec_storage.index_unchecked(0uz)};
+        local_function.function_type_ptr = ::std::addressof(function_type);
+        alias.target.defined_ptr = ::std::addressof(local_function);
+        auto const local{llvm_details::resolve_runtime_direct_callee(consumer, 0u)};
+        if(!local.state_valid || !local.direct_callable || local.func_index != 1u ||
+           local.function_type_ptr != ::std::addressof(function_type)) [[unlikely]]
+        {
+            ::std::cerr << "same-module defined-function alias was not resolved to index 1\n";
+            return false;
+        }
+        // An interior byte of this module's vector is malformed metadata; reject it before reading a function record.
+        auto const interior_address{reinterpret_cast<::std::uintptr_t>(consumer.local_defined_function_vec_storage.data()) + 1u};
+        alias.target.defined_ptr = reinterpret_cast<local_defined_function_storage_t*>(interior_address);
+        auto const interior{llvm_details::resolve_runtime_direct_callee(consumer, 0u)};
+        if(interior.state_valid || interior.direct_callable || interior.function_type_ptr != nullptr) [[unlikely]]
+        {
+            ::std::cerr << "interior-byte defined-function alias was dereferenced or accepted\n";
+            return false;
+        }
         return true;
     }
 

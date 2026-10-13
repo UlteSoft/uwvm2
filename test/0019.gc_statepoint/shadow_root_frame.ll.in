@@ -1,0 +1,114 @@
+; Standalone ABI probe. This is not generated UWVM JIT code.
+; @WORD@ is size_t and @CARRIER@ is the native complete Wasm ref carrier.
+; Root slots escape through enter; ordinary external calls may observe them.
+%root_frame = type { ptr, ptr, @WORD@, @WORD@ }
+
+declare void @uwvm_probe_root_enter(ptr, ptr, @WORD@) nounwind
+declare void @uwvm_probe_root_publish(ptr, @WORD@) nounwind
+declare void @uwvm_probe_root_leave(ptr) nounwind
+declare void @uwvm_probe_collect() nounwind
+declare void @uwvm_probe_allocate_collect() nounwind
+declare void @uwvm_probe_throw()
+declare i32 @__gxx_personality_v0(...)
+
+define void @shadow_nested(ptr %output, ptr %arguments) nounwind {
+entry:
+  %frame = alloca %root_frame, align 8
+  %slots = alloca [2 x @CARRIER@], align 8
+  call void @uwvm_probe_root_enter(ptr %frame, ptr %slots, @WORD@ 2)
+  %a = load @CARRIER@, ptr %arguments, align @ALIGN@
+  %b_address = getelementptr @CARRIER@, ptr %arguments, @WORD@ 1
+  %b = load @CARRIER@, ptr %b_address, align @ALIGN@
+  store @CARRIER@ %a, ptr %slots, align @ALIGN@
+  %slot_b = getelementptr @CARRIER@, ptr %slots, @WORD@ 1
+  store @CARRIER@ %b, ptr %slot_b, align @ALIGN@
+  call void @uwvm_probe_root_publish(ptr %frame, @WORD@ 2)
+  call void @uwvm_probe_collect()
+  store @CARRIER@ %b, ptr %output, align @ALIGN@
+  call void @uwvm_probe_root_leave(ptr %frame)
+  ret void
+}
+
+; Twelve refs are live below the nested call. The callee's two roots cannot
+; replace this caller's frame. Numeric values never enter the root slots.
+define void @shadow_many_roots(ptr %output, ptr %arguments) nounwind {
+entry:
+  %frame = alloca %root_frame, align 8
+  %slots = alloca [12 x @CARRIER@], align 8
+  %result = alloca @CARRIER@, align 8
+  call void @uwvm_probe_root_enter(ptr %frame, ptr %slots, @WORD@ 12)
+@MANY_LOADS@
+  call void @uwvm_probe_root_publish(ptr %frame, @WORD@ 12)
+  call void @shadow_nested(ptr %result, ptr %arguments)
+@MANY_STORES@
+  call void @uwvm_probe_root_leave(ptr %frame)
+  ret void
+}
+
+; Only the selected phi value is a root. The other token must be reclaimed.
+define void @shadow_branch_root(ptr %output, ptr %arguments, i1 %take_first) nounwind {
+entry:
+  %frame = alloca %root_frame, align 8
+  %slots = alloca [1 x @CARRIER@], align 8
+  call void @uwvm_probe_root_enter(ptr %frame, ptr %slots, @WORD@ 1)
+  %a = load @CARRIER@, ptr %arguments, align @ALIGN@
+  %b_address = getelementptr @CARRIER@, ptr %arguments, @WORD@ 1
+  %b = load @CARRIER@, ptr %b_address, align @ALIGN@
+  br i1 %take_first, label %first, label %second
+first:
+  br label %join
+second:
+  br label %join
+join:
+  %chosen = phi @CARRIER@ [ %a, %first ], [ %b, %second ]
+  store @CARRIER@ %chosen, ptr %slots, align @ALIGN@
+  call void @uwvm_probe_root_publish(ptr %frame, @WORD@ 1)
+  call void @uwvm_probe_collect()
+  store @CARRIER@ %chosen, ptr %output, align @ALIGN@
+  call void @uwvm_probe_root_leave(ptr %frame)
+  ret void
+}
+
+; The reference remains an SSA value through several allocating iterations.
+define void @shadow_loop_root(ptr %output, ptr %argument, @WORD@ %iterations) nounwind {
+entry:
+  %frame = alloca %root_frame, align 8
+  %slots = alloca [1 x @CARRIER@], align 8
+  call void @uwvm_probe_root_enter(ptr %frame, ptr %slots, @WORD@ 1)
+  %reference = load @CARRIER@, ptr %argument, align @ALIGN@
+  br label %loop
+loop:
+  %index = phi @WORD@ [ 0, %entry ], [ %next, %body ]
+  %done = icmp eq @WORD@ %index, %iterations
+  br i1 %done, label %exit, label %body
+body:
+  store @CARRIER@ %reference, ptr %slots, align @ALIGN@
+  call void @uwvm_probe_root_publish(ptr %frame, @WORD@ 1)
+  call void @uwvm_probe_allocate_collect()
+  %next = add nuw @WORD@ %index, 1
+  br label %loop
+exit:
+  store @CARRIER@ %reference, ptr %output, align @ALIGN@
+  call void @uwvm_probe_root_leave(ptr %frame)
+  ret void
+}
+
+; This cleanup tests the Itanium EH model used by this standalone probe.
+; It does not qualify Windows SEH, Wasm catch_ref, or product landing pads.
+define void @shadow_exception_cleanup(ptr %argument) personality ptr @__gxx_personality_v0 {
+entry:
+  %frame = alloca %root_frame, align 8
+  %slots = alloca [1 x @CARRIER@], align 8
+  call void @uwvm_probe_root_enter(ptr %frame, ptr %slots, @WORD@ 1)
+  %reference = load @CARRIER@, ptr %argument, align @ALIGN@
+  store @CARRIER@ %reference, ptr %slots, align @ALIGN@
+  call void @uwvm_probe_root_publish(ptr %frame, @WORD@ 1)
+  invoke void @uwvm_probe_throw() to label %normal unwind label %cleanup
+normal:
+  call void @uwvm_probe_root_leave(ptr %frame)
+  ret void
+cleanup:
+  %exception = landingpad { ptr, i32 } cleanup
+  call void @uwvm_probe_root_leave(ptr %frame)
+  resume { ptr, i32 } %exception
+}

@@ -1,0 +1,142 @@
+{
+  "schema": "uwvm-precise-gc-trace-metadata-source-cold-v1",
+  "source_only": true,
+  "execute_ready": false,
+  "fresh_build_source_id": null,
+  "fresh_runtime_sha256": null,
+  "fresh_elf_sha256": null,
+  "compiler_receipt": null,
+  "pins": {
+    "src/uwvm2/uwvm/runtime/storage/gc_trace_metadata.h": {
+      "bytes": 8782,
+      "sha256": "998b85e4e38568f4ff60e2e0438e092565c7bd17c7ddf7d540b6007a8a090ab9"
+    },
+    "src/uwvm2/uwvm/runtime/storage/gc_trace_metadata.cppm": {
+      "bytes": 669,
+      "sha256": "346b9eb541ae8043ec43ee0d6b799194928ae8fda69b4762cfe81a306ba52b7c"
+    },
+    "src/uwvm2/uwvm/runtime/storage/gc_object.h": {
+      "bytes": 282971,
+      "sha256": "aeb9efb38c9d430856949196c3d5df1a8c7097ac6f9b7de15055d18cacb92f06"
+    },
+    "src/uwvm2/uwvm/runtime/storage/impl.h": {
+      "bytes": 1110,
+      "sha256": "4041b9dd22d42a37aed10a8466a9b7d899449840651bf45cfe9995f8272602c2"
+    },
+    "src/uwvm2/uwvm/runtime/storage/impl.cppm": {
+      "bytes": 1265,
+      "sha256": "908fcf01297fc04aa2e681077f2b9943b199da85af35472810b6de75bcf721ae"
+    },
+    "src/uwvm2/uwvm/runtime/storage/wasm_module.cppm": {
+      "bytes": 2976,
+      "sha256": "604437b348bb23e2829f9455aa98c51164bf33664dece435f3d5f800ab4637ce"
+    },
+    "test/0019.gc_statepoint/gc_trace_metadata.cc": {
+      "bytes": 8006,
+      "sha256": "9eaefe597aa94b9f4da373b08fc933612d95638f34903ad9cb4e52a688ec02c1"
+    },
+    "test/0019.gc_statepoint/gc_trace_metadata_store.cc": {
+      "bytes": 11984,
+      "sha256": "1ed2ba0286c35a9db321dd4de0739bbda7b8c529ad6c87eea533dac855f485cc"
+    }
+  },
+  "baseline_before_images": {
+    "gc_object.h": "55cb0d40fb264ba9b825f551d2de16c1f79b0cc9db2eb08de092651ef29ee036",
+    "descriptor.h": "9a770293c14aa2fd7406af8dff5b4b3c0d6d34a4f9511b3f0b2b546872dffb62"
+  },
+  "candidate_gate": "UWVM_EXPERIMENTAL_PRECISE_GC_TRACE_METADATA",
+  "default_gate_value": 0,
+  "normal_native_profiles": [
+    {
+      "six_experimental_switches": 0,
+      "precise_metadata": 0
+    },
+    {
+      "six_experimental_switches": 0,
+      "precise_metadata": 1
+    },
+    {
+      "six_experimental_switches": 1,
+      "precise_metadata": 0
+    },
+    {
+      "six_experimental_switches": 1,
+      "precise_metadata": 1
+    }
+  ],
+  "oom_test_controls": [
+    {
+      "fixture": "test/0019.gc_statepoint/gc_trace_metadata.cc",
+      "defines": [
+        "UWVM2TEST_TRACE_METADATA_OOM=1"
+      ],
+      "expected_actual_failures": 1
+    },
+    {
+      "fixture": "test/0019.gc_statepoint/gc_trace_metadata_store.cc",
+      "precise_metadata": 1,
+      "defines": [
+        "UWVM2TEST_TRACE_METADATA_STORE_OOM=1",
+        "UWVM2TEST_GC_TRACE_METADATA_ALLOCATION_PROBE=1"
+      ],
+      "expected_matched_probes": 1,
+      "expected_actual_failures": 1
+    }
+  ],
+  "expected_store_cold": {
+    "successful_collections": 3,
+    "reclaimed": 8,
+    "invalid_later_root_reclaimed": 0,
+    "native_component_only": true,
+    "performance_measured": false
+  },
+  "memory_contract": "sizeof(metadata) per type + actual requested struct-reference index bytes; allocator/cookie/rounding/RSS measured separately",
+  "native_execution": false,
+  "wasm_execution": false,
+  "sanitizers_passed": false,
+  "module_build_passed": false,
+  "performance_qualified": false,
+  "resource_contract": {
+    "memory_max_bytes": 68719476736,
+    "memory_swap_max_bytes": 0,
+    "compile_cpu_role": "admitted E-core",
+    "timing_cpu_role": "P0 only after cold",
+    "sole_ssh_owner": "linux_fused_resume"
+  },
+  "implementation_status": "source implemented; default off; native/module/VM/performance acceptance pending actual keeper receipts",
+  "exception_graph_regression": {
+    "required_precise_metadata_values": [
+      0,
+      1
+    ],
+    "current_matched_profiles_required": true,
+    "current_graph_controls_binding": null,
+    "required_controls": [
+      "aggregate-exn cycle",
+      "old-exnref retained in new caught wrapper",
+      "registered native exception owner",
+      "unreachable invalid payload",
+      "stale and foreign tokens",
+      "root drop",
+      "failed collection zero reclamation",
+      "immutable identity and original trace preserved"
+    ],
+    "historical_scope_warning": "0019 payload/native-EH fixtures include aggregate-only prototype rejection expectations; historical overlay results do not qualify graph-enabled product collection",
+    "historical_fixtures": [
+      "test/0019.gc_statepoint/exception_payload_roots.cc",
+      "test/0019.gc_statepoint/llvm_gc_exception_roots.cc",
+      "test/0019.gc_statepoint/llvm_gc_exception_roots.wat",
+      "test/0019.gc_statepoint/product_cohort_sweep.cc"
+    ],
+    "source_regression_pins": {
+      "src/uwvm2/uwvm/runtime/storage/gc_exception_graph.inc": {
+        "bytes": 27978,
+        "sha256": "cbd3f8894b1261667f6aec8ba17ce57217a9deed7d2b00963e6acc7a996695a4"
+      },
+      "src/uwvm2/runtime/exception/native_roots.h": {
+        "bytes": 20962,
+        "sha256": "ac973417c0459c65570027a0fddeaa296fcd4fc57dd9198ab88fc651c31d3ac9"
+      }
+    }
+  }
+}

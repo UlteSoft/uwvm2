@@ -1,0 +1,547 @@
+{
+  "schema": "uwvm-core3-dead-codegen-model-source-plan-v6",
+  "source_only": true,
+  "native_execution_passed": false,
+  "component": "test/0013.uwvm_int/wasm3/dead_codegen_model.cc",
+  "options": [
+    "k_test_byref_opt",
+    "make_tailcall_scalar4_merged_opt<1>()",
+    "make_tailcall_scalar4_merged_opt<2>()",
+    "make_tailcall_scalar4_merged_opt<3>()"
+  ],
+  "macros": [
+    "UWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+    "UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+    "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+    "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+    "UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+  ],
+  "vectors": [
+    {
+      "vector": 0,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": []
+    },
+    {
+      "vector": 1,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1"
+      ]
+    },
+    {
+      "vector": 2,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1"
+      ]
+    },
+    {
+      "vector": 3,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1"
+      ]
+    },
+    {
+      "vector": 4,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1"
+      ]
+    },
+    {
+      "vector": 5,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1"
+      ]
+    },
+    {
+      "vector": 6,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1"
+      ]
+    },
+    {
+      "vector": 7,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1"
+      ]
+    },
+    {
+      "vector": 8,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1"
+      ]
+    },
+    {
+      "vector": 9,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1"
+      ]
+    },
+    {
+      "vector": 10,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1"
+      ]
+    },
+    {
+      "vector": 11,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1"
+      ]
+    },
+    {
+      "vector": 12,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1"
+      ]
+    },
+    {
+      "vector": 13,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1"
+      ]
+    },
+    {
+      "vector": 14,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1"
+      ]
+    },
+    {
+      "vector": 15,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1"
+      ]
+    },
+    {
+      "vector": 16,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 17,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 18,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 19,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 20,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 21,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 22,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 23,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 24,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 25,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 26,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 27,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 28,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 29,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 30,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    },
+    {
+      "vector": 31,
+      "undefine_all_first": [
+        "-UUWVM_ENABLE_UWVM_INT_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT",
+        "-UUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY"
+      ],
+      "define_selected": [
+        "-DUWVM_ENABLE_UWVM_INT_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT=1",
+        "-DUWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY=1"
+      ]
+    }
+  ],
+  "fixtures": [
+    {
+      "file": "test/0017.runtime/fixtures/wasm3_dead_codegen_model_results_select.wat",
+      "expectation": "valid",
+      "runtime_expected": "runtime-unreachable"
+    },
+    {
+      "file": "test/0017.runtime/fixtures/wasm3_dead_codegen_model_mixed_results.wat",
+      "expectation": "valid",
+      "runtime_expected": "runtime-unreachable"
+    },
+    {
+      "file": "test/0017.runtime/fixtures/wasm3_dead_codegen_model_outer_live_else.wat",
+      "expectation": "valid",
+      "runtime_expected": "success"
+    },
+    {
+      "file": "test/0017.runtime/fixtures/wasm3_dead_codegen_model_block_params.wat",
+      "expectation": "valid",
+      "runtime_expected": "runtime-unreachable"
+    },
+    {
+      "file": "test/0017.runtime/fixtures/wasm3_dead_codegen_model_loop_params.wat",
+      "expectation": "valid",
+      "runtime_expected": "runtime-unreachable"
+    },
+    {
+      "file": "test/0017.runtime/fixtures/wasm3_dead_codegen_model_if_params_else.wat",
+      "expectation": "valid",
+      "runtime_expected": "runtime-unreachable"
+    },
+    {
+      "file": "test/0017.runtime/fixtures/wasm3_dead_codegen_model_if_params_no_else.wat",
+      "expectation": "valid",
+      "runtime_expected": "runtime-unreachable"
+    },
+    {
+      "file": "test/0017.runtime/fixtures/wasm3_dead_codegen_model_typed_select_wrong_heap.wat",
+      "expectation": "invalid",
+      "runtime_expected": "validation-error"
+    },
+    {
+      "file": "test/0017.runtime/fixtures/wasm3_dead_codegen_model_typed_select_nullable.wat",
+      "expectation": "invalid",
+      "runtime_expected": "validation-error"
+    }
+  ],
+  "source_qualification": "official wasm-tools validate before component/CLI; use actual initialized byte source",
+  "scope": "9 fixtures x 4 translation layouts; first default/current vector, then all32 combine/delay vectors; pending native/ASM",
+  "local_execution_allowed": false,
+  "runtime_execution": "same official-valid bytes via existing four-mode runtime runner, ROS supported full modes; the component itself compiles, it does not execute Wasm",
+  "assembly_receipt": "capture only untimed; prove no new runtime instructions/musttail regression in these validation-only changes; source assertion is not assembly evidence",
+  "sanitizer_qualification": {
+    "asan_ubsan_flags": [
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer"
+    ],
+    "native_executor": "sole SSH Linux keeper 64GiB cgroup",
+    "expected_component_checks": 199,
+    "separate_untimed_run": true,
+    "not_a_performance_sample": true,
+    "native_passed": false
+  }
+}

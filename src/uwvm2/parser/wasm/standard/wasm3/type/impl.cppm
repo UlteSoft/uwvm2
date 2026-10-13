@@ -24,6 +24,10 @@ module;
 
 export module uwvm2.parser.wasm.standard.wasm3.type;
 export import :value_type;
+export import uwvm2.parser.wasm.standard.wasm3.type.recursive_type;
+export import uwvm2.parser.wasm.standard.wasm3.type.section_details;
+export import uwvm2.parser.wasm.standard.wasm3.type.custom_section_details;
+export import uwvm2.parser.wasm.standard.wasm3.type.function_signature;
 export import :section_type;
 
 #ifndef UWVM_MODULE

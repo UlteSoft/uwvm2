@@ -1,0 +1,10 @@
+--- a/third-parties/fast_io/share/fast_io/fast_io_inc/core.inc
++++ b/third-parties/fast_io/share/fast_io/fast_io_inc/core.inc
+@@ -44,6 +44,7 @@
+ 
+ using ::fast_io::parse_by_scan;
+ using ::fast_io::parse_code;
++using ::fast_io::parse_result;
+ 
+ using ::fast_io::io_dup;
+ using ::fast_io::open_mode;

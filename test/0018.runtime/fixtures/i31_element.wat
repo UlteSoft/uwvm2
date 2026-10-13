@@ -1,0 +1,1 @@
+(module (table 2 i31ref) (elem $e i31ref (ref.i31 (i32.const 7))) (func (export "_start") i32.const 0 i32.const 0 i32.const 1 table.init 0 $e i32.const 0 table.get 0 i31.get_s i32.const 7 i32.ne if unreachable end))

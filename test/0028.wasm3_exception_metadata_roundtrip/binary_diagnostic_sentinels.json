@@ -1,0 +1,30 @@
+{
+  "schema": "uwvm-eh-diagnostic-original-binary-source-r4",
+  "source_only": true,
+  "official_oracle_passed": false,
+  "native_execution_passed": false,
+  "fixtures": [
+    {
+      "name": "missing_end_at_module_end",
+      "hex": "0061736d01000000010401600000030201000a0601040002400b",
+      "sha256": "d29f95f65b0c18262e9b942ff87b5c3fbf453e62b7a9aa75cee4d7fe48d07365",
+      "official_validate_expected": "invalid",
+      "parser_section_expected": "Pass actual minimum-end parser: expression nonempty, final physical byte 0x0b. Nested block closes; function frame remains open.",
+      "runtime_expected": "Actual fused missing_end at module_end; never guest execution.",
+      "module_end_offset": 26,
+      "original_binary_required": true,
+      "reason": "Original body local-count0, block void, end. The physical end closes only the nested frame; the next bounded dispatch reaches module_end with the function still open."
+    },
+    {
+      "name": "empty_expression_missing_end_parse_only",
+      "hex": "0061736d01000000010401600000030201000a03010100",
+      "sha256": "e398d2dcf3c4fd35dce7b96d7607601d942391fac368b0b052c20675c327271c",
+      "official_validate_expected": "invalid",
+      "parser_section_expected": "Actual parser rejects missing_code_body_end at offset23 before runtime.",
+      "runtime_expected": "Not reached. Parser rejection must not qualify runtime compiler formatter.",
+      "module_end_offset": 23,
+      "original_binary_required": true,
+      "reason": "Historical r2/r3 prediction was wrong: actual code_section.h minimum-end check rejects expr_begin==code_end. Preserve original bytes as parse-only control; old frozen archives remain unchanged."
+    }
+  ]
+}

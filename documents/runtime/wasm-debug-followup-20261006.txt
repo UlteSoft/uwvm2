@@ -1,0 +1,312 @@
+2026-10-06 Wasm dbg follow-up: paired targeted regressions and native qualification
+
+本轮同步修改 uwvm2 与 uwvm2-ros 的
+test/0018.debugger/run_wasm_operand_preview_cli.py。
+两份文件 SHA256 均为：
+114da7e68c8de6a538fd92a0ca0ee3cbb919ec7e2604c4d0b15b8c44d9530070
+
+新增 10 个真实 Wasm 调试用例：
+call_indirect、return_call_indirect、call_ref、return_call_ref 的目标函数
+typed operands、调用者 prefix 与完整 activation total；尾调用必须移除
+middle activation，但保留真实调用者和它的数据栈。
+另加 multi-memory copy、memory64 load/store、memory64 atomic.wait64、
+table64 references/grow、确定性 relaxed SIMD swizzle、GC cast/field values。
+支持重复 --case 选择针对性矩阵；未知 case 会拒绝，避免静默漏测。
+
+所有 Wasm parse/validate、VM 会话及进程监控回归均在 SSH linux 的现有
+64 GiB / swap=0 cgroup 内执行。编译产品为已核验的 native46 完整产品，
+SDK 为 23.1.1-uwvm-ros.11；5190 个实际编译依赖和全部产品再次核对一致。
+运行时 source41 不变，source57/source58 只覆盖测试文件。
+ROS 保持 full uwvm-int / full LLVM JIT，没有引入 lazy/tiered modes。
+没有修改 C++ I/O 或运行时代码，没有覆盖、回滚其他 agent 的改动。
+
+本轮计入通过的真实 VM 会话共 686 次：
+- 10000 locals 下的公开 ASM SI/NI、数值寄存器、隐藏 scaffold、stale stop
+  拒绝、禁止原始地址查询和 managed quit：4 次，两库各两种调用栈策略。
+- 原有 20 个精准 operands 用例：400 次，覆盖两库、instruction/unwind、
+  default/debug/fast-compile/balanced/max 五种 JIT 策略。
+  包括整数、浮点位模式/NaN/-0、v128、GC refs、结构化分支/循环 prefix、
+  异常 payload/throw_ref、非默认 locals 初始化、原子等待、分页和 10000 locals。
+- 深层 activation boundaries 63/64/65/128/1024/4097/10000：30 次。
+  检查末端/超范围页、深层祖先 operands、活动目标替换拒绝、非活动目标
+  替换成功及 step over/out；4097 另覆盖 native stop 后 typed state 不可用。
+- 深层异常 10000 帧、尾递归 20000 次与 step out：8 次。
+- 热更新/wasm-script：4 次，验证错误类型、坏 opcode、whole-module 输入
+  拒绝；合法 function body 更新、stale generation/活动目标拒绝；
+  script 失败后不继续执行后续命令，并检查实际返回值与 memory 修改。
+- Core3 feature entry smoke：112 次，28 个 fixture × 两库 × 两种调用栈
+  策略。验证真实 entry-stop queries、3 次 Wasm step、opcode trace、guest exit。
+  这是入口 smoke，不代表全部 feature state 或并发调试已覆盖。
+- 新间接调用 / typed-ref / tail activation 用例：80 次，
+  两库 × 五种 JIT 策略 × 两种调用栈策略 × 4 个 fixture。
+- 新 memory64 / table64 / multi-memory / relaxed-SIMD / GC 用例：48 次，
+  两库 × default/max × 两种调用栈策略 × 6 个 fixture。
+
+保留了 recovery55 balanced 的监控中断原始记录；它的局部通过行不计入 686。
+监控器新增原 PIDFD 已退休且 birth/UID/cgroup/parent/CPU 一致时的 terminal
+image 处理，退出观察不提供 tool qualification；非退休的异常变化仍拒绝，
+并保留两个实际 process snapshots 供诊断。后续完整矩阵通过。
+实际 512 个短命 Python 子进程回归通过；未列入许可清单的 live sleep
+子进程被拒绝，其 owned subtree 已退休。没有信号发送给其他 agent。
+原监控竞态在后续未再次复现，新增 terminal 分支触发次数为 0，
+因此没有宣称通过一次重跑完全确定原始竞态根因。
+
+资源记录时：整个恢复根目录分配 5684080640 bytes（约 5.29 GiB），
+文件系统可用 122791612416 bytes（约 114.36 GiB）；
+共享 cgroup memory.current=17069375488 bytes，memory events 全为 0。
+沿用 16 GiB 目录高水位和 24 GiB 最低实际磁盘余量的 admission/periodic
+监控。它们不是硬文件系统 quota。新 source cuts 使用硬链接，
+两轮只新增约 90 KiB 测试源码，未复制 SDK 或完整产品。
+
+精确记录：
+/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/RECOVERY-RESULT60.json
+/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/selected-results60.json
+/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/recovery60-evidence.tar.gz
+
+范围限制：本轮是固定 source41 运行时的 Linux x86_64 实测；本机并行产生的
+source_scalar_expression 与 WASIp1 改动未纳入这批二进制，也未被本轮修改。
+没有宣称 language DWARF、WASIp1、全部 opcode、真实并发线程调试、
+dbg-off 零开销测量或所有 ISA 体验已经完整验证。
+此前 RISC-V 10000-local 实际 Wasm managed-quit abort 仍未在恢复后的
+精确跨架构 SDK 上复测/修复；QEMU engines 已恢复，cross SDK/sysroots 未恢复。
+
+
+2026-10-06 successor recovery61–90: RISC-V 大栈帧退出修复
+
+本节更新上面的“RISC-V 尚未修复”结论；保留旧记录供复现。
+同时修正旧测试口径：旧 Console.close 没有检查 VM 非零退出，所以上述
+686 次仅能作为当时的值/操作观察记录，不能独立证明全部正常退出。
+两库的 Console.close 现已要求 quit 后实际 exit=0；超时强杀判失败。
+新的 managed-quit 驱动也只认可真实 Wasm 断点与正常进程退出。
+
+恢复了精确 ros.11 的 RISC-V target-host LLVM SDK、GNU sysroot 和两库的
+full interpreter / full LLVM JIT 产品。所有编译、validator、LLVM 工具、
+QEMU、GDB 和测试均在 SSH linux 已核验的 64 GiB / swap=0 cgroup 中执行。
+复用其他 agent 提供的 SDK/source 时只读核验，没有改动其目录或进程。
+本批生产对象固定于 source61；后续 peer WASIp1 改动未默默并入。
+
+实际旧产品：两库 × instruction/unwind 下，1-local 用例正常退出；
+10000-local 用例全部到达真实断点，但 quit 后 abort（4 个失败保留）。
+GDB 捕获真实 shutdown exception：GNU _Unwind_RaiseException 返回
+_URC_END_OF_STACK=5，未到外层 C++ catch；不是 catch ownership 检查失败。
+
+根因在 LLVM RISCVFrameLowering::allocateStack 的 large probe loop：
+Offset 仅是本次分配，RealStackSize 才是完整帧。CFI 漏算先前保存寄存器的
+496 字节，导致 native unwinder 从错误槽位读取 RA。实测修复前注册 FDE
+临时寄存器 CFA=202752、最终 SP CFA=203088；修复后分别为 203248、203584。
+ROS 已直接修复 vendored backend，并更新 sources.sha256 对应单行。
+uwvm2 携带同内容 external LLVM patch；两库 cross CI 都增加坏源码形态
+拒绝检查。外部 SDK 必须重编 LLVMRISCVCodeGen 并重新链接 VM：
+仅保留 ros.11 版本字符串或换测试脚本不足以修复。
+后继 SDK 标识为“ros.11 + exact scoped CFA backport”，没有冒充未改的 ros.11。
+
+修复后的真实测试：
+- QEMU RISC-V 两库 × 1/10000 locals × instruction/unwind：8/8，真实断点
+  与 quit exit=0 均通过。
+- QEMU RISC-V 精确 typed operands：26/26。覆盖 default/max 下 mixed
+  numeric bits、间接尾调用和 typed-ref 尾调用及 debug 策略的 10000 locals。
+  大 locals 用例在 byte 16 读到 [i32=123, i64=456]；local[0]=123，
+  local[9998]=0，local[9999]=-4567；byte 19 的 operands 正确为空。
+- Linux x86_64 使用严格退出判定重验两库：8 个 managed-quit + 16 个
+  numeric/tail operand 会话，24/24；产品仍是已核验 native46/source41。
+- 私有 native MCJIT cleanup 回归：修复前 no-fp large-probe 两库均崩溃，
+  unprobed/fp controls 正常；修复后 5 case × 两库共 10 次全通过，
+  真实 3 层递归+root backtrace、4 次 landing-pad cleanup 和 C++ catch。
+  8 个前后对象的 .text 完全相同；变化限于 large no-fp probe 的 .eh_frame。
+  栈探测仍启用，未添加执行指令或强制 frame-pointer workaround。
+- 一个实际 full Wasm GDB capture 确认修复后的注册 FDE、真实 caller 链
+  以及 VM 正常退出。它只用于私有诊断，不赋予公开 ASM 调试 VM 本身的能力。
+
+另一个功能缺口：RISC-V physical finish asm 尚未实现。其 controller、
+caller capture、return-event continuation 目前只有 Linux x86_64 实现。
+原 normal 功能测试 recovery87 的失败保留；没有算成成功的 finish。
+新增 unsupported-finish 的 4 个两库/策略运行仅证明拒绝后 stop ID、PC、
+Wasm function 不变，继续运行返回 14，wait/join/reset/retirement 完成。
+日志明确 real-native-finish=0。最后一处只把计数标签 actual-bt 改为
+actual-native-console，行为测试源仍冻结于 source64，未把标签变更当功能实现。
+详情：test/0017.runtime/README.debug-riscv-finish-status.md。
+
+修复详情与复现：
+test/0017.runtime/README.debug-riscv-probe-cfi.md
+test/0018.debugger/README.wasm-managed-quit.md
+tools/ci/patches/llvm23-linux-riscv-split-probe-cfi.patch
+
+精确产品、编译依赖、cgroup、PIDFD 退休、原失败及成功记录：
+/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/RECOVERY-RESULT90.json
+/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/riscv77/qualified79.json
+后继证据归档 recovery91-evidence.tar.gz 只保存源码/证明/日志，不复制 SDK
+archive 或 VM 产品。保留之前 build61 的 EMFILE、原 link/诊断/功能失败；
+没有用后继通过覆盖原记录。supervisor62 扩大 NOFILE 并使用 poll，后继
+SDK 构建实际退休 1518 个受控子进程，memory events 全为 0。
+
+磁盘仍按 16 GiB owned-folder 高水位 / 24 GiB 最低余量执行 admission 与
+periodic 监控（不是硬 quota）。本机发生 ENOSPC 时只把本任务既有的
+472594478-byte 旧证据归档移至 Linux，双方 SHA256 一致后删除本地副本；
+archive-move86.json 保留原路径/目的路径/大小/哈希。没有删除其他 agent 文件。
+
+仍未完整验证/实现的范围：全部 ISA 的 full-VM 调试体验、全部 Core3 的
+针对性调试、完整并发线程关闭、language GDB/LLDB、RISC-V physical finish、
+完整 checkpoint restoration/replay。ROS 未引入基础/lazy/tiered modes。
+
+
+[2026-10-07 RV64 physical finish: source111 / qualification127]
+Restored/reused the rebooted 64 GiB, swap-zero test cgroup and verified its boot/keeper identity. All compilers, LLVM tools, validators, QEMU and VM tests ran inside the verified cgroup. Foreign tasks were neither adopted nor signalled.
+Both full-interpreter/full-LLVM products now qualify Linux RV64 physical finish asm: actual registered CFI, authenticated parent SP/code owner, recursive return/escape traps, running cancellation and real worker ACK. Root/host callers and stale stops are refused. CFA-only metadata remains distinct from RA/caller authority. ENOSYS-only stack-copy fallback uses FastIO self-mem with bounded authenticated slots. No emitted guest instruction is added when debug observation is disabled.
+91 selected successful build/validation/regression commands plus one successful final closure audit: 40 actual finish-fixture sessions and 18 actual CLI sessions, 72 physical return hops. Both policies and repositories pass 64 scalar parameters and 70-level recursion; each deep recursive-running case observes 69 wrong-SP hits and 69 genuine successor traps. Four actual parent-display cases verify architecture SP/FP values=0 and known bits=0. Four NI-call-before-finish-cancel cases pass. Typed numeric/SIMD, indirect/ref tail-call previews and 10000-local normal quit/workspace regressions pass with strict actual exit-code-0 closure.
+QUALIFIED127.json SHA256=619411dbd8623b31aa25d4b4bb03d63f98238d6b87d3f5a62a5fba79054f33c6. It rechecks 30154 pinned inputs, 5988 actual dependencies and all 1648 RV ELF SDK members; only the existing split-probe-CFA backend member is patched. Selected owned RSS peak=7077494784 bytes; recovery-folder high-water=16153972736 bytes, below 16 GiB. Reboot-era max/OOM counters remain zero. Linux free disk was about 93.4 GiB after closure.
+Sources and evidence: test/0017.runtime/README.debug-riscv-finish-status.md and native_finish_riscv64.qualification.json; /home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-rv-finish-20261007-r1. Old refusal/failure history is preserved. The old optional!=0 cancellation diagnostic was misleading; its no-native-PC assertion already passed. Fixture126 corrects the label, fixture129 adds architecture SP/FP assertions; the current s0-name check is RV64-only with equivalent RV behavior. Caller header differences after source111 are comment-only. Other concurrent working-tree changes are preserved and recorded separately.
+This qualifies the exact recorded RV64 GNU/QEMU/source111 cut, not alternate guest-base mappings, all ISAs, all Core-3/thread/language functionality, full checkpoint/external-I/O rollback, or later concurrent changes. ROS receives no basic/lazy/tiered modes.
+
+[2026-10-07 Wasm targeted value qualification: source135 / proof153]
+Both repositories now carry exact live-stack cases for all67 scalar atomic opcodes (i32/i64 addresses) and all20 relaxed SIMD opcodes with uniquely permitted results. Before/after operands, signed/narrow/wrapping values, memory readback and caller prefixes are checked. The real two-participant GC fixture now has observe-atomic/checkpoint-atomic modes: shared Wasm RMW returns are checked independently in original local[5], with the actual complete cohort and existing GC/exn/alias/member/stale-stop negatives. IO uses FastIO in the C++ fixture. No production guest execution path was modified by this task.
+The Core3 smoke harness no longer counts nonzero or timed-out/forced managed quit as success. Initial prompt failures keep a reachable child for cleanup; close failures remain in row/transcript/exit data. Eight real-VM negative sessions first prove actual VM exit0, then force wrapper exit23 or timeout; every abnormal closure is correctly rejected.
+304 positive VM sessions,9772 exact-value pauses and32 actual two-participant episodes (16 atomic) pass across paired repositories; all67 atomics and all20 relaxed SIMD pass native x86_64 and QEMU RV64 with default/max JIT and instruction/unwind policies. Native products are fresh coherent source135; RV extensions use the separately closed source111/full-product/sysroot/exact ros.11 CFA-backport cut. Fourteen later concurrent production changes are retained and recorded separately, not relabelled as tested source135. ROS adds no basic/lazy/tiered modes.
+60 selected successful build/validation/test commands plus actual closure audit153 and package154 pass in the verified64GiB/swap-zero SSH Linux cgroup. Audit rehashes46710 inputs and5517 actual dependencies; actual owned PIDFD retirement/reaping and unchanged zero max/OOM events are checked. Sampled owned RSS peak=6891909120B; folder high-water=16946155520B<16GiB. Only our redundant transferred overlay and eight superseded failed .o files were retired; failed binaries, sources, dependencies, hashes and logs remain. The initial stronger all-user process-reference check declined on nondumpable systemd; no deletion happened in that attempt. The successful object-only cleanup checks active test-cgroup references and touches no foreign file/process.
+QUALIFIED153.json SHA256=aab56b33e7ea236efae332c899bc5248ae18127ea40adb0860af42b2b52301cc. evidence154.tar.gz SHA256=8245615979fed64a00cc956338dce293eb9d9405976ba1364cca747df081f515,5340566B/1400files; includes executable source scripts, excludes compiled VM/object/SDK products. DELIVERY155.json separately closes the archive process after real exit/reaping. Linux root: /home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1. Details: test/0018.debugger/README.wasm-core3-targeted-values-20261007.md and wasm_core3_targeted_values_qualification_20261007.json.
+These are targeted finite matrices. Entry smoke is not exhaustive per-feature state coverage. Zero-timeout/mismatch waits and no-waiter notify do not qualify blocked wait/notify debugging. Real atomic RMW/GC cohorts do not qualify arbitrary schedules, full world restore/replay, all ISA/language/ASM behavior or later source changes.
+
+2026-10-07 paired blocked atomic.wait closure (source212): qualified Linux
+x86_64 + GNU/QEMU RISC-V64. Managed wait cancellation uses the real private
+native shutdown signal after queue/callback/lock cleanup; no fabricated Wasm
+wait result. A durable atomic pause-or-close hint prevents resumed infinite
+waits from sleeping again after domain close. Ordinary execution installs no
+debug wait policy and selects ManagedShutdown=false.
+320 new actual VM runs passed: 192 two-worker, 64 blocked CLI, 32 ordinary
+CLI, 32 try_table/catch_all private-unwind quit. 64 source135 baseline runs
+and 80 two-worker utility cells passed separately. In-flight typed operands,
+GC locals, caller frames, repeated pauses, original comparison/deadline,
+real notify, physical joins and quiescence checked; VM asm remains refused.
+QUALIFIED241 SHA256 d95fbce7e595652679db48a5e6b6a84d7cf42ce37c18ca88a48cbe447c5b27bc
+Source IDs: main c9052516f4bead683100a034f39d8c4b843ffda562c530e2702f366080bf6fa6;
+ROS 6a98e1dd7c2b4031cdd94f3c7a6b62146b83d70767794073e6dc2016442c2c58.
+Shared cgroup swap briefly changed externally to max; affected owned work
+was retired and retried after swap0 restoration. Queued blocking flock now
+avoids poll-based starvation; no foreign process was adopted or signalled.
+Whole-world checkpoint restore, arbitrary thread schedules, other ISAs,
+absolute whole-VM performance and later concurrent source changes remain
+outside this qualification. Full ROS modes only; no basic modes added.
+
+2026-10-07 paired wait utility cross-Linux qualification: native x86_64 and QEMU aarch64, i686, riscv64, ppc64, sparc64, loongarch64, mips64; 64 fresh compiles and 64 actual executions (48 positive, 16 expected old-predicate failures with joins); 640 two-worker close cells, 1280 worker lifecycles and 2560 pause observations. Source212 utility headers, runner test260 for seven profiles and test277 for unmodified MIPS CRT/libc executable-stack contract (GNU_STACK=7). Both repositories synchronized. No complete VM/JIT/ASM parity, whole-world restore or performance claim. Qualified proof SHA-256 dc65dfa2d094331d049000487a27cc7594f550cf51f834c23607278df2c5f4ca; compact delivery SHA-256 1c7f617c2d87b07982d18869e13583fe2e1aae8c7dcd3058c0d731371938be11, 5604216 bytes, 529 members, verified on Linux and Mac. See documents/runtime/keyed-wait-cross-qualification-20261007.json. Source inspection confirms native scalar bits are encoded with FastIO LE and v128 is copied as <16 x i8>; full BE JIT experience remains unqualified. Failed LLD dependency, MIPS stack constraint and private metadata experiment histories preserved.
+
+2026-10-07 paired AArch64 full-LLVM Wasm debugger qualification (source212 / proof308): 360 actual VM sessions pass under QEMU in verified SSH Linux 64 GiB/swap-zero cgroup: 96 two-worker blocked waits, 64 debug CLI waits,16 ordinary dbg-off controls,160 typed-value sessions (4336 exact pauses),24 deep-stack sessions up to10000 actual frames. Both policies/repositories, all67 scalar atomic opcodes and all20 relaxed SIMD opcodes pass the recorded finite matrices. VM-helper ASM remains refused; last-Wasm-safepoint note retained. Fresh target-host ros.11 SDK/65archives/1663AArch64ELFmembers, fresh full interpreter/fullLLVM products; no production C++ change or ROS basic modes. Both EH regression entry defaults now quit; two old defaults fail before VM and16 new-default VM runs pass. Source212 IDs retained; later peer changes excluded. Failed audit307 retained; successor308 derives5 omitted generated.def identities from fixed source templates/config (not observed pre-compilation hashes). QUALIFIED308 SHA25602d5199dd68adac2dec4e9a9d25711d8e6827e93e788ab79aca0bbddea15df58. Compact delivery318 SHA256e68ca4bd2e27ab8ddb98f9750cbb3d026955b224e021b12a053469cc3060edf4,18677544bytes/7519members, Linux/Mac member verified; package root retired in DELIVERY319. Final owned folder14355587072bytes<16GiB; Linux free67946020864bytes>24GiB; max/OOM0, no foreign signal/adoption/removal. FullAArch64physicalASM/exhaustiveCore3/wholeworldrestore/debug-offperf/otherISAfullVM remain open. Details: test/0018.debugger/README.wasm-aarch64-debug-qualification.md and documents/runtime/wasm-aarch64-debug-qualification-20261007.json.
+
+[2026-10-07 AArch64 post-reboot deep native continuation: proof326]
+Linux reboot invalidated the old keeper/boot binding. Guard322 refused before
+starting a child. Reused the already restored 64 GiB, swap-zero cgroup; new
+keeper PID 11166, birth 22661, boot c8d3550f-3a19-40d7-8507-a76c2045ace5.
+Supervisor323 changes only the boot/keeper constants, preserving limits and
+PIDFD ownership. Preflight324 and closure326 rehash 26250 inputs. Both source212
+products pass 4097-frame instruction, unwind and instruction-native variants:
+6 actual VM sessions, 2 genuine native instruction stops, stale Wasm operands
+refused, last-Wasm-safepoint note shown, real continued guest exit 0. Combined
+with the separately retained base proof308, 366 actual AArch64 VM sessions pass.
+QUALIFIED326 SHA256 be36c44fe2f7fc1c41792e7b043258568cd9dba24efb9599f57452c5647bf8dd.
+Delivery329 SHA256 6cd001072d1cbf060f881add213ca80de3eb3c4d087c32c59d8ad0734cffe41d,
+1299752 bytes / 64 members verified on Linux and after Mac transport; package
+root actually retired in DELIVERY330. Final owned folder 14371196928 bytes,
+Linux free 70073245696 bytes, max/OOM zero; no foreign signal/adoption.
+Paired compact JSON/README updated. Full ASM parity, exhaustive Core3, whole
+world restore, debug-off performance and later peer changes remain outside.
+
+[2026-10-07 live bulk memory/table state: source212 / qualification346]
+Added paired wasm_operand_bulk_state_cases.py and run_wasm_bulk_state_cli.py.
+Eight cases cover all four independent i32/i64 source/destination width pairs
+for memories and funcref tables. Checks include live typed operands with
+i64/f32 prefixes, passive init/drop, zero length at one-past after segment
+drop, overlapping copies and exact readback, fill, grow success/failure,
+null references and a real indirect call through the grown slot. No production
+C++ or basic ROS mode change. Existing source212 full products/target-host SDKs
+and qualified CLI helpers are pinned; later peer changes remain excluded.
+192 actual full-LLVM VM matrix sessions plus 2 smoke sessions pass across
+Linux x86_64, GNU/QEMU RV64 and AArch64, both repos, default/max JIT and
+instruction/unwind policies. 7104 matrix exact-value pauses + 74 smoke = 7178.
+All validators/QEMU/VM work ran inside the verified 64 GiB/swap-zero SSH Linux
+cgroup. Closure346 rehashes 30200 inputs, checks recorded operands/bytecode,
+real exit 0 and owned root PIDFD retirement/reaping. Max/OOM counters zero,
+no foreign signal/adoption or file removal. Sampled owned RSS 312025088 bytes;
+final owned folder 14397915136 bytes < 16 GiB; Linux free 67885056000 > 24 GiB.
+QUALIFIED346 SHA256 3b82f92fa6eaa4e655fa53c1cdecb649579463b44c98f560ac4351864a5a8cfd.
+Delivery347 SHA256 c009f5b3717d73489ba636ed0235d12406dce2cb82fe2c1ebe9a8a4836330047,
+7740857 bytes / 642 members checked on Linux and after Mac transport.
+Package root actually retired in DELIVERY348. Paired README/compact proof
+record the scope: guest-side table readback, not table enumeration UI; invalid
+access traps, typed GC table subtype combinations, other ISAs, full Core3,
+world restore and debug-off performance remain outside this qualification.
+
+2026-10-07 live table/GC container follow-up: paired seven-case full-LLVM JIT matrix passes source212 on native x86_64, QEMU RISC-V64 and QEMU AArch64, instruction/unwind + default/max. 168 matrix + 4 smoke actual VM sessions; 4311 exact-value pauses; 29488 table pages; 6000 GC member pages. Added synchronized run_wasm_live_containers_cli.py / wasm_live_container_cases.py; no production C++ change required. Immutable closure QUALIFIED357 sha256=21cb1b3150f0fbf24e08130a5aa03401e9bd8e1adb12bfe9c9407e1e697b5646. Prepared-status running hash transitioned normally to passed: failed audit354 retained; successor audit357 verifies the exact transition, without a source/product change or VM retry. Archive delivery358 sha256=9dee1a63d01b3de15c52b3003ca28bad78084d56bce4968a1c862ecc199dbbca; 8131386 bytes / 598 members, local metadata-only verification360 passed. All tests executed in 64GiB/swap0 cgroup; max/OOM=0, all owned roots retired/reaped, foreign work preserved. Final owned folder high-water 14441992192 bytes (<16GiB), free 66154160128 bytes (>24GiB). Latest mutable trees, all Core3 features, remaining full-VM ISAs, whole-instance restore and debug-off performance remain outside this closure. See wasm-live-containers-qualification-20261007.json.
+
+2026-10-07 GC array element-segment follow-up: paired source212 full-LLVM matrix passes array.new_elem/array.init_elem generic/typed nullable funcref on native x86_64, QEMU RISC-V64/AArch64, instruction/unwind and default/max. 48 matrix +2 smoke positive VM sessions, 750 exact-value pauses, 8350 GC member pages including 700 empty-array pages; 4 paired modules independently validated. One real old-harness VM control fails as expected on members operands 1 0 0 0 2 -1 1, while its managed VM quits 0; corrected harness completes. Synchronized shared Python harness fix plus wasm_array_elem_cases.py / run_wasm_array_elem_cli.py; production C++ unchanged. QUALIFIED365 sha256=e638beb30fa9fc325a81fff0e4896cbad45b2819f9a64937e3c262fd0e03804d. Archive delivery366 sha256=77173f00ea1f9aa25669dababf7c01ba1b939db0cfe978999010eefb099df444; 9033271 bytes/283 members; local metadata-only verification370 passes. 30311 immutable input bindings checked. All validators/VM/QEMU and negative execution run in 64GiB/swap0 cgroup, max/OOM=0, owned processes retired/reaped; foreign work preserved. Final owned folder high-water 14662692864 bytes, Linux free 64389926912 bytes. Not latest mutable trees/all Core3/full remaining-ISA VM/whole-instance restore/debug-off performance. Next gaps: nonzero dropped-element traps, other GC ref kinds/subtyping/cycles, empty table harness, invalid/stale paths. See wasm-array-elements-qualification-20261007.json.
+
+2026-10-07 container boundary follow-up: synchronized empty-table window correction and real VM PIDFD ownership/retirement in CLI helpers. Frozen source212 full LLVM: 144 matrix +6 smoke =150 passing actual VM sessions, 750 pre-op pauses, 1700 table pages (500 empty),1200 GC pages; one real old-table-window expected failure; two real 30s prepared-VM timeout/PIDFD SIGKILL controls. All153 VM lifetimes proven; no production C++ change in this follow-up. Main qualification SHA631496fca0bc7d6952e27ea2251e84cc5c1cc9842f75265d4a84628b8763f574; evidence6f850fbf7b490a63f1a2d883fb63e1b59148a3ca598412e11479f4799aeaf2a8. Actual after-failure Wasm trap pause/inspection still unsupported in source212. Latest tree/full Core3 coverage/performance not qualified. All tests Linux64GiB/swap0 cgroup; max/OOM0, foreign work preserved; failed earlier lifecycle audit retained. See README.wasm-container-boundaries.md and wasm-container-boundaries-qualification-20261007.json.
+
+2026-10-07 actual trap stop implementation pending validation: synchronized cold actual-failure observer, catch wasm trap, after-failure trace, terminal read-only Wasm inspection and explicit pre-trap input notice in both repositories. Saved packets bind current activation incarnation; staged 72-frame and retired-tail tests, plus an independent -991 leaf/-990 caller oracle. DAP parser/scope/event support synchronized as a separately pinned overlay. Immutable final-r4 C++ cut: main 4f3a190d6c4e51397b4f08f5578626a9b794fe5d1d55ecf7b995231a034c6028, ROS 10f8bf9cfe338d8ba8982a72c6902d695dafde099e86932d7a8a9b267638bfdd. Remote supervisor393263 is still queued under the existing shared lock; no compilation, validator, VM, QEMU or protocol test has executed for this cut yet. Resource retention now deletes only this task's exact successful linker input objects and compresses authenticated binaries for on-demand materialization. Planned runtime counts are not passing results. See README.wasm-trap-stops.md; prior source212 qualifications do not validate these production changes.
+
+2026-10-07 trap/DAP validation update: final-r4 executed immutable source preparation and the first 39-test DAP protocol suite in the verified cgroup; the suite failed on a missing pretrap initializer in the staged typed-state parser. No C++ compiler, validator, VM or QEMU was launched. Failed protocol log and actual owned root retirement (exit1/PIDFD readable) are retained; no foreign process signal/adoption. Current paired local adapter SHA bce457f9fff9b8908c9632a794714795acf4bd44827cbd4ddbd50097603faf34 places the initializer in the typed-state parser and preserves lexical layout parsing. final-r5 retains that corrected overlay and reuses hash-verified extracted final-r4 C++ inputs to avoid duplicate source storage. Remote supervisor435395/exec58044 remains queued; do not restart this queued batch. All new VM/compilation/normal-regression qualifications remain pending.
+
+[2026-10-07 wasm-trap continuation / pending]
+Preserved the queued final-r5 supervisor (PID435395/session58044); no cancellation, foreign process signalling, compiler or VM test claimed. Read-only review found the supervisor executable whitelist still names final-r4/products while the immutable build/test plans use final-r5/products. Prepared supervisor-products-r5.py (SHA25695d7a23b59176e7c59fd736dbf3ec04df88e3cdfa886939fc2c438a4430025ee) for the next owned execution; the active original supervisor and pins remain unchanged.
+Paired DAP fix: when an authenticated pre-trap operands reply says Wasm state unavailable, retain the pre-trap snapshotNote rather than discarding it. The known unavailable status remains unavailable, with no invented operand values. Added assertions for retaining the note and not adding one to an ordinary unavailable reply. Preserved concurrent copied-variant changes in the adapter.
+A separately pinned latest protocol-only cut is staged at wasm-trap-stop-20261007-r1/dap-trap-notice-r1 on SSH Linux (paired adapter SHA2566c6becb145f14c3dbd0aae376e9fba107f9111158a62c01533046d49968fe0ff). Transport hashes and local whitespace checks passed; no protocol test has launched for this cut. Its functional tests, compilation, the360 actual trap VM matrix and84 regressions remain pending the verified64GiB/swap0 cgroup and shared lock. Fixed frozen runtime/console cuts do not qualify concurrently changed working trees.
+
+[2026-10-07 wasm-trap final-r5 pre-payload failure / final-r6 pending]
+The actual final-r5 supervisor retired with no compiler, protocol test or VM launched. Shared BUILD inventory reached17,181,274,112B (limit17,179,869,184B); its private trap task subtree was only174,956,544B. Global disk free remained57,555,824,640B and all cgroup memory events stayed zero. No foreign files were removed and no foreign tasks were adopted or signalled. Failed receipt retained under final-r5/failed-receipts.json.
+Corrected final-r6 resource ownership accounting caps the complete PRIVATE trap task subtree at16GiB while retaining the actual shared filesystem free floor24GiB. Shared read-only LLVM/sysroot/tool inputs remain hash pinned. Cgroup,64GiB/swap0,CPU16-31,10GiB owned RSS,12GiB headroom/AS,PIDFD,shared lock and all deadlines remain unchanged. Corrected the exact six private generated VM paths too.
+Submitted final-r6 fresh build (source reuses the actual verified final-r4 archive/extraction) with the latest paired DAP unavailable-note fix. Planned payload:63 real command roots including24 compiler/link commands,360 trapVMs and84 normal/distinct-recursive regressionVMs. None is reported as passed until actual results and the two in-cgroup metadata closures complete. Active session98696; observed supervisor PID485961/birth2606172. Do not cancel a queued job to replace it with another.
+
+[2026-10-07 actual paired DAP80 PASS / C++ trap pending]
+The final-r6 actual cgroup execution completed40 finite DAP protocol tests per repository,80 total, including authenticated unavailable pre-trap note preservation, typed input pages, readonly scope labels, empty-vs-unavailable distinction and stale/native stop rejection. The exact two Popen/PIDFD protocol roots returned0, retired and were reaped. Qualification is protocol-only; no actual trapVM or full latest working tree is qualified. Paired record: documents/runtime/wasm-trap-dap-protocol-20261007.json.
+Native uwvm2 runtime and host compilation returned0. The native main compilation failed on three conditional bare character pointer print arguments in the immutable base console. Current local consoles in both repositories already contain exactly the three mnp::os_c_str wrappers, with no other console differences; preserved them.
+Submitted final-r7 full fresh rebuild using a pinned exact two-file ClangVFS overlay of these paired console fixes over the immutable final-r4 base; no duplicate source tree was extracted or edited. Latest DAP notice cut remains pinned. Planned24 compiler/link roots,360 actual trapVMs and84 normal/distinct-recursiveVMs remain pending, followed by in-cgroup evidence closure. Current session40314, observed queued supervisor PID501726/birth2701834.
+A copied normal-plan digest was stale during preflight. Corrected only the metadata hashes while this exact supervisor had no children and remained a blocking lock waiter. Old pin versions and PREEXECUTION-PIN-CORRECTION.json are retained. Source/test/program contents and queue position remained unchanged. All35 input pins then verified.
+
+[2026-10-07 final-r7 launcher failure / final-r8 pending]
+The final-r7 actual prepare and both DAP protocol roots returned0, but the first build launcher put -ivfsoverlay before an env prefix and exited1 before Clang. Exact failed receipt and argv/log retained; no compiler or VM launched in final-r7. The final-r6 independent80-test DAP qualification remains valid.
+Corrected compilerflag placement to immediately follow the actual clang++ executable for every native/cross invocation, preserving each existing varying environment prefix. Moved compiler TMPDIR into the private final-r8 folder. Before submission, all35 actual remote pins and18 compileflag positions verified; all24 compiler/link and36 runtime harness paths matched private final-r8 products/outputs.
+Submitted session87997 for final-r8; same effective C++ source identities as final-r7 (only the paired three FastIO os_c_str console wrappers over the immutable base). Planned360 trapVMs and84 normalVMs remain unqualified until actual results and the two cgroup metadata audits pass. Keep its queued admission rather than cancelling/requeueing. Retired only two exact private objects from the actually failed/retired final-r6 batch after recording hashes, releasing152,062,424B; retained source, commands, dependency and failure logs. No shared/foreign input was deleted.
+
+[2026-10-07 final-r8 actual ROS compile failure / final-r9 pending]
+final-r8 repeated actual DAP80 PASS and compiled/linked native uwvm2, but ROS runtime compile failed on an ordinary-build-only accessor in the frozen trap callback. Its actual parent518691 retired/reaped1 with readablePIDFD; ownedRSS peak7360512000B and cgroup memory events all zero; no VM launched. Failed receipt/logs retained. Current local ROS callback already uses get_llvm_jit_generated_bridge_scope_depth(), whose capability is suspended during host callbacks; current main uses its own generated-Wasm bridge-entry counter. Preserve concurrent changes. final-r9 adds exactly this one-name ROS runtime correction to the pinned VFS overlays and embeds effective source IDs in new compile argv. All37input pins and18compiler flag positions verified before launch; source base unmodified. Session30886 supervisor527831/birth2885551 is queued, do not cancel/requeue. All360trapVMs+84normalVMs remain pending actual results and in-cgroup closure.
+
+[2026-10-07 final-r9 actual VM failures / final-r10 pending]
+final-r9 all24 compiler/link roots pass (native/RISC-V64/AArch64, both repositories); exact parent536547 retired/reaped1 after the first30 real native VM tests FAILED. Max/OOM events remain0; ownedRSS peak9046622208B. Actual logs showed real math/GC/null/alignment trap pauses and exact operands, but these are not passing VM qualifications: success-only Console.send rejected the expected ASM denial reply; fixtures misread physical=0 ordinal as frame total and omitted table64 opt-in; table32/table.fill failed to pause because old internal table calls created a foreign-host activation island. Current paired table emitter already preserves the Wasm identity for these known engine-owned leaves, retaining normal-mode targets and refusing VM helper ASM. Captured only that exact lambda block over the frozen base, plus current already-correct expected-rejection/table64 fixture logic. Strengthened paired frame-page oracle binds actual stop/thread/count/total/physical ordinal and role rows; no production frame metadata was falsified.
+final-r10 prepared6452 source files from6446 original files plus6 test/DAP additions;17 targeted captured files. It uses hardlinks for unchanged inputs and removes changed destination links BEFORE copying to new inodes. Original source bytes are verified before/after; no shared SDK copied or deleted. Latest paired DAP snapshot30f95da8bbd4006bf25e4a4bbf8a01ae72a3a892c1c6e407a1870e62bd307676 included. All38pins17overrides24buildargv verified before launch. Session11310 supervisor573887/birth3191783 queued; do not cancel/requeue. Planned360trapVMs/720pauses+84regressionVMs remain unqualified until actual results and two in-cgroup metadata closures pass.
+
+2026-10-08 Wasm actual-trap follow-up (original failed evidence preserved):
+- final-r10 actual fresh full LLVM builds: native x86_64, QEMU RISC-V64, QEMU AArch64, both repositories; all24 compiler/link roots passed. Latest paired DAP30f95d protocol80 passed. All360 actual trapVMs passed (720 exact-value pauses); independent metadata qualification is queued in final-r12, not a whole-batch PASS.
+- Full batch genuinely failed at subsequent native memory64 blocked-wait startup: memory32 four cases passed, memory64 four cases SIGILL before prompt. Flags already include threads and memory64. Original supervisor root581944 was PIDFD-retired/reaped1, all max/OOM counters zero. No remaining original payload.
+- Source inspection found mmap64 on64-bit hosts ignores declared_max_pages at reservation, reserving1TiB for a one-page maximum under the owned12GiB address-space cap. Added paired memory64-only clamp before shift, using existing reservation/grow/release accounting; 64-bit memory32 guard domain remains unchanged. Actual GDB diagnosis is queued; do not count inspection as runtime proof.
+- Added paired test/0017.runtime/mmap_memory64_declared_max.cc (fast_io diagnostics) for real shared/unshared mmap initialization, silent/strict growth cap, zero maximum, move/clear/reinitialize, and the full memory32 guard. Backend tests and fresh3ISA paired trap+normal regressions are prepared in final-r14, no new PASS claimed yet. A childless final-r13 queue was PIDFD-cancelled and fully retired before correcting its bundled libc++ loader environment; no payload/test executed there.
+- Resource scope: only own wasm-trap subtree<=16GiB, actual FS free>=24GiB, verified64GiB/swap0 cgroup, shared test/build lock, owned RSS10GiB/headroom12GiB/AS12GiB, only own objects retired after real successful linking. No foreign tasks/files changed.
+
+2026-10-08 actual evidence closure: final-r11 original memory64 startup GDB reproduction PASS, SIGILL in mmap_memory_t::init_by_page_count before prompt, root retired0/RSS403701760B; final-r12 independent original trap subset metadata closure PASS, actualroot retired0/RSS54009856B/all maxOOM0,360VMs/720pauses qualified while original failed fullbatch preserved. Paired documents/runtime/wasm-trap-runtime-20261008.json records the finite source cut and audit receipt. final-r14 genuinely failed its firstbackend compile because test launcher omitted bizwen include; no patchedVM build or execution started. Retired parent and original failed records preserved. New final-r16 fixes only launcher includes, also traces the original >16GiB mmap request/kernel return, then plans2backend+24build+360trap+84normal proofs. Source production remains paired mmap64 declaredmax fix, sourceIDs df829c/7cd554; fullmutabletree and debugoffperformance unqualified.96 supplemental actual memory64 boundary lifetimes (one-page, zero-max, unsigned -1 address, unalignedatomic) prepared separately, not run yet.
+
+2026-10-08 final-r16 actual admitted progress: controlled GDB syscall trace confirms originalmemory64 mmap bytes1099511693376 with kernel -12(ENOMEM), followed by SIGILL initialization; source cause now actualruntime-confirmed. Paired realbackend binaries compiled/executed/reaped0: shared/unshared memory64 declared reservation, silent/strict growth cap, zero max, move, clear/reinitialize, original fullmemory32 guard. LatestDAP40tests/repo(80total) passed/reaped0. Fresh24 VMcompiler/link roots are executing; new360trap/84normal qualification and96supplemental memory64 boundaries stillpending. Preserve live r16 supervisor688768 and originalPIDFD process tree; do not edit inputs or cancel/requeue.
+
+2026-10-08 trap continuation: final-r16 failed honestly at supervisor stale final-r13 product allowlist (first new VM); actual own root691616 PIDFD retired/reaped-9; every owned child retired, no foreign adoption/signalling, all cgroup memory events0. Its successfully reaped prefix contains24 fresh compiler/link roots,2 actual mmap-memory64 backend regressions and80 latest DAP tests. Six exact compressed binaries preserved. New final-r17 VM-only continuation explicitly allows its six materialized paths; reuse the final-r16 source/product hashes; no C++ rebuild. Fresh360 trap +84 normal VM matrix running under existing verified64GiB/swap0 Linux cgroup/shared lock. Runtime qualification pending; no mutable whole-tree/allCore3/performance claim.
+
+2026-10-08 final-r17 actual qualification PASS:360 fresh real trapVMs/720 exact typed pauses and84 regressions(72 normal zero exits +12 distinct recursive trap lifetimes), on native x86_64/QEMU RISC-V64/QEMU AArch64 in both repositories;36 genuine harness roots all reaped0. Runtime root752166 and metadata closure root785547 both actualPIDFD retired/reaped0. Paired backend2 and latest pinnedDAP80 were independently verified from the30-success-prefix of honestly failed final-r16; originalstaleallowlistguardfailure/reaped-9 preserved. SourceIDs main df829c3d9cb1641af97768d31695a3d740fb1538b6a869c286f4b6dc3670d48c andROS7cd5547e217f41ff544c95ebade0dfcc507507461f5286b1f4523015af346b39. Same64GiB/swap0 cgroup, ownedRSSpeak541310976B, no OOM and no foreign signals/adoption. Supplemental96 memory64 real traps now executing/queued at memory64-boundary-r1(session95243); preserve its live tree. Full mutable workingtree, allCore3/allISA and debugoff performance remain unqualified.
+
+2026-10-08 memory64/trap follow-up CLOSED: all96 supplementary real memory64 boundaryVMs and192 typed pre-/afterfailure pauses PASS, across both repos and native x86_64/QEMU RV64/QEMU AArch64, default/max and instruction/unwind. Actual runtime root786773 and actual metadata root796192 bothPIDFD retired/reaped0. Combined frozen-source qualification:540 actualVM sessions(360 base traps +96 memory64 boundary traps +12 distinct recursive traps +72 zero-exit regressions),24 successful fresh compiler/link roots,2 actual memorybackend tests and80 pinnedDAP tests. Four real payload/closure roots retired0; cgroup max/OOMeventsall0; no foreign signal/adoption. Original final-r16 staleallowlist wholebatch failure/root-9 preserved as failed; compiled6 exactproducts reusedwithout recompile. Published paired documents/runtime/wasm-trap-memory64-runtime-20261008.json and updated README. Bounded42,465,121-byte evidence archive SHA25660799b452ce2dbfecc0f0c13017828817c73339e621af4a1546ad05e55fe036a verified per-member remotely and transport locally; no SDK/object/executable payloads. Remote private task root1,594,634,919 bytes (~1.49GiB), filesystemfree47,278,211,072 bytes(~44.03GiB). No active ownVM/compiler/supervisor remains. Remaining outside this closed scope: allCore3 feature coverage, other fullLLVM architectures, debugoff performance, huge/unbounded memory64 reservations, uncaughtEH/call-dispatch trap paths and latest concurrently changing whole workingtree.
+
+2026-10-08 call-dispatch supplement CLOSED:336 actual VM trap lifetimes and672 exact typed pauses PASS, fourteen fixtures covering call_indirect/return_call_indirect table32/table64 bounds/null/signature, call_ref/return_call_ref null; table64 index4294967296. Both repos, native x86_64/QEMU RV64/QEMU AArch64, default/max JIT and instruction/unwind. Exact nine-value inputs retain NaN payload, negative zero and vector bytes; live table/frame pages prove callee not entered and failing tail activation not retired; terminal helper ASM queries denied. Runtime and independent metadata actual PIDFD roots retired/reaped0, cgroup64GiB/swap0/shared lock/all maxOOM0/no foreign adoption or signalling. Reused six exact final-r16 compiled products; no production C++ change necessary. Total with previous540 now876 distinct proven lifetimes. Paired qualification wasm-call-dispatch-debug-runtime-20261008.json; bounded archive f1c32f01e45c0ac5997ce7b541256d81ffe04678e0a31490dab4a6357362a7af. Uncaught exception snapshots, allCore3/otherISA/current mutable trees/debugoff performance remain outside this finite qualification.
+
+2026-10-08 uncaught pre-unwind debugging CLOSED: paired full-LLVM debug-only numeric/tuple/throw_ref bridges observe the actual thrown guest_exception before generated Wasm frames unwind. Real sealed handler tag identity prevents handled exceptions from stopping; the unwrapped debug target retains the genuine Wasm wait point. Typed operands/locals/GC roots and all current activation identities remain live. VM/helper ASM endpoints are denied; continue retains original fatal semantics. DAP labels only the actual throwing participant. Ordinary nondebug emission keeps original ABI targets; measured performance remains unqualified.
+Frozen uncaught-r6-build completed24 fresh compiler/link roots and100 detached DAP tests(50/repo); all6,660 actual compiler dependency paths were bound before compilation, including2,674 new standard/system headers. Its10 actual native smoke sessions contain16 typed pauses. uncaught-r2-runtime reused six exact products: all600 actual VM lifetimes and1,104 typed pauses PASS, with144 uncaught throws,96 handled zero-exit controls,360 trap regressions and48 beyond64 deep preview pauses checking operands/locals at64/70/71. Both repos, native x86_64/QEMU RV64/QEMU AArch64, default/max and instruction/unwind. Combined610 distinct lifetimes/1,120 typed pauses. Both producer roots and both runtime/independent-audit roots PIDFD retired/reaped0. Runtime ownedRSSpeak544153600B; verified64GiB/swap0/shared lock/all maxOOMevents0/no foreign signalling or adoption.
+SourceIDs main0da3c78e71713c5accf9ac7c6f2617973641d2cc1c0d05d681ae6b44aab06579, ROS8625755315e420b73b0a4bb17c83aa476b2d12d11527623ace6b315ab4df1b8c. Paired report wasm-uncaught-debug-runtime-20261008.json SHA256115bb08d25a2b92f38c3728c779986123a461a76a4035377aef0fc10fa44d0b9. Bounded20,446,688B archive65a612c2c17d317f28d4cca823e175f8658668f937790a620ca1c810d9536f19:2,031 members file-hash verified remotely and locally; no SDK/object/executable payload or local functional execution. Failed predecessors retained, including runtime-r1 quoting failure before any VM; runtime-r2 required no C++ rebuild. To recover local disk space, only42 own staging duplicates identical to retained remote/archive bytes were deleted(10,176,766B); remote deletion receipts retained. Peer changes preserved. Remaining outside this finite cut: imported/host-origin or threaded uncaught paths, quota exhaustion, allCore3/allISA/debugoff performance/latest mutable working trees. See README.wasm-uncaught-stops.md.
+
+2026-10-08 imported-tag / cross-module uncaught debugging CLOSED: C6 baseline reproduction failed all16 actual VMs on tag-only/forwarding module GC-store borrowing or ordinary cross-module frame admission. Paired fix seals actual validated source/profile/epoch for modules with no definitions; native engine/context presence is vacuous only for that empty extent, while all source/store/cohort ownership checks remain. Authentic defined-Wasm import observation preserves the Wasm caller chain after actual cache/source/ABI classification; foreign host boundaries remain. This incorporates the corresponding existing peer import-observation change into the fixed cut and preserves later peer edits.
+Fresh uncaught-import-build-r2 completed24 compiler/link roots and100 detached DAP tests; all successful compilation dependencies prebound. Native pilot16 VMs/24 typed pauses passed. uncaught-import-runtime-r1 added176 imported matrix VMs and100 native exception/trap regressions. Combined292 distinct successful actual VM lifetimes/472 typed pauses: imported192 (96 actual unhandled fatal +96 handled zero-exit), regression100 (24 unhandled +16 handled +60 traps). Both repos, x86_64/RV64/AArch64, default/max and instruction/unwind for imported cases; native default regression includes72 frames. Imported tag identity, aliases, same-signature distinct tags, ordinary calls, forwarded tail retirement, per-frame operands/locals, terminal ASM refusal and actual process exits passed. Original producer/runtime/audit/archival roots all PIDFD retired/reaped0; verified64GiB/swap0/shared lock/all maxOOM0/no foreign signalling or adoption.
+SourceIDs main1d6de706d4eea6124474021534431209ff548f1cd529cf1bfce8503f51228e2f, ROS99b8ea8f9ca068b44fdaa12f7c8d89cf7360b5980e1a218b618cbc4f3b5398de. Paired wasm-imported-uncaught-runtime-20261008.json SHA256ccde68fbc396319b76c896aed5f799fd80fa9a5a8f0c3061492d4234642b180d. Archive10,739,384B SHA2566e125e5f76e9b487a3c8f3ae3712d970c1c398998d538c31da19a80c83f63675;1,347 member hashes verified remotely/locally,16 source overlay files match compiler manifest. No native executable/object/SDK payloads downloaded. Failures retained: omitted CPU environment before any VM; baseline16 real failed VMs; early publisher variable compile error before any VM. Remaining: threaded/host-origin uncaught, cross-module reference-bearing state/payload tests, quota exhaustion, other fullLLVM ISAs, allCore3, measured debugoff performance and later mutable changes. See README.wasm-imported-uncaught.md.
+
+2026-10-08 cross-module reference debug follow-up: paired8-case LLVM-full matrix, both repositories / native x86_64 / QEMU RISC-V64 and AArch64 / default-max / instruction-unwind. 192 actual VM lifetimes,312 exact typed pauses,10224 original-root member pages pass;120 genuine uncaught fatal propagations and72 handled exits. Exact struct/packed-i16 array module provenance,negative i31,null extern,extern-wrapper shared-object aliases,Wasm function identity,caller GC locals/prefix,cross-module throw_ref and actual tag identity validated. Native VM/helper ASM remains refused at terminal wrappers. No production C++ change required; the tested C++ source cut/products are reused from uncaught-import-build-r2, with separately pinned paired test overlay. Independent audit QUALIFIED SHA2560eecc07c81263a6dc2437fb8f3b4702f7ccdc592f6371962b1d2ac0d9394142d; report SHA25617676b726309381f42721c50f86c4a5bcce964742ecefca0c613d362d735a40d. Evidence archive11783818B/1117members SHA256cb38b9d2b26dfff31ba76c1136475ad111cf34baa9dc7d36929bfc99a24e7ebf, per-member verified in Linux cgroup and after Mac transport, without local test import/execution. Pilot/runtime/audit/artifact roots retired/reaped0;all max/OOM events0. Removed536831472B of own failed-stage materializations only after hash/retirement checks; retained compressed originals and failures. Threaded/host-origin uncaught,quota exhaustion,other fullLLVM targets,allCore3,debug-off measured performance and latest concurrent trees remain open. See wasm-cross-module-reference-runtime-20261008.json and README.wasm-uncaught-references.md.
+
+2026-10-08 quota follow-up ACTIVE: paired Wasm path preparation now separates invalid selection, stale labels/stops and actual resource limits; query and mutation controllers preserve the preparation reason. Fresh wasm-quota-build-r4 is independently closed: six new full-LLVM products,24 compiler/link roots,6 DATA-only path units,100 detached DAP tests and8 native pilot VMs. SourceIDs main0fa4e8d0e05f65ee43772a9b205e06ac7cf74f2323075510dffe37783681190a / ROSf50a0451cd2d31c7a827dc9ded0ab29dd3136b6442c79e396286d4ebedf29fdf. Frozen runtime-r5 honestly retains58 passing VM rows plus a59th actual RISC-V64/max prepared-prompt timeout; failed VM PIDFD reaped-9, root reaped1, all own children retired. Successor runtime-r6 uses a short-loop typed-table reply fixture and additionally checks8 simultaneous4096-edge live paths at32768 aggregate indices; paired runner always retains a result row when retirement raises. Preserve active original supervisor/session60122 and its shared-lock/PIDFD tree. Planned120 quota +32 native reference regression VMs; qualification and archival closure still pending. Concurrent controller language/MIPS changes are preserved and excluded from whole-working-tree qualification. Every functional action remains in the existing64GiB/swap0 SSH Linux cgroup.
+
+2026-10-08 quota follow-up CLOSED: paired production fix forwards explicit invalid/stale/resource preparation reasons through both Wasm path query and mutation controllers; bounded rejection preserves the actual stop, prior handles and guest state. Fresh producer wasm-quota-build-r4:24 compile/link roots,6 detached DATA-only units,100 detached DAP protocol tests and8 actual native quota pilots. Runtime-r6 independently passed120 actual quota matrix VMs and32 native reference regressions across both repositories; quota matrix covers x86_64/QEMU RISC-V64/QEMU AArch64, default/max and instruction/unwind. Combined160 actual VM lifetimes,308 typed pauses,740 quota member pages and1704 reference member pages. All24 matrix cyclic VMs genuinely filled32768 stored indices with8 simultaneous4096-edge paths, refused the next retained index while allowing a zero-edge handle, preserved old paths, and recovered after clear; new real stops retire labels. Actual128-object/256-member/128-handle/4096-depth/32768-text boundaries and original-root pagination verified. Paired runner now retains failure rows even when VM retirement raises.
+Exact sourceIDs main0fa4e8d0e05f65ee43772a9b205e06ac7cf74f2323075510dffe37783681190a, ROSf50a0451cd2d31c7a827dc9ded0ab29dd3136b6442c79e396286d4ebedf29fdf. Paired report wasm-debug-quota-runtime-20261008.json SHA2562b67f71294a152017987ee6a0dcfc9c744a8385f1526073b4e66e0b18ffe3d06. Source/compile dependencies were prebound and independently rechecked; no new JIT execution probe added. Latest concurrent language/native MIPS controller changes preserved and whole mutable trees unqualified. Retained failed predecessors include r5's unrolled large saved-parameter RISC-V64/max prepared-prompt600s timeout:58 passing rows plus59th actual VM reaped-9; test root reaped1. Passing r6 uses short-loop table construction, preserving graph/text/pagination assertions.
+Producer roots1223027/1293853, runtime/audit1394342/1437605 and artifact/audit1439489/1439736 all originalPIDFD retired/reaped0. Verified64GiB/swap0/shared lock, all max/OOM counters0, no foreign signals/adoption. Archive29,861,894B/1333members SHA256184d253bd20e1f7ab49320520453d1288c0a7f1b8274b8b9a9f6846fc851dd61 retained on Linux; every member rehashed twice in the cgroup. Removed1,070,444,304B of owned failed-stage materializations after exact hash/retirement checks; compressed originals and failures retained. Local full archive copy hit actualENOSPC; its terminated SCP's13,056,000B partial was removed. REMOTE-ONLY.json records this; paired236,057B reports and1509B archival closure were transported/hash verified, with no local functional execution. Final private remote allocated3,388,162,048B, Linux free36,323,753,984B. No active ownVM/compiler/test supervisor remains; CURRENT.json records closure. Remaining: threaded/host-origin uncaught runtime paths, allocator failure/OOM recovery, other fullLLVM targets, allCore3 coverage, measured debug-off performance and later concurrent whole-tree changes.
+
+2026-10-08 real threaded uncaught follow-up CLOSED: paired full-LLVM embedding fixture runs two actual FastIO guest threads and obtains original canonical captures from each live worker before parking. Six numeric/tuple/throw_ref modules with matching-handler controls pass native x86_64/QEMU RISC-V64/QEMU AArch64, default/max JIT and instruction/unwind in both repositories:144 actual VM lifetimes,288 guest-worker lifetimes,72 actual two-worker uncaught stops,72 handled controls and216 typed captures. Exact leaf/caller operand prefixes,caller locals,distinct sibling i32/i64 locals,i64/v128 tuple bits,live GC field42 and throw_ref tag/payload111 pass. Missing/duplicate cohort and same-pointer/foreign-control-block owners are refused; handled workers physically join and old captures are refused. Unhandled continuation genuinely exits SIGILL(-4) on x86_64/RV64 and SIGTRAP(-5) on AArch64; these72 fatal VMs are expected nonzero exits, while72 handled controls return0.
+Test-only fixes correct catch_ref validation shape, explicit fast_io::out() before fatal continuation and target-ELF-bound signal oracle. No production C++ fix required. Reused frozen quota-build-r4 SourceIDs main0fa4e8d0e05f65ee43772a9b205e06ac7cf74f2323075510dffe37783681190a / ROSf50a0451cd2d31c7a827dc9ded0ab29dd3136b6442c79e396286d4ebedf29fdf; new fixture/generator separately pinned; all successful compiler dependencies prebound/reverified. Later concurrent changes preserved, whole mutable trees unqualified. ROS retains only its full interpreter/fullLLVM modes.
+All functional work and independent audits used verified64GiB/swap0 SSH Linux cgroup/shared lock. Native roots1486558/1495404,cross1515909/1525485,artifact1528913/1530160 all originalPIDFD retired/reaped0; all cgroup memory events0,no foreign signal/adoption. Failed validator/buffered-marker/wrong-AArch64-signal attempts remain failed in history, rather than being counted in the144 qualified rows. Paired wasm-threaded-uncaught-runtime-20261008.json is1095720B,SHA256ec642d9d7bf8a155d12c26a707b49766dab53701ab9d00dc17fcc51f0c57a320. Linux-only archive18152097B/519members,SHA25661cd3be2f193c69f8b612897bc83223e755f001a2b5dcc6673239e20ffaf8b00,member-manifest87ca692e8dd997b3938c1ca7d998603a0c7fccdc6110dc9d4e178ede0e4181bb:all members checked twice plus independent closure audit; no executable/object/SDK payloads. Small report and closure metadata transported/hash verified locally without functional execution. Own redundant raw products1269767792B removed only after exact hash/root-retirement checks; six compressed qualified products retained. Final private remote allocated4885655552B,actual free32113541120B,no active ownVM/compiler/test supervisor; CURRENT.json and ARTIFACTS-CLOSED.json record all closure.
+Scope is actual runtime embedding, without WASIp1 or native VM ASM access. Remaining: host-origin exception stops, joint threads/atomic-wait/native-reentry cases, more than two actual guest workers, multithread CLI/DAP frontend, other fullLLVM targets, allCore3, whole-instance restore, allocator failure/OOM, measured debug-off performance and latest concurrent trees. See README.wasm-threaded-uncaught.md.

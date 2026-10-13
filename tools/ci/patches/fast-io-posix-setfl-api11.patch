@@ -1,0 +1,74 @@
+--- a/third-parties/fast_io/include/fast_io_hosted/filesystem/posix_nothrow.h
++++ b/third-parties/fast_io/include/fast_io_hosted/filesystem/posix_nothrow.h
+@@ -117,8 +117,8 @@
+ #else
+ extern seek_offset_type fd_seek(int, seek_offset_type, int) noexcept __asm__("lseek");
+ #endif
+-// The only public operation below is F_GETFL. No arbitrary fcntl command,
+-// locking-structure ABI, mutation or pointer payload is accepted.
++// The readonly getter below accepts F_GETFL only. No arbitrary fcntl
++// command, locking-structure ABI or pointer payload is accepted.
+ #if defined(__APPLE__) && defined(__MACH__)
+ extern int fd_get_flags(int, int, ...) noexcept __DARWIN_ALIAS_C(fcntl);
+ #elif defined(__GLIBC__) && defined(__USE_TIME64_REDIRECTS)
+@@ -127,6 +127,18 @@
+ extern int fd_get_flags(int, int, ...) noexcept __asm__("fcntl64");
+ #else
+ extern int fd_get_flags(int, int, ...) noexcept __asm__("fcntl");
++#endif
++// F_SETFL has one int scalar payload. Keep its native aliases separate from
++// the readonly getter; neither public API accepts an arbitrary fcntl command
++// or a pointer/file-lock structure. SDK redirects select the real libc ABI.
++#if defined(__APPLE__) && defined(__MACH__)
++extern int fd_set_flags(int, int, ...) noexcept __DARWIN_ALIAS_C(fcntl);
++#elif defined(__GLIBC__) && defined(__USE_TIME64_REDIRECTS)
++extern int fd_set_flags(int, int, ...) noexcept __asm__("__fcntl_time64");
++#elif defined(__GLIBC__) && defined(__USE_FILE_OFFSET64)
++extern int fd_set_flags(int, int, ...) noexcept __asm__("fcntl64");
++#else
++extern int fd_set_flags(int, int, ...) noexcept __asm__("fcntl");
+ #endif
+ inline int last_error() noexcept { int const error{errno}; return error == 0 ? EIO : error; }
+ inline int checked_at_status(int directory, char const* path, struct ::stat* output, int flags) noexcept
+@@ -220,6 +232,31 @@
+ 	if (flags < 0) return {0, details::posix_nothrow_abi::last_error()};
+ #endif
+ 	return {flags, 0};
++}
++template <::fast_io::posix_family family, ::std::integral char_type>
++inline posix_operation_result posix_setfl_nothrow(basic_posix_family_io_observer<family, char_type> file,
++	int native_flags) noexcept
++{
++	// Borrow only this live descriptor number for ONE F_SETFL with the exact
++	// caller-supplied int flags. No pointer, owner release, allocation, retry,
++	// implicit get/verify/rollback or exception enters this operation.
++	// Status flags belong to the shared open file description. The caller must
++	// serialize any read/modify/verify/rollback transaction and pin FD lifetime.
++	// Native F_SETFL success can ignore unsupported flags (for example Linux
++	// O_SYNC/O_DSYNC); success here does not promise requested bits took effect.
++#if defined(__linux__) && defined(__NR_fcntl)
++	auto const result{::fast_io::system_call<__NR_fcntl, int>(file.native_handle(), F_SETFL, native_flags)};
++	if (::fast_io::linux_system_call_fails(result)) return {static_cast<int>(-result)};
++#elif defined(__linux__) && defined(__NR_fcntl64)
++	// The target SDK advertises this real syscall. F_SETFL retains its int
++	// scalar ABI; no different fcntl64 file-lock structure is exposed.
++	auto const result{::fast_io::system_call<__NR_fcntl64, int>(file.native_handle(), F_SETFL, native_flags)};
++	if (::fast_io::linux_system_call_fails(result)) return {static_cast<int>(-result)};
++#else
++	auto const result{details::posix_nothrow_abi::fd_set_flags(file.native_handle(), F_SETFL, native_flags)};
++	if (result < 0) return {details::posix_nothrow_abi::last_error()};
++#endif
++	return {};
+ }
+ template <::fast_io::posix_family family, ::std::integral char_type>
+ inline posix_seek_result posix_seek_nothrow(basic_posix_family_io_observer<family, char_type> file,
+--- a/third-parties/fast_io/share/fast_io/fast_io_inc/host/posix.inc
++++ b/third-parties/fast_io/share/fast_io/fast_io_inc/host/posix.inc
+@@ -21,6 +21,7 @@
+     using ::fast_io::posix_openat_nothrow;
+     using ::fast_io::posix_truncate_nothrow;
+     using ::fast_io::posix_getfl_nothrow;
++    using ::fast_io::posix_setfl_nothrow;
+     using ::fast_io::posix_seek_nothrow;
+     using ::fast_io::posix_read_nothrow;
+     using ::fast_io::posix_write_nothrow;

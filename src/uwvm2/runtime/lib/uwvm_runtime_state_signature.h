@@ -27,6 +27,8 @@ namespace uwvm2::runtime::lib::details
         runtime_state_kind kind{};
         ::std::uint_least32_t runtime_compiler{};
         ::std::uint_least32_t runtime_mode{};
+        bool gc_precise_roots_requested{};
+        ::std::uint_least32_t gc_root_abi_version{};
 
         bool assume_full_code_verified{};
         bool runtime_compile_threads_existed{};
@@ -48,6 +50,8 @@ namespace uwvm2::runtime::lib::details
         ::std::uint_least32_t llvm_jit_lazy_policy{};
         bool llvm_jit_full_policy_existed{};
         ::std::uint_least32_t llvm_jit_full_policy{};
+        bool llvm_jit_exception_dispatch_existed{};
+        ::std::uint_least32_t llvm_jit_exception_dispatch{};
         bool llvm_jit_call_stack_existed{};
         ::std::uint_least32_t llvm_jit_call_stack{};
         bool llvm_jit_disable_ir_verification{};
@@ -64,6 +68,8 @@ namespace uwvm2::runtime::lib::details
     [[nodiscard]] inline constexpr bool operator== (runtime_state_signature const& lhs, runtime_state_signature const& rhs) noexcept
     {
         return lhs.kind == rhs.kind && lhs.runtime_compiler == rhs.runtime_compiler && lhs.runtime_mode == rhs.runtime_mode &&
+               lhs.gc_precise_roots_requested == rhs.gc_precise_roots_requested &&
+               lhs.gc_root_abi_version == rhs.gc_root_abi_version &&
                lhs.assume_full_code_verified == rhs.assume_full_code_verified &&
                lhs.runtime_compile_threads_existed == rhs.runtime_compile_threads_existed &&
                lhs.runtime_compile_threads_policy == rhs.runtime_compile_threads_policy &&
@@ -78,6 +84,8 @@ namespace uwvm2::runtime::lib::details
                lhs.llvm_jit_policy_existed == rhs.llvm_jit_policy_existed && lhs.llvm_jit_policy == rhs.llvm_jit_policy &&
                lhs.llvm_jit_lazy_policy_existed == rhs.llvm_jit_lazy_policy_existed && lhs.llvm_jit_lazy_policy == rhs.llvm_jit_lazy_policy &&
                lhs.llvm_jit_full_policy_existed == rhs.llvm_jit_full_policy_existed && lhs.llvm_jit_full_policy == rhs.llvm_jit_full_policy &&
+               lhs.llvm_jit_exception_dispatch_existed == rhs.llvm_jit_exception_dispatch_existed &&
+               lhs.llvm_jit_exception_dispatch == rhs.llvm_jit_exception_dispatch &&
                lhs.llvm_jit_call_stack_existed == rhs.llvm_jit_call_stack_existed && lhs.llvm_jit_call_stack == rhs.llvm_jit_call_stack &&
                lhs.llvm_jit_disable_ir_verification == rhs.llvm_jit_disable_ir_verification &&
                lhs.llvm_jit_cache_path_mode == rhs.llvm_jit_cache_path_mode &&

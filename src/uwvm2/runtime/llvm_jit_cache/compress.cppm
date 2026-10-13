@@ -35,6 +35,7 @@ module;
 
 export module uwvm2.runtime.llvm_jit_cache:compress;
 
+import fast_io;
 import uwvm2.utils.container;
 import :format;
 

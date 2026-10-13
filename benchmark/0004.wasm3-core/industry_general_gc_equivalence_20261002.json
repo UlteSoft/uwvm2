@@ -1,0 +1,178 @@
+{
+  "schema": "uwvm-industry-general-gc-equivalence-source-audit-v2",
+  "observed_date": "2026-10-02",
+  "native": false,
+  "performance_passed": false,
+  "source_pins": {
+    "managed_general/java/GeneralGc.java": {
+      "bytes": 15811,
+      "sha256": "7a4b88e6bb4771abb6ee3f90554672d2a162a92b2c1907ab96a975d8613d391e"
+    },
+    "managed_general/dotnet/Program.cs": {
+      "bytes": 16839,
+      "sha256": "402490b8e91a21145abb9f33176106fb5e6e579bc4fd567961cb9078329ca797"
+    },
+    "managed_general/dotnet/GeneralGc.csproj": {
+      "bytes": 333,
+      "sha256": "3d15dcf71cb39af9d22c4605ee9fb7b58a4fdcf1e5396b8de24f64f5525e7616"
+    },
+    "managed/node/managed_ring.mjs": {
+      "bytes": 2819,
+      "sha256": "d89a52001e6b9f29ab0a0b64e08332943ac33d5fd480ff59ecac4290dc9a5701"
+    },
+    "generate_general_gc.py": {
+      "bytes": 18432,
+      "sha256": "eb6048d1d1fe7ad0f3264af41cc742b5a89ee17c2ca720c891ac5571fef9471e"
+    },
+    "check_managed_general.py": {
+      "bytes": 5159,
+      "sha256": "4b82c6e8d6dd385c4b7f954f1cae4081ef985f15c3538ec19979cb6fe1605c59"
+    },
+    "prepare_managed_general_plan.py": {
+      "bytes": 5972,
+      "sha256": "beef60d614f1e85aaf99c46dfdce68e1c75f192f7e9ad263242d4df0b28d0cd4"
+    },
+    "run_managed_general_measurement.py": {
+      "bytes": 30565,
+      "sha256": "23f58b55dcf8bf4e360c7e67ce8bba9d1383872694331b878f57b3daf607feeb"
+    },
+    "check_managed_general_measurement.py": {
+      "bytes": 6003,
+      "sha256": "1b3de68a309b5449c64079124abbf3d22b8eecab9e73c6d13ff8d4315bff4b0c"
+    },
+    "industry_general_gc_candidates_20261002.json": {
+      "bytes": 5099,
+      "sha256": "a0e18bf43fa853b369a05ae8e6f06407da84417c9f83142ca601f5f4488da522"
+    },
+    "prepare_gc_nativeTLS_ABC.py": {
+      "bytes": 31506,
+      "sha256": "15d9c4dbe170e7a69158247568e20762912c2881e37db904154afeefd59b2c60"
+    },
+    "gc_nativeTLS_ABC_source_contract.json": {
+      "bytes": 12685,
+      "sha256": "011483d59edede21051c56f66975ad66abdfaf675037b8dd4d6defbb30e398b8"
+    }
+  },
+  "actual_runtime_executable_bindings": null,
+  "scalar_oracle_source_only": {
+    "reference-array/allocate/250000": {
+      "step_checksum_u32": 1224754256,
+      "root_checksum_u32": 2668464640,
+      "return_checksum_u32": 3591229008,
+      "last_lcg_u32": 972744485,
+      "guest_planned_allocations": 750000,
+      "allocation_groups": 250000,
+      "overwritten_root_groups": 248976,
+      "final_root_group_count": 1024,
+      "final_reachable_objects": 3072,
+      "guest_main_iterations": 250000,
+      "guest_main_allocations": 750000,
+      "collection_count": null,
+      "reclaimed_count": null,
+      "count_contract": "planned syntax operations; actual GC/reclaimed counters must be measured"
+    },
+    "reference-array/allocate/2000000": {
+      "step_checksum_u32": 3016573056,
+      "root_checksum_u32": 236603904,
+      "return_checksum_u32": 3184986752,
+      "last_lcg_u32": 750095765,
+      "guest_planned_allocations": 6000000,
+      "allocation_groups": 2000000,
+      "overwritten_root_groups": 1998976,
+      "final_root_group_count": 1024,
+      "final_reachable_objects": 3072,
+      "guest_main_iterations": 2000000,
+      "guest_main_allocations": 6000000,
+      "collection_count": null,
+      "reclaimed_count": null,
+      "count_contract": "planned syntax operations; actual GC/reclaimed counters must be measured"
+    },
+    "mutable-struct/mutate/250000": {
+      "step_checksum_u32": 3834106880,
+      "root_checksum_u32": 3853910016,
+      "return_checksum_u32": 20042752,
+      "last_lcg_u32": 1615514405,
+      "guest_planned_allocations": 1024,
+      "allocation_groups": 1024,
+      "overwritten_root_groups": 0,
+      "final_root_group_count": 1024,
+      "final_reachable_objects": 1024,
+      "guest_main_iterations": 250000,
+      "guest_main_allocations": 0,
+      "collection_count": null,
+      "reclaimed_count": null,
+      "count_contract": "planned syntax operations; actual GC/reclaimed counters must be measured"
+    },
+    "mutable-struct/mutate/2000000": {
+      "step_checksum_u32": 39747584,
+      "root_checksum_u32": 3034316800,
+      "return_checksum_u32": 3062005760,
+      "last_lcg_u32": 3673977237,
+      "guest_planned_allocations": 1024,
+      "allocation_groups": 1024,
+      "overwritten_root_groups": 0,
+      "final_root_group_count": 1024,
+      "final_reachable_objects": 1024,
+      "guest_main_iterations": 2000000,
+      "guest_main_allocations": 0,
+      "collection_count": null,
+      "reclaimed_count": null,
+      "count_contract": "planned syntax operations; actual GC/reclaimed counters must be measured"
+    }
+  },
+  "managed_cold_runner": {
+    "n": 65536,
+    "warm_n": 250000,
+    "rounds": 0,
+    "rows": 24
+  },
+  "warmed_representative_2M_runner_binding_pending": true,
+  "JS_general_family_equivalent": false,
+  "DRC_cycle_reclamation_qualified": false,
+  "ABC_actual_build_cold_result": null,
+  "WAVM_local_source": {
+    "path": "/Users/liyinan/Documents/MacroModel/src/WAVM",
+    "HEAD": "6f871e61c6e8fc54fa5317b5d61d128d681846f3",
+    "label": "WAVM-MEMTAG fork; dirty LLVMJIT.cpp",
+    "source_pins": {
+      "README.md": {
+        "bytes": 4178,
+        "sha256": "d6a7ef2b7aaaf20d1da5ee66376c4a9ceb6af84d796bc1bd732b76afa344a4cc"
+      },
+      "Include/WAVM/IR/FeatureSpec.h": {
+        "bytes": 8085,
+        "sha256": "9265e3b2e855e9bbc4b5fde19a2d2dd068ab33bfbaf325788d2cb63d7ecf1afe"
+      },
+      "Include/WAVM/IR/OperatorTable.h": {
+        "bytes": 104714,
+        "sha256": "a25576805266c7a8718404bf98586d53af0553acd6f5245fff8b4a3de16d246e"
+      },
+      "Programs/wavm/wavm-run.cpp": {
+        "bytes": 28304,
+        "sha256": "8fa8d8bf9ede5231ee89ec1d701cf3525377ecdd3a35ef10f5cceb2a29ba1ccc"
+      },
+      "CMakeLists.txt": {
+        "bytes": 35115,
+        "sha256": "9756d5b419403b34313e3dd8803baf615b83bea19b7176cf488b2964775cf243"
+      },
+      "Doc/Building.md": {
+        "bytes": 2650,
+        "sha256": "9c18fed44d724362075707d33c7d8b0c642010927f8f91bfc61c499c6cbf8ab6"
+      },
+      "Lib/LLVMJIT/LLVMJIT.cpp": {
+        "bytes": 11630,
+        "sha256": "1c442d3387c737e027b425be8f47910f99158b01daa01e677e10625b3b44f7b0"
+      }
+    },
+    "Core3_GC_source_support": false,
+    "try_table_source_support": false,
+    "memory64_actual_semantic_pass": null,
+    "actual_Linux_tool_inventory": null
+  },
+  "WAVM_official_candidate": {
+    "commit": "4e82bb9fecf9c1bdb4d00f96fa89063ee4382d09",
+    "tag": "nightly/2026-04-05",
+    "actual_build_pass": null
+  },
+  "assembly_capture": "untimed only; exact compile-time/env/output filename proof; formal samples capture unset"
+}

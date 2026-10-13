@@ -92,6 +92,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
         passbuilder_o3
     };
 
+    // Cold full-compilation request; never a plan/source/admission certificate.
+    enum class runtime_llvm_jit_exception_dispatch_t : unsigned
+    {
+        auto_policy,
+        native_unwind,
+        pending_numeric
+    };
+
     enum class runtime_llvm_jit_call_stack_t : unsigned
     {
         auto_policy,
@@ -238,6 +246,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 
     /// @brief Full/tier-2 LLVM JIT policy override.
     inline runtime_llvm_jit_full_policy_t global_runtime_llvm_jit_full_policy{runtime_llvm_jit_full_policy_t::auto_policy};  // [global]
+
+    /// @brief Whether the full exception-dispatch request was explicit.
+    inline bool runtime_llvm_jit_exception_dispatch_existed{};
+    /// @brief auto preserves existing eligible pending selection; all failures fall back to native.
+    inline runtime_llvm_jit_exception_dispatch_t global_runtime_llvm_jit_exception_dispatch{
+        runtime_llvm_jit_exception_dispatch_t::auto_policy};
 
     /// @brief Whether the runtime LLVM JIT call-stack tracking mode was explicitly configured.
     inline bool runtime_llvm_jit_call_stack_existed{};  // [global]

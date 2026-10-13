@@ -1,0 +1,111 @@
+Wasm operand/data stack preview qualification, 2026-10-04
+
+Result
+The CLI already implements operands THREAD [FRAME [FIRST COUNT]] and info operands.
+Frame 0 is the current leaf. Indices run from bottom to top; the last index is
+the stack top. Each query returns at most 64 rows; this is pagination, not a
+64/256-value capture truncation. A stop describes the state before its opcode.
+Example from the actual atomic fixture: operand 0 i64 = 1000; operand 1 i32 = 9;
+operand 2 i32 = 13. Empty stacks correctly report total=0.
+
+Both repositories: 40 distinct positive real-VM scenarios qualified, across
+instruction/unwind call-stack policies. Exact row indices, declarations and
+values were checked, rather than merely accepting the command response.
+Cases: mixed i32/i64/f32/f64/v128; negative zero and NaN payload bits; GC struct,
+array, i31, typed function and null extern references; both if branches and
+retained outer operands; loop PHI/backedge values; multi-value call return;
+genuine caller waiting prefix and tail-call frame elimination; exception
+payload/prefix; atomic RMW/load/wait arguments and return; 300 distinct live
+values including pages above index 256. The 300-row case reconstructed all rows.
+
+Four additional real-VM executions captured the actual MCJIT ELF object with
+debug off/on, in both repositories. Official toolchain llvm-objdump inspected
+all four objects. The ordinary typed numeric function was exactly 9 bytes:
+  movslq %edi, %rax
+  addq %rsi, %rax
+  retq $0x8
+Alignment padding after ret is not part of its execution. There were no spill,
+debug callback, stack record or debug-state test instructions in this function.
+The debug version had actual frame stores and callbacks; its live result was
+queried and checked as i64=1037 before the final Wasm end instruction.
+This supports zero added debug instrumentation in generated ordinary guest
+code. It is not a whole-program performance benchmark or an absolute promise
+that every host-entry path has zero overhead: runtime_debug_execution_scope is
+still constructed at the host execution entrances and tests current TLS/control
+state before returning for an ordinary invocation.
+
+Confirmed gap relative to unconditional complete-preview requirement
+Four real-VM quota cases (both repositories, both stack policies) used a valid
+function declaring 1000 i32 locals but only two live operands, i32=123/i64=456.
+At both its nonempty and empty stack stops, the actual reply was:
+  Wasm state unavailable: this control or exception site has no complete typed packet
+The compiler's per-function native checkpoint workspace cap is 32768 bytes,
+including entry-local storage, dynamic typed storage, flags/alignment and saved
+control storage. This function exceeds the cap. It keeps executing successfully,
+but the stack preview is unavailable. These cases qualified the refusal, NOT
+the requested complete-preview feature: results explicitly record
+complete_preview_requirement_met=false. The runtime limitation remains unfixed.
+
+Current implementation and implications
+The fused validator records exact Wasm types/index partitions for each site.
+The JIT emitter borrows the genuine live LLVM SSA operand handles, writes them
+to a reusable, frame-owned packet (16 bytes per typed slot), and materializes
+the current logical frame before the cooperative stop. The runtime authenticates
+the current stopped cohort/site/generation and borrows real GC roots for refs.
+Public preview returns copied Wasm values/object identities, never native memory
+addresses. This is a debug-only SSA-to-typed-memory materialization scheme; it
+does not reconstruct the Wasm stack by assuming physical register order.
+It is implemented for cooperative Wasm opcode stops, not arbitrary asm PCs.
+
+emit_debug_safe_points=false and a null checkpoint profile skip packet/flag/site/
+callback IR emission. Merely linking the management APIs does not generate a
+second Wasm stack in ordinary guest code. Debug mode itself has real store and
+callback overhead. A location-map design also needs to keep debug values live
+through optimization: metadata alone cannot recover an erased SSA value. Such
+preservation must be selected before JIT compilation and omitted when dbg is off.
+
+To meet the stronger requirement, the remaining design work is debug-only
+growable per-activation storage for oversized typed packets (keeping native
+stack usage bounded), precise quota/allocation diagnostics, and publication-time
+selection of ordinary/debug host-entry paths. Register/frame/constant mappings
+can reduce debug copying if bound to actual native PC and code generation; they
+cannot authorize VM/host context inspection. No such runtime change is claimed
+by this test-only qualification.
+
+Reproduction and source scope
+New tests, identically copied to uwvm2 and uwvm2-ros:
+  test/0018.debugger/run_wasm_operand_preview_cli.py
+  test/0018.debugger/run_wasm_operand_codegen_cli.py
+The codegen test requires a qualified build with compile-time
+UWVM2_TEST_CAPTURE_NATIVE_JIT_OBJECT=1, an existing Linux test-cgroup keeper,
+wasm-tools, and subsequent official llvm-objdump inspection. The object capture
+environment variable is used only for that test and then removed.
+All parser/validator, actual VM and disassembler executions used the existing
+SSH linux cgroup supervisor, not the local machine. The deep-stack first attempt
+hit a 30-second harness compilation timeout on ROS; retry used a bounded
+120-second prompt allowance and qualified both policies. No positive result is
+inferred from the failed timeout attempt.
+
+This qualification reuses the previous frozen R8 sources/binaries:
+  uwvm2: sha256:e08df19da304b5af8fe63ba3fae6826dfc91c3bf388ca4b9f33ac2889be7927f
+  uwvm2-ros: sha256:2b39fa78369cbd75d8d5f1f2a241221b73e8f104402bcb2c5e6738e02c162a6f
+Later concurrent working-tree changes are not qualified by these VM executions.
+The current source was also read to confirm its packet-generation gates,
+workspace cap, query pagination and remaining host-entry scope checks.
+
+Local detailed evidence:
+  /tmp/wasm-operand-preview-20261004/operand-preview-summary.json
+  /tmp/wasm-operand-preview-20261004/operand-preview-final-results.json
+  /tmp/wasm-operand-preview-20261004/operand-preview-evidence.tar.gz
+Evidence archive: 220481 bytes
+SHA256: 743c6f911a541490b496d0bec2468d6e7d72e0c05d68db68a26dbb0d1ebea8fc
+SSH permanent control root:
+  /home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/wasm-dbg-wait-checkpoint-20261004-1791101237384-r2-r8
+
+Primary source locations
+  src/uwvm2/uwvm/debugger/wasm_state.h:28 (64-row query bound), :306 (typed display)
+  src/uwvm2/runtime/checkpoint/materialization.h:34 (32 KiB workspace cap)
+  src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_checkpoint_packet_emit.h:36 (null-plan no-IR gate), :218 (real SSA stores)
+  src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_checkpoint_opcode_emit.h:130 (live original-index SSA mapping)
+  src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h:7447 (debug-off safe-point gate)
+  src/uwvm2/runtime/lib/uwvm_runtime.default.cpp:1278 (host-entry debug scope)

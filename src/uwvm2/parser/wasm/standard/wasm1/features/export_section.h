@@ -227,6 +227,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 }
                 break;
             }
+            case ::uwvm2::parser::wasm::standard::wasm1::type::external_types::tag:
+            {
+                if constexpr(requires { validate_extended_tag_export(export_idx, module_storage, section_curr, err, fs_para); })
+                {
+                    validate_extended_tag_export(export_idx, module_storage, section_curr, err, fs_para);
+                    fwet_exports_storage.tag_idx = export_idx;
+                }
+                else
+                {
+                    // [export kind][checked index ... end) no index-derived pointer is formed.
+                    //               ^^ err_curr
+                    err.err_curr = section_curr; err.err_selectable.u8 = 4u;
+                    err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::illegal_exportdesc_prefix;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                }
+                break;
+            }
             [[unlikely]] default:
             {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)

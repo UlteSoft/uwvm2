@@ -1,0 +1,41 @@
+Wasm operand preview snapshot notice — verified 2026-10-05
+
+Both uwvm2 and uwvm2-ros display:
+Note: Last Wasm safepoint snapshot; may differ from current native state.
+
+The available typed operand page prints the notice, including empty pages and
+operand-root member pages. Native status/backtrace prints it before the copied
+historical Wasm trace. The DAP operand scope names the safepoint snapshot;
+uwvm/wasmState returns snapshotNote. The parser also accepts older operand
+packets without the notice and rejects misplaced, altered or duplicate notices.
+Native stops continue to refuse current typed Wasm state queries.
+
+C++ output uses fast_io::string_view and fast_io::io::print. This change adds
+display text only; it adds no runtime operand capture, sampling or stack work.
+It does not change arbitrary-native-PC reconstruction or the activation limit.
+
+Verification ran through SSH linux in the existing keeper's 64-GiB cgroup:
+- Each product: 53 Wasm state grammar/format checks.
+- Each product: 1449 controller checks, including native status/backtrace notice.
+- Each product: 171 DAP tests; 342 total, including the concurrent native-window
+  update retained in the final tested adapter.
+- Final source/compiler/provider/system/dependency closure check passed.
+These are display/controller fixtures, not fresh complete VM/QEMU qualification.
+Runtime capture/restore and native ownership are not minted by these fixtures.
+
+Stale fixture expectations were updated for native Registers scopes and the
+existing breakpoint enabled/hits/ignore fields; unavailable WASIp1 capsule mocks
+were added for the newer host API. Failed/incomplete attempts are preserved in
+the evidence archive, including shared-memory guard cancellation and a metadata
+coordinator named queue.py shadowing the Python standard library. That metadata
+coordinator was renamed before the successful final DAP run. Foreign tasks were
+not adopted or signalled. Selected passing receipts have unchanged OOM counters.
+
+Frozen remote root: /dev/shm/wasm-operand-preview-note-20261005-r1
+Local archive root: /tmp/wasm-operand-preview-note-20261005
+Reconstruct final tested source by extracting source.tar.gz, then final-overlay.tar.gz.
+Base SHA-256: d7de8a169ea28c97b8031a31ec5530bf9bca326c08f657ac780a5dcf6ca4d798
+Overlay SHA-256: 6c1b5370bbc2295f26da5fc0c71f61da58e51aac2d9ae750ae1be6727d09eaae
+Evidence SHA-256: a1a00e1801060b4e52cfb7d9c9fce01fd1230f455cbe32f288251620af484686
+archive-verification.json verifies both reconstructed source manifests and changed local files.
+evidence-verification.json selects 12 passing receipts and verifies archived build artifacts.

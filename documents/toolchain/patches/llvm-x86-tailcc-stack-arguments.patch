@@ -1,0 +1,13 @@
+--- a/llvm/lib/Target/X86/X86ISelLoweringCall.cpp
++++ b/llvm/lib/Target/X86/X86ISelLoweringCall.cpp
+@@ -2124,7 +2124,9 @@
+     // function prototype.
+     CallingConv::ID CallerCC = MF.getFunction().getCallingConv();
+     isTailCall = (CallConv == CallerCC);
+-    IsSibcall = IsMustTail;
++    // musttail is not proof that the outgoing stack layout is a sibling
++    // layout. tailcc permits different prototypes and modified stack arguments.
++    IsSibcall = IsMustTail && isEligibleForSiblingCallOpt(CLI, CCInfo, ArgLocs);
+   } else if (isTailCall) {
+     // Check if this tail call is a "sibling" call, which is loosely defined to
+     // be a tail call that doesn't require heroics like moving the return

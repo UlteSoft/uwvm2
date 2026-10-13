@@ -1,0 +1,87 @@
+// REVIEW ONLY: not included in any translation unit and not applied to production.
+// Reuse successful existing bounded parser walks; never add a per-body type scan.
+namespace uwvm2::validation::standard::wasm3
+{
+    struct declaration_value_requirements
+    {
+        bool reference_types{};
+        bool simd{};
+        bool multi_value{};
+    };
+
+    // legacy_mvp_reference_position is true only after the parser proves an old
+    // table/element funcref position AND its legacy source encoding. A 0x63 long
+    // nullable-func spelling is reference-types syntax even though its erased
+    // carrier matches 0x70. Function/local/global/GC-field values never use this exemption.
+    [[nodiscard]] inline constexpr declaration_value_requirements classify_declaration_value(
+        ::uwvm2::parser::wasm::standard::wasm3::type::core_value_type value,
+        bool legacy_mvp_reference_position = false) noexcept
+    {
+        namespace t = ::uwvm2::parser::wasm::standard::wasm3::type;
+        bool const legacy_funcref{legacy_mvp_reference_position &&
+            value.kind == t::value_kind::reference && value.nullable &&
+            value.heap.code == static_cast<::std::int_least64_t>(t::abstract_heap_type::func) &&
+            value.source_prefix == 0x70u};
+        return {.reference_types = value.kind == t::value_kind::reference && !legacy_funcref,
+                .simd = value.kind == t::value_kind::v128};
+    }
+
+    // Add the function RESULTS count only; multiple function parameters are MVP.
+    // An indexed block's parameter/result requirements remain an instruction gate.
+    inline constexpr void add_declared_result_count(declaration_value_requirements& out,
+        ::std::size_t results) noexcept
+    { out.multi_value |= results > 1uz; }
+
+    template<typename Policy>
+    inline constexpr void require_module_declaration_value_policy(
+        declaration_value_requirements types,
+        declaration_value_requirements tables,
+        declaration_value_requirements globals,
+        declaration_value_requirements elements,
+        Policy const& policy, ::std::byte const* diagnostic,
+        ::uwvm2::validation::error::code_validation_error_impl& error) UWVM_THROWS
+    {
+        bool const mv_disabled{policy.disable_multi_value || policy.controllable_allow_multi_result_vector};
+        if(!policy.disable_reference_types && !policy.disable_simd && !mv_disabled) { return; }
+        using feature = ::uwvm2::parser::wasm::base::wasm1p1_feature_kind;
+        using subject = ::uwvm2::parser::wasm::base::wasm1p1_error_subject;
+        auto const fail = [&](feature required, subject site, unsigned value) constexpr UWVM_THROWS
+        {
+            // [caller-owned expression ...] | body_end
+            // [safe borrow                 ] | unsafe (one-past)
+            // ^^ diagnostic: retained without reads, arithmetic, or cursor movement.
+            error.err_curr = diagnostic;
+            error.err_code = ::uwvm2::validation::error::code_validation_error_code::wasm1p1_feature_required;
+            error.err_selectable.wasm1p1_feature_required = {.value = value, .feature = required, .subject = site};
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        };
+        auto const check = [&](declaration_value_requirements requirements, subject site) constexpr UWVM_THROWS
+        {
+            if(policy.disable_reference_types && requirements.reference_types) { fail(feature::reference_types, site, 0x6fu); }
+            if(policy.disable_simd && requirements.simd) { fail(feature::simd, site, 0x7bu); }
+            if(mv_disabled && requirements.multi_value) { fail(feature::multi_value, site, 0x60u); }
+        };
+        check(types, subject::function_type);
+        check(tables, subject::table_type);
+        check(globals, subject::global_type);
+        check(elements, subject::element_segment);
+    }
+}
+// Integration candidate:
+// - OR successful existing type projection values across ALL declarations, even
+//   unused/imported signatures and nonpacked GC fields. Include result counts.
+// - OR successful table/global/element scanners, preserving source_prefix and
+//   original segment mode so legacy MVP funcref exemption cannot be fabricated.
+// - Copy/move/init/reset/rebuild aggregate requirements exactly, including the
+//   type_section manual copy constructor. Current GC/EH independent bool flags
+//   stay owned by their existing patch owners; this is not a competing live patch.
+// - Pure Core3, facade legacy precheck, int full, int lazy metadata and actual
+//   materialization, LLVM full/lazy consume this SINGLE shared policy helper.
+// - Keep current local-run gate for every encoded run, including count==0.
+//   Reuse exact core_type/has_core_type for future shared classifiers.
+// - Do not mark every 0x63/0x64 heap as function-references: nullable extern,
+//   abstract any/eq/struct and defined GC heaps must keep their independent gates.
+// - Table/element encoding-mode and initializer instruction requirements are a
+//   separate scalar requirement witness; this type classifier is not complete
+//   coverage of bulk-memory, table-initializer, memory64, shared-memory, or SIMD
+//   initializer operations. Those must be preserved from their own parser paths.

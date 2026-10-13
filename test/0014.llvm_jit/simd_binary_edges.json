@@ -1,0 +1,115 @@
+{
+  "scope": "raw binary fixtures; no parser/compiler executed",
+  "cases": [
+    {
+      "name": "missing-simd-subopcode",
+      "wasm_hex": "0061736d010000000104016000000302010005030100010a04010200fd",
+      "bytes": 29,
+      "sha256": "82637870d163f5aebd226551d3f5910bbddb9da168f58f2a53ac8cd55601ed0c",
+      "body_hex": "00fd",
+      "body_field_offset_zero_based": 2,
+      "field_note": "simd prefix EOF",
+      "expected_valid": false,
+      "actual_oracle": null
+    },
+    {
+      "name": "unterminated-subopcode",
+      "wasm_hex": "0061736d010000000104016000000302010005030100010a09010700fd8080808080",
+      "bytes": 34,
+      "sha256": "f0eca9fc8506a590c809ee45ba8265e2e20343a91b289c67afa8322afaabc078",
+      "body_hex": "00fd8080808080",
+      "body_field_offset_zero_based": 2,
+      "field_note": "bounded u32 LEB failure",
+      "expected_valid": false,
+      "actual_oracle": null
+    },
+    {
+      "name": "overflow-subopcode",
+      "wasm_hex": "0061736d010000000104016000000302010005030100010a09010700fdffffffff10",
+      "bytes": 34,
+      "sha256": "76a8f86d2fe722164746562e67aad186eae1ddcd7bbd77717d42867983abc67b",
+      "body_hex": "00fdffffffff10",
+      "body_field_offset_zero_based": 2,
+      "field_note": "u32 overflow",
+      "expected_valid": false,
+      "actual_oracle": null
+    },
+    {
+      "name": "truncated-v128-constant",
+      "wasm_hex": "0061736d010000000104016000000302010005030100010a14011200fd0c000000000000000000000000000000",
+      "bytes": 45,
+      "sha256": "c73a88c353c94d47afc6359cd5399393f8c85d4aaca21b971ec279e110dafb39",
+      "body_hex": "00fd0c000000000000000000000000000000",
+      "body_field_offset_zero_based": 3,
+      "field_note": "16-byte immediate EOF",
+      "expected_valid": false,
+      "actual_oracle": null
+    },
+    {
+      "name": "out-of-range-extract-lane",
+      "wasm_hex": "0061736d010000000104016000000302010005030100010a1a011800fd0c000102030405060708090a0b0c0d0e0ffd16101a0b",
+      "bytes": 51,
+      "sha256": "af8310356bda6fa384a351d8998c1389d4a52b394f805faf904d67a88ea8ebbe",
+      "body_hex": "00fd0c000102030405060708090a0b0c0d0e0ffd16101a0b",
+      "body_field_offset_zero_based": 21,
+      "field_note": "lane16 >=16",
+      "expected_valid": false,
+      "actual_oracle": null
+    },
+    {
+      "name": "out-of-range-shuffle-lane",
+      "wasm_hex": "0061736d010000000104016000000302010005030100010a3b013900fd0c000102030405060708090a0b0c0d0e0ffd0c000102030405060708090a0b0c0d0e0ffd0d200000000000000000000000000000001a0b",
+      "bytes": 84,
+      "sha256": "33dad5ee295b5e7609409bf004855f05edaf4638db556ea2fb85be2119aa742f",
+      "body_hex": "00fd0c000102030405060708090a0b0c0d0e0ffd0c000102030405060708090a0b0c0d0e0ffd0d200000000000000000000000000000001a0b",
+      "body_field_offset_zero_based": 39,
+      "field_note": "shuffle lane32 >=32",
+      "expected_valid": false,
+      "actual_oracle": null
+    },
+    {
+      "name": "alignment-reserved-bit7",
+      "wasm_hex": "0061736d010000000104016000000302010005030100010a0c010a004100fd008001001a0b",
+      "bytes": 37,
+      "sha256": "ef79d9ff6defa85ed229c3f87cc130dabf1a808992812cf7565a3ce659827b33",
+      "body_hex": "004100fd008001001a0b",
+      "body_field_offset_zero_based": 5,
+      "field_note": "reserved memarg alignment flag",
+      "expected_valid": false,
+      "actual_oracle": null
+    },
+    {
+      "name": "alignment-exceeds-natural",
+      "wasm_hex": "0061736d010000000104016000000302010005030100010a0b0109004100fd0005001a0b",
+      "bytes": 36,
+      "sha256": "e8eee59f69bbb58e8f26a2ea959ecd9814518670af07f442af2e181582fc7ca9",
+      "body_hex": "004100fd0005001a0b",
+      "body_field_offset_zero_based": 5,
+      "field_note": "v128 load alignment5 >4",
+      "expected_valid": false,
+      "actual_oracle": null
+    },
+    {
+      "name": "optional-memory-index-unavailable",
+      "wasm_hex": "0061736d010000000104016000000302010005030100010a0c010a004100fd004401001a0b",
+      "bytes": 37,
+      "sha256": "db051657001913125bb5fb781e3837971188475736e500e4df9fbd37587f1aff",
+      "body_hex": "004100fd004401001a0b",
+      "body_field_offset_zero_based": 6,
+      "field_note": "selected memory1 >=1",
+      "expected_valid": false,
+      "actual_oracle": null
+    },
+    {
+      "name": "truncated-offset",
+      "wasm_hex": "0061736d010000000104016000000302010005030100010a090107004100fd000480",
+      "bytes": 34,
+      "sha256": "8cccdc3b0c525d838e4ef24440092c4bb18ae2cf6070cefd6e6b44bb072367ff",
+      "body_hex": "004100fd000480",
+      "body_field_offset_zero_based": 6,
+      "field_note": "offset EOF",
+      "expected_valid": false,
+      "actual_oracle": null
+    }
+  ]
+}

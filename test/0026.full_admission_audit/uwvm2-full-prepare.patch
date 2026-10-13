@@ -1,0 +1,96 @@
+--- a/src/uwvm2/runtime/lib/uwvm_runtime.h
++++ b/src/uwvm2/runtime/lib/uwvm_runtime.h
+@@ -483,6 +483,14 @@
+         bool module_start{};
+     };
+ 
++    /// @brief Validate and translate every initialized module with the selected full compiler without executing guest code.
++    /// @note Call before applying ANY active segment or invoking ANY start/entry function in the module graph.
++    ///       Fused validation/translation occurs once; the compatible later full entry reuses this publication.
++    /// @note Returns false for unavailable/non-full backends, empty registry or execution/publication/provider re-entry.
++    ///       Invalid bodies retain existing full-compiler fatal diagnostics. The host serializes loader/configuration/reset.
++    ///       Actual generation/GC admission and floating-point scopes protect this cold operation; no guest frame is fabricated.
++    extern "C++" bool full_compile_prepare_host_api() noexcept;
++
+     /// @brief Full-compile and run the main module using the configured runtime backend.
+     /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
+     /// @note  After a runtime registry is published, changing full/lazy mode or backend configuration requires a quiescent
+--- a/src/uwvm2/runtime/lib/uwvm_runtime.default.cpp
++++ b/src/uwvm2/runtime/lib/uwvm_runtime.default.cpp
+@@ -18416,6 +18416,37 @@
+     defined(UWVM_EXPERIMENTAL_EXCEPTION_SOURCE_RETENTION) && UWVM_EXPERIMENTAL_EXCEPTION_SOURCE_RETENTION == 1
+ # include "source_exception_cold_publication.inc"
+ #endif
++
++    extern "C++" bool full_compile_prepare_host_api() noexcept
++    {
++# if defined(UWVM_RUNTIME_HAS_BACKEND)
++        namespace mode = ::uwvm2::uwvm::runtime::runtime_mode;
++        if(mode::global_runtime_mode != mode::runtime_mode_t::full_compile ||
++           (!runtime_compiler_requests_uwvm_int_translation() && !runtime_compiler_requests_llvm_jit_translation()) ||
++           !details::runtime_execution_entry_reset_allowed(get_runtime_execution_entry_depth()) ||
++           !details::runtime_state_publication_access_allowed(get_runtime_state_publication_depth()) ||
++           !details::runtime_compilation_metadata_callback_access_allowed(get_runtime_compilation_metadata_callback_depth()) ||
++           ::uwvm2::uwvm::runtime::storage::active_runtime_registry().empty()) { return false; }
++        // Retain the actual initialized generation during full publication.
++        // No generated guest entry, call frame or fictitious GC participant is enrolled.
++        runtime_execution_entry_scope entry{};
++        ::uwvm2::runtime::lib::details::scoped_llvm_wasm_fp_environment fp{get_llvm_wasm_fp_environment_active_state()};
++        if(!fp.ready()) [[unlikely]] { ::fast_io::fast_terminate(); }
++#  if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_EXPERIMENTAL_NATIVE_EH_PRIVATE_LEAF) && UWVM_EXPERIMENTAL_NATIVE_EH_PRIVATE_LEAF == 1
++        {
++            runtime_state_publication_guard private_management_guard{};
++            if(runtime_native_eh_private_leaf_management_blocked()) { return false; }
++        }
++#  endif
++        // Fuse validation with full translation for every local body. The later
++        // full run entry consumes this same signature/compiled_all publication
++        // and returns from its cache check without decoding any body again.
++        compile_all_modules_if_needed();
++        return true;
++# else
++        return false;
++# endif
++    }
+ 
+     extern "C++" UWVM_NOINLINE void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config cfg) noexcept
+     {
+--- a/src/uwvm2/runtime/lib/uwvm_stub_runtime.default.cpp
++++ b/src/uwvm2/runtime/lib/uwvm_stub_runtime.default.cpp
+@@ -18,6 +18,8 @@
+ 
+ namespace uwvm2::runtime::lib
+ {
++    extern "C++" bool full_compile_prepare_host_api() noexcept { return false; }
++
+     extern "C++" void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config cfg) noexcept
+     {
+         static_cast<void>(main_module_name);
+--- a/src/uwvm2/uwvm/run/run.h
++++ b/src/uwvm2/uwvm/run/run.h
+@@ -1140,7 +1140,24 @@
+         // Derived by runtime from the actual initializer-owned native map and
+         // mode. No external bool or raw module/handle can assert this closure.
+         if constexpr(::std::is_same_v<RunConfig, ::uwvm2::runtime::lib::full_compile_run_config>)
+-        { static_cast<void>(::uwvm2::runtime::lib::runtime_gc_prepare_cli_collection_host_api()); }
++        {
++            static_cast<void>(::uwvm2::runtime::lib::runtime_gc_prepare_cli_collection_host_api());
++            // Core 3 instantiation rejects every invalid body before any active
++            // segment can mutate an imported memory or table. Full compilation
++            // fuses that proof with its one translation of every body.
++            if(!::uwvm2::runtime::lib::full_compile_prepare_host_api()) [[unlikely]]
++            {
++                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
++                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
++                    u8"uwvm: ",
++                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
++                    u8"[fatal] ",
++                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
++                    u8"Cannot prepare the initialized module graph for the current full runtime mode.\n\n",
++                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
++                ::fast_io::fast_terminate();
++            }
++        }
+         using start_section_t = ::uwvm2::parser::wasm::standard::wasm1::features::start_section_storage_t;
+         // Preloaded Wasm modules are instances too: run each actual start section once, in preload order.
+         // Do not invoke library exports named _start/main, and do not apply the main-module CLI override to libraries.

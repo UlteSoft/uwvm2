@@ -16,7 +16,10 @@ local llvm_jit_required_components = {
     "instcombine",
     "bitreader",
     "bitwriter",
-    "object"
+    "object",
+    -- Embedded source/inline metadata is parsed only by the host debugger.
+    -- It still uses real DWARFContext symbols in a static LLVM consumer.
+    "debuginfodwarf"
 }
 
 local llvm_jit_optional_components = {
@@ -29,22 +32,41 @@ local llvm_jit_terminal_component_candidates = {
 }
 
 local llvm_component_link_names = {
+    aarch64asmparser = { "LLVMAArch64AsmParser" },
+    aarch64disassembler = { "LLVMAArch64Disassembler", "LLVMMCDisassembler", "LLVMMC" },
+    armasmparser = { "LLVMARMAsmParser" },
+    armdisassembler = { "LLVMARMDisassembler", "LLVMMCDisassembler", "LLVMMC" },
     analysis = { "LLVMAnalysis" },
     bitreader = { "LLVMBitReader" },
     bitwriter = { "LLVMBitWriter" },
     core = { "LLVMCore" },
+    debuginfodwarf = { "LLVMDebugInfoDWARF" },
     executionengine = { "LLVMExecutionEngine" },
     instcombine = { "LLVMInstCombine" },
     linker = { "LLVMLinker" },
+    loongarchasmparser = { "LLVMLoongArchAsmParser" },
+    loongarchdisassembler = { "LLVMLoongArchDisassembler", "LLVMMCDisassembler", "LLVMMC" },
     mcjit = { "LLVMMCJIT" },
+    mipsasmparser = { "LLVMMipsAsmParser" },
+    mipsdisassembler = { "LLVMMipsDisassembler", "LLVMMCDisassembler", "LLVMMC" },
     object = { "LLVMObject" },
     passes = { "LLVMPasses" },
+    powerpcasmparser = { "LLVMPowerPCAsmParser" },
+    powerpcdisassembler = { "LLVMPowerPCDisassembler", "LLVMMCDisassembler", "LLVMMC" },
     runtimedyld = { "LLVMRuntimeDyld" },
+    riscvasmparser = { "LLVMRISCVAsmParser" },
+    riscvdisassembler = { "LLVMRISCVDisassembler", "LLVMMCDisassembler", "LLVMMC" },
     scalaropts = { "LLVMScalarOpts" },
+    sparcasmparser = { "LLVMSparcAsmParser" },
+    sparcdisassembler = { "LLVMSparcDisassembler", "LLVMMCDisassembler", "LLVMMC" },
     support = { "LLVMSupport" },
+    systemzasmparser = { "LLVMSystemZAsmParser" },
+    systemzdisassembler = { "LLVMSystemZDisassembler", "LLVMMCDisassembler", "LLVMMC" },
     target = { "LLVMTarget" },
     targetparser = { "LLVMTargetParser" },
-    transformutils = { "LLVMTransformUtils" }
+    transformutils = { "LLVMTransformUtils" },
+    x86asmparser = { "LLVMX86AsmParser" },
+    x86disassembler = { "LLVMX86Disassembler", "LLVMMCDisassembler", "LLVMMC" }
 }
 
 local llvm_native_target_link_names = {
@@ -67,7 +89,9 @@ local function _llvm_host_target_component_candidates()
 
     if arch == "arm64" or arch == "aarch64" then
         table.insert(candidates, "aarch64")
-    elseif arch == "x86_64" or arch == "x64" or arch == "amd64" or arch == "i386" or arch == "x86" then
+    elseif arch == "arm" or arch:find("armv") then
+        table.insert(candidates, "arm")
+    elseif arch == "x86_64" or arch == "x64" or arch == "amd64" or arch == "i386" or arch == "i686" or arch == "x86" then
         table.insert(candidates, "x86")
     elseif arch:find("riscv") then
         table.insert(candidates, "riscv")
@@ -107,8 +131,17 @@ end
 
 local function _llvm_jit_base_components(available)
     local components = {}
+    assert(available["debuginfodwarf"], "LLVM-full source debugging requires the LLVM debuginfodwarf component")
     for _, component in ipairs(llvm_jit_required_components) do
         table.insert(components, component)
+    end
+    -- Native numeric register witnesses consume real inline assembly.
+    -- nativecodegen alone omits the target parser, so static MCJIT consumers
+    -- must link it explicitly for every supported process architecture.
+    for _, target in ipairs(_llvm_host_target_component_candidates()) do
+        local parser = target .. "asmparser"
+        assert(available[parser], target .. " LLVM JIT requires its AsmParser component")
+        table.insert(components, parser)
     end
     for _, component in ipairs(llvm_jit_optional_components) do
         if available[component] then
@@ -393,6 +426,22 @@ local function _add_llvm_libcxx_runtime_paths(result, seen, llvm_config, libdir)
             end
         end
     end
+
+    -- A cross/macOS sysroot may supply newer libc++ headers than the SDK's
+    -- libSystem stub exports. Its matching static runtime resolves new atomic
+    -- wait/notify entry points without changing the LLVM dylibs' system ABI.
+    local macos_sysroot = get_config("sysroot")
+    if (get_config("plat") or ""):lower() == "macosx" and macos_sysroot and macos_sysroot ~= "" then
+        local runtime_dir = path.join(macos_sysroot, "usr", "lib")
+        local libcxx_archive = path.join(runtime_dir, "libc++.a")
+        local libcxxabi_archive = path.join(runtime_dir, "libc++abi.a")
+        if os.isfile(libcxx_archive) and os.isfile(libcxxabi_archive) then
+            _append_unique(result, seen, "ldflags", libcxx_archive)
+            _append_unique(result, seen, "ldflags", libcxxabi_archive)
+            _append_unique(result, seen, "shflags", libcxx_archive)
+            _append_unique(result, seen, "shflags", libcxxabi_archive)
+        end
+    end
 end
 
 local function _parse_llvm_cxxflags(flags, result, seen)
@@ -584,6 +633,11 @@ function add_linkflags_to_target(target, flags, link_field)
 end
 
 local function _find_llvm_config_tool()
+    local configured = get_config("llvm-config")
+    if configured and configured ~= "auto" then
+        assert(os.isfile(configured), "Configured llvm-config does not exist: " .. configured)
+        return {program = configured, version = os.iorunv(configured, {"--version"}):trim()}
+    end
     local env_program = os.getenv("LLVM_CONFIG")
     if env_program and env_program ~= "" then
         local tool = find_tool("llvm-config", { program = env_program, version = true })
@@ -725,6 +779,14 @@ local function _llvm_direct_link_names(base_components, target_components)
 end
 
 local function _filter_llvm_dynamic_link_flags(flags, direct_link_names)
+    -- An SDK may provide static component archives even with --static=none.
+    -- Archives do not carry transitive dependencies: preserve llvm-config's
+    -- complete closure instead of applying the shared-library optimization.
+    for _, flag in ipairs(os.argv(flags or "")) do
+        if _endswith(flag:lower(), ".a") or _endswith(flag:lower(), ".lib") then
+            return flags
+        end
+    end
     local keep = {}
     for _, name in ipairs(direct_link_names or {}) do
         keep[name] = true
@@ -736,7 +798,7 @@ local function _filter_llvm_dynamic_link_flags(flags, direct_link_names)
     local monolithic_seen = {}
     for _, flag in ipairs(os.argv(flags or "")) do
         local link_name = _llvm_link_name_from_flag(flag)
-        if link_name == "LLVM" or link_name:match("^LLVM%-") then
+        if link_name and (link_name == "LLVM" or link_name:match("^LLVM%-")) then
             _append_unique_string(monolithic, monolithic_seen, flag)
         elseif link_name and keep[link_name] then
             _append_unique_string(filtered, filtered_seen, flag)
@@ -756,6 +818,15 @@ local function _resolve_llvm_jit_components(llvm_config, link_static)
         available[component] = true
     end
     local base_components = _llvm_jit_base_components(available)
+    -- Cold, owned-JIT disassembly is linked on every supported native ISA,
+    -- independently of whether that platform admits machine instruction steps.
+    for _, target in ipairs(_llvm_host_target_component_candidates()) do
+        local component = target .. "disassembler"
+        if not available[component] then
+            raise("LLVM-full debugger requires the LLVM " .. component .. " component")
+        end
+        table.insert(base_components, component)
+    end
     local host_target_components = _llvm_host_target_components(available)
 
     local native_components = {}
@@ -858,13 +929,14 @@ function get_llvm_jit_options()
     local link_static = static_mode == "non-system" or static_mode == "compiler"
 
     local cache_key = table.concat({
-        "llvm-jit-v18",
+        "llvm-jit-v24-static-sdk-native-define",
         llvm_config.program,
         llvm_config.version or "",
         get_config("plat") or "",
         get_config("arch") or "",
         get_config("stdlib") or "",
         get_config("llvm-target") or "",
+        get_config("sysroot") or "",
         static_mode
     }, "|")
 
@@ -889,10 +961,23 @@ function get_llvm_jit_options()
     local result = {
         llvm_config = llvm_config.program,
         llvm_version = llvm_config.version,
+        llvm_full_version = _run_llvm_config(llvm_config, { "--version" }),
         llvm_components = components,
         static_mode = static_mode
     }
     local seen = {}
+    -- This belongs to the shared SDK option: target on_load callbacks may be
+    -- replaced by later platform callbacks and leave CLI/runtime inconsistent.
+    local sdk_version = result.llvm_full_version or result.llvm_version or ""
+    local owner_revision = tonumber(sdk_version:match("%-uwvm%-ros%.(%d+)"))
+    local native_arch = string.lower(tostring(get_config("arch") or os.arch() or ""))
+    local native_plat = get_config("plat") or ""
+    if owner_revision and owner_revision >= 10 and get_config("use-llvm-compiler") and
+       ((native_plat == "macosx" and (native_arch == "arm64" or native_arch == "aarch64" or get_config("macos-x64-native-step"))) or
+        (native_plat == "mingw" and (native_arch == "x86_64" or native_arch == "x64" or native_arch == "amd64"))) then
+        _append_unique(result, seen, "defines", "UWVM_EXPERIMENTAL_NATIVE_OWNER_TABLE_V2=1")
+    end
+
 
     local normalized_includedir = _normalize_dir(includedir)
     if not _is_default_system_include_dir(normalized_includedir) then
@@ -956,7 +1041,9 @@ function get_llvm_jit_options()
     end
     if not link_static and native_codegen_linkflags and native_codegen_linkflags ~= "" and host_target_components and #host_target_components ~= 0 then
         -- Shared component libraries carry their own transitive dependencies. Keep only the native target family here;
-        -- otherwise llvm-config's expanded closure reintroduces unrelated libraries such as DebugInfoDWARF.
+        -- otherwise llvm-config's expanded closure reintroduces unrelated
+        -- transitive libraries. The debugger's direct DWARF component stays
+        -- in the separately resolved base components above.
         local native_direct_link_names = _llvm_direct_link_names({}, host_target_components)
         local native_direct_linkflags = _filter_llvm_dynamic_link_flags(native_codegen_linkflags, native_direct_link_names)
         if native_direct_linkflags ~= "" then

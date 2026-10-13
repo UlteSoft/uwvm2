@@ -1,0 +1,35 @@
+{
+  "source_only": true,
+  "files": [
+    {
+      "path": "README.md",
+      "size": 5997,
+      "sha256": "8f299259293a7474be4689b6c0b34781e77344511189a4264e27710f8919099f"
+    },
+    {
+      "path": "fixtures/i32_numeric_core3.wast",
+      "size": 8151,
+      "sha256": "37ffde45f966468eab6dc981f8761ff3e73bf44780d556b0446e0eb0cf940362"
+    },
+    {
+      "path": "i32_numeric_event_component.cc",
+      "size": 5992,
+      "sha256": "2406eddd28cd8ebe464673491787f5936f1bd7148e9260b0980e91b9064fe3e8"
+    },
+    {
+      "path": "i32_numeric_event_ir.cc",
+      "size": 8630,
+      "sha256": "78ef91c1830458f59b99e8ea5bb1a6f9eafc48942c21b46caf0016619745fca9"
+    },
+    {
+      "path": "i32_numeric_event_module.cppm",
+      "size": 1208,
+      "sha256": "3d405fe9b605423c299a759047e929edb58e6c77a18548f6a1c63a1e3393daf2"
+    },
+    {
+      "path": "run_actual_cli.py",
+      "size": 7435,
+      "sha256": "2d55839ebcea027f93e436f51c1a88d4aa886d8aa913198f09793b25bc321dbb"
+    }
+  ]
+}

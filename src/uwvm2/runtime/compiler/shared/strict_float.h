@@ -9,6 +9,7 @@
 #include <bit>
 #include <cstdint>
 #include <type_traits>
+#include <fast_io_freestanding.h>
 
 namespace uwvm2::runtime::compiler::shared::strict_float
 {
@@ -231,8 +232,9 @@ namespace uwvm2::runtime::compiler::shared::strict_float
         }
 # undef UWVM2_STRICT_X87
         u64 significand{};
-        for(unsigned i{}; i != 8u; ++i) { significand |= static_cast<u64>(raw.bytes[i]) << (i * 8u); }
-        unsigned const sign_exponent{static_cast<unsigned>(raw.bytes[8]) | (static_cast<unsigned>(raw.bytes[9]) << 8u)};
+        unsigned sign_exponent{};
+        (void)::fast_io::parse_by_scan(raw.bytes, raw.bytes + 8u, ::fast_io::mnp::le_get<64>(significand));
+        (void)::fast_io::parse_by_scan(raw.bytes + 8u, raw.bytes + 10u, ::fast_io::mnp::le_get<16>(sign_exponent));
         return {significand | ((status & 0x20u) != 0u), sign_exponent};
 #elif (defined(__GNUC__) || defined(__clang__)) && defined(__m68k__) && defined(__HAVE_68881__)
         struct raw_extended { unsigned char bytes[12]; } raw;
@@ -264,8 +266,9 @@ namespace uwvm2::runtime::compiler::shared::strict_float
         }
 # undef UWVM2_STRICT_M68K
         u64 significand{};
-        for(unsigned i{4u}; i != 12u; ++i) { significand = (significand << 8u) | raw.bytes[i]; }
-        unsigned const sign_exponent{(static_cast<unsigned>(raw.bytes[0]) << 8u) | raw.bytes[1]};
+        unsigned sign_exponent{};
+        (void)::fast_io::parse_by_scan(raw.bytes + 4u, raw.bytes + 12u, ::fast_io::mnp::be_get<64>(significand));
+        (void)::fast_io::parse_by_scan(raw.bytes, raw.bytes + 2u, ::fast_io::mnp::be_get<16>(sign_exponent));
         return {significand | ((status & 8u) != 0u), sign_exponent};
 #else
         static_assert(sizeof(Float) == 0, "extended arithmetic is only instantiated on supported x87/68881 targets");
@@ -323,8 +326,11 @@ namespace uwvm2::runtime::compiler::shared::strict_float
             else if constexpr(Op == operation::mul) { UWVM2_NEAREST_X87("fldl", "fmull %[right]", "fstl %[result]\n\tfstpt %[extended]"); }
             else if constexpr(Op == operation::div) { UWVM2_NEAREST_X87("fldl", "fdivl %[right]", "fstl %[result]\n\tfstpt %[extended]"); }
             else { UWVM2_NEAREST_X87("fldl", "fsqrt", "fstl %[result]\n\tfstpt %[extended]"); }
-            unsigned const exponent{(static_cast<unsigned>(raw.bytes[8]) | (static_cast<unsigned>(raw.bytes[9]) << 8u)) & 0x7fffu};
-            unsigned const low{(static_cast<unsigned>(raw.bytes[0]) | (static_cast<unsigned>(raw.bytes[1]) << 8u)) & 2047u};
+            unsigned exponent{}, low{};
+            (void)::fast_io::parse_by_scan(raw.bytes + 8u, raw.bytes + 10u, ::fast_io::mnp::le_get<16>(exponent));
+            (void)::fast_io::parse_by_scan(raw.bytes, raw.bytes + 2u, ::fast_io::mnp::le_get<16>(low));
+            exponent &= 0x7fffu;
+            low &= 2047u;
             // The finite operands cannot underflow extended precision; exponent zero therefore means exact zero.
             return exponent == 0u || (exponent >= 15361u && exponent < 17407u && low != 1024u);
         }
@@ -358,8 +364,11 @@ namespace uwvm2::runtime::compiler::shared::strict_float
             else if constexpr(Op == operation::mul) { UWVM2_NEAREST_M68K("fmove.d", "fmul.d %[right],%%fp0", "fmove.d %%fp0,%[result]\n\tfmove.x %%fp0,%[extended]"); }
             else if constexpr(Op == operation::div) { UWVM2_NEAREST_M68K("fmove.d", "fdiv.d %[right],%%fp0", "fmove.d %%fp0,%[result]\n\tfmove.x %%fp0,%[extended]"); }
             else { UWVM2_NEAREST_M68K("fmove.d", "fsqrt.x %%fp0,%%fp0", "fmove.d %%fp0,%[result]\n\tfmove.x %%fp0,%[extended]"); }
-            unsigned const exponent{((static_cast<unsigned>(raw.bytes[0]) << 8u) | raw.bytes[1]) & 0x7fffu};
-            unsigned const low{((static_cast<unsigned>(raw.bytes[10]) << 8u) | raw.bytes[11]) & 2047u};
+            unsigned exponent{}, low{};
+            (void)::fast_io::parse_by_scan(raw.bytes, raw.bytes + 2u, ::fast_io::mnp::be_get<16>(exponent));
+            (void)::fast_io::parse_by_scan(raw.bytes + 10u, raw.bytes + 12u, ::fast_io::mnp::be_get<16>(low));
+            exponent &= 0x7fffu;
+            low &= 2047u;
             return exponent == 0u || (exponent >= 15361u && exponent < 17407u && low != 1024u);
         }
 # undef UWVM2_NEAREST_M68K

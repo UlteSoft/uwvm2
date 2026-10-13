@@ -47,6 +47,22 @@ namespace
         ::std::byte{0x80}, ::std::byte{0x80}, ::std::byte{0x80}, ::std::byte{0x80}, ::std::byte{0x80}, ::std::byte{0x00}};
     inline constexpr ::std::byte nonzero_mvp[]{::std::byte{0x01}};
 
+    constexpr bool check_fifth_byte_range()
+    {
+        for(unsigned last{}; last != 256u; ++last)
+        {
+            ::std::byte bytes[]{::std::byte{0xff}, ::std::byte{0xff}, ::std::byte{0xff}, ::std::byte{0xff},
+                                static_cast<::std::byte>(last), ::std::byte{0}};
+            auto cursor{static_cast<::std::byte const*>(bytes)};
+            ::std::uint_least32_t value{42u};
+            bool const valid{parse_call_indirect_trailing_immediate(cursor, bytes + 6, false, value)};
+            if(valid != (last <= 15u)) { return false; }
+            if(valid ? cursor != bytes + 5 : (cursor != bytes || value != 42u)) { return false; }
+        }
+        return true;
+    }
+    static_assert(check_fifth_byte_range());
+
     static_assert(expect_success(canonical_zero, false, 0u));
     static_assert(expect_success(padded_zero, false, 0u));
     // Feature policy is intentionally outside the decoder: a nonzero u32 remains a valid immediate here.

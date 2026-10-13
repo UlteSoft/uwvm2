@@ -40,6 +40,59 @@ namespace details
         ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* function_type_ptr{};
     };
 
+    enum class runtime_defined_function_pointer_membership : unsigned
+    {
+        outside,
+        element,
+        invalid,
+    };
+
+    // Imported functions can forward to defined-function storage in another module.  Convert addresses to integers
+    // before range classification: C++ pointer ordering/subtraction is valid only within one allocation.  An address
+    // inside the current vector must land exactly on an element boundary; outside is a valid provider-module target.
+    [[nodiscard]] inline constexpr runtime_defined_function_pointer_membership classify_runtime_defined_function_pointer(
+        ::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t const* begin,
+        ::std::size_t count,
+        ::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t const* element,
+        ::std::size_t& index) noexcept
+    {
+        using element_t = ::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t;
+        index = 0uz;
+        if(element == nullptr) { return runtime_defined_function_pointer_membership::outside; }
+        if(begin == nullptr)
+        {
+            return count == 0uz ? runtime_defined_function_pointer_membership::outside :
+                                  runtime_defined_function_pointer_membership::invalid;
+        }
+        if(count > (::std::numeric_limits<::std::uintptr_t>::max() / sizeof(element_t))) [[unlikely]]
+        {
+            return runtime_defined_function_pointer_membership::invalid;
+        }
+
+        auto const begin_address{reinterpret_cast<::std::uintptr_t>(begin)};
+        auto const element_address{reinterpret_cast<::std::uintptr_t>(element)};
+        auto const storage_bytes{static_cast<::std::uintptr_t>(count * sizeof(element_t))};
+        if(begin_address > (::std::numeric_limits<::std::uintptr_t>::max() - storage_bytes)) [[unlikely]]
+        {
+            return runtime_defined_function_pointer_membership::invalid;
+        }
+
+        auto const end_address{begin_address + storage_bytes};
+        if(element_address < begin_address || element_address >= end_address)
+        {
+            return runtime_defined_function_pointer_membership::outside;
+        }
+
+        auto const byte_offset{element_address - begin_address};
+        if((byte_offset % sizeof(element_t)) != 0u) [[unlikely]]
+        {
+            return runtime_defined_function_pointer_membership::invalid;
+        }
+        index = static_cast<::std::size_t>(byte_offset / sizeof(element_t));
+        if(index >= count) [[unlikely]] { return runtime_defined_function_pointer_membership::invalid; }
+        return runtime_defined_function_pointer_membership::element;
+    }
+
     // Runtime initialization rejects import-alias cycles and unresolved chains.  A post-initialization function alias chain
     // can therefore visit at most one imported-function record per runtime import before reaching a concrete target.  Derive
     // the defensive walk bound from runtime storage instead of using a fixed cap, so large but valid module graphs are not
@@ -86,7 +139,12 @@ namespace details
             {
                 case function_link_kind::imported:
                 {
+                    // [current imported link][initializer-owned next link]
+                    // [safe                 ] ^^ curr->target.imported_ptr belongs to the live runtime module;
+                    // the storage-derived walk bound above rejects a cycle before it can be followed indefinitely.
                     curr = curr->target.imported_ptr;
+                    // [completed link] [next imported link or null]
+                    //                  ^^ curr: the loop checks null and its remaining link-walk budget before dereference.
                     continue;
                 }
                 case function_link_kind::defined:
@@ -94,16 +152,21 @@ namespace details
                     auto const defined_func_ptr{curr->target.defined_ptr};
                     if(defined_func_ptr == nullptr) [[unlikely]] { return {}; }
 
+                    ::std::size_t local_defined_index{};
+                    // [current-module local storage, one-past) | provider module or malformed pointer
+                    // [safe exact element                    ] unsafe (foreign allocation or interior byte)
+                    // ^^ classify before dereference: an interior byte in this vector must fail without reading a partial record.
+                    auto const membership{classify_runtime_defined_function_pointer(local_func_begin, local_func_count,
+                                                                                     defined_func_ptr, local_defined_index)};
+                    if(membership == runtime_defined_function_pointer_membership::invalid) [[unlikely]] { return {}; }
+                    // The initializer proves foreign aliases point to retained provider records; only an exact local element
+                    // or such a provider record is dereferenced below.
                     result.function_type_ptr = defined_func_ptr->function_type_ptr;
                     if(result.function_type_ptr == nullptr) [[unlikely]] { return {}; }
-
-                    if(local_func_begin == nullptr || defined_func_ptr < local_func_begin || defined_func_ptr >= local_func_begin + local_func_count)
-                    {
-                        return result;
-                    }
+                    if(membership == runtime_defined_function_pointer_membership::outside) { return result; }
 
                     result.direct_callable = true;
-                    result.local_defined_index = static_cast<::std::size_t>(defined_func_ptr - local_func_begin);
+                    result.local_defined_index = local_defined_index;
                     return result;
                 }
                 case function_link_kind::local_imported:
@@ -153,51 +216,38 @@ namespace details
                            {
                                if(curr == end) { return false; }
                                ::std::memcpy(::std::addressof(out), curr, sizeof(out));
+                               // [checked opcode] next ... end
+                               // [safe          ] unsafe (possibly end)
+                               // ^^ curr: equality check above proves the single opcode byte readable.
                                ++curr;
+                               // [consumed opcode] next ... end
+                               // [safe           ] unsafe (possibly end)
+                               //                   ^^ curr: one-past is permitted; the next read rechecks equality.
                                return true;
                            }};
 
-        auto const read_u32_leb{[&](::std::uint32_t& out) constexpr noexcept -> bool
-                                {
-                                    ::std::uint32_t v{};
-                                    ::std::uint32_t shift{};
-                                    for(::std::size_t i{}; i != 5uz; ++i)
-                                    {
-                                        if(curr == end) { return false; }
-                                        auto const byte{::std::to_integer<::std::uint8_t>(*curr)};
-                                        ++curr;
-                                        v |= (static_cast<::std::uint32_t>(byte & 0x7fu) << shift);
-                                        if((byte & 0x80u) == 0u)
-                                        {
-                                            out = v;
-                                            return true;
-                                        }
-                                        shift += 7u;
-                                    }
-                                    return false;
-                                }};
-
-        auto const read_i32_leb{[&](wasm_i32& out) constexpr noexcept -> bool
-                                {
-                                    ::std::int32_t v{};
-                                    ::std::uint32_t shift{};
-                                    ::std::uint8_t byte{};
-                                    for(::std::size_t i{}; i != 5uz; ++i)
-                                    {
-                                        if(curr == end) { return false; }
-                                        byte = ::std::to_integer<::std::uint8_t>(*curr);
-                                        ++curr;
-                                        v |= (static_cast<::std::int32_t>(byte & 0x7fu) << shift);
-                                        shift += 7u;
-                                        if((byte & 0x80u) == 0u)
-                                        {
-                                            if(shift < 32u && (byte & 0x40u)) { v |= (-1) << shift; }
-                                            out = static_cast<wasm_i32>(v);
-                                            return true;
-                                        }
-                                    }
-                                    return false;
-                                }};
+        auto const read_integer_leb{[&](auto& out) constexpr noexcept -> bool
+                                   {
+                                       if(curr == end) { return false; }
+                                       auto const first{reinterpret_cast<unsigned char const*>(curr)};
+                                       auto const remaining{static_cast<::std::size_t>(end - curr)};
+                                       auto const last{first + (remaining < 5u ? remaining : 5u)};
+                                       ::std::remove_reference_t<decltype(out)> decoded{};
+                                       auto const [next, code]{::fast_io::parse_by_scan(first, last, ::fast_io::mnp::leb128_get(decoded))};
+                                       if(code != ::fast_io::parse_code::ok) { return false; }
+                                       out = decoded;
+                                       // [consumed bytes][bounded LEB bytes] ... end
+                                       // [safe          ][safe             ] unsafe (possibly end)
+                                       //                 ^^ curr: parse_by_scan returned next in [first, last],
+                                       // with last at most end and next-first no greater than remaining.
+                                       curr += next - first;
+                                       // [consumed complete LEB] next ... end
+                                       // [safe                 ] unsafe (possibly end)
+                                       //                         ^^ curr: no dereference until the next bounded read.
+                                       return true;
+                                   }};
+        auto const read_u32_leb{[&](::std::uint32_t& out) constexpr noexcept -> bool { return read_integer_leb(out); }};
+        auto const read_i32_leb{[&](wasm_i32& out) constexpr noexcept -> bool { return read_integer_leb(out); }};
 
         // Pattern: xorshift32 (i32 -> i32)
         // local.get 0
@@ -214,7 +264,13 @@ namespace details
                                             auto const begin{curr};
                                             auto fail{[&]() constexpr noexcept
                                                       {
+                                                          // [expr begin ... checked probe] tail ... end
+                                                          // [safe                         ] unsafe (possibly end)
+                                                          // ^^ begin: saved before this matcher consumed any bytes.
                                                           curr = begin;
+                                                          // [expr begin ...] tail ... end
+                                                          // [safe          ] unsafe (possibly end)
+                                                          // ^^ curr: reset within the same function-body allocation.
                                                           return false;
                                                       }};
 

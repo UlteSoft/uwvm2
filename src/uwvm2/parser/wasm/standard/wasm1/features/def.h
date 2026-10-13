@@ -993,13 +993,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             done
         };
 
+        template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         struct context
         {
+            using body_type = body_wrapper_t<Fs...>;
+            static constexpr ::std::size_t body_capacity{print_reserve_static_stack_size(::fast_io::io_reserve_type<char8_t, body_type>)};
             stage curr_stage{};
             ::std::size_t offset{};
+            // A context producer must make progress even for a one-character
+            // output window. Render once, including its import-counter update,
+            // then copy the bounded body in as many windows as required.
+            char8_t body_buffer[body_capacity]{};
+            ::std::size_t body_size{};
 
-            template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-                requires context_body_supported<char8_t, Fs...>
             inline constexpr ::fast_io::context_print_result<char8_t*> print_context_define(
                 final_import_type_section_details_wrapper_t<Fs...> const import_type_details_wrapper,
                 char8_t* curr,
@@ -1021,15 +1027,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                     {
                         case stage::body:
                         {
-                            using body_type = body_wrapper_t<Fs...>;
-                            constexpr ::std::size_t reserve_size{print_reserve_static_stack_size(::fast_io::io_reserve_type<char8_t, body_type>)};
-                            if(static_cast<::std::size_t>(end - curr) < reserve_size) { return {curr, false}; }
-                            curr = print_reserve_define(
-                                ::fast_io::io_reserve_type<char8_t, body_type>,
-                                curr,
-                                section_details(import_type_details_wrapper.import_type_ptr->imports,
-                                                *import_type_details_wrapper.all_sections_ptr,
-                                                import_type_details_wrapper.importdesc_counter_ptr));
+                            if(this->body_size == 0uz)
+                            {
+                                // [body_buffer: body_capacity characters] end
+                                // [safe                               ]
+                                // ^^ begin; reserve writer cannot exceed its advertised capacity.
+                                auto const body_end{print_reserve_define(
+                                    ::fast_io::io_reserve_type<char8_t, body_type>, this->body_buffer,
+                                    section_details(import_type_details_wrapper.import_type_ptr->imports,
+                                                    *import_type_details_wrapper.all_sections_ptr,
+                                                    import_type_details_wrapper.importdesc_counter_ptr))};
+                                // [rendered body] [remaining reservation] end
+                                //                 ^^ body_end; may equal end, never dereferenced.
+                                this->body_size = static_cast<::std::size_t>(body_end - this->body_buffer);
+                            }
+                            auto const left{this->body_size - this->offset};
+                            auto const space{static_cast<::std::size_t>(end - curr)};
+                            auto const count{left < space ? left : space};
+                            curr = ::fast_io::freestanding::my_copy_n(this->body_buffer + this->offset, count, curr);
+                            // [copied output] [remaining window] end
+                            //                 ^^ curr; count <= window space and remaining body.
+                            this->offset += count;
+                            if(this->offset != this->body_size) { return {curr, false}; }
+                            this->offset = 0uz;
                             this->curr_stage = stage::module_prefix;
                             break;
                         }
@@ -1081,7 +1101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         requires details::final_import_type_section_details_print::context_body_supported<char_type, Fs...>
     inline constexpr auto print_context_type(::fast_io::io_reserve_type_t<char_type, final_import_type_section_details_wrapper_t<Fs...>>) noexcept
-    { return ::fast_io::io_type_t<::uwvm2::parser::wasm::standard::wasm1::features::details::final_import_type_section_details_print::context>{}; }
+    { return ::fast_io::io_type_t<::uwvm2::parser::wasm::standard::wasm1::features::details::final_import_type_section_details_print::context<Fs...>>{}; }
 
     template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         requires details::final_import_type_section_details_print::context_body_supported<char_type, Fs...>
@@ -1567,8 +1587,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }(::std::make_index_sequence<sizeof...(Fs)>{});
     }
 
-    // Since multi-memory changes the parsing behavior, wasm1.1 uses the features of wasm1.0 for extension, so a freely controllable version is not provided
-    // here.
+    // A runtime policy overrides the compile-time default, including an explicit disable.
+    // Keep this generic so the MVP parser does not depend on the later feature's definition.
+    template <::std::size_t N, typename... Paras>
+    inline constexpr bool multi_memory_enabled_parameters(::uwvm2::utils::container::tuple<Paras...> const& paras, bool fallback) noexcept
+    {
+        if constexpr(N == sizeof...(Paras)) { return fallback; }
+        else
+        {
+            auto const& parameter{get<N>(paras)};
+            if constexpr(requires { parameter.disable_multi_memory; }) { return !parameter.disable_multi_memory; }
+            else { return multi_memory_enabled_parameters<N + 1uz>(paras, fallback); }
+        }
+    }
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr bool multi_memory_enabled(::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& paras) noexcept
+    { return multi_memory_enabled_parameters<0uz>(paras.parameters, allow_multi_memory<Fs...>()); }
 
     /////////////////////////////
     //      Global Section     //

@@ -1,0 +1,18 @@
+{
+  "candidate_applied": false,
+  "native_qualified": false,
+  "source_base": "ROS vendored LLVM23 current source; checked actual hashes",
+  "source_before": "/tmp/uwvm-llvm23-macho-unsigned-source-before-20261003-r1",
+  "files": [
+    {
+      "path": "llvm/lib/Object/RelocationResolver.cpp",
+      "source_before_sha256": "05ae3ffdb4b0dd445d327c5f4831c1e0947dd578132d3672ea41f14f7c8ee7da",
+      "source_candidate_sha256": "fff4847f88ac66fec522c77e78ae6c21054a9fafd4180d16dcc4cc1a29d1f35e"
+    },
+    {
+      "path": "llvm/lib/DebugInfo/DWARF/DWARFContext.cpp",
+      "source_before_sha256": "8e1e4ab17a2417be1eadc904aaae8383ce1de6048cd88e0284c6235b44628fc6",
+      "source_candidate_sha256": "f746ed8658209ae941ad24a55d81b957f8a1754a14bfa77c2719f06cdff2d59b"
+    }
+  ]
+}

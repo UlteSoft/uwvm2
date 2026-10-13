@@ -1,0 +1,41 @@
+diff --git a/llvm/include/llvm/IR/IRBuilder.h b/llvm/include/llvm/IR/IRBuilder.h
+index f2621bbe..4508b61c 100644
+--- a/llvm/include/llvm/IR/IRBuilder.h
++++ b/llvm/include/llvm/IR/IRBuilder.h
+@@ -994,6 +994,9 @@ public:
+                                          Name);
+   }
+ 
++  // Module-stable default callable for CreateIntrinsic.
++  static void noopIntrinsicSetFn(CallInst *) {}
++
+   /// Variant to create a possibly constant-folded intrinsic. An optional \p
+   /// SetFn is called if the intrinsic doesn't fold, and can be used to set
+   /// things like attributes.
+@@ -1001,7 +1004,7 @@ public:
+       Intrinsic::ID ID, ArrayRef<Type *> OverloadTypes, ArrayRef<Value *> Args,
+       FMFSource FMFSource = {}, const Twine &Name = "",
+       ArrayRef<OperandBundleDef> OpBundles = {},
+-      function_ref<void(CallInst *)> SetFn = [](CallInst *) {});
++      function_ref<void(CallInst *)> SetFn = noopIntrinsicSetFn);
+ 
+   /// Variant to create a possibly constant-folded intrinsic. An optional \p
+   /// SetFn is called if the intrinsic doesn't fold, and can be used to set
+@@ -1009,7 +1012,7 @@ public:
+   LLVM_ABI Value *CreateIntrinsic(
+       Type *RetTy, Intrinsic::ID ID, ArrayRef<Value *> Args,
+       FMFSource FMFSource = {}, const Twine &Name = "",
+-      function_ref<void(CallInst *)> SetFn = [](CallInst *) {});
++      function_ref<void(CallInst *)> SetFn = noopIntrinsicSetFn);
+ 
+   /// Variant to create a possibly constant-folded intrinsic. An optional \p
+   /// SetFn is called if the intrinsic doesn't fold, and can be used to set
+@@ -1017,7 +1020,7 @@ public:
+   Value *CreateIntrinsic(
+       Intrinsic::ID ID, ArrayRef<Value *> Args, FMFSource FMFSource = {},
+       const Twine &Name = "",
+-      function_ref<void(CallInst *)> SetFn = [](CallInst *) {}) {
++      function_ref<void(CallInst *)> SetFn = noopIntrinsicSetFn) {
+     return CreateIntrinsic(ID, /*Types=*/{}, Args, FMFSource, Name, {}, SetFn);
+   }
+ 

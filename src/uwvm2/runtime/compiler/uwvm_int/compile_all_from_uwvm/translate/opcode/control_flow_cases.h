@@ -45,6 +45,14 @@ case wasm1_code::nop:
 
     break;
 }
+#if defined(__clang__)
+# pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wswitch" // Core 3 opcode is intentionally outside the shared wasm1 enum.
+#endif
+case static_cast<wasm1_code>(0x1f): // Core 3 try_table
+#if defined(__clang__)
+# pragma clang diagnostic pop
+#endif
 case wasm1_code::block:
 {
     // A `block` creates a forward branch target whose label arity is its result type. We record the
@@ -65,7 +73,31 @@ case wasm1_code::block:
     // [safe] unsafe (could be the section_end)
     //        ^^ code_curr
 
+    if(curr_opbase == static_cast<wasm1_code>(0x1f))
+    { ::uwvm2::validation::standard::wasm3::require_exceptions_enabled(!wasm1p1_para.disable_exceptions, 0x1fu, op_begin, err); }
     auto const signature{parse_block_type(op_begin, u8"block")};
+    ::uwvm2::runtime::compiler::shared::wasm_exception_control::handlers exception_handlers{};
+    if(curr_opbase == static_cast<wasm1_code>(0x1f))
+    {
+        exception_handlers = ::uwvm2::runtime::compiler::shared::wasm_exception_control::read_handlers(
+            code_curr, code_end, op_begin, curr_module, control_flow_stack.size(),
+            [&](::std::size_t frame_index) constexpr noexcept
+            {
+                auto const& frame{control_flow_stack.index_unchecked(frame_index)};
+                return frame.label;
+            },
+            [&](::std::size_t frame_index, ::std::size_t value_index) noexcept
+            {
+                auto const& frame{control_flow_stack.index_unchecked(frame_index)};
+                return block_core_type_at(frame.label, frame.signature_type_index,
+                    frame.type != block_type::loop, frame.has_singleton_result_core_type,
+                    frame.singleton_result_core_type, value_index);
+            }, err);
+        // [try_table blocktype checked catch vector] next ... code_end
+        // [safe                                   ] unsafe (could be code_end)
+        //                                           ^^ code_curr: transactional decoder committed before publishing this frame.
+    }
+
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     // Large functions may enter tiered execution while looping. Emitting the poll at an outer
@@ -80,13 +112,26 @@ case wasm1_code::block:
             auto const result_begin{curr_func_type.result.begin};
             auto const result_end{curr_func_type.result.end};
             auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
-            if(result_count <= 1uz)
+            // OSR writes the complete function result at the empty operand-stack
+            // base. Reserve that full span even when this body's only exit is a
+            // tail transfer and its ordinary stack high-water mark is smaller.
             {
                 ::std::size_t result_bytes{};
-                if(result_count == 1uz) { result_bytes = operand_stack_valtype_size(result_begin[0]); }
-
-                if(result_count == 0uz || result_bytes != 0uz)
+                bool result_layout_valid{true};
+                for(::std::size_t index{}; index != result_count; ++index)
                 {
+                    // [validated result types ...] result_count; index is in range.
+                    // [safe                     ] no cursor escapes the type storage.
+                    auto const width{operand_stack_valtype_size(result_begin[index])};
+                    if(width == 0uz || width > (::std::numeric_limits<::std::size_t>::max)() - result_bytes)
+                    { result_layout_valid = false; break; }
+                    result_bytes += width;
+                }
+
+                if(result_layout_valid)
+                {
+                    if(result_bytes > runtime_operand_stack_byte_max) { runtime_operand_stack_byte_max = result_bytes; }
+                    if(result_count > runtime_operand_stack_max) { runtime_operand_stack_max = result_count; }
                     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                     using poll_imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
                     auto const request_countdown{
@@ -111,6 +156,7 @@ case wasm1_code::block:
 #endif
 
     enter_control_frame(op_begin, u8"block", block_type::block, signature, SIZE_MAX, new_label(false), SIZE_MAX);
+    control_flow_stack.back_unchecked().exception_handlers = ::std::move(exception_handlers);
 
     break;
 }
@@ -208,13 +254,26 @@ case wasm1_code::loop:
                      auto const result_begin{curr_func_type.result.begin};
                      auto const result_end{curr_func_type.result.end};
                      auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
-                     if(result_count <= 1uz)
+                     // OSR writes the complete function result at the empty operand-stack
+                     // base. Reserve that full span even when this body's only exit is a
+                     // tail transfer and its ordinary stack high-water mark is smaller.
                      {
                          ::std::size_t result_bytes{};
-                         if(result_count == 1uz) { result_bytes = operand_stack_valtype_size(result_begin[0]); }
-
-                         if(result_count == 0uz || result_bytes != 0uz)
+                         bool result_layout_valid{true};
+                         for(::std::size_t index{}; index != result_count; ++index)
                          {
+                             // [validated result types ...] result_count; index is in range.
+                             // [safe                     ] no cursor escapes the type storage.
+                             auto const width{operand_stack_valtype_size(result_begin[index])};
+                             if(width == 0uz || width > (::std::numeric_limits<::std::size_t>::max)() - result_bytes)
+                             { result_layout_valid = false; break; }
+                             result_bytes += width;
+                         }
+
+                         if(result_layout_valid)
+                         {
+                             if(result_bytes > runtime_operand_stack_byte_max) { runtime_operand_stack_byte_max = result_bytes; }
+                             if(result_count > runtime_operand_stack_max) { runtime_operand_stack_max = result_count; }
                              namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                              using poll_imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
                              auto const poll_policy{::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_counter_policy_for_function_size(
@@ -243,6 +302,21 @@ case wasm1_code::loop:
          }()};
 
     enter_control_frame(op_begin, u8"loop", block_type::loop, signature, loop_start_label_id, new_label(false), SIZE_MAX, code_curr);
+#if defined(UWVM_CPP_EXCEPTIONS)
+    {
+        // The loop's header was published after register-only entry normalization. Save that exact
+        // small cache state now: later try_table clauses can select this backward target.
+        auto& loop_frame{control_flow_stack.back_unchecked()};
+        loop_frame.stacktop_currpos_at_else_entry = curr_stacktop;
+        loop_frame.stacktop_memory_count_at_else_entry = stacktop_memory_count;
+        loop_frame.stacktop_cache_count_at_else_entry = stacktop_cache_count;
+        loop_frame.stacktop_cache_i32_count_at_else_entry = stacktop_cache_i32_count;
+        loop_frame.stacktop_cache_i64_count_at_else_entry = stacktop_cache_i64_count;
+        loop_frame.stacktop_cache_f32_count_at_else_entry = stacktop_cache_f32_count;
+        loop_frame.stacktop_cache_f64_count_at_else_entry = stacktop_cache_f64_count;
+    }
+#endif
+
 
     break;
 }
@@ -279,6 +353,9 @@ case wasm1_code::if_:
 
     if(auto const cond{try_pop_concrete_operand()}; !operand_type_matches(cond, curr_operand_stack_value_type::i32)) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.if_cond_type_not_i32.cond_type = to_wasm1_value_type(cond.type);
         err.err_code = code_validation_error_code::if_cond_type_not_i32;
@@ -453,6 +530,9 @@ case wasm1_code::else_:
 
     if(control_flow_stack.empty() || control_flow_stack.back_unchecked().type != block_type::if_) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_code = code_validation_error_code::illegal_else;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
@@ -469,6 +549,9 @@ case wasm1_code::else_:
 
     if(!is_polymorphic ? (actual_count != expected_count) : (actual_count > expected_count))
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
         err.err_selectable.if_then_result_mismatch.actual_count = actual_count;
@@ -500,8 +583,13 @@ case wasm1_code::else_:
         {
             auto const expected_type{if_frame.result.begin[expected_count - 1uz - i]};
             auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
-            if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
+            if(!block_value_matches(actual_operand, if_frame.result, if_frame.signature_type_index, true,
+                if_frame.has_singleton_result_core_type, if_frame.singleton_result_core_type,
+                expected_count - 1uz - i)) [[unlikely]]
             {
+                // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                 err.err_curr = op_begin;
                 err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
                 err.err_selectable.if_then_result_mismatch.actual_count = actual_count;
@@ -550,7 +638,8 @@ case wasm1_code::else_:
     set_label_offset(if_frame.else_label_id, bytecode.size());
 
     operand_stack_truncate_to(if_frame.operand_stack_base);
-    for(auto curr{if_frame.start.begin}; curr != if_frame.start.end; ++curr) { operand_stack_push(*curr); }
+    block_push_types(if_frame.start, if_frame.signature_type_index, false,
+        if_frame.has_singleton_result_core_type, if_frame.singleton_result_core_type);
     // As in the spec's push_ctrl(else, ...), the else-frame itself starts reachable.
     is_polymorphic = false;
     codegen_reachable = if_frame.codegen_entry_reachable;
@@ -567,9 +656,15 @@ case wasm1_code::else_:
             stacktop_cache_i64_count = if_frame.stacktop_cache_i64_count_at_else_entry;
             stacktop_cache_f32_count = if_frame.stacktop_cache_f32_count_at_else_entry;
             stacktop_cache_f64_count = if_frame.stacktop_cache_f64_count_at_else_entry;
-            sync_type_stacks_from_codegen_snapshot(if_frame.codegen_operand_stack_at_else_entry);
+            sync_type_stacks_from_codegen_snapshot(if_frame.codegen_operand_stack_at_else_entry, if_frame.codegen_entry_reachable);
         }
     }
+    // The saved pre-entry snapshot may be synthetic/dead and omit declared parameters.
+    // Rebuild after that restoration, never instead of a real incoming-edge snapshot.
+    stacktop_restore_dead_validation_model();
+    // Core 3 pop_ctrl resets non-defaultable locals initialized only in the then arm.
+    if(!initialized_locals.restore(if_frame.local_init_checkpoint)) [[unlikely]]
+    { ::fast_io::fast_terminate(); }
     if_frame.type = block_type::else_;
 
     break;
@@ -596,6 +691,9 @@ case wasm1_code::end:
 
     if(control_flow_stack.empty()) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.u8 = static_cast<::std::uint_least8_t>(curr_opbase);
         err.err_code = code_validation_error_code::illegal_opbase;
@@ -649,11 +747,26 @@ case wasm1_code::end:
         implicit_else_matches_result = start_count == expected_count;
         for(::std::size_t i{}; implicit_else_matches_result && i != expected_count; ++i)
         {
-            implicit_else_matches_result = frame.start.begin[i] == frame.result.begin[i];
+            auto const start_rich{block_core_type_at(frame.start, frame.signature_type_index, false,
+                frame.has_singleton_result_core_type, frame.singleton_result_core_type, i)};
+            auto const result_rich{block_core_type_at(frame.result, frame.signature_type_index, true,
+                frame.has_singleton_result_core_type, frame.singleton_result_core_type, i)};
+            auto const start_core{start_rich.has_type ? start_rich.type :
+                ::uwvm2::validation::standard::wasm3::core3_legacy_carrier_type(frame.start.begin[i])};
+            auto const result_core{result_rich.has_type ? result_rich.type :
+                ::uwvm2::validation::standard::wasm3::core3_legacy_carrier_type(frame.result.begin[i])};
+            auto const signatures{::uwvm2::validation::standard::wasm3::core3_signature_view<
+                ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_owned_signature_t>{rich_owned_begin,
+                    rich_owned_available ? runtime_type_count : 0uz}};
+            implicit_else_matches_result = frame.start.begin[i] == frame.result.begin[i] &&
+                runtime_core3_value_type_matches(start_core, result_core, signatures);
         }
     }
     if(frame.type == block_type::if_ && !implicit_else_matches_result) [[unlikely]]
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.if_missing_else.expected_count = expected_count;
         err.err_selectable.if_missing_else.expected_type =
@@ -668,6 +781,9 @@ case wasm1_code::end:
 
     if(!is_polymorphic ? (actual_count != expected_count) : (actual_count > expected_count))
     {
+        // [caller-saved opcode/prefix] immediate bytes ... | code_end
+        // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+        // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
         err.err_curr = op_begin;
         err.err_selectable.end_result_mismatch.block_kind = block_kind;
         err.err_selectable.end_result_mismatch.expected_count = expected_count;
@@ -700,8 +816,14 @@ case wasm1_code::end:
         {
             auto const expected_type{frame.result.begin[expected_count - 1uz - i]};
             auto const actual_operand{operand_stack.index_unchecked(stack_size - 1uz - i)};
-            if(!stack_entry_type_matches(actual_operand, expected_type)) [[unlikely]]
+            auto const matches{block_value_matches(actual_operand, frame.result, frame.signature_type_index, true,
+                frame.has_singleton_result_core_type, frame.singleton_result_core_type,
+                expected_count - 1uz - i)};
+            if(!matches) [[unlikely]]
             {
+                // [caller-saved opcode/prefix] immediate bytes ... | code_end
+                // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+                // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
                 err.err_curr = op_begin;
                 err.err_selectable.end_result_mismatch.block_kind = block_kind;
                 err.err_selectable.end_result_mismatch.expected_count = expected_count;
@@ -710,6 +832,74 @@ case wasm1_code::end:
                 err.err_selectable.end_result_mismatch.actual_type = to_wasm1_value_type(actual_operand.type);
                 err.err_code = code_validation_error_code::end_result_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+        }
+    }
+
+    // A branch to this end may arrive with a different register-ring cursor from a live
+    // fallthrough. In particular, a try_table catch-only predecessor starts with a freshly
+    // materialized payload, while a normal protected call can branch with its result cached.
+    // Normalize only the conflicting fallthrough edge to the already published branch state.
+    // This is translation-time selection: matching joins and functions without such a join
+    // emit no extra runtime instructions.
+    if constexpr(stacktop_enabled && !strict_cf_entry_like_call)
+    {
+        if(codegen_reachable && !is_polymorphic && frame.stacktop_has_end_state)
+        {
+            auto const& target_types{frame.codegen_operand_stack_at_end};
+            auto const& target_pos{frame.stacktop_currpos_at_end};
+            bool const same_state{
+                curr_stacktop.i32_stack_top_curr_pos == target_pos.i32_stack_top_curr_pos &&
+                curr_stacktop.i64_stack_top_curr_pos == target_pos.i64_stack_top_curr_pos &&
+                curr_stacktop.f32_stack_top_curr_pos == target_pos.f32_stack_top_curr_pos &&
+                curr_stacktop.f64_stack_top_curr_pos == target_pos.f64_stack_top_curr_pos &&
+                curr_stacktop.v128_stack_top_curr_pos == target_pos.v128_stack_top_curr_pos &&
+                stacktop_memory_count == frame.stacktop_memory_count_at_end &&
+                stacktop_cache_count == frame.stacktop_cache_count_at_end &&
+                stacktop_cache_i32_count == frame.stacktop_cache_i32_count_at_end &&
+                stacktop_cache_i64_count == frame.stacktop_cache_i64_count_at_end &&
+                stacktop_cache_f32_count == frame.stacktop_cache_f32_count_at_end &&
+                stacktop_cache_f64_count == frame.stacktop_cache_f64_count_at_end};
+            if(!same_state)
+            {
+                auto const count{codegen_operand_stack.size()};
+                if(count != target_types.size() || frame.stacktop_memory_count_at_end > count ||
+                   frame.stacktop_cache_count_at_end != count - frame.stacktop_memory_count_at_end) [[unlikely]]
+                { ::fast_io::fast_terminate(); }
+                for(::std::size_t index{}; index != count; ++index)
+                {
+                    if(codegen_operand_stack.index_unchecked(index).type != target_types.index_unchecked(index).type) [[unlikely]]
+                    { ::fast_io::fast_terminate(); }
+                }
+                // [live fallthrough operand frame][cached suffix] -> complete memory tuple.
+                // [safe                            ] the current type stack supplies every spill width.
+                stacktop_flush_all_to_operand_stack(bytecode);
+                // Empty caches make cursor reassignment a compiler-only operation. The target snapshot
+                // came from a validated branch to this exact frame and has the same carrier tuple.
+                curr_stacktop = target_pos;
+                codegen_operand_stack = target_types;
+                while(stacktop_memory_count != frame.stacktop_memory_count_at_end)
+                {
+                    auto const vt{codegen_operand_stack.index_unchecked(stacktop_memory_count - 1uz).type};
+                    if(!stacktop_enabled_for_vt(vt)) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const begin{stacktop_range_begin_pos(vt)};
+                    auto const end{stacktop_range_end_pos(vt)};
+                    auto const cached{stacktop_cache_count_for_range(begin, end)};
+                    if(cached >= end - begin) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const slot{stacktop_ring_advance_next(stacktop_currpos_for_range(begin, end), cached, begin, end)};
+                    // [fully materialized operand prefix][one complete value] -> cached target suffix.
+                    // [safe                            ^^^^^^^^^^^^^^^^^^^] the validated snapshot bounds each fill.
+                    emit_stacktop_fill1_typed_to(bytecode, slot, vt);
+                    --stacktop_memory_count;
+                    ++stacktop_cache_count;
+                    ++stacktop_cache_count_ref_for_vt(vt);
+                }
+                if(stacktop_cache_count != frame.stacktop_cache_count_at_end ||
+                   stacktop_cache_i32_count != frame.stacktop_cache_i32_count_at_end ||
+                   stacktop_cache_i64_count != frame.stacktop_cache_i64_count_at_end ||
+                   stacktop_cache_f32_count != frame.stacktop_cache_f32_count_at_end ||
+                   stacktop_cache_f64_count != frame.stacktop_cache_f64_count_at_end) [[unlikely]]
+                { ::fast_io::fast_terminate(); }
             }
         }
     }
@@ -748,7 +938,8 @@ case wasm1_code::end:
     }
 
     operand_stack_truncate_to(base);
-    for(::std::size_t i{}; i != expected_count; ++i) { operand_stack_push(frame.result.begin[i]); }
+    block_push_types(frame.result, frame.signature_type_index, true,
+        frame.has_singleton_result_core_type, frame.singleton_result_core_type);
 
     bool const codegen_fallthrough_before_merge{codegen_reachable};
     // Validation restores the enclosing frame's bottom flag, not the execution
@@ -790,7 +981,7 @@ case wasm1_code::end:
                     stacktop_cache_i64_count = frame.stacktop_cache_i64_count_at_else_entry;
                     stacktop_cache_f32_count = frame.stacktop_cache_f32_count_at_else_entry;
                     stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_else_entry;
-                    sync_type_stacks_from_codegen_snapshot(frame.codegen_operand_stack_at_else_entry);
+                    sync_type_stacks_from_codegen_snapshot(frame.codegen_operand_stack_at_else_entry, frame.codegen_entry_reachable);
                 }
                 else if(frame.type == block_type::else_ && !frame.then_polymorphic_end && frame.stacktop_has_then_end_state)
                 {
@@ -802,7 +993,7 @@ case wasm1_code::end:
                     stacktop_cache_i64_count = frame.stacktop_cache_i64_count_at_then_end;
                     stacktop_cache_f32_count = frame.stacktop_cache_f32_count_at_then_end;
                     stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_then_end;
-                    sync_type_stacks_from_codegen_snapshot(frame.codegen_operand_stack_at_then_end);
+                    sync_type_stacks_from_codegen_snapshot(frame.codegen_operand_stack_at_then_end, frame.stacktop_has_then_end_state);
                 }
                 else if(frame.stacktop_has_end_state)
                 {
@@ -815,7 +1006,7 @@ case wasm1_code::end:
                     stacktop_cache_i64_count = frame.stacktop_cache_i64_count_at_end;
                     stacktop_cache_f32_count = frame.stacktop_cache_f32_count_at_end;
                     stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_end;
-                    sync_type_stacks_from_codegen_snapshot(frame.codegen_operand_stack_at_end);
+                    sync_type_stacks_from_codegen_snapshot(frame.codegen_operand_stack_at_end, frame.stacktop_has_end_state);
                 }
             }
         }
@@ -824,64 +1015,190 @@ case wasm1_code::end:
     codegen_reachable = codegen_fallthrough_before_merge || frame.stacktop_has_end_state ||
                         frame.stacktop_has_then_end_state ||
                         (frame.type == block_type::if_ && frame.codegen_entry_reachable);
+#if defined(UWVM_CPP_EXCEPTIONS)
+    if(frame.type != block_type::loop && frame.exception_target_index != SIZE_MAX)
+    {
+        bool const exception_only_entry{!codegen_reachable};
+        if(exception_only_entry)
+        {
+            // EH is the only executable incoming edge. Validation has already restored the target
+            // tuple; select an empty cache for its successor, independent of unreachable stale state.
+            codegen_operand_stack = operand_stack;
+            stacktop_reset_currpos_to_begin();
+            stacktop_memory_count = codegen_operand_stack.size();
+            stacktop_cache_count = 0uz;
+            stacktop_cache_i32_count = stacktop_cache_i64_count = stacktop_cache_f32_count = stacktop_cache_f64_count = 0uz;
+        }
+        codegen_reachable = true;
+        exception_capture_end_state(frame);
+        if(exception_only_entry && !is_function_frame)
+        {
+            // This label accepts the empty-cache snapshot captured above. Numeric opfunc selection
+            // assumes canonical caches at ordinary instruction boundaries, so refill at the label
+            // before compiling its successor. EH thunks branch to this refill, never beyond it.
+            // Only the EH-only edge executes these loads; existing ordinary joins are unchanged.
+            stacktop_fill_to_canonical(bytecode);
+        }
+    }
+#endif
+    // All real ordinary/EH incoming edges have been resolved above. When none
+    // reaches this end, the specification still reifies the declared result tuple.
+    // Its memory-only accounting model emits no dead recovery instructions.
+    stacktop_restore_dead_validation_model();
+    // A branch-to-end restores a codegen snapshot whose carriers may predate the
+    // declared block result. Rebind the validation witness to the result tuple
+    // after every merge; this does not change guest values or emitted opfuncs.
+    if((rich_owned_available && frame.signature_type_index < runtime_type_count) ||
+       frame.has_singleton_result_core_type)
+    {
+        if(operand_stack.size() < expected_count) [[unlikely]] { ::fast_io::fast_terminate(); }
+        for(::std::size_t i{}; i != expected_count; ++i)
+        {
+            auto const rich{block_core_type_at(frame.result, frame.signature_type_index, true,
+                frame.has_singleton_result_core_type, frame.singleton_result_core_type, i)};
+            if(!rich.has_type) { continue; }
+            auto& value{operand_stack.index_unchecked(operand_stack.size() - expected_count + i)};
+            value.core_type = rich.type;
+            value.has_core_type = true;
+            if(codegen_operand_stack.size() >= expected_count)
+            {
+                auto& codegen_value{codegen_operand_stack.index_unchecked(codegen_operand_stack.size() - expected_count + i)};
+                codegen_value.core_type = rich.type;
+                codegen_value.has_core_type = true;
+            }
+        }
+    }
+    // Core 3 pop_ctrl does not export local.set effects from a nested frame.
+    if(!initialized_locals.restore(frame.local_init_checkpoint)) [[unlikely]]
+    { ::fast_io::fast_terminate(); }
     control_flow_stack.pop_back_unchecked();
 
     if(is_function_frame)
     {
         if(code_curr != code_end) [[unlikely]]
         {
+            // [caller-saved opcode/prefix] immediate bytes ... | code_end
+            // [dispatch-proven byte, where present       ] | one-past is not dereferenced
+            // ^^ op_begin -> err.err_curr: copy only; caller owns the opcode-span proof.
             err.err_curr = op_begin;
             err.err_code = code_validation_error_code::trailing_code_after_end;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
 
 #if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
-        // Extra-heavy mega-fuse: replace the whole reference ChaCha20 block function body with one opfunc.
-        // Matching is hash-based and intentionally strict so it never triggers accidentally.
+        // Extra-heavy mega-fuse is permitted only for the exact reference expression and its complete ABI.
         if constexpr(CompileOption.is_tail_call)
         {
-            auto const fnv1a64{[](::std::byte const* p, ::std::size_t n) constexpr noexcept -> ::std::uint_least64_t
-                               {
-                                   ::std::uint_least64_t h{0xcbf29ce484222325ull};
-                                   for(::std::size_t i{}; i != n; ++i)
-                                   {
-                                       h ^= static_cast<::std::uint_least64_t>(::std::to_integer<::std::uint_least8_t>(p[i]));
-                                       h *= 0x100000001b3ull;
-                                   }
-                                   return h;
-                               }};
-
-            constexpr ::std::uint_least64_t kChacha20RefExprHash{0x247b8526bda862aaull};
-            constexpr ::std::size_t kChacha20RefExprLen{770uz};
-            ::std::size_t const code_len{static_cast<::std::size_t>(code_end - code_begin)};
-            if(code_len == kChacha20RefExprLen && fnv1a64(code_begin, code_len) == kChacha20RefExprHash)
+            static constexpr ::std::byte kChacha20RefExpr[]{
+                ::std::byte{0x41u}, ::std::byte{0x9cu}, ::std::byte{0xbau}, ::std::byte{0xf8u}, ::std::byte{0xf8u}, ::std::byte{0x01u}, ::std::byte{0x21u}, ::std::byte{0x02u}, ::std::byte{0x41u}, ::std::byte{0x00u}, ::std::byte{0x21u}, ::std::byte{0x03u},
+                ::std::byte{0x41u}, ::std::byte{0xf4u}, ::std::byte{0xcau}, ::std::byte{0x81u}, ::std::byte{0xd9u}, ::std::byte{0x06u}, ::std::byte{0x21u}, ::std::byte{0x04u}, ::std::byte{0x41u}, ::std::byte{0x8cu}, ::std::byte{0x9au}, ::std::byte{0xb8u},
+                ::std::byte{0xf8u}, ::std::byte{0x00u}, ::std::byte{0x21u}, ::std::byte{0x05u}, ::std::byte{0x41u}, ::std::byte{0x98u}, ::std::byte{0xb2u}, ::std::byte{0xe8u}, ::std::byte{0xd8u}, ::std::byte{0x01u}, ::std::byte{0x21u}, ::std::byte{0x06u},
+                ::std::byte{0x41u}, ::std::byte{0x80u}, ::std::byte{0x80u}, ::std::byte{0x80u}, ::std::byte{0xd0u}, ::std::byte{0x04u}, ::std::byte{0x21u}, ::std::byte{0x07u}, ::std::byte{0x41u}, ::std::byte{0xb2u}, ::std::byte{0xdau}, ::std::byte{0x88u},
+                ::std::byte{0xcbu}, ::std::byte{0x07u}, ::std::byte{0x21u}, ::std::byte{0x08u}, ::std::byte{0x41u}, ::std::byte{0x88u}, ::std::byte{0x92u}, ::std::byte{0xa8u}, ::std::byte{0xd8u}, ::std::byte{0x00u}, ::std::byte{0x21u}, ::std::byte{0x09u},
+                ::std::byte{0x41u}, ::std::byte{0x94u}, ::std::byte{0xaau}, ::std::byte{0xd8u}, ::std::byte{0xb8u}, ::std::byte{0x01u}, ::std::byte{0x21u}, ::std::byte{0x0au}, ::std::byte{0x41u}, ::std::byte{0x80u}, ::std::byte{0x80u}, ::std::byte{0x80u},
+                ::std::byte{0xc8u}, ::std::byte{0x00u}, ::std::byte{0x21u}, ::std::byte{0x0bu}, ::std::byte{0x41u}, ::std::byte{0xeeu}, ::std::byte{0xc8u}, ::std::byte{0x81u}, ::std::byte{0x99u}, ::std::byte{0x03u}, ::std::byte{0x21u}, ::std::byte{0x0cu},
+                ::std::byte{0x41u}, ::std::byte{0x84u}, ::std::byte{0x8au}, ::std::byte{0x98u}, ::std::byte{0x38u}, ::std::byte{0x21u}, ::std::byte{0x0du}, ::std::byte{0x41u}, ::std::byte{0x90u}, ::std::byte{0xa2u}, ::std::byte{0xc8u}, ::std::byte{0x98u},
+                ::std::byte{0x01u}, ::std::byte{0x21u}, ::std::byte{0x0eu}, ::std::byte{0x41u}, ::std::byte{0xe5u}, ::std::byte{0xf0u}, ::std::byte{0xc1u}, ::std::byte{0x8bu}, ::std::byte{0x06u}, ::std::byte{0x21u}, ::std::byte{0x0fu}, ::std::byte{0x41u},
+                ::std::byte{0x80u}, ::std::byte{0x82u}, ::std::byte{0x88u}, ::std::byte{0x18u}, ::std::byte{0x21u}, ::std::byte{0x10u}, ::std::byte{0x41u}, ::std::byte{0x0au}, ::std::byte{0x21u}, ::std::byte{0x11u}, ::std::byte{0x20u}, ::std::byte{0x01u},
+                ::std::byte{0x21u}, ::std::byte{0x12u}, ::std::byte{0x03u}, ::std::byte{0x40u}, ::std::byte{0x20u}, ::std::byte{0x02u}, ::std::byte{0x20u}, ::std::byte{0x03u}, ::std::byte{0x20u}, ::std::byte{0x04u}, ::std::byte{0x20u}, ::std::byte{0x05u},
+                ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x04u}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x10u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x03u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x02u},
+                ::std::byte{0x20u}, ::std::byte{0x05u}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x0cu}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x05u}, ::std::byte{0x20u}, ::std::byte{0x04u}, ::std::byte{0x6au}, ::std::byte{0x22u},
+                ::std::byte{0x13u}, ::std::byte{0x20u}, ::std::byte{0x0eu}, ::std::byte{0x20u}, ::std::byte{0x12u}, ::std::byte{0x20u}, ::std::byte{0x0fu}, ::std::byte{0x20u}, ::std::byte{0x10u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x04u},
+                ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x10u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x0fu}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x0eu}, ::std::byte{0x20u}, ::std::byte{0x10u}, ::std::byte{0x73u},
+                ::std::byte{0x41u}, ::std::byte{0x0cu}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x10u}, ::std::byte{0x20u}, ::std::byte{0x04u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x14u}, ::std::byte{0x20u}, ::std::byte{0x0fu},
+                ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x08u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x0fu}, ::std::byte{0x20u}, ::std::byte{0x0eu}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x0eu}, ::std::byte{0x20u},
+                ::std::byte{0x10u}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x07u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x10u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x04u}, ::std::byte{0x20u}, ::std::byte{0x06u},
+                ::std::byte{0x20u}, ::std::byte{0x07u}, ::std::byte{0x20u}, ::std::byte{0x08u}, ::std::byte{0x20u}, ::std::byte{0x09u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x08u}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x10u},
+                ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x07u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x06u}, ::std::byte{0x20u}, ::std::byte{0x09u}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x0cu}, ::std::byte{0x77u},
+                ::std::byte{0x22u}, ::std::byte{0x09u}, ::std::byte{0x20u}, ::std::byte{0x08u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x08u}, ::std::byte{0x20u}, ::std::byte{0x07u}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x08u},
+                ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x12u}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x10u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x07u}, ::std::byte{0x20u}, ::std::byte{0x0au}, ::std::byte{0x20u},
+                ::std::byte{0x0bu}, ::std::byte{0x20u}, ::std::byte{0x0cu}, ::std::byte{0x20u}, ::std::byte{0x0du}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x0cu}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x10u}, ::std::byte{0x77u},
+                ::std::byte{0x22u}, ::std::byte{0x0bu}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x0au}, ::std::byte{0x20u}, ::std::byte{0x0du}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x0cu}, ::std::byte{0x77u}, ::std::byte{0x22u},
+                ::std::byte{0x0du}, ::std::byte{0x20u}, ::std::byte{0x0cu}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x0cu}, ::std::byte{0x20u}, ::std::byte{0x0bu}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x08u}, ::std::byte{0x77u},
+                ::std::byte{0x22u}, ::std::byte{0x0bu}, ::std::byte{0x20u}, ::std::byte{0x0au}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x15u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x0au}, ::std::byte{0x20u}, ::std::byte{0x10u},
+                ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x0cu}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x10u}, ::std::byte{0x20u}, ::std::byte{0x04u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x04u}, ::std::byte{0x20u},
+                ::std::byte{0x07u}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x08u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x07u}, ::std::byte{0x20u}, ::std::byte{0x0au}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x0au},
+                ::std::byte{0x20u}, ::std::byte{0x10u}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x07u}, ::std::byte{0x77u}, ::std::byte{0x21u}, ::std::byte{0x10u}, ::std::byte{0x20u}, ::std::byte{0x13u}, ::std::byte{0x20u}, ::std::byte{0x03u},
+                ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x08u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x03u}, ::std::byte{0x20u}, ::std::byte{0x02u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x02u}, ::std::byte{0x20u},
+                ::std::byte{0x05u}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x07u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x05u}, ::std::byte{0x20u}, ::std::byte{0x08u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x08u},
+                ::std::byte{0x20u}, ::std::byte{0x0bu}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x10u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x0bu}, ::std::byte{0x20u}, ::std::byte{0x0eu}, ::std::byte{0x6au}, ::std::byte{0x22u},
+                ::std::byte{0x0eu}, ::std::byte{0x20u}, ::std::byte{0x05u}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x0cu}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x05u}, ::std::byte{0x20u}, ::std::byte{0x08u}, ::std::byte{0x6au},
+                ::std::byte{0x22u}, ::std::byte{0x08u}, ::std::byte{0x20u}, ::std::byte{0x0bu}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x08u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x0bu}, ::std::byte{0x20u}, ::std::byte{0x0eu},
+                ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x0eu}, ::std::byte{0x20u}, ::std::byte{0x05u}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x07u}, ::std::byte{0x77u}, ::std::byte{0x21u}, ::std::byte{0x05u}, ::std::byte{0x20u},
+                ::std::byte{0x02u}, ::std::byte{0x20u}, ::std::byte{0x12u}, ::std::byte{0x20u}, ::std::byte{0x06u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x06u}, ::std::byte{0x20u}, ::std::byte{0x09u}, ::std::byte{0x73u}, ::std::byte{0x41u},
+                ::std::byte{0x07u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x09u}, ::std::byte{0x20u}, ::std::byte{0x0cu}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x0cu}, ::std::byte{0x20u}, ::std::byte{0x0fu}, ::std::byte{0x73u},
+                ::std::byte{0x41u}, ::std::byte{0x10u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x0fu}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x02u}, ::std::byte{0x20u}, ::std::byte{0x09u}, ::std::byte{0x73u}, ::std::byte{0x41u},
+                ::std::byte{0x0cu}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x09u}, ::std::byte{0x20u}, ::std::byte{0x0cu}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x0cu}, ::std::byte{0x20u}, ::std::byte{0x0fu}, ::std::byte{0x73u},
+                ::std::byte{0x41u}, ::std::byte{0x08u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x12u}, ::std::byte{0x20u}, ::std::byte{0x02u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x02u}, ::std::byte{0x20u}, ::std::byte{0x09u},
+                ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x07u}, ::std::byte{0x77u}, ::std::byte{0x21u}, ::std::byte{0x09u}, ::std::byte{0x20u}, ::std::byte{0x03u}, ::std::byte{0x20u}, ::std::byte{0x15u}, ::std::byte{0x20u}, ::std::byte{0x0du},
+                ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x07u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x0du}, ::std::byte{0x20u}, ::std::byte{0x14u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x0fu}, ::std::byte{0x73u},
+                ::std::byte{0x41u}, ::std::byte{0x10u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x03u}, ::std::byte{0x20u}, ::std::byte{0x06u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x06u}, ::std::byte{0x20u}, ::std::byte{0x0du},
+                ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x0cu}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x0du}, ::std::byte{0x20u}, ::std::byte{0x0fu}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x0fu}, ::std::byte{0x20u},
+                ::std::byte{0x03u}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x08u}, ::std::byte{0x77u}, ::std::byte{0x22u}, ::std::byte{0x03u}, ::std::byte{0x20u}, ::std::byte{0x06u}, ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x06u},
+                ::std::byte{0x20u}, ::std::byte{0x0du}, ::std::byte{0x73u}, ::std::byte{0x41u}, ::std::byte{0x07u}, ::std::byte{0x77u}, ::std::byte{0x21u}, ::std::byte{0x0du}, ::std::byte{0x20u}, ::std::byte{0x11u}, ::std::byte{0x41u}, ::std::byte{0x7fu},
+                ::std::byte{0x6au}, ::std::byte{0x22u}, ::std::byte{0x11u}, ::std::byte{0x0du}, ::std::byte{0x00u}, ::std::byte{0x0bu}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x03u}, ::std::byte{0x36u}, ::std::byte{0x02u},
+                ::std::byte{0x3cu}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x07u}, ::std::byte{0x41u}, ::std::byte{0x80u}, ::std::byte{0x80u}, ::std::byte{0x80u}, ::std::byte{0xd0u}, ::std::byte{0x04u}, ::std::byte{0x6au},
+                ::std::byte{0x36u}, ::std::byte{0x02u}, ::std::byte{0x38u}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x0bu}, ::std::byte{0x41u}, ::std::byte{0x80u}, ::std::byte{0x80u}, ::std::byte{0x80u}, ::std::byte{0xc8u},
+                ::std::byte{0x00u}, ::std::byte{0x6au}, ::std::byte{0x36u}, ::std::byte{0x02u}, ::std::byte{0x34u}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x01u}, ::std::byte{0x20u}, ::std::byte{0x12u}, ::std::byte{0x6au},
+                ::std::byte{0x36u}, ::std::byte{0x02u}, ::std::byte{0x30u}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x02u}, ::std::byte{0x41u}, ::std::byte{0x9cu}, ::std::byte{0xbau}, ::std::byte{0xf8u}, ::std::byte{0xf8u},
+                ::std::byte{0x01u}, ::std::byte{0x6au}, ::std::byte{0x36u}, ::std::byte{0x02u}, ::std::byte{0x2cu}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x06u}, ::std::byte{0x41u}, ::std::byte{0x98u}, ::std::byte{0xb2u},
+                ::std::byte{0xe8u}, ::std::byte{0xd8u}, ::std::byte{0x01u}, ::std::byte{0x6au}, ::std::byte{0x36u}, ::std::byte{0x02u}, ::std::byte{0x28u}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x0au}, ::std::byte{0x41u},
+                ::std::byte{0x94u}, ::std::byte{0xaau}, ::std::byte{0xd8u}, ::std::byte{0xb8u}, ::std::byte{0x01u}, ::std::byte{0x6au}, ::std::byte{0x36u}, ::std::byte{0x02u}, ::std::byte{0x24u}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u},
+                ::std::byte{0x0eu}, ::std::byte{0x41u}, ::std::byte{0x90u}, ::std::byte{0xa2u}, ::std::byte{0xc8u}, ::std::byte{0x98u}, ::std::byte{0x01u}, ::std::byte{0x6au}, ::std::byte{0x36u}, ::std::byte{0x02u}, ::std::byte{0x20u}, ::std::byte{0x20u},
+                ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x05u}, ::std::byte{0x41u}, ::std::byte{0x8cu}, ::std::byte{0x9au}, ::std::byte{0xb8u}, ::std::byte{0xf8u}, ::std::byte{0x00u}, ::std::byte{0x6au}, ::std::byte{0x36u}, ::std::byte{0x02u},
+                ::std::byte{0x1cu}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x09u}, ::std::byte{0x41u}, ::std::byte{0x88u}, ::std::byte{0x92u}, ::std::byte{0xa8u}, ::std::byte{0xd8u}, ::std::byte{0x00u}, ::std::byte{0x6au},
+                ::std::byte{0x36u}, ::std::byte{0x02u}, ::std::byte{0x18u}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x0du}, ::std::byte{0x41u}, ::std::byte{0x84u}, ::std::byte{0x8au}, ::std::byte{0x98u}, ::std::byte{0x38u},
+                ::std::byte{0x6au}, ::std::byte{0x36u}, ::std::byte{0x02u}, ::std::byte{0x14u}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x10u}, ::std::byte{0x41u}, ::std::byte{0x80u}, ::std::byte{0x82u}, ::std::byte{0x88u},
+                ::std::byte{0x18u}, ::std::byte{0x6au}, ::std::byte{0x36u}, ::std::byte{0x02u}, ::std::byte{0x10u}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x04u}, ::std::byte{0x41u}, ::std::byte{0xf4u}, ::std::byte{0xcau},
+                ::std::byte{0x81u}, ::std::byte{0xd9u}, ::std::byte{0x06u}, ::std::byte{0x6au}, ::std::byte{0x36u}, ::std::byte{0x02u}, ::std::byte{0x0cu}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x08u}, ::std::byte{0x41u},
+                ::std::byte{0xb2u}, ::std::byte{0xdau}, ::std::byte{0x88u}, ::std::byte{0xcbu}, ::std::byte{0x07u}, ::std::byte{0x6au}, ::std::byte{0x36u}, ::std::byte{0x02u}, ::std::byte{0x08u}, ::std::byte{0x20u}, ::std::byte{0x00u}, ::std::byte{0x20u},
+                ::std::byte{0x0cu}, ::std::byte{0x41u}, ::std::byte{0xeeu}, ::std::byte{0xc8u}, ::std::byte{0x81u}, ::std::byte{0x99u}, ::std::byte{0x03u}, ::std::byte{0x6au}, ::std::byte{0x36u}, ::std::byte{0x02u}, ::std::byte{0x04u}, ::std::byte{0x20u},
+                ::std::byte{0x00u}, ::std::byte{0x20u}, ::std::byte{0x0fu}, ::std::byte{0x41u}, ::std::byte{0xe5u}, ::std::byte{0xf0u}, ::std::byte{0xc1u}, ::std::byte{0x8bu}, ::std::byte{0x06u}, ::std::byte{0x6au}, ::std::byte{0x36u}, ::std::byte{0x02u},
+                ::std::byte{0x00u}, ::std::byte{0x0bu},
+            };
+            static_assert(sizeof(kChacha20RefExpr) == 770uz);
+            // The fused walker already proved [code_begin, code_end) belongs to this function and reached its exclusive end.
+            // [complete validated expression] | code_end
+            // [safe: size equality below    ] | exclusive end is never dereferenced
+            // ^^ code_begin: exact bytes are compared only after the complete extent proof; no pointer advances.
+            auto const code_len{static_cast<::std::size_t>(code_end - code_begin)};
+            bool exact_abi{func_parameter_count_uz == 2uz && curr_func_type.result.begin == curr_func_type.result.end &&
+                           all_local_count == 22u};
+            if(exact_abi)
             {
-                // Validate parameter locals are i32.
-                if(func_parameter_count_uz >= 2uz && local_type_from_index(0u) == curr_operand_stack_value_type::i32 &&
-                   local_type_from_index(1u) == curr_operand_stack_value_type::i32)
+                // Exactly two parameters and twenty declared locals are present. Every queried index is below the proved 22.
+                for(wasm_u32 local_index{}; local_index != 22u; ++local_index)
                 {
-                    ensure_memory0_resolved();
-                    namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-
-                    // Drop the previously generated bytecode and emit only:
-                    //   [mega-op][return]
-                    bytecode.clear();
-                    labels.clear();
-                    ptr_fixups.clear();
-                    thunks.clear();
-
-                    emit_opfunc_to(bytecode,
-                                   translate::get_uwvmint_chacha20_block_fixed_key_run_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                    emit_imm_to(bytecode, local_offset_from_index(0u));  // out_ptr
-                    emit_imm_to(bytecode, local_offset_from_index(1u));  // counter
-                    emit_imm_to(bytecode, resolved_memory0.memory_p);    // memory0
+                    if(local_type_from_index(local_index) != curr_operand_stack_value_type::i32) { exact_abi = false; break; }
                 }
+            }
+            if(exact_abi && code_len == sizeof(kChacha20RefExpr) &&
+               ::fast_io::freestanding::my_memcmp(code_begin, kChacha20RefExpr, sizeof(kChacha20RefExpr)) == 0)
+            {
+                ensure_memory_resolved();
+                namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+                // Drop the previously generated bytecode and emit only:
+                //   [mega-op][return]
+                bytecode.clear();
+                labels.clear();
+                ptr_fixups.clear();
+                thunks.clear();
+
+                emit_opfunc_to(bytecode,
+                               translate::get_uwvmint_chacha20_block_fixed_key_run_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(bytecode, local_offset_from_index(0u));  // out_ptr
+                emit_imm_to(bytecode, local_offset_from_index(1u));  // counter
+                emit_imm_to(bytecode, resolved_memory.memory_p);    // memory0
             }
         }
 #endif
 
         // Function end: emit `return` at the function end label.
         emit_return_to(bytecode);
+#if defined(UWVM_CPP_EXCEPTIONS)
+        emit_exception_thunks();
+#endif
 
         // Finalize thunks and patch all `[byte const*]` immediates:
         // - First pass: fill rel_offset_t placeholders with absolute offsets from bytecode begin.
@@ -919,6 +1236,12 @@ case wasm1_code::end:
             rel_offset_t const ptr_bits{::std::bit_cast<rel_offset_t>(target_ptr)};
             ::std::memcpy(bytecode_begin_mut_ptr + site_abs, ::std::addressof(ptr_bits), sizeof(ptr_bits));
         }
+
+#if defined(UWVM_CPP_EXCEPTIONS)
+        // All bytecode buffers are now final. Publish immutable call descriptors and their bounded
+        // pointer immediates only after the cold targets and branch relocations are resolved.
+        finalize_exception_metadata(main_size);
+#endif
 
         if(runtime_log_on && runtime_log_emit_func_stats) [[unlikely]]
         {

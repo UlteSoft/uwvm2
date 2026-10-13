@@ -1,0 +1,13 @@
+(module
+  (tag $a (param i32))
+  (tag $b (param i32))
+  (func $throw_b (result i32) i32.const 41 throw $b)
+  (func $nested (result i32)
+    (block $outer (result i32)
+      (try_table (result i32) (catch $b $outer)
+        (block $inner (result i32)
+          (try_table (result i32) (catch $a $inner)
+            call $throw_b))
+        i32.const 900 i32.add)))
+  (func (export "run") (result i32) call $nested)
+)

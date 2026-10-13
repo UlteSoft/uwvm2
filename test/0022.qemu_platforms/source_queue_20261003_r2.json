@@ -1,0 +1,87 @@
+{
+  "execution_requires_shared_ticket_and_original_pidfd_guard": true,
+  "executor": "/root/qemu_platform_tests",
+  "kind": "source-and-exact-component-evidence-queue",
+  "linux_keeper_retains_pcore_bench_and_vtune": true,
+  "mac_native_execution": false,
+  "outer_cgroup_memory_max": 68719476736,
+  "previous_source_queue_preserved": "source_queue_20261003.json",
+  "schema": "uwvm-qemu-source-queue-20261003-r2",
+  "source_queue": [
+    {
+      "actual_composite_source_archive_sha256": "8410f8446ec6091050f5b4e1d3eee8336bf332c13dbddce2021353822d13d3ee",
+      "actual_result": "checkpoint_s390x_clang22_r1_actual_20261003.json",
+      "artifact": "/tmp/uwvm-debug-checkpoint-source-frozen-20261003-r4/source-candidate.tar.gz",
+      "artifact_bytes": 59940,
+      "artifact_sha256": "faca23801eda3d71d3862feb6a870d81a833001dbe88880f392b95a7c498a2f5",
+      "name": "checkpoint-schema3-formatter-fixed",
+      "native_execution_accepted": true,
+      "scope": "standaloneGNU-codec-fourBEcells-no-fullVMrestore-or-product-ABIqualification",
+      "state": "standalone-BE-component-qualified-exact-composite-R4-plus-approved-SHA-fix"
+    },
+    {
+      "artifact": "/tmp/uwvm-gc-single-cas-publication-source-20261003-r1/source.tar.gz",
+      "artifact_bytes": 149804,
+      "artifact_sha256": "ac8da47452985f24cc47827f0cc738af54d1faf43a4857fd6ddb5d388fc13ec5",
+      "name": "gc-single-cas-publication",
+      "native_execution_accepted": false,
+      "scope": "publicationmacrooff-on",
+      "state": "source-only"
+    },
+    {
+      "artifact": "/tmp/uwvm-gc-data-fastio-source-20261003-r3/source.tar.gz",
+      "artifact_bytes": 296702,
+      "artifact_sha256": "d0f23f66cd4fc463f39d2c3e076f93d212afd3d77ba2b604bbaa459393c3232c",
+      "name": "gc-packed-data-fastio-big-endian",
+      "native_execution_accepted": false,
+      "scope": "scalar-packed-v128-nativeBE",
+      "state": "source-only"
+    },
+    {
+      "artifact": "/tmp/uwvm-gc-native-dense-source-20261003-r2/source.tar.gz",
+      "artifact_bytes": 170394,
+      "artifact_sha256": "328ae09b4f1809da1cbcb6c94ef834dbf8f59a865137cd29946d25504912ca67",
+      "name": "gc-dense64-65",
+      "native_execution_accepted": false,
+      "scope": "inline-metadata-correctness",
+      "state": "source-only"
+    },
+    {
+      "artifact": "/tmp/uwvm-native-windows-raii-source-frozen-20261003-r1.tar.gz",
+      "artifact_bytes": 44121,
+      "artifact_sha256": "dcd5ed14e1ad2b217634c3aa26cede22588c239fe2879755bcc9d900418d55b9",
+      "name": "native-windows-raii",
+      "native_execution_accepted": false,
+      "scope": "standalone-VEH-GPR-cancel-death",
+      "state": "source-only"
+    },
+    {
+      "artifact": "/tmp/uwvm-native-loaded-provenance-source-frozen-20261003-r1.tar.gz",
+      "artifact_bytes": 450835,
+      "artifact_sha256": "c0f6e2a524669327b463093d431d0e192ddf3f6dd78efaf744d105f11db6e0a5",
+      "name": "native-loaded-provenance",
+      "native_execution_accepted": false,
+      "scope": "ELF-COFF-MachO-object-data",
+      "state": "source-only"
+    },
+    {
+      "artifact": "/tmp/uwvm-qemu-windows-raii-source-frozen-20261003-r1/source.tar.gz",
+      "artifact_bytes": 4416065,
+      "artifact_sha256": "180dacb4528cedee57cefcecf3266d7c20a5ac1ffc2fa6974432d88d2b8d624a",
+      "manifest_sha256": "2893d8263494c435c7ad6d4e4eac31b3722fea05447f8b3a3c9e621379f55be9",
+      "name": "windows-raii-current-complete-header-closure",
+      "native_execution_accepted": false,
+      "scope": "standalone-VEH-GPR-cancel-four-death-children-freshPE-needed",
+      "state": "source-only"
+    },
+    {
+      "artifact": "/tmp/uwvm-gc-immutable-chain-source-20261003-r1/source.tar.gz",
+      "artifact_bytes": 188273,
+      "artifact_sha256": "61eb74d21cd1d8a1aa03088d2888423b05cd2a4730566b056e2c4dd9bf0ea73e",
+      "name": "gc-immutable-chain-cold",
+      "native_execution_accepted": false,
+      "scope": "newBE-and-ISA32-SDK-free-store-cold-component",
+      "state": "source-only"
+    }
+  ]
+}

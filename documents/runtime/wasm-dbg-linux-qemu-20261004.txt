@@ -1,0 +1,232 @@
+Linux QEMU 跨架构 Wasm DBG 测试，2026-10-04
+
+结论
+本轮不能确认所有 Linux 架构的调试体验与 x86_64 一样。
+普通版 AArch64、RISC-V64 已运行当前冻结源码构建出的完整 VM：
+每种架构通过 20 个精确操作数栈正例、56 个 Core 3 调试 smoke 场景。
+RISC-V64 的 instruction/unwind 两种策略均通过热替换脚本测试。
+AArch64 的 instruction 策略通过，unwind 策略回溯截断，热替换被拒绝。
+其他架构通过的是下面明确列出的 DATA 组件测试；不能据此宣称完整 VM 通过。
+
+架构结果
+架构                         字节序/位宽       两仓库 DATA 组件     普通版完整 VM DBG
+aarch64-linux-gnu             LE / 64          通过                  已测，有 unwind 热替换差异
+riscv64-linux-gnu             LE / 64          通过                  已测，所列正例通过
+i686-linux-gnu                LE / 32          通过                  当前构建未完成，内存预算受限
+powerpc64-linux-gnu           BE / 64 ELFv1    通过                  缺目标主机 LLVM 库，未验证
+powerpc64le-linux-gnu         LE / 64 ELFv2    通过                  缺目标主机 LLVM 库，未验证
+mips64-linux-gnuabi64         BE / 64          通过                  缺目标主机 LLVM 库，未验证
+mips64el-linux-gnuabi64       LE / 64          通过                  缺目标主机 LLVM 库，未验证
+sparc64-linux-gnu             BE / 64          通过                  当前源码明确禁用 LLVM JIT
+loongarch64-linux-gnu         LE / 64          通过                  缺目标主机 LLVM 库，未验证
+s390x-linux-gnu               BE / 64          通过                  缺目标主机 LLVM 库，未验证
+将请求中的 sparx 按 SPARC64 处理；另覆盖了 PPC64LE、MIPS64EL、s390x。
+“缺库”是本测试环境的依赖缺口，不等于对应架构在产品中不受支持。
+
+ROS 的边界
+两仓库在上述 10 种架构共完成 40 个 DATA 组件 executable 测试、
+20 个能力/ABI executable 测试。ROS 的当前完整产品没有获得跨架构验收。
+ROS 强制要求真正的 23.1.1-uwvm-ros.10 目标主机库；现有 AArch64、
+RISC-V64、i686 库是 .9，不能冒充 .10。三次实际负向编译均被版本
+static_assert 正确拒绝。现有 x86_64 的 .10 库不能链接到其他 ISA。
+普通版允许 .9 外部 LLVM，本轮两个完整 VM 用的正是这个合法配置。
+没有放松 ROS 版本检查，也没有将旧 provider 改版本后当成新 provider。
+
+完整 VM 的具体覆盖
+20 个操作数栈正例 = 10 个 fixture × instruction/unwind 两种调用栈策略。
+逐项核对类型、索引和值，而非仅判断命令返回成功：
+- 混合 i32/i64/f32/f64/v128，负零、NaN payload 位模式；
+- struct、array、i31、typed function、null extern reference；
+- if 的两条分支、外层保留的操作数、loop PHI/backedge；
+- multivalue 调用结果、真实 caller waiting prefix、tail-call 帧消除；
+- exception payload/prefix；
+- atomic RMW/load、wait 超时的参数和结果；
+- 300 个不同的活跃值，逐页还原全部内容，包括索引 256 以上的值。
+
+CLI 为 operands THREAD [FRAME [FIRST COUNT]]，frame 0 是当前叶帧，
+索引按栈底到栈顶排列；每次最多返回 64 行，可分页，不能把 64 行
+查询上限误认为捕获截断。停点描述的是执行对应 Wasm opcode 之前的状态。
+本轮沿用了上轮 x86_64 的 fixture 和值检查方法；x86_64 上轮的源码
+快照不同，本轮没有再将当前同一快照的 x86_64 全量运行算入数量。
+
+56 个 Core 3 smoke 场景 = 28 个 fixture × 两种调用栈策略，分别在
+AArch64、RISC-V64 全部通过，共 112 个实际 VM 场景。覆盖 scalar、
+multivalue、bulk-memory、table/reference、SIMD、relaxed SIMD、
+extended const、direct/indirect/ref tail-call、exception/exception-all、
+multimemory、memory64/table64、typed reference branches、GC struct/
+array/cast/const/element、atomic RMW、wait32/wait64、atomic memory64、
+annotation 等类别。
+这是有针对性的 smoke 矩阵，不是 Core 3 所有指令组合的穷尽验证；
+wait 超时和 atomic 用例也不等于真实并发线程、notify/唤醒竞态均已验收。
+本轮没有把 language level、asm level、WASIP1 的完整验收算作通过。
+
+AArch64 热替换差异
+相同 fixture 的 instruction 策略：
+  bt 1                         可获得所需调用栈
+  replace 0 0 1 .../valid.bin   function replaced; generation 2
+unwind 策略：
+  bt 1                         backtrace truncated
+  replace 0 0 1 .../valid.bin   error: command or thread is not valid in the current execution state
+脚本接口同样返回 invalid_state。该结果发生在本轮当前源码 + .9 外部
+目标库的组合中。回溯不完整使控制器无法证明目标函数不是活跃帧，
+不能绕过这个检查来伪造热替换成功；该差异仍未修复。
+原始记录：aarch64-hot-diag-instruction.log、aarch64-hot-diag-unwind.log、
+aarch64-replacement-script/results.json。
+RISC-V64 对应的两个脚本策略都通过。
+
+操作数预览仍有的限制
+每个 ISA 另有两次 workspace quota 用例，valid Wasm 声明 1000 个 i32
+locals，而实际只有 i32=123/i64=456 两个活跃操作数。函数可以继续执行，
+但超出 32 KiB native checkpoint workspace 后，预览返回：
+  Wasm state unavailable: this control or exception site has no complete typed packet
+四次 quota 测试“通过”的含义是正确观察到拒绝；结果明确记录
+complete_preview_requirement_met=false。不能将其算成完整栈预览通过。
+这个限制与上轮 x86_64 的发现一致，仍未修复。
+
+非 dbg 的代码生成
+每种 ISA 捕获 dbg off/on 两个真实 MCJIT ELF object，再用官方工具链
+llvm-objdump 检查。off 的采样数值叶函数：
+AArch64：8 字节
+  add x0, x1, w0, sxtw
+  ret
+RISC-V64：6 字节（含压缩指令）
+  sext.w a0, a0
+  add a0, a0, a1
+  ret
+这些函数没有操作数 packet 写入、debug callback 或 debug probe；
+on 版本确实包含写入和回调，且查询出的值正确。
+这支持“所采样的普通 guest 函数没有新增调试插桩”，不是全程序绝对
+零开销或性能 benchmark。host 入口的 runtime_debug_execution_scope
+仍有 TLS/control 检查；测试二进制另外编译了 object capture hook。
+没有据此宣称其他尚未运行完整 VM 的 ISA 也通过了同样的性能检查。
+
+DATA 组件的准确含义
+debug_wasm_state_view.cc：51 项 grammar/格式检查，标量/ref/v128 展示、
+分页等，输入是构造的 copied data。
+debug_checkpoint_dynamic_native_packet.cc：构造 typed native packet，
+检查复制、初始化标志、NaN/vector/ref 位模式。
+二者不是实际 guest 捕获/恢复测试，不构成完整 checkpoint 验收。
+能力 probe 确认 pointer 位宽、端序和 typed slot 大小；i686 的 reference
+carrier 为 8 字节，其他目标为 16 字节，typed slot 均为 16 字节。
+“LLVM JIT enabled/disabled”来自编译宏策略，不证明 LLVM 链接/运行。
+所有 60 个最终组件 ELF 的 machine、class、data endian 又经过核对。
+
+SPARC 与 asm level
+src/uwvm2/uwvm/runtime/macro/push_macros.h 对 SPARC/SPARC64 不启用
+UWVM_RUNTIME_LLVM_JIT，注释说明 MCJIT/RuntimeDyld 在最小函数上会 abort。
+本轮实际编译/QEMU capability probe 确认了这条禁用策略。
+src/uwvm2/runtime/lib/uwvm_runtime.default.cpp 的 native step platform
+gate 在 Linux 只放行 x86_64。因此不能宣称其他 Linux ISA 原生 asm
+单步接近 x86_64 体验。链接冷反汇编组件与放行机器单步是两件不同的事。
+本轮没有通过 asm 调试进入 VM 本身或其 host 上下文。
+
+修复与同步
+1. 两仓库 source_dwarf_types.h：
+   将 std::vector<location_piece> pieces{}; 改为 pieces;，保留空 vector
+   默认构造，延迟在 location_piece 完整之前的 special-member 实例化。
+   实际 AArch64/GCC15 libstdc++ 前端错误因此消除；AArch64/RISC-V64
+   当前完整 main/runtime/host-api 编译与运行已验证普通版的该修复。
+2. 两仓库的 operand preview、codegen、Core3 matrix、replacement script
+   Python harness 同步支持 --runner-prefix-json；前三者支持有界 QEMU
+   prompt/stop timeout。记录真实 VM hash、QEMU prefix/hash、cgroup，
+   不把包装器 hash 当作 guest 二进制 hash。
+3. 普通版 xmake/utility/utility.lua：
+   每个已解析的 native target 都要求对应 Disassembler，补全多 ISA
+   component 映射及 ARM/i686 的识别；更新配置缓存版本。
+4. ROS xmake/llvm/contract.cmake：
+   一律链接 ${LLVM_NATIVE_ARCH}Disassembler。ROS 的 .10 pin 保持不变。
+实际完整 link 曾在 AArch64/RISC-V64 缺少 LLVM C disasm/target initializer
+符号处失败，补编同一 .9 LLVM 源码的 target Disassembler 和
+MCDisassembler 后完成全量 link 并运行。
+上述构建配置修改没有经过完整 xmake 自动配置/ROS .10 CMake 产品构建；
+不能把手动成功链接当成它们已完成集成构建验收。
+其余并发 agent 的工作树修改未覆盖、回滚或计入本轮已验证源码。
+
+资源与失败记录
+i686 第一轮完整 runtime 编译 owned RSS 峰值 22,578,470,912 字节，
+约 21.03 GiB，触发共享 cgroup OOM，编译器被杀。
+随后使用 12 GiB owned 总预算再试 O0 full、O1 LLVM-only、Clang22 O0
+LLVM-only，均被 supervisor 在预算处停止，没有产生可用的当前 VM。
+这些是构建资源失败，不能描述为 VM 运行失败。没有为了获得结果放开预算。
+最初 RISC-V64 preview 被该 OOM 中断，仅有 19 条结果，不作为验收；
+干净的 post-oom 完整重跑 22 条（20 正例 + 2 quota refusal）是最终依据。
+初期工具链/链接/CPU-model 拒绝记录均保留；5 个更旧跨架构 VM 虽然
+help 可运行，但 -Rdbg 返回 invalid parameter/126，均未算作当前通过。
+MIPS 使用与 legacy NaN ELF 匹配的 MIPS64R2-generic。I6400 拒绝结果保留。
+旧 MIPS CRT 在 LLD23 下要求 execstack，组件链接显式使用 -z execstack；
+这个组件环境调整不能代表完整 VM 的执行栈策略已经验收。
+额外的 evidence closure 初版错误假设 depfile 数量，检查失败已保留；
+第二版从最终成功编译的 -MF 参数逐一收集文件，完整核对 73 份依赖。
+
+cgroup 约束
+所有实际 compiler、Wasm parser/validator、QEMU guest、VM、反汇编器和
+验收脚本都在 SSH linux 的既有 Docker cgroup admission 之后执行：
+  0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope
+keeper 为 sleep infinity，init PID=11866，birth=58402，
+boot ID=484df744-bc84-4acd-9245-801e24c21cfd。
+supervisor 先 SIGSTOP 自己创建的子进程，核对 birth/uid/exe，迁入 cgroup，
+设置 CPU 16-31 后执行工具；持续核对自己拥有的 descendant，限制 RSS、
+wall time、日志大小和磁盘余量。未接管、暂停或杀死其他 agent 的进程。
+cgroup memory.max=64 GiB、swap.max=0，与其他工作共享。
+开始前 oom=2/oom_kill=2；i686 失败后 oom=9/oom_kill=3；
+后续受控重试没有新 OOM。最终收尾记录仍为 oom=9/oom_kill=3。
+本机仅编辑、读取源码、复制和整理证据，没有在本机编译/运行项目测试。
+
+冻结源码与输入
+测试快照 ID（自定义算法，不是仓库 canonical source fingerprint）：
+  uwvm2      sha256:2152be35ad38d69109e4b63ad6535134202b89ae5cdb863ecb6adc12af6a0d11
+  uwvm2-ros  sha256:b827a4a0f64cb9df39fa2151c7623782ca9a48f1fa391fafb524d2be65c0a3c2
+算法为排序后的 src/、third-parties/ 相对路径 UTF-8 + NUL + SHA256 digest
+bytes。源文件清单共 23,748 项，收尾逐项验证，冻结快照没有变化。
+v2 是初始快照加上述单行 DWARF 修复。组件源代码与原快照一致；
+测试实际调用的是 control 中同步后的 harness，hash 在 inputs 中独立记录。
+AArch64 VM SHA256：
+  0b7d4faec601819048176f81028fa71943844bbf32b1356d945c5f4265de576b
+RISC-V64 VM SHA256：
+  4ed85e5129911c708235d424fa8e222eb33589e691d34e19179bbabc4051af34
+所有完整 VM 测试 inputs 与该 guest hash 一致；ELF machine 分别为 183/243。
+187 个既有目标 LLVM archives 的 bytes/hash/member count/machine 前后
+一致，另核对 4 个同源补编 archive、编译头文件依赖和工具可执行文件 hash。
+既有 provider 输入中的 product_source_id 对应初始 v1，只作初始记录；
+不能把它当成本轮最终 VM 的源码 ID。
+
+证据与复现
+SSH 永久控制目录：
+  /home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/wasm-dbg-cross-20261004-1791111443186
+冻结 RAM 目录：
+  /dev/shm/wasm-dbg-cross-20261004-1791111443186
+完整 VM 和 60 个组件 ELF 也复制至永久控制目录 retained-target-binaries，
+分别重新核对 hash，避免只保存临时 RAM 中的产物。
+
+本机：
+  /tmp/wasm-dbg-cross-20261004/cross-final-results.json
+  /tmp/wasm-dbg-cross-20261004/cross-provider-component-closure.json
+  /tmp/wasm-dbg-cross-20261004/cross-retention-tool-inputs.json
+  /tmp/wasm-dbg-cross-20261004/cross-evidence.tar.gz
+归档大小：80,666,118 bytes
+归档 SHA256：7553b9f5157e341d955357783e7f3744668722301cee3e304d5663392f98175c
+归档包含 1,383 个 regular members，含 62 个 retained ELF、fixture、
+输入/编译/QEMU argv、transcript、失败、cgroup receipt、source IDs、
+dependency manifests。逐成员 bytes/hash 验证由 SSH cgroup 中的 seal 完成。
+初始 source.tar.gz 及大体积外部 provider 独立保留，不包含在此归档中：
+  source.tar.gz SHA256: 7ed3972578ff341a7de0047950e41ee90ec42792b264bfb96ecdb8deb0c515a9
+
+最终结果目录：
+  aarch64-operands-all/results.json
+  riscv64-operands-all-post-oom/results.json
+  aarch64-core3-matrix/results.json
+  riscv64-core3-matrix/results.json
+  aarch64-replacement-script/results.json
+  riscv64-replacement-script/results.json
+  aarch64-codegen/ 与 riscv64-codegen/
+最终组件/capability receipt 的选择见 cross-final-results.json.components；
+失败和被替代的输出均保留，不用旧错误输出覆盖新成功的验收记录。
+
+复现时先为输出创建新目录、复制对应 command-json 并改 --out，
+不要覆写封存证据；由 supervisor 的 --command-json 启动计划。
+QEMU 前缀在 aarch64-qemu-prefix.json / riscv64-qemu-prefix.json；
+显式 -U LD_LIBRARY_PATH，-E 传入目标库路径，-L 指定目标 sysroot。
+完整执行 argv 已保存，含实际 guest binary、wasm-tools、source-root、
+--runner-prefix-json、QEMU 有界 timeout。keeper/boot 身份必须重新核对，
+重启后不能沿用硬编码旧 PID/birth 来放行测试。
+

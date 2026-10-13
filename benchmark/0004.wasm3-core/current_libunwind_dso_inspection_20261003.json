@@ -1,0 +1,46 @@
+{
+  "schema": "uwvm-read-only-libunwind-dso-inspection-v1",
+  "actual_file": {
+    "origin_path": "/tmp/uwvm-r9-evidence-20261001/evidence/vtune-r9-matched-dso-20261002-r1/module1-libunwind.so.1.0",
+    "bytes": 50040,
+    "sha256": "241acf655fc4c677866c5c6c749a27478baf3305ed7880bdd16ce124afff672c",
+    "md5": "1c4746d081d017b51ab695659db7583f"
+  },
+  "method": "Python byte reading only; no native ELF/tool/workload execution",
+  "native_execution": false,
+  "source_identity_qualified": false,
+  "current_build_options_qualified": false,
+  "compiler_comment_buildid_debuglink_sections": [],
+  "actual_ascii_strings": [
+    {
+      "file_offset": 10260,
+      "text": "LIBUNWIND_PRINT_UNWINDING"
+    },
+    {
+      "file_offset": 10521,
+      "text": "static bool libunwind::CFI_Parser<libunwind::LocalAddressSpace>::parseFDEInstructions(A &, const FDE_Info &, const CIE_Info &, typename R::link_hardened_reg_arg_t, int, PrologInfo *) [A = libunwind::LocalAddressSpace, R = libunwind::Registers_x86_64]"
+    },
+    {
+      "file_offset": 10851,
+      "text": "LIBUNWIND_PRINT_DWARF"
+    },
+    {
+      "file_offset": 12604,
+      "text": "LIBUNWIND_PRINT_APIS"
+    },
+    {
+      "file_offset": 14924,
+      "text": "/home/luo/llvm/libunwind/src/DwarfParser.hpp"
+    },
+    {
+      "file_offset": 15924,
+      "text": "/home/luo/llvm/libunwind/src/DwarfInstructions.hpp"
+    },
+    {
+      "file_offset": 16430,
+      "text": "parseFDEInstructions(instructions=0x%0lx)"
+    }
+  ],
+  "inference": "Tracing/assertion text is retained. Actual source commit/configuration remain unknown. The R::link_hardened_reg_arg_t signature also exists in upstream llvmorg-23-init; neither the build path nor this signature proves local patches.",
+  "actual_23_init_source_provenance": false
+}

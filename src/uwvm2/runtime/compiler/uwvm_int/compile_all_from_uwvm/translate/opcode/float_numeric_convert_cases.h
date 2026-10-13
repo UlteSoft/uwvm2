@@ -144,6 +144,10 @@ case wasm1_code::f32_add:
                 {
                     wasm_u32 tmp_local_index{};
                     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                    // [checked local.tee opcode][possibly empty LEB bytes ... code_end)
+                    // [safe                    ] unsafe (code_end is one-past)
+                    //                         ^^ code_curr + 1: the outer live-opcode check permits one-past;
+                    //                            parse_by_scan bounds every later LEB read.
                     auto const [next_code, parse_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr + 1),
                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                                ::fast_io::mnp::leb128_get(tmp_local_index))};
@@ -276,6 +280,10 @@ case wasm1_code::f32_add:
             {
                 wasm_u32 next_local_index{};
                 using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                // [checked local.set/tee opcode][possibly empty LEB bytes ... code_end)
+                // [safe                        ] unsafe (code_end is one-past)
+                //                             ^^ code_curr + 1u: code_curr != code_end above
+                //                                proves one-byte advance legal; the decoder checks the rest.
                 auto const next_local_imm_begin{reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr + 1u)};
                 auto const next_local_imm_end{reinterpret_cast<char8_t_const_may_alias_ptr>(code_end)};
                 auto const [next_local_index_next, next_local_index_err]{
@@ -315,6 +323,10 @@ case wasm1_code::f32_add:
             {
                 wasm_u32 next_local_index{};
                 using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                // [checked local.set/tee opcode][possibly empty LEB bytes ... code_end)
+                // [safe                        ] unsafe (code_end is one-past)
+                //                             ^^ code_curr + 1: the non-end opcode guard permits
+                //                                this one-past cursor; parse_by_scan bounds the LEB.
                 auto const [next_local_index_next, next_local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr + 1),
                                                                                                   reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                                                   ::fast_io::mnp::leb128_get(next_local_index))};
@@ -1993,7 +2005,7 @@ case wasm1_code::f64_copysign:
 }
 case wasm1_code::i32_wrap_i64:
 {
-    validate_numeric_unary(u8"i32.wrap_i64", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
+    (void)validate_integer_width.template operator()<0xa7u>(u8"i32.wrap_i64");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
     if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i32) &&
@@ -2181,7 +2193,7 @@ case wasm1_code::i64_extend_i32_s:
 {
     // Sign-extension changes value width and stack-top range. Keeping it explicit avoids treating
     // the result as an i32 cached value after the helper has produced an i64.
-    validate_numeric_unary(u8"i64.extend_i32_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64);
+    (void)validate_integer_width.template operator()<0xacu>(u8"i64.extend_i32_s");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
@@ -2224,7 +2236,7 @@ case wasm1_code::i64_extend_i32_s:
 }
 case wasm1_code::i64_extend_i32_u:
 {
-    validate_numeric_unary(u8"i64.extend_i32_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64);
+    (void)validate_integer_width.template operator()<0xadu>(u8"i64.extend_i32_u");
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)

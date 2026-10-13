@@ -205,6 +205,35 @@ namespace
             (void)mb.add_func(::std::move(ty), ::std::move(fb));
         }
 
+        // Keep an i32 beneath the temporary i64 result.  The fused return must reserve 4 + 8 bytes,
+        // even though drop/local.set leaves only the i32 on the logical operand stack.
+        {
+            // 12: call_drop_i64_with_prefix: () -> (i32)
+            func_type ty{{}, {k_val_i32}};
+            func_body fb{};
+            op(fb.code, wasm_op::i32_const);
+            u32(fb.code, 7u);
+            op(fb.code, wasm_op::call);
+            u32(fb.code, 0u);
+            op(fb.code, wasm_op::drop);
+            op(fb.code, wasm_op::end);
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+        {
+            // 13: call_local_set_i64_with_prefix: () -> (i32)
+            func_type ty{{}, {k_val_i32}};
+            func_body fb{};
+            fb.locals.push_back({1u, k_val_i64});
+            op(fb.code, wasm_op::i32_const);
+            u32(fb.code, 7u);
+            op(fb.code, wasm_op::call);
+            u32(fb.code, 0u);
+            op(fb.code, wasm_op::local_set);
+            u32(fb.code, 0u);
+            op(fb.code, wasm_op::end);
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
         return mb.build();
     }
 
@@ -218,7 +247,18 @@ namespace
         optable::compile_option cop{};
         auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
         UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-        UWVM2TEST_REQUIRE(cm.local_funcs.size() == 12uz);
+        UWVM2TEST_REQUIRE(cm.local_funcs.size() == 14uz);
+
+        // The bridge writes a fused call's result into the caller before the fused drop/set consumes it.
+        // The frame maximum must include this transient span, including a live value below the call.
+        UWVM2TEST_REQUIRE(cm.local_funcs.index_unchecked(3).operand_stack_byte_max >= 8uz);
+        UWVM2TEST_REQUIRE(cm.local_funcs.index_unchecked(4).operand_stack_byte_max >= 8uz);
+        UWVM2TEST_REQUIRE(cm.local_funcs.index_unchecked(6).operand_stack_byte_max >= 4uz);
+        UWVM2TEST_REQUIRE(cm.local_funcs.index_unchecked(7).operand_stack_byte_max >= 4uz);
+        UWVM2TEST_REQUIRE(cm.local_funcs.index_unchecked(9).operand_stack_byte_max >= 8uz);
+        UWVM2TEST_REQUIRE(cm.local_funcs.index_unchecked(10).operand_stack_byte_max >= 8uz);
+        UWVM2TEST_REQUIRE(cm.local_funcs.index_unchecked(12).operand_stack_byte_max >= 12uz);
+        UWVM2TEST_REQUIRE(cm.local_funcs.index_unchecked(13).operand_stack_byte_max >= 12uz);
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         if constexpr(Opt.is_tail_call && Opt.i32_stack_top_begin_pos == SIZE_MAX && Opt.i64_stack_top_begin_pos == SIZE_MAX &&
@@ -291,6 +331,12 @@ namespace
 
         auto rr11 = Runner::run(cm.local_funcs.index_unchecked(11), rt.local_defined_function_vec_storage.index_unchecked(11), pack_no_params(), nullptr, nullptr);
         UWVM2TEST_REQUIRE(load_f64(rr11.results) == 2.5);
+
+        auto rr12 = Runner::run(cm.local_funcs.index_unchecked(12), rt.local_defined_function_vec_storage.index_unchecked(12), pack_no_params(), nullptr, nullptr);
+        UWVM2TEST_REQUIRE(load_i32(rr12.results) == 7);
+
+        auto rr13 = Runner::run(cm.local_funcs.index_unchecked(13), rt.local_defined_function_vec_storage.index_unchecked(13), pack_no_params(), nullptr, nullptr);
+        UWVM2TEST_REQUIRE(load_i32(rr13.results) == 7);
 
         return 0;
     }

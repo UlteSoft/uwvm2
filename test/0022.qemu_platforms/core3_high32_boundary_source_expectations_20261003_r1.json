@@ -1,0 +1,123 @@
+{
+  "acceptance": [
+    "Run official wasm-tools parse then validate --features all in the sole Linux 64-GiB cgroup under the approved finite guardian; retain actual executable/provider/version/argv/rc and all raw output.",
+    "Derive the actual generated Wasm final-access binary offset from the official opcode dump. Bind that exact binary SHA/offset in a new result record before the product execution.",
+    "Bind fresh product source, target ISA/libc, full compiler/LLVM/CRT/link/loader closure and all relevant runtime translation units. Header-only or historical binaries do not qualify current product behavior.",
+    "Require the expected Wasm trap class and final-access function/offset witness. Arbitrary nonzero process exit, unavailable feature, validation rejection, failed linking, native signal without a Wasm trap witness, or the earlier unreachable is a failure or unqualified result.",
+    "Record the full Wasm i64 address/index/offset in diagnostics when available. A successful process exit is a failure: it may indicate the high bits were lost.",
+    "For i386, record direct ELF32 IA32-compatible kernel execution and qemu-i386 translated execution separately. Neither result implies Windows/FreeBSD hardware trap qualification.",
+    "For both products distinguish developer GNU ABI diagnostics from vendored LLVM23 ROS production qualification.",
+    "Expand from the first short correctness cell to each supported uwvm-int full/lazy and llvm-jit full/lazy/tiered mode and active exception-policy matrix only after its fresh product/target closure exists."
+  ],
+  "cases": [
+    {
+      "actual_target_execution_passed": false,
+      "entry_export": "_start",
+      "expected_misalignment": false,
+      "expected_trap": "memory_out_of_bounds",
+      "final_access": "i32.load",
+      "final_access_binary_offset": null,
+      "local_function_index": 0,
+      "low_address_witness": "Must complete before the final high-bit access; the fixture uses unreachable only on a wrong low-access result.",
+      "official_parse_validate_passed": false,
+      "required_features": [
+        "memory64"
+      ],
+      "source": "fixtures/core3_memory64_address_high32_oob.wat",
+      "wasm_binary_sha256": null
+    },
+    {
+      "actual_target_execution_passed": false,
+      "entry_export": "_start",
+      "expected_misalignment": false,
+      "expected_trap": "memory_out_of_bounds",
+      "final_access": "i32.load offset=4294967296",
+      "final_access_binary_offset": null,
+      "local_function_index": 0,
+      "low_address_witness": "Must complete before the final high-bit access; the fixture uses unreachable only on a wrong low-access result.",
+      "official_parse_validate_passed": false,
+      "required_features": [
+        "memory64"
+      ],
+      "source": "fixtures/core3_memory64_memarg_high32_oob.wat",
+      "wasm_binary_sha256": null
+    },
+    {
+      "actual_target_execution_passed": false,
+      "entry_export": "_start",
+      "expected_misalignment": false,
+      "expected_trap": "table_out_of_bounds",
+      "final_access": "table.get 0",
+      "final_access_binary_offset": null,
+      "local_function_index": 0,
+      "low_address_witness": "Must complete before the final high-bit access; the fixture uses unreachable only on a wrong low-access result.",
+      "official_parse_validate_passed": false,
+      "required_features": [
+        "memory64",
+        "reference-types"
+      ],
+      "source": "fixtures/core3_table64_index_high32_oob.wat",
+      "wasm_binary_sha256": null
+    },
+    {
+      "actual_target_execution_passed": false,
+      "entry_export": "_start",
+      "expected_misalignment": false,
+      "expected_trap": "memory_out_of_bounds",
+      "final_access": "i64.atomic.load",
+      "final_access_binary_offset": null,
+      "local_function_index": 0,
+      "low_address_witness": "Must complete before the final high-bit access; the fixture uses unreachable only on a wrong low-access result.",
+      "official_parse_validate_passed": false,
+      "required_features": [
+        "memory64",
+        "threads"
+      ],
+      "source": "fixtures/core3_shared_memory64_atomic_high32_oob.wat",
+      "wasm_binary_sha256": null
+    }
+  ],
+  "created_date": "2026-10-03",
+  "current_product_passed": false,
+  "official_parse_validate_passed": false,
+  "primary_sources": [
+    {
+      "claim": "Core3 load traps when address + offset + access width exceeds the memory byte count.",
+      "url": "https://webassembly.github.io/spec/core/exec/instructions.html#exec-load"
+    },
+    {
+      "claim": "Core3 table.get traps when the full-width table index is at least the table length.",
+      "url": "https://webassembly.github.io/spec/core/exec/instructions.html#exec-table-get"
+    },
+    {
+      "claim": "The memory64 composition gives all Threads memory operations i64 addresses on an i64 memory; the effective address is checked without truncation.",
+      "url": "https://raw.githubusercontent.com/WebAssembly/memory64/main/proposals/memory64/Overview.md"
+    },
+    {
+      "claim": "Atomic load follows non-atomic load bounds rules and uses sequential consistency.",
+      "url": "https://webassembly.github.io/threads/core/exec/instructions.html#exec-atomic-load"
+    }
+  ],
+  "safety": {
+    "all_actual_execution_requires_original_guardian_ticket": true,
+    "hostcalls": false,
+    "mac_native_execution": false,
+    "maximum_table_entries": 1,
+    "maximum_wasm_memory_bytes": 65536,
+    "native_execution_in_this_packet": false,
+    "threads_created": 0,
+    "unbounded_growth": false
+  },
+  "schema": "uwvm.qemu.core3-high32-boundary-source-expectations.v1",
+  "semantics": {
+    "address": "4294967296",
+    "distinction": "The memory64+Threads fixture tests the Threads extension composed with Core3 memory64; shared atomics are not claimed to be part of Core3 alone.",
+    "low32_bits": 0,
+    "memory_bytes": 65536,
+    "memory_pages": 1,
+    "rationale": "A 32-bit native pointer or helper ABI must preserve the Wasm i64 address/index until a full-width bounds check. Passing an access at address zero after truncation is a failure.",
+    "table_length": 1
+  },
+  "source_only": true,
+  "whole_ROS_bundled_passed": false
+}

@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "at_unix": 1790286264.459531,
+  "source_id": "sha256:800c0e5252af0224df50b133b7edb4f3aa7cc3526c31a3473274434fe1585dfe",
+  "cgroup": "docker-b384d4f254a20a178646cf901f3b283ddd686175638889347672241224bcae31.scope",
+  "memory_max": "68719476736",
+  "memory_swap_max": "0",
+  "cpuset_cpus_effective": "0,2,4,6,16-31",
+  "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n",
+  "processes": {
+    "windows_pe_builder": {
+      "pid": 809995,
+      "cgroup": "0::/system.slice/docker-b384d4f254a20a178646cf901f3b283ddd686175638889347672241224bcae31.scope",
+      "cmdline_sha256": "930ca0e29a0ea698ba98570f5464c35d8effa0a1785b6349a50a5cd23530371c"
+    },
+    "paused_win11_qemu": {
+      "pid": 37899,
+      "cgroup": "0::/system.slice/docker-b384d4f254a20a178646cf901f3b283ddd686175638889347672241224bcae31.scope",
+      "cmdline_sha256": "27ab9ccaf8ba0186ec01ac4024ac323a47acd7fb047534778c9b87806cd023d8"
+    }
+  }
+}

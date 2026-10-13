@@ -1,0 +1,12 @@
+--- a/third-parties/fast_io/share/fast_io/fast_io_inc/core.inc
++++ b/third-parties/fast_io/share/fast_io/fast_io_inc/core.inc
+@@ -167,6 +167,9 @@
+ using ::fast_io::manipulators::address_default_scalar_flags;
+ using ::fast_io::manipulators::scalar_manip_t;
+ 
++using ::fast_io::manipulators::chvw_t;
++using ::fast_io::manipulators::chvw;
++
+ using ::fast_io::manipulators::member_function_pointer_holder_t;
+ using ::fast_io::manipulators::whole_get_t;
+ 

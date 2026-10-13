@@ -1,0 +1,80 @@
+{
+  "scope": "R28 private WASIp1 candidate installation; original unstripped qualified arm64 binaries",
+  "cases": [
+    {
+      "label": "checkpoint-instruction",
+      "argv": [
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/fixture.exe",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/checkpoint.wasm",
+        "instruction",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/checkpoint-instruction"
+      ],
+      "checks": 197,
+      "pattern": "^debug_wasip1_checkpoint_runtime PASS checks=([0-9]+) policy=instruction$",
+      "joint": true
+    },
+    {
+      "label": "checkpoint-unwind",
+      "argv": [
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/fixture.exe",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/checkpoint.wasm",
+        "unwind",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/checkpoint-unwind"
+      ],
+      "checks": 197,
+      "pattern": "^debug_wasip1_checkpoint_runtime PASS checks=([0-9]+) policy=unwind$",
+      "joint": true
+    },
+    {
+      "label": "aliases-instruction",
+      "argv": [
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/fixture.exe",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/aliases.wasm",
+        "instruction",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/aliases-instruction"
+      ],
+      "checks": 197,
+      "pattern": "^debug_wasip1_checkpoint_runtime PASS checks=([0-9]+) policy=instruction$",
+      "joint": true
+    },
+    {
+      "label": "aliases-unwind",
+      "argv": [
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/fixture.exe",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/aliases.wasm",
+        "unwind",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/aliases-unwind"
+      ],
+      "checks": 197,
+      "pattern": "^debug_wasip1_checkpoint_runtime PASS checks=([0-9]+) policy=unwind$",
+      "joint": true
+    },
+    {
+      "label": "environment-group-instruction",
+      "argv": [
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/environment-group.exe",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/group-main.wasm",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/group-provider.wasm",
+        "instruction",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/environment-group-instruction"
+      ],
+      "checks": 481,
+      "pattern": "^debug_wasip1_environment_group_runtime PASS checks=([0-9]+) policy=instruction$",
+      "joint": false
+    },
+    {
+      "label": "environment-group-unwind",
+      "argv": [
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/environment-group.exe",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/group-main.wasm",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/group-provider.wasm",
+        "unwind",
+        "/Users/liyinan/Documents/MacroModel/src/uwvm2/test/0018.debugger/wasip1-world-install-r28-work/macos/uwvm2/environment-group-unwind"
+      ],
+      "checks": 481,
+      "pattern": "^debug_wasip1_environment_group_runtime PASS checks=([0-9]+) policy=unwind$",
+      "joint": false
+    }
+  ],
+  "limit_bytes": 2147483648
+}

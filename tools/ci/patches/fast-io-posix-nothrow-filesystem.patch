@@ -1,0 +1,408 @@
+--- a/include/fast_io_hosted/filesystem/native.h
++++ b/include/fast_io_hosted/filesystem/native.h
+@@ -6,6 +6,9 @@
+ #if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && !defined(__MSDOS__) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
+ #include "posix.h"
+ #include "posix_at.h"
++#if defined(__linux__) || (defined(__APPLE__) && defined(__MACH__))
++#include "posix_nothrow.h"
++#endif
+ #endif
+ 
+ #if (defined(_WIN32) || defined(__CYGWIN__))
+--- /dev/null
++++ b/include/fast_io_hosted/filesystem/posix_nothrow.h
+@@ -0,0 +1,363 @@
++#pragma once
++
++// Error-returning POSIX filesystem operations. These share one implementation
++// with and without C++ exceptions; no failure calls throw_posix_error().
++// Include through fast_io.h / fast_io_hosted.h, after the POSIX file provider.
++#if defined(__linux__) || (defined(__APPLE__) && defined(__MACH__))
++namespace fast_io
++{
++struct posix_status_result
++{
++	posix_file_status value{};
++	int error{};
++	inline explicit constexpr operator bool() const noexcept { return error == 0; }
++};
++struct posix_operation_result
++{
++	int error{};
++	inline explicit constexpr operator bool() const noexcept { return error == 0; }
++};
++struct posix_read_result
++{
++	::std::size_t transferred{};
++	int error{};
++	inline explicit constexpr operator bool() const noexcept { return error == 0; }
++};
++// Read and write share one byte-transfer result layout.
++using posix_write_result = posix_read_result;
++struct posix_getfl_result
++{
++	int flags{};
++	int error{};
++	inline explicit constexpr operator bool() const noexcept { return error == 0; }
++};
++struct posix_seek_result
++{
++	::fast_io::intfpos_t position{};
++	int error{};
++	inline explicit constexpr operator bool() const noexcept { return error == 0; }
++};
++struct posix_openat_result
++{
++	posix_file file{};
++	int error{};
++	inline posix_openat_result(posix_file&& owner, int native_error) noexcept
++		: file(static_cast<posix_file&&>(owner)), error(native_error) {}
++	posix_openat_result(posix_openat_result const&) = delete;
++	posix_openat_result& operator=(posix_openat_result const&) = delete;
++	posix_openat_result(posix_openat_result&&) noexcept = default;
++	posix_openat_result& operator=(posix_openat_result&&) noexcept = default;
++	inline explicit constexpr operator bool() const noexcept { return error == 0 && file.native_handle() != -1; }
++};
++namespace details::posix_nothrow_abi
++{
++// Preserve fast_io intfpos_t large-file positions even when native off_t is
++// 32-bit. These are the real SDK libc ABI types, not guessed kernel words.
++#if defined(__GLIBC__)
++using seek_offset_type = ::__off64_t;
++#elif defined(__BIONIC__)
++using seek_offset_type = ::off64_t;
++#else
++using seek_offset_type = ::off_t;
++#endif
++// Match the selected libc's *native struct stat* and off_t declarations, not
++// a guessed kernel stat structure or the presence of optional stat64 names.
++#if defined(__APPLE__) && defined(__MACH__)
++extern int fd_status(int, struct ::stat*) noexcept __DARWIN_INODE64(fstat);
++extern int path_status(char const*, struct ::stat*) noexcept __DARWIN_INODE64(stat);
++extern int link_status(char const*, struct ::stat*) noexcept __DARWIN_INODE64(lstat);
++[[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
++extern int at_status(int, char const*, struct ::stat*, int) noexcept __DARWIN_INODE64(fstatat);
++[[clang::availability(macos, introduced = 10.10), clang::availability(ios, introduced = 8.0)]]
++extern int at_open(int, char const*, int, ...) noexcept __DARWIN_NOCANCEL(openat);
++extern int path_open(char const*, int, ...) noexcept __DARWIN_ALIAS_C(open);
++extern int fd_truncate(int, ::off_t) noexcept __asm__("_ftruncate");
++extern ::ssize_t fd_read(int, void*, ::std::size_t) noexcept __DARWIN_ALIAS_C(read);
++extern ::ssize_t fd_write(int, void const*, ::std::size_t) noexcept __DARWIN_ALIAS_C(write);
++extern int fd_close(int) noexcept __DARWIN_ALIAS_C(close);
++extern int fd_sync(int) noexcept __DARWIN_ALIAS_C(fsync);
++#elif defined(__GLIBC__) && defined(__USE_FILE_OFFSET64)
++# if defined(__USE_TIME64_REDIRECTS) || (defined(__USE_TIME_BITS64) && defined(__TIMESIZE) && __TIMESIZE == 32)
++extern int fd_status(int, struct ::stat*) noexcept __asm__("__fstat64_time64");
++extern int at_status(int, char const*, struct ::stat*, int) noexcept __asm__("__fstatat64_time64");
++# else
++extern int fd_status(int, struct ::stat*) noexcept __asm__("fstat64");
++extern int at_status(int, char const*, struct ::stat*, int) noexcept __asm__("fstatat64");
++# endif
++extern int at_open(int, char const*, int, ...) noexcept __asm__("openat64");
++extern int fd_truncate(int, ::off_t) noexcept __asm__("ftruncate64");
++extern ::ssize_t fd_read(int, void*, ::std::size_t) noexcept __asm__("read");
++extern ::ssize_t fd_write(int, void const*, ::std::size_t) noexcept __asm__("write");
++extern int fd_close(int) noexcept __asm__("close");
++extern int fd_sync(int) noexcept __asm__("fsync");
++#else
++// musl's 32-bit time64 redirection changes stat, but not off_t/openat.
++# if defined(_REDIR_TIME64) && _REDIR_TIME64
++extern int fd_status(int, struct ::stat*) noexcept __asm__("__fstat_time64");
++extern int at_status(int, char const*, struct ::stat*, int) noexcept __asm__("__fstatat_time64");
++# else
++extern int fd_status(int, struct ::stat*) noexcept __asm__("fstat");
++extern int at_status(int, char const*, struct ::stat*, int) noexcept __asm__("fstatat");
++# endif
++extern int at_open(int, char const*, int, ...) noexcept __asm__("openat");
++# if defined(__BIONIC__) && defined(__USE_FILE_OFFSET64)
++extern int fd_truncate(int, ::off_t) noexcept __asm__("ftruncate64");
++# else
++extern int fd_truncate(int, ::off_t) noexcept __asm__("ftruncate");
++# endif
++extern ::ssize_t fd_read(int, void*, ::std::size_t) noexcept __asm__("read");
++extern ::ssize_t fd_write(int, void const*, ::std::size_t) noexcept __asm__("write");
++extern int fd_close(int) noexcept __asm__("close");
++extern int fd_sync(int) noexcept __asm__("fsync");
++#endif
++#if defined(__APPLE__) && defined(__MACH__)
++extern seek_offset_type fd_seek(int, seek_offset_type, int) noexcept __asm__("_lseek");
++#elif defined(__GLIBC__) || defined(__BIONIC__)
++extern seek_offset_type fd_seek(int, seek_offset_type, int) noexcept __asm__("lseek64");
++#else
++extern seek_offset_type fd_seek(int, seek_offset_type, int) noexcept __asm__("lseek");
++#endif
++// The only public operation below is F_GETFL. No arbitrary fcntl command,
++// locking-structure ABI, mutation or pointer payload is accepted.
++#if defined(__APPLE__) && defined(__MACH__)
++extern int fd_get_flags(int, int, ...) noexcept __DARWIN_ALIAS_C(fcntl);
++#elif defined(__GLIBC__) && defined(__USE_TIME64_REDIRECTS)
++extern int fd_get_flags(int, int, ...) noexcept __asm__("__fcntl_time64");
++#elif defined(__GLIBC__) && defined(__USE_FILE_OFFSET64)
++extern int fd_get_flags(int, int, ...) noexcept __asm__("fcntl64");
++#else
++extern int fd_get_flags(int, int, ...) noexcept __asm__("fcntl");
++#endif
++inline int last_error() noexcept { int const error{errno}; return error == 0 ? EIO : error; }
++inline int checked_at_status(int directory, char const* path, struct ::stat* output, int flags) noexcept
++{
++	// path borrows a complete caller-owned NUL-terminated pathname, and output
++	// borrows one complete native struct stat only through this synchronous call.
++#if defined(__APPLE__) && defined(__MACH__) && FAST_IO_HAS_BUILTIN(__builtin_available)
++	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
++		return at_status(directory, path, output, flags);
++	if (directory == AT_FDCWD)
++	{
++		if (flags == 0) return path_status(path, output);
++# if defined(AT_SYMLINK_NOFOLLOW)
++		if (flags == AT_SYMLINK_NOFOLLOW) return link_status(path, output);
++# endif
++	}
++	errno = ENOSYS;
++	return -1;
++#else
++	return at_status(directory, path, output, flags);
++#endif
++}
++inline int checked_at_open(int directory, char const* path, int flags, ::mode_t permissions) noexcept
++{
++	// The kernel/libc consumes the pathname during this call; it is never kept.
++#if defined(__APPLE__) && defined(__MACH__) && FAST_IO_HAS_BUILTIN(__builtin_available)
++	if (__builtin_available(macOS 10.10, iOS 8.0, *)) [[likely]]
++		return at_open(directory, path, flags, permissions);
++	if (directory == AT_FDCWD) return path_open(path, flags, permissions);
++	errno = ENOSYS;
++	return -1;
++#else
++	return at_open(directory, path, flags, permissions);
++#endif
++}
++} // namespace details::posix_nothrow_abi
++
++template <::fast_io::posix_family family, ::std::integral char_type>
++inline posix_status_result posix_status_nothrow(basic_posix_family_io_observer<family, char_type> file) noexcept
++{
++	struct ::stat native{};
++	// native is one complete local cell; the borrowed observer never owns or
++	// changes the descriptor, and no native structure escapes this function.
++	if (details::posix_nothrow_abi::fd_status(file.native_handle(), __builtin_addressof(native)) != 0)
++		return {{}, details::posix_nothrow_abi::last_error()};
++	return {details::struct_stat_to_posix_file_status(native), 0};
++}
++inline posix_status_result posix_fstatat_nothrow(posix_at_entry directory, char const* path, int flags = 0) noexcept
++{
++	struct ::stat native{};
++	if (details::posix_nothrow_abi::checked_at_status(directory.fd, path, __builtin_addressof(native), flags) != 0)
++		return {{}, details::posix_nothrow_abi::last_error()};
++	return {details::struct_stat_to_posix_file_status(native), 0};
++}
++inline posix_openat_result posix_openat_nothrow(posix_at_entry directory, char const* path, int native_flags,
++	perms permissions = static_cast<perms>(436)) noexcept
++{
++	// native_flags are passed exactly. Unlike open_mode, this API never adds
++	// O_CREAT/O_TRUNC; the caller controls destructive operations and CLOEXEC.
++	int const descriptor{details::posix_nothrow_abi::checked_at_open(directory.fd, path, native_flags,
++		static_cast<::mode_t>(permissions))};
++	if (descriptor < 0) return {posix_file{}, details::posix_nothrow_abi::last_error()};
++	// Exclusive ownership transfers directly into this move-only result. The
++	// pathname borrow ends here; only the owned file survives the call.
++	return {posix_file{descriptor}, 0};
++}
++template <::fast_io::posix_family family, ::std::integral char_type>
++inline posix_operation_result posix_truncate_nothrow(basic_posix_family_io_observer<family, char_type> file,
++	::fast_io::uintfpos_t size) noexcept
++{
++	if (size > static_cast<::fast_io::uintfpos_t>(::std::numeric_limits<::off_t>::max())) return {EINVAL};
++	if (details::posix_nothrow_abi::fd_truncate(file.native_handle(), static_cast<::off_t>(size)) != 0)
++		return {details::posix_nothrow_abi::last_error()};
++	return {};
++}
++template <::fast_io::posix_family family, ::std::integral char_type>
++inline posix_getfl_result posix_getfl_nothrow(basic_posix_family_io_observer<family, char_type> file) noexcept
++{
++	// Only the descriptor number is borrowed during ONE readonly F_GETFL.
++	// No owner is released, flag changed, pointer used or errno retry performed.
++#if defined(__linux__) && defined(__NR_fcntl)
++	auto const flags{::fast_io::system_call<__NR_fcntl, int>(file.native_handle(), F_GETFL, 0)};
++	if (::fast_io::linux_system_call_fails(flags)) return {0, static_cast<int>(-flags)};
++#elif defined(__linux__) && defined(__NR_fcntl64)
++	// F_GETFL has the same scalar ABI on the target's fcntl64 syscall. This
++	// does not expose its different file-lock structure or invent an NR alias.
++	auto const flags{::fast_io::system_call<__NR_fcntl64, int>(file.native_handle(), F_GETFL, 0)};
++	if (::fast_io::linux_system_call_fails(flags)) return {0, static_cast<int>(-flags)};
++#else
++	auto const flags{details::posix_nothrow_abi::fd_get_flags(file.native_handle(), F_GETFL, 0)};
++	if (flags < 0) return {0, details::posix_nothrow_abi::last_error()};
++#endif
++	return {flags, 0};
++}
++template <::fast_io::posix_family family, ::std::integral char_type>
++inline posix_seek_result posix_seek_nothrow(basic_posix_family_io_observer<family, char_type> file,
++	::fast_io::intfpos_t offset, ::fast_io::seekdir direction) noexcept
++{
++	using native_offset_type = details::posix_nothrow_abi::seek_offset_type;
++	int native_direction{};
++	switch (direction)
++	{
++	case ::fast_io::seekdir::beg: native_direction = SEEK_SET; break;
++	case ::fast_io::seekdir::cur: native_direction = SEEK_CUR; break;
++	case ::fast_io::seekdir::end: native_direction = SEEK_END; break;
++	default: return {0, EINVAL};
++	}
++#if defined(__linux__) && (defined(__NR_llseek) || defined(__NR__llseek))
++	if constexpr (::std::numeric_limits<native_offset_type>::digits < ::std::numeric_limits<::std::int64_t>::digits)
++	{
++		// Preserve the existing fast_io Linux32 large-file contract even for a
++		// libc with native off_t32 and no qualified public lseek64 declaration.
++		// __NR_llseek / __NR__llseek come from target kernel syscall headers; the real
++		// five-argument ABI is fd, high32, low32, loff_t* result, whence. RV32
++		// need not advertise the different single-register __NR_lseek ABI.
++		if constexpr (::std::numeric_limits<::fast_io::intfpos_t>::digits > ::std::numeric_limits<::std::int64_t>::digits)
++		{
++			if (offset < static_cast<::fast_io::intfpos_t>((::std::numeric_limits<::std::int64_t>::min)()) ||
++				offset > static_cast<::fast_io::intfpos_t>((::std::numeric_limits<::std::int64_t>::max)())) return {0, EOVERFLOW};
++		}
++		::std::int64_t position{};
++		::std::uint64_t const offset_bits{static_cast<::std::uint64_t>(offset)};
++		// position is one complete owned 8-byte loff_t-compatible cell. The
++		// kernel borrows/writes it only during this call; no cursor is advanced,
++		// pointer escapes, ownership changes or libc errno access occurs.
++# if defined(__NR_llseek) && defined(__NR__llseek)
++		static_assert(__NR_llseek == __NR__llseek, "Conflicting target llseek syscall declarations");
++# endif
++# if defined(__NR_llseek)
++		constexpr auto syscall_number{__NR_llseek};
++# else
++		// i386/ARM headers use _llseek; generic/RV32 headers use llseek.
++		// Select the actual target constant, never define a guessed NR alias.
++		constexpr auto syscall_number{__NR__llseek};
++# endif
++		auto const result{::fast_io::system_call<syscall_number, int>(file.native_handle(),
++			static_cast<unsigned long>(offset_bits >> 32u),
++			static_cast<unsigned long>(static_cast<::std::uint32_t>(offset_bits)),
++			__builtin_addressof(position), static_cast<unsigned int>(native_direction))};
++		if (::fast_io::linux_system_call_fails(result)) return {0, static_cast<int>(-result)};
++		if (result != 0 || position < 0) return {0, EIO};
++		if constexpr (::std::numeric_limits<::fast_io::intfpos_t>::digits < ::std::numeric_limits<::std::int64_t>::digits)
++		{
++			if (position > static_cast<::std::int64_t>((::std::numeric_limits<::fast_io::intfpos_t>::max)())) return {0, EOVERFLOW};
++		}
++		return {static_cast<::fast_io::intfpos_t>(position), 0};
++	}
++#endif
++	if constexpr (::std::numeric_limits<native_offset_type>::digits < ::std::numeric_limits<::fast_io::intfpos_t>::digits)
++	{
++		if (offset < static_cast<::fast_io::intfpos_t>((::std::numeric_limits<native_offset_type>::min)()) ||
++			offset > static_cast<::fast_io::intfpos_t>((::std::numeric_limits<native_offset_type>::max)())) return {0, EOVERFLOW};
++	}
++	// This synchronous observer borrow changes only the kernel file position;
++	// no ownership, user pointer, retry or throwing adapter is involved. The
++	// SDK-selected wide offset type and libc symbol handle Linux32's split-offset
++	// kernel ABI, including RV32 without __NR_lseek, rather than guessing it.
++	auto const position{details::posix_nothrow_abi::fd_seek(file.native_handle(), static_cast<native_offset_type>(offset), native_direction)};
++	if (position == static_cast<native_offset_type>(-1)) return {0, details::posix_nothrow_abi::last_error()};
++	if constexpr (::std::numeric_limits<native_offset_type>::digits > ::std::numeric_limits<::fast_io::intfpos_t>::digits)
++	{
++		if (position < static_cast<native_offset_type>((::std::numeric_limits<::fast_io::intfpos_t>::min)()) ||
++			position > static_cast<native_offset_type>((::std::numeric_limits<::fast_io::intfpos_t>::max)())) return {0, EOVERFLOW};
++	}
++	return {static_cast<::fast_io::intfpos_t>(position), 0};
++}
++template <::fast_io::posix_family family, ::std::integral char_type>
++inline posix_read_result posix_read_nothrow(basic_posix_family_io_observer<family, char_type> file,
++	void* buffer, ::std::size_t count) noexcept
++{
++	// buffer borrows [buffer,buffer+count) of caller-owned writable bytes for
++	// this synchronous call. No pointer is advanced or retained. Successful
++	// transferred==0 is EOF; EINTR and other native errors remain caller policy.
++	if (count > static_cast<::std::size_t>(::std::numeric_limits<::ssize_t>::max())) return {0, EINVAL};
++	auto const transferred{details::posix_nothrow_abi::fd_read(file.native_handle(), buffer, count)};
++	if (transferred < 0) return {0, details::posix_nothrow_abi::last_error()};
++	if (static_cast<::std::size_t>(transferred) > count) return {0, EIO};
++	return {static_cast<::std::size_t>(transferred), 0};
++}
++template <::fast_io::posix_family family, ::std::integral char_type>
++inline posix_write_result posix_write_nothrow(basic_posix_family_io_observer<family, char_type> file,
++	void const* buffer, ::std::size_t count) noexcept
++{
++	// buffer borrows [buffer,buffer+count) of caller-owned readable bytes only
++	// through this one synchronous native write. No pointer is advanced/retained,
++	// allocation, locking, flushing or retry occurs. Partial writes and EINTR
++	// remain caller policy; the observer never owns or closes the descriptor.
++	if (count > static_cast<::std::size_t>(::std::numeric_limits<::ssize_t>::max())) return {0, EINVAL};
++#if defined(__linux__) && defined(__NR_write)
++	// Use fast_io's existing raw syscall primitive. A failure's negative errno
++	// is returned directly, without accessing or changing the interrupted errno.
++	auto const transferred{::fast_io::system_call<__NR_write, ::std::ptrdiff_t>(file.native_handle(), buffer, count)};
++	if (::fast_io::linux_system_call_fails(transferred)) return {0, static_cast<int>(-transferred)};
++#else
++	auto const transferred{details::posix_nothrow_abi::fd_write(file.native_handle(), buffer, count)};
++	if (transferred < 0) return {0, details::posix_nothrow_abi::last_error()};
++#endif
++	if (static_cast<::std::size_t>(transferred) > count) return {0, EIO};
++	return {static_cast<::std::size_t>(transferred), 0};
++}
++template <::fast_io::posix_family family, ::std::integral char_type>
++inline posix_operation_result posix_fsync_nothrow(basic_posix_family_io_observer<family, char_type> file) noexcept
++{
++	// The borrowed observer neither owns nor closes the descriptor. Flush any
++	// user-space buffer first; this issues exactly one native fsync request with
++	// no retry. It does not substitute Darwin F_FULLFSYNC or prove power-loss
++	// durability/parent-directory publication for an unqualified filesystem.
++#if defined(__linux__) && defined(__NR_fsync)
++	auto const result{::fast_io::system_call<__NR_fsync, int>(file.native_handle())};
++	if (::fast_io::linux_system_call_fails(result)) return {static_cast<int>(-result)};
++	if (result != 0) return {EIO};
++#else
++	if (details::posix_nothrow_abi::fd_sync(file.native_handle()) != 0)
++		return {details::posix_nothrow_abi::last_error()};
++#endif
++	return {};
++}
++template <::fast_io::posix_family family, ::std::integral char_type>
++inline posix_operation_result posix_close_nothrow(basic_posix_family_file<family, char_type>& file) noexcept
++{
++	// Release invalidates the unique persistent owner before one close. Retrying
++	// EINTR could close a reused descriptor; destruction can never close it twice.
++	int const descriptor{file.release()};
++#if defined(__linux__) && defined(__NR_close)
++	auto const result{details::sys_close(descriptor)};
++	if (::fast_io::linux_system_call_fails(result)) return {static_cast<int>(-result)};
++#else
++	auto const result{details::posix_nothrow_abi::fd_close(descriptor)};
++	if (result < 0) return {details::posix_nothrow_abi::last_error()};
++#endif
++	return {};
++}
++} // namespace fast_io
++#endif
+--- a/share/fast_io/fast_io_inc/host/posix.inc
++++ b/share/fast_io/fast_io_inc/host/posix.inc
+@@ -6,6 +6,27 @@
+     using ::fast_io::posix_stderr_number;
+     using ::fast_io::posix_domain_value;
+ 
++#if defined(__linux__) || (defined(__APPLE__) && defined(__MACH__))
++    using ::fast_io::posix_at_entry;
++    using ::fast_io::posix_at_fdcwd;
++    using ::fast_io::posix_status_result;
++    using ::fast_io::posix_operation_result;
++    using ::fast_io::posix_read_result;
++    using ::fast_io::posix_write_result;
++    using ::fast_io::posix_openat_result;
++    using ::fast_io::posix_getfl_result;
++    using ::fast_io::posix_seek_result;
++    using ::fast_io::posix_status_nothrow;
++    using ::fast_io::posix_fstatat_nothrow;
++    using ::fast_io::posix_openat_nothrow;
++    using ::fast_io::posix_truncate_nothrow;
++    using ::fast_io::posix_getfl_nothrow;
++    using ::fast_io::posix_seek_nothrow;
++    using ::fast_io::posix_read_nothrow;
++    using ::fast_io::posix_write_nothrow;
++    using ::fast_io::posix_fsync_nothrow;
++    using ::fast_io::posix_close_nothrow;
++#endif
+ 
+ #if ((!defined(_WIN32) || defined(__WINE__)) || defined(__CYGWIN__))
+     namespace posix

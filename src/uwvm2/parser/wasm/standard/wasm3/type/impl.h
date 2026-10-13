@@ -24,5 +24,9 @@
 
 #ifndef UWVM_MODULE
 # include "value_type.h"
+# include "recursive_type.h"
+# include "section_details.h"
+# include "custom_section_details.h"
+# include "function_signature.h"
 # include "section_type.h"
 #endif

@@ -1,0 +1,75 @@
+{
+  "ROS_self_contained_LLVM23_product_qualified": false,
+  "blocker": "Wait for root-approved fast_io shared-memory noEH RAII source change and a new immutable header/backend/fixture source cut. This source-only proposal does not grant a native slot.",
+  "clang_sha256": "0e800e4decf0de00b5ebeefed814b2cf6551d17291a220ee107b5198cd7ca23b",
+  "driver_reason": "LLVM23 MinGW AddLibGCC enters AddRunTimeLibs only for compiler-rt. CommonArgs AddUnwindLibrary selects libunwind.a under static-libgcc for UNW_CompilerRT; static-libstdc++ keeps C++ archives static without statically replacing Windows system DLLs.",
+  "guest_qualified": false,
+  "kind": "source-only",
+  "lld_sha256": "2c67e1532947128d789d0c4696f75ff26d30400cd658361604b46806fd61b105",
+  "native_commands_executed": false,
+  "necessary_actual_evidence": [
+    "Separate fresh all four objects and PEs under the original guarded same-CG ticket; actual -MD provider headers plus complete resource/SDK input-before/after hash closure.",
+    "Actual --verbose linker Reading absolute providers must contain libunwind.a/libclang_rt.builtins.a and bound C++ runtime archives; reject libgcc/libgcc_s/libgcc_eh as contributing Reading inputs.",
+    "LLVM-readobj actual AMD64 archive members/imports/PE32+; no GCC unwind/libstdc++/libunwind DLL imports. Keep kernel32/ntdll/UCRT API-set identities distinct from portable runtime archives.",
+    "Actual Win64 POPFQ/RET bridge and unwind metadata; source inspection alone is no acceptance.",
+    "Before actual guest execution, pin regular executable/DLL/module identities and bind owned nonbreakaway Job plus full status/raw log for all four death-case child processes.",
+    "Runtime PE symbol and EH call-stack behavior must be tested on the new Windows binaries; no full-product LLVM23 pairing or wasm EH acceleration claim from standalone RAII."
+  ],
+  "old_r3_default_mingw_raw_imports_preserved": true,
+  "primary_sources": [
+    {
+      "relevant_lines": [
+        54,
+        77,
+        252,
+        259
+      ],
+      "url": "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-23.1.1/clang/lib/Driver/ToolChains/MinGW.cpp"
+    },
+    {
+      "relevant_lines": [
+        2247,
+        2257,
+        2271,
+        2322,
+        2342,
+        2350
+      ],
+      "url": "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-23.1.1/clang/lib/Driver/ToolChains/CommonArgs.cpp"
+    }
+  ],
+  "proposed_link_flags": [
+    "--rtlib=compiler-rt",
+    "--unwindlib=libunwind",
+    "-static-libgcc",
+    "-static-libstdc++"
+  ],
+  "required_actual_target_providers": [
+    {
+      "bytes": 3578998,
+      "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++.a",
+      "sha256": "aa0f98c5deb041ee1894938473c514de4c1b21384b3087831b1b6236f36c6b96"
+    },
+    {
+      "bytes": 574378,
+      "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libc++abi.a",
+      "sha256": "0741954703fa94b04af33a4e861df97423841c5db91e630c17432126e2eb257b"
+    },
+    {
+      "bytes": 95756,
+      "path": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk/x86_64-w64-mingw32/lib/libunwind.a",
+      "sha256": "6c26b3a7446360327d1c71197b134c2c536afbdf8c21e73f3c53ff3b9f450544"
+    },
+    {
+      "bytes": 259642,
+      "path": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-w64-windows-gnu/libclang_rt.builtins.a",
+      "resolved": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/clang/23/lib/x86_64-unknown-windows-gnu/libclang_rt.builtins.a",
+      "sha256": "17c4db794b21e489a1356d35666a647ae0203faff9c0f08b5144798940c6435f"
+    }
+  ],
+  "schema": "uwvm-windows-llvm-unwind-fixed-recipe-proposal-v1",
+  "scope": "Independent new standalone four-cell RAII compile/link recipe; complete product source/runtime proof remains separate. Do not replace the actual R3 flags or its GNU unwind record.",
+  "sysroot": "/home/macromodel/Documents/uwvm-validation-20260918.PwcF7M/windows-sdk",
+  "target": "x86_64-w64-windows-gnu",
+  "toolchain": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm"
+}

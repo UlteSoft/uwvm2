@@ -1,0 +1,40 @@
+R35 小型修复与验证（2026-10-08）
+
+修改：ordinary local struct.set 在一次操作内复用已经成功的同 store 类型/成员认证，
+避免 retain_embedded_reference 再做一次相同本地查询。对象 mutation_lock、完整原校验、
+foreign/compact/exception/extern/function 的原保留路径均保持。
+开关：UWVM_EXPERIMENTAL_STRUCT_SET_LOCAL_REF_AUTH=1；未定义或非1时关闭。
+这是有限范围实验优化。没有修改 GC 对象布局、GC 算法、根或例外保留协议。
+
+两个源码目录的 gc_object.h 与经过 Linux 测试的候选逐字相同：
+SHA256 93d86267e1be6aa591eb46418880cb5d4514b2d412dcbf3aecd55808343f17c9。
+新测试：gc_struct_set_local_ref_auth.cc、gc_struct_set_edge_liveness.cc。
+
+已完成的测试全部在现有64GiB/swap0 cgroup 内：
+  2仓库 × baseline/candidate/compact/standalone = 8 个基础 native 配置；
+  同8配置的 holder-only edge/实际 shared admission 回归；
+  每个 edge 配置6种本地/跨store普通、subtype、array边，每个14对象创建=回收、
+  27次真实exclusive收集、16次真实exclusive拒绝。
+  主仓库完整LLVM JIT CLI 158个 Wasm 自动GC模块（均发生真实收集）。
+  主仓库8个post-JIT benchmark × 2版本 × (pilot+5交替进程轮次)=96 cells；
+  每个测量cell5个clock_gettime内部样本，JIT与两批warmup不计入。
+  实际主VM ELF汇编确认成功同owner分支跳过retention调用，仍进入原对象锁。
+
+五轮按相同round配对的比值中位数（candidate/baseline）：
+  chain4-r0 .985117；chain4-r256 .993549；
+  cycle2-r256 .987239；diamond4-r256 .990923。
+改善约0.6%–1.5%；存在主机频率/负载变化，不能声称明显解决整个GC差距。
+ratio-of-medians会受异常round偏移，尤其cycle原round0；完整原始样本保留。
+大v128/SIMD/EH控制用例也已测量，不能把小的clock波动归于本次无关改动。
+
+本地同步只含两处gc_object.h条件代码及两新native测试；用户已有其他修改保留。
+本地未运行Mac/QEMU性能测试。ROS完整CLI新一轮158模块及性能仍待独立完成；
+Windows/FreeBSD/其他架构未在本轮据此获得资格。
+R36 deferred-roots 仍是/tmp的独立候选。r256是table容量，不是256个JIT局部根，
+当前graph每函数只有4个ref locals，分配点最多6个根描述符。
+R36完整CLI构建三次因cgroup软停止48GiB中断；两个已成功编译TU保留，
+没有qualified最终ELF/动态分支/性能结论，也未同步R36到生产源码。
+
+证据：本聊天 r35-qualified 下的 native-qualified/edge-qualified/final-gc-qualified/
+pilot-qualified/source-audit-r35-graph-auth-receipt/local-sync-qualified.json，
+包含精确source/ELF/Wasm SHA和cgroup资源receipts引用。所有guard失败保留。

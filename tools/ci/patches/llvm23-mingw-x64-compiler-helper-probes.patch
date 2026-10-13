@@ -1,0 +1,65 @@
+diff --git a/llvm/cmake/config-ix.cmake b/llvm/cmake/config-ix.cmake
+--- a/llvm/cmake/config-ix.cmake
++++ b/llvm/cmake/config-ix.cmake
+@@ -417,26 +417,41 @@
+ if(WIN32)
+   check_symbol_exists(_chsize_s io.h HAVE__CHSIZE_S)
+ 
+-  check_function_exists(_alloca HAVE__ALLOCA)
+-  check_function_exists(__alloca HAVE___ALLOCA)
+-  check_function_exists(__chkstk HAVE___CHKSTK)
+-  check_function_exists(__chkstk_ms HAVE___CHKSTK_MS)
+-  check_function_exists(___chkstk HAVE____CHKSTK)
+-  check_function_exists(___chkstk_ms HAVE____CHKSTK_MS)
+-
+-  check_function_exists(__ashldi3 HAVE___ASHLDI3)
+-  check_function_exists(__ashrdi3 HAVE___ASHRDI3)
+-  check_function_exists(__divdi3 HAVE___DIVDI3)
+-  check_function_exists(__fixdfdi HAVE___FIXDFDI)
+-  check_function_exists(__fixsfdi HAVE___FIXSFDI)
+-  check_function_exists(__floatdidf HAVE___FLOATDIDF)
+-  check_function_exists(__lshrdi3 HAVE___LSHRDI3)
+-  check_function_exists(__moddi3 HAVE___MODDI3)
+-  check_function_exists(__udivdi3 HAVE___UDIVDI3)
+-  check_function_exists(__umoddi3 HAVE___UMODDI3)
+-
+-  check_function_exists(__main HAVE___MAIN)
+-  check_function_exists(__cmpdi2 HAVE___CMPDI2)
++  # These explicit DynamicLibrary entry points must actually link. A
++  # STATIC_LIBRARY try_compile only archives an unresolved reference and
++  # would report every spelling as available. Check with EXECUTABLE in a
++  # function-local scope, without changing the caller's cross-toolchain
++  # policy or running a target executable. Do not infer names from pointer
++  # size: Win64 also includes AArch64 and uses a different helper ABI.
++  # Use separate cache keys so older compile-only HAVE_* results cannot
++  # silently survive a reconfigure after this fix.
++  function(uwvm_check_linkable_compiler_helper symbol result)
++    set(CMAKE_TRY_COMPILE_TARGET_TYPE EXECUTABLE)
++    set(uwvm_link_probe "UWVM_LINK_${result}")
++    check_function_exists("${symbol}" "${uwvm_link_probe}")
++    set("${result}" "${${uwvm_link_probe}}" PARENT_SCOPE)
++  endfunction()
++
++  uwvm_check_linkable_compiler_helper(_alloca HAVE__ALLOCA)
++  uwvm_check_linkable_compiler_helper(__alloca HAVE___ALLOCA)
++  uwvm_check_linkable_compiler_helper(__chkstk HAVE___CHKSTK)
++  uwvm_check_linkable_compiler_helper(__chkstk_ms HAVE___CHKSTK_MS)
++  uwvm_check_linkable_compiler_helper(___chkstk HAVE____CHKSTK)
++  uwvm_check_linkable_compiler_helper(___chkstk_ms HAVE____CHKSTK_MS)
++
++  uwvm_check_linkable_compiler_helper(__ashldi3 HAVE___ASHLDI3)
++  uwvm_check_linkable_compiler_helper(__ashrdi3 HAVE___ASHRDI3)
++  uwvm_check_linkable_compiler_helper(__divdi3 HAVE___DIVDI3)
++  uwvm_check_linkable_compiler_helper(__fixdfdi HAVE___FIXDFDI)
++  uwvm_check_linkable_compiler_helper(__fixsfdi HAVE___FIXSFDI)
++  uwvm_check_linkable_compiler_helper(__floatdidf HAVE___FLOATDIDF)
++  uwvm_check_linkable_compiler_helper(__lshrdi3 HAVE___LSHRDI3)
++  uwvm_check_linkable_compiler_helper(__moddi3 HAVE___MODDI3)
++  uwvm_check_linkable_compiler_helper(__udivdi3 HAVE___UDIVDI3)
++  uwvm_check_linkable_compiler_helper(__umoddi3 HAVE___UMODDI3)
++
++  uwvm_check_linkable_compiler_helper(__main HAVE___MAIN)
++  uwvm_check_linkable_compiler_helper(__cmpdi2 HAVE___CMPDI2)
+ endif()
+ 
+ CHECK_STRUCT_HAS_MEMBER("struct stat" st_mtimespec.tv_nsec

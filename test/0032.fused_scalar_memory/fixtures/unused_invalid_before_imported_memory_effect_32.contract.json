@@ -1,0 +1,10 @@
+{
+  "source_only": true,
+  "native_executed": false,
+  "validation_result": "reject invalid local index even if function31 never called",
+  "precondition": "real provider instance has exported memory with byte0 equal to 0x41",
+  "postcondition_after_failed_instantiation": "provider byte0 remains 0x41; active data X must never be applied",
+  "modes": "all public Core3 int/LLVM full/lazy/verification/tiered; ROS full only",
+  "lazy_config": "threads=0; bad index31 beyond <=16 adjacent warmup; not an executable command contract",
+  "old_validators_changed": false
+}

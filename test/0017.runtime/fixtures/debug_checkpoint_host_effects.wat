@@ -1,0 +1,41 @@
+;; All six actual host-call forms, with new Core 3 GC/nondefaultable locals.
+;; The native provider synchronously enters $reentry through the actual host
+;; raw API; checkpoint recording MUST already be non-replayable at its stop.
+;; This fixture does not grant full checkpoint capture or restore.
+(module
+  (type $host_result (func (result i32)))
+  (type $node (struct (field i32)))
+  (import "checkpoint-host" "effect" (func $effect (type $host_result)))
+  (table 1 funcref)
+  (elem (i32.const 0) $effect)
+  (func $direct (export "direct") (result i32)
+    (local $node (ref $node))
+    (local.set $node (struct.new $node (i32.const 42)))
+    (drop (call $effect))
+    (struct.get $node 0 (local.get $node)))
+  (func $indirect (export "indirect") (result i32)
+    (local $node (ref $node))
+    (local.set $node (struct.new $node (i32.const 42)))
+    (drop (call_indirect (type $host_result) (i32.const 0)))
+    (struct.get $node 0 (local.get $node)))
+  (func $reference (export "reference") (result i32)
+    (local $node (ref $node))
+    (local.set $node (struct.new $node (i32.const 42)))
+    (drop (call_ref $host_result (ref.func $effect)))
+    (struct.get $node 0 (local.get $node)))
+  (func $direct_tail (export "direct-tail") (result i32)
+    (local $node (ref $node))
+    (local.set $node (struct.new $node (i32.const 42)))
+    (return_call $effect))
+  (func $indirect_tail (export "indirect-tail") (result i32)
+    (local $node (ref $node))
+    (local.set $node (struct.new $node (i32.const 42)))
+    (return_call_indirect (type $host_result) (i32.const 0)))
+  (func $reference_tail (export "reference-tail") (result i32)
+    (local $node (ref $node))
+    (local.set $node (struct.new $node (i32.const 42)))
+    (return_call_ref $host_result (ref.func $effect)))
+  ;; Index 7 including imported effect0. The local is legal but deliberately
+  ;; uninitialized: no poison/undefined native carrier may be read at the stop.
+  (func $reentry (export "reentry") (local $uninitialized (ref $node))
+    nop))

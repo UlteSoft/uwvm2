@@ -1,0 +1,10 @@
+(module
+  (type $read_type (func (result i32)))
+  (memory i64 1)
+  (data (i64.const 0) "*")
+  (table i64 1 funcref)
+  (func $read (type $read_type) i64.const 0 i32.load8_u)
+  (elem (i64.const 0) func $read)
+  (func (export "_start")
+    i64.const 0 call_indirect (type $read_type)
+    i32.const 42 i32.ne if unreachable end))

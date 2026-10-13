@@ -55,6 +55,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 # if defined(UWVM_IMPORT_WASI_WASIP1)
     using wasip1_env_type = ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t>;
 
+    struct wasip1_memory_binding_cursor
+    {
+        wasip1_env_type const* environment{};
+        ::uwvm2::object::memory::linear::native_memory_t* memory{};
+        wasip1_memory_binding_cursor* previous{};
+    };
+
+    [[nodiscard]] inline constexpr ::uwvm2::object::memory::linear::native_memory_t*
+        resolve_current_wasip1_memory(wasip1_env_type const* environment) noexcept;
+
+
     // Command-line environment edits are stored as views into the already-owned
     // command-line argument storage. They are consumed only during pre-execution
     // WASI environment initialization, so no extra string ownership is required
@@ -160,7 +171,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> environment_storage{};
         ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> argument_storage{};
 
-        wasip1_env_type env{};
+        wasip1_env_type env{.wasip1_memory_resolver = resolve_current_wasip1_memory};
 
         [[nodiscard]] inline constexpr bool has_override() const noexcept
         {
@@ -224,7 +235,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> wasip1_force_argument_storage{};  // [global]
 
     /// @brief     Default WasiPreview1 environment
-    inline wasip1_env_type default_wasip1_env{};  // [global]
+    inline wasip1_env_type default_wasip1_env{.wasip1_memory_resolver = resolve_current_wasip1_memory};  // [global]
 
     // All configured target states live in one deque so pointers/references to a
     // state remain stable while command-line parsing appends more groups.
@@ -254,6 +265,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     // Wasm module so one process can execute modules with different WASI
     // defaults, mount tables, sockets, argv/env values, and trace settings.
     inline thread_local wasip1_env_type* current_wasip1_env_ptr{::std::addressof(default_wasip1_env)};  // [global] [thread_local]
+    inline thread_local wasip1_memory_binding_cursor* current_wasip1_memory_binding{};
 
 #   if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
 #    ifdef UWVM
@@ -297,6 +309,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     struct wasip1_thread_state
     {
         wasip1_env_type* current_env_ptr{::std::addressof(default_wasip1_env)};
+        wasip1_memory_binding_cursor* memory_binding{};
         bool current_target_is_set{};
         wasip1_module_target_kind_t current_target_kind{};
         ::uwvm2::utils::container::u8string_view current_target_module_name{};
@@ -356,32 +369,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             if(nt_path_warning && ::uwvm2::uwvm::io::show_nt_path_warning)
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                     u8"[warn]  ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"Resolve to NT path: \"",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                                     nt_path,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"\".",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                     u8" (nt-path)\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
 
                 if(::uwvm2::uwvm::io::nt_path_warning_fatal) [[unlikely]]
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                         u8"uwvm: ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                                         u8"[fatal] ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                         u8"Convert warnings to fatal errors. ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                         u8"(nt-path)\n\n",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                        ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                     ::fast_io::fast_terminate();
                 }
             }
@@ -421,6 +434,43 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         static_cast<void>(path);
         return false;
 #  endif
+    }
+
+
+    [[nodiscard]] inline constexpr wasip1_memory_binding_cursor*& current_wasip1_memory_binding_ref() noexcept
+    {
+#  if defined(UWVM_USE_THREAD_LOCAL)
+        return current_wasip1_memory_binding;
+#  else
+        return current_wasip1_state().memory_binding;
+#  endif
+    }
+
+    struct scoped_current_wasip1_memory_t
+    {
+        wasip1_memory_binding_cursor binding{};
+        inline constexpr scoped_current_wasip1_memory_t(
+            wasip1_env_type const& environment, ::uwvm2::object::memory::linear::native_memory_t* memory) noexcept :
+            binding{::std::addressof(environment), memory, current_wasip1_memory_binding_ref()}
+        { current_wasip1_memory_binding_ref() = ::std::addressof(binding); }
+        scoped_current_wasip1_memory_t(scoped_current_wasip1_memory_t const&) = delete;
+        scoped_current_wasip1_memory_t& operator=(scoped_current_wasip1_memory_t const&) = delete;
+        inline constexpr ~scoped_current_wasip1_memory_t()
+        {
+            if(current_wasip1_memory_binding_ref() != ::std::addressof(binding)) { ::fast_io::fast_terminate(); }
+            current_wasip1_memory_binding_ref() = binding.previous;
+        }
+    };
+
+    [[nodiscard]] inline constexpr ::uwvm2::object::memory::linear::native_memory_t*
+        resolve_current_wasip1_memory(wasip1_env_type const* environment) noexcept
+    {
+        for(auto binding{current_wasip1_memory_binding_ref()}; binding != nullptr; binding = binding->previous)
+        {
+            // An explicitly null binding must hide an older non-null binding.
+            if(binding->environment == environment) { return binding->memory; }
+        }
+        return nullptr;
     }
 
     [[nodiscard]] inline constexpr wasip1_env_type& current_wasip1_env() noexcept

@@ -66,6 +66,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         inline static constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte section_id{
             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(::uwvm2::parser::wasm::standard::wasm1::section::section_id::memory_sec)};
 
+        // Aggregates include actual definitions and imports, collected only after bounded limits decode.
+        bool requires_memory64{}, requires_threads{};
         ::uwvm2::parser::wasm::standard::wasm1::section::section_span_view sec_span{};
 
         ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::features::final_memory_type<Fs...>> memories{};
@@ -212,8 +214,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             }
         }
 
-        constexpr bool allow_multi_memory{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_memory<Fs...>()};
-        if constexpr(!allow_multi_memory)
+        bool const allow_multi_memory{::uwvm2::parser::wasm::standard::wasm1::features::multi_memory_enabled(fs_para)};
+        if(!allow_multi_memory)
         {
             /// @details    In the current version of WebAssembly, at most one memory may be defined or imported in a single module,
             ///             and all constructs implicitly reference this memory 0. This restriction may be lifted in future versions

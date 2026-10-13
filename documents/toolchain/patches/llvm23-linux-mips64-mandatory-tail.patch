@@ -1,0 +1,26 @@
+--- a/llvm/lib/Target/Mips/MipsISelLowering.cpp
++++ b/llvm/lib/Target/Mips/MipsISelLowering.cpp
+@@ -3377,12 +3377,22 @@
+       CalleeIsLocal = HasLocalLinkage || HasHiddenVisibility;
+     else
+       CalleeIsLocal = GV->isDSOLocal();
+   }
+ 
++  // Optional sibling-call policy must not disable the exact static N64 C
++  // musttail ABI used by the native Wasm engine. Keep PIC, differing/variadic
++  // prototypes and other ABIs on the existing opt-in path. The ordinary
++  // byval/incoming-area/local-callee checks below remain authoritative.
++  bool MandatoryStaticN64 =
++      IsMustTail && ABI.IsN64() && !IsPIC && CallConv == CallingConv::C &&
++      MF.getFunction().getCallingConv() == CallingConv::C && !IsVarArg &&
++      !MF.getFunction().isVarArg() &&
++      CB->getFunctionType() == MF.getFunction().getFunctionType();
++
+   if (IsTailCall) {
+-    if (!UseMipsTailCalls) {
++    if (!UseMipsTailCalls && !MandatoryStaticN64) {
+       IsTailCall = false;
+       if (IsMustTail)
+         report_fatal_error("failed to perform tail call elimination on a call "
+                            "site marked musttail");
+     } else {

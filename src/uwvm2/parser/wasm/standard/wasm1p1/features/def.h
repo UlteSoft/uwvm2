@@ -64,7 +64,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
     };
 
     /// @brief Legacy-compatible runtime storage shared by the default wasm1p1 target and the layered WebAssembly 2.0 policy.
-    /// @details Every disable_* field remains false by default, preserving the historical wasm1p1 behavior unless the user explicitly disables a group.
+    /// @details Wasm 2.0 disable flags remain false by default; later standard additions are explicitly opt-in.
     /// @details The explicit_* fields record CLI ownership so the feature collection and its subfeatures can report conflicts deterministically.
     /// @warning Extension point: every shared feature flag needs CLI ownership, feature conflict handling, parser gating, and version-correct ECO output.
     struct wasm_binfmt1p1_feature_parameter
@@ -79,6 +79,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
         bool disable_sign_extension{};
         bool disable_nontrapping_float_to_int{};
         bool disable_simd{};
+        // Wasm 3.0 additions are opt-in; legacy Wasm 2.0 defaults stay unchanged.
+        bool disable_extended_const{true};
+        bool disable_table_initializer{true};
+        bool disable_relaxed_simd{true};
+        bool disable_multi_memory{true};
+        bool disable_tail_call{true};
+        bool disable_memory64{true};
+        bool disable_table64{true};
+        bool disable_function_references{true};
+        bool disable_gc{true};
+        bool disable_exceptions{true};
+        // Threads is an independent extension, not part of the Core 3.0 feature set.
+        bool disable_threads{true};
 
         bool explicit_feature_mvp{};
         bool explicit_feature_wasm1p1{};
@@ -91,6 +104,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
         bool explicit_enable_sign_extension{};
         bool explicit_enable_nontrapping_float_to_int{};
         bool explicit_enable_simd{};
+        bool explicit_enable_extended_const{};
+        bool explicit_enable_table_initializer{};
+        bool explicit_enable_relaxed_simd{};
+        bool explicit_enable_multi_memory{};
+        bool explicit_enable_threads{};
+        bool explicit_enable_tail_call{};
+        bool explicit_enable_memory64{};
+        bool explicit_enable_table64{};
+        bool explicit_enable_function_references{};
+        bool explicit_enable_gc{};
+        bool explicit_enable_exceptions{};
         bool explicit_disable_multi_value{};
         bool explicit_disable_reference_types{};
         bool explicit_disable_table_instructions{};
@@ -99,6 +123,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
         bool explicit_disable_sign_extension{};
         bool explicit_disable_nontrapping_float_to_int{};
         bool explicit_disable_simd{};
+        bool explicit_disable_extended_const{};
+        bool explicit_disable_table_initializer{};
+        bool explicit_disable_relaxed_simd{};
+        bool explicit_disable_multi_memory{};
+        bool explicit_disable_threads{};
+        bool explicit_disable_tail_call{};
+        bool explicit_disable_memory64{};
+        bool explicit_disable_table64{};
+        bool explicit_disable_function_references{};
+        bool explicit_disable_gc{};
+        bool explicit_disable_exceptions{};
 
         wasm1p1_parser_limit_t parser_limit{};
 
@@ -153,6 +188,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
         return ::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1p1>(fs_para);
     }
 
+    /// @brief Gate a Core 3 shorthand abstract reference by its defining proposal.
+    /// @details Callers recognize the exact shorthand range before entering this helper;
+    ///          the legacy 0x6f/0x70 carriers retain their original rules.
+    [[nodiscard]] inline constexpr bool core3_abstract_reference_type_enabled(
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte code,
+        wasm_binfmt1p1_feature_parameter const& para) noexcept
+    {
+        if(para.disable_reference_types) { return false; }
+        switch(code)
+        {
+            case 0x69u: case 0x74u: return !para.disable_exceptions;
+            case 0x6au: case 0x6bu: case 0x6cu: case 0x6du: case 0x6eu: case 0x71u: case 0x72u: case 0x73u:
+                return !para.disable_gc;
+            default: return false;
+        }
+    }
+
+    [[nodiscard]] inline constexpr bool is_core3_abstract_reference_type(
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte code) noexcept
+    { return (code >= 0x69u && code <= 0x6eu) || (code >= 0x71u && code <= 0x74u); }
+
     /// @brief Return whether a value type is legal under the currently enabled wasm1.1 subfeatures.
     /// @warning Extension point: new value types must be mapped to the feature flag that enables them here.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -160,6 +216,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
                                              ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) noexcept
     {
         auto const& para{get_wasm1p1_parameter(fs_para)};
+        // Core 3 abstract carriers are outside the legacy enum's named enumerators.
+        // Check before switch so Clang's exhaustive-enum diagnostics remain useful.
+        auto const code{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(vt)};
+        if(is_core3_abstract_reference_type(code))
+        { return core3_abstract_reference_type_enabled(code, para); }
         switch(vt)
         {
             case ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::i32: [[fallthrough]];
@@ -180,6 +241,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
                                                  ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) noexcept
     {
         auto const& para{get_wasm1p1_parameter(fs_para)};
+        auto const code{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(rt)};
+        if(is_core3_abstract_reference_type(code))
+        { return core3_abstract_reference_type_enabled(code, para); }
         switch(rt)
         {
             case ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type::funcref:
@@ -200,6 +264,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::features
                                                        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) noexcept
     {
         auto const& para{get_wasm1p1_parameter(fs_para)};
+        auto const code{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(rt)};
+        if(is_core3_abstract_reference_type(code))
+        { return !para.disable_table_instructions && core3_abstract_reference_type_enabled(code, para); }
         switch(rt)
         {
             case ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type::funcref: return true;

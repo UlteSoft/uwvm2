@@ -1,0 +1,143 @@
+{
+  "schema": "uwvm-eh-declaration-roundtrip-source-v1",
+  "source_only": true,
+  "official_oracle_passed": false,
+  "native_execution_passed": false,
+  "component": "declaration_roundtrip.cc",
+  "provider": "fixtures/provider.wat",
+  "features_parse_init": "all enabled; disable only exceptions for later validation",
+  "pure_api": "genuine deep parser-module copy; validate only final _start; zero-local-body is explicit SKIP",
+  "runtime_api": "actual int full/lazy and optional LLVM full/lazy; explicitly materialize each existing unit",
+  "initializer_only": "--initializer-only [--provider provider.wasm] reject|accept subject actual.wasm; native fatal for reject expected",
+  "fixtures": [
+    {
+      "name": "unused_struct_exn",
+      "wat": "fixtures/unused_struct_exn.wat",
+      "official_expected": "valid",
+      "without_exceptions": "reject",
+      "subject": "function",
+      "provider": false,
+      "pure_skip": false
+    },
+    {
+      "name": "unused_array_noexn",
+      "wat": "fixtures/unused_array_noexn.wat",
+      "official_expected": "valid",
+      "without_exceptions": "reject",
+      "subject": "function",
+      "provider": false,
+      "pure_skip": false
+    },
+    {
+      "name": "unused_struct_nonnull_noexn",
+      "wat": "fixtures/unused_struct_nonnull_noexn.wat",
+      "official_expected": "valid",
+      "without_exceptions": "reject",
+      "subject": "function",
+      "provider": false,
+      "pure_skip": false
+    },
+    {
+      "name": "unused_other_function_local_exn",
+      "wat": "fixtures/unused_other_function_local_exn.wat",
+      "official_expected": "valid",
+      "without_exceptions": "reject",
+      "subject": "local",
+      "provider": false,
+      "pure_skip": false
+    },
+    {
+      "name": "tag_exn_payload",
+      "wat": "fixtures/tag_exn_payload.wat",
+      "official_expected": "valid",
+      "without_exceptions": "reject",
+      "subject": "tag",
+      "provider": false,
+      "pure_skip": false
+    },
+    {
+      "name": "import_tag_noexn",
+      "wat": "fixtures/import_tag_noexn.wat",
+      "official_expected": "valid",
+      "without_exceptions": "reject",
+      "subject": "tag",
+      "provider": true,
+      "pure_skip": false
+    },
+    {
+      "name": "no_local_table_exn",
+      "wat": "fixtures/no_local_table_exn.wat",
+      "official_expected": "valid",
+      "without_exceptions": "reject",
+      "subject": "table",
+      "provider": false,
+      "pure_skip": true
+    },
+    {
+      "name": "no_local_tag_exn",
+      "wat": "fixtures/no_local_tag_exn.wat",
+      "official_expected": "valid",
+      "without_exceptions": "reject",
+      "subject": "tag",
+      "provider": false,
+      "pure_skip": true
+    },
+    {
+      "name": "defined_gc_control",
+      "wat": "fixtures/defined_gc_control.wat",
+      "official_expected": "valid",
+      "without_exceptions": "accept",
+      "subject": "none",
+      "provider": false,
+      "pure_skip": false
+    },
+    {
+      "name": "defined_func_control",
+      "wat": "fixtures/defined_func_control.wat",
+      "official_expected": "valid",
+      "without_exceptions": "accept",
+      "subject": "none",
+      "provider": false,
+      "pure_skip": false
+    },
+    {
+      "name": "extern_control",
+      "wat": "fixtures/extern_control.wat",
+      "official_expected": "valid",
+      "without_exceptions": "accept",
+      "subject": "none",
+      "provider": false,
+      "pure_skip": false
+    },
+    {
+      "name": "baseline",
+      "wat": "fixtures/baseline.wat",
+      "official_expected": "valid",
+      "without_exceptions": "accept",
+      "subject": "none",
+      "provider": false,
+      "pure_skip": false
+    }
+  ],
+  "native_limit": "SSH Linux managed shared 64 GiB cgroup only; no local native run",
+  "production_apply_allowed": false,
+  "strict_pair_probe": {
+    "argv": "--both-disabled reject function unused_struct_exn.wasm",
+    "expected_feature": "gc",
+    "reason": "Existing GC type requirement precedes EH consistently in pure/fused/declaration admission."
+  },
+  "actual_runtime_fatal": {
+    "macro": "UWVM2TEST_EH_RUNTIME_DIAGNOSTIC",
+    "linked_product_required": "genuine matching public runtime object; not stub, synthetic formatter, or unrelated SDK",
+    "commands": [
+      "--runtime-fatal-int reject table no_local_table_exn.wasm",
+      "--runtime-fatal-llvm reject tag no_local_tag_exn.wasm",
+      "--runtime-fatal-int reject function missing_end_at_module_end.wasm"
+    ],
+    "no_body_expected": "actual wf/module error text, exceptions feature and table/tag subject, bounded offset zero, matching memory indicator; ANSI enabled",
+    "sentinel_expected": "actual fused missing_end body error; offset26 and end marker after actual parser minimum-end accepts nonempty nested block/end; raw exit/output recorded",
+    "unavailable_link_not_pass": true,
+    "parse_only_control": "Historical 23B empty expression must fail actual parser missing_code_body_end at offset23 and is explicitly NOT compiler-formatter qualification."
+  },
+  "test_revision": "r4: only sentinel plan corrected after actual parser source trace; CC r3 and all WAT/policy expectations unchanged; no actual oracle/native run"
+}

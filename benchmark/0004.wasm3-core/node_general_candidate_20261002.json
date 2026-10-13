@@ -1,0 +1,24 @@
+{
+  "schema": "uwvm-node-general-source-candidate-v1",
+  "date": "2026-10-02",
+  "official_index": "https://nodejs.org/dist/index.json",
+  "candidate_version": "v26.10.0",
+  "candidate_v8_base": "14.6.202.34",
+  "platform": "linux",
+  "arch": "x64",
+  "official_asset_sha256": null,
+  "actual_executable_sha256": null,
+  "actual_version_passed": false,
+  "actual_syntax_passed": false,
+  "actual_semantics_passed": false,
+  "native_executed_locally": false,
+  "timed_vm_flags": [
+    "--max-old-space-size=1024",
+    "--max-semi-space-size=16"
+  ],
+  "worker_policy": "ordinary V8 defaults; actual observed TIDs pinned P0 within exact cgroup",
+  "cold_cells": 8,
+  "warm_representative_cells": 4,
+  "collector_qualified": false,
+  "formal_acceptance": false
+}

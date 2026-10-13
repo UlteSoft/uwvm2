@@ -53,21 +53,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                                               ::uwvm2::utils::container::u8string_view conflict) noexcept
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                 u8"[error] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8"Conflicting Wasm feature parameters: \"",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                 curr,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8"\" conflicts with \"",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                 conflict,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8"\".\n\n",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
             return parameter_return_type::return_m1_imme;
         }
 
@@ -88,6 +88,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                     if(para.explicit_enable_bulk_memory) { return u8"--wasm-feature-enable-bulk-memory"; }
                     if(para.explicit_enable_sign_extension) { return u8"--wasm-feature-enable-sign-extension"; }
                     if(para.explicit_enable_nontrapping_float_to_int) { return u8"--wasm-feature-enable-nontrapping-float-to-int"; }
+                    if(para.explicit_enable_extended_const) { return u8"--wasm-feature-enable-extended-const"; }
+                    if(para.explicit_enable_table_initializer) { return u8"--wasm-feature-enable-table-initializer"; }
+                    if(para.explicit_enable_relaxed_simd) { return u8"--wasm-feature-enable-relaxed-simd"; }
+                    if(para.explicit_enable_multi_memory) { return u8"--wasm-feature-enable-multi-memory"; }
+                    if(para.explicit_enable_tail_call) { return u8"--wasm-feature-enable-tail-call"; }
+                    if(para.explicit_enable_memory64) { return u8"--wasm-feature-enable-memory64"; }
+                    if(para.explicit_enable_function_references) { return u8"--wasm-feature-enable-function-references"; }
+                    if(para.explicit_enable_gc) { return u8"--wasm-feature-enable-gc"; }
+                    if(para.explicit_enable_exceptions) { return u8"--wasm-feature-enable-exceptions"; }
+                    if(para.explicit_enable_table64) { return u8"--wasm-feature-enable-table64"; }
+                    if(para.explicit_enable_threads) { return u8"--wasm-feature-enable-threads"; }
+                    if(para.explicit_disable_extended_const) { return u8"--wasm-feature-disable-extended-const"; }
+                    if(para.explicit_disable_table_initializer) { return u8"--wasm-feature-disable-table-initializer"; }
+                    if(para.explicit_disable_relaxed_simd) { return u8"--wasm-feature-disable-relaxed-simd"; }
+                    if(para.explicit_disable_multi_memory) { return u8"--wasm-feature-disable-multi-memory"; }
+                    if(para.explicit_disable_tail_call) { return u8"--wasm-feature-disable-tail-call"; }
+                    if(para.explicit_disable_memory64) { return u8"--wasm-feature-disable-memory64"; }
+                    if(para.explicit_disable_function_references) { return u8"--wasm-feature-disable-function-references"; }
+                    if(para.explicit_disable_gc) { return u8"--wasm-feature-disable-gc"; }
+                    if(para.explicit_disable_exceptions) { return u8"--wasm-feature-disable-exceptions"; }
+                    if(para.explicit_disable_table64) { return u8"--wasm-feature-disable-table64"; }
+                    if(para.explicit_disable_threads) { return u8"--wasm-feature-disable-threads"; }
                     if(para.explicit_enable_simd) { return u8"--wasm-feature-enable-simd"; }
                     if(para.explicit_disable_multi_value) { return u8"--wasm-feature-disable-multi-value"; }
                     if(para.explicit_disable_reference_types) { return u8"--wasm-feature-disable-reference-types"; }
@@ -142,6 +164,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             para.disable_sign_extension = true;
             para.disable_nontrapping_float_to_int = true;
             para.disable_simd = true;
+            para.disable_extended_const = true;
+            para.disable_table_initializer = true;
+            para.disable_relaxed_simd = true;
+            para.disable_multi_memory = true;
+            para.disable_threads = true;
+            para.disable_tail_call = true;
+            para.disable_memory64 = true;
+            para.disable_table64 = true;
+            para.disable_function_references = true;
+            para.disable_gc = true;
+            para.disable_exceptions = true;
             para.controllable_allow_multi_result_vector = true;
             para.controllable_allow_multi_table = true;
         }
@@ -157,6 +190,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             para.disable_sign_extension = false;
             para.disable_nontrapping_float_to_int = false;
             para.disable_simd = false;
+            para.disable_extended_const = true;
+            para.disable_table_initializer = true;
+            para.disable_relaxed_simd = true;
+            para.disable_multi_memory = true;
+            para.disable_threads = true;
+            para.disable_tail_call = true;
+            para.disable_memory64 = true;
+            para.disable_table64 = true;
+            para.disable_function_references = true;
+            para.disable_gc = true;
+            para.disable_exceptions = true;
             para.controllable_allow_multi_result_vector = false;
             para.controllable_allow_multi_table = false;
         }
@@ -305,6 +349,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
     UWVM_DEFINE_WASM_FEATURE_PAIR(sign_extension, "sign-extension", false, false)
     UWVM_DEFINE_WASM_FEATURE_PAIR(nontrapping_float_to_int, "nontrapping-float-to-int", false, false)
     UWVM_DEFINE_WASM_FEATURE_PAIR(simd, "simd", false, false)
+    UWVM_DEFINE_WASM_FEATURE_PAIR(extended_const, "extended-const", false, false)
+    UWVM_DEFINE_WASM_FEATURE_PAIR(table_initializer, "table-initializer", false, false)
+    UWVM_DEFINE_WASM_FEATURE_PAIR(relaxed_simd, "relaxed-simd", false, false)
+    UWVM_DEFINE_WASM_FEATURE_PAIR(multi_memory, "multi-memory", false, false)
+    UWVM_DEFINE_WASM_FEATURE_PAIR(threads, "threads", false, false)
+    UWVM_DEFINE_WASM_FEATURE_PAIR(tail_call, "tail-call", false, false)
+    UWVM_DEFINE_WASM_FEATURE_PAIR(memory64, "memory64", false, false)
+    UWVM_DEFINE_WASM_FEATURE_PAIR(table64, "table64", false, false)
+    UWVM_DEFINE_WASM_FEATURE_PAIR(function_references, "function-references", false, false)
+    UWVM_DEFINE_WASM_FEATURE_PAIR(gc, "gc", false, false)
+    UWVM_DEFINE_WASM_FEATURE_PAIR(exceptions, "exceptions", false, false)
 
 #undef UWVM_DEFINE_WASM_FEATURE_PAIR
 #undef UWVM_WASM_FEATURE_CALLBACK_LINKAGE

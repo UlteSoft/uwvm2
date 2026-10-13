@@ -1,0 +1,234 @@
+{
+  "schema": "uwvm-core3-exact-type-declaration-stage2-test-r2",
+  "source_only": true,
+  "production_changed_paths": [],
+  "oracle_passed": false,
+  "native_execution_passed": false,
+  "guest_execution": 0,
+  "cases": [
+    {
+      "name": "gc_simd_field",
+      "wat_sha256": "7767ff1b5cc308eb07cc137e4f2eb9dc12b1fe1bb29df884026db01e0d6f3b54",
+      "oracle": "valid_pending_actual",
+      "module_argv": [
+        "rich",
+        "simd",
+        "reject",
+        "function",
+        "gc_simd_field.wasm"
+      ]
+    },
+    {
+      "name": "unused_simd_parameter",
+      "wat_sha256": "8b913805d5745a0d2ac992ca2b254ca4157161901de94742d6951693dcb554cb",
+      "oracle": "valid_pending_actual",
+      "module_argv": [
+        "rich",
+        "simd",
+        "reject",
+        "function",
+        "unused_simd_parameter.wasm"
+      ]
+    },
+    {
+      "name": "gc_numeric_field_simd_control",
+      "wat_sha256": "54decee19c8b93a3ed1437ed794c3202f2ffea8c607556e856927cb0d3d51281",
+      "oracle": "valid_pending_actual",
+      "module_argv": [
+        "rich",
+        "simd",
+        "accept",
+        "none",
+        "gc_numeric_field_simd_control.wasm"
+      ]
+    },
+    {
+      "name": "unused_extern_parameter",
+      "wat_sha256": "2f17fb20fd90e002f1f0a0a3f7fbe9e4ce6b3037c611d241b8ff597129129ce4",
+      "oracle": "valid_pending_actual",
+      "module_argv": [
+        "rich",
+        "reference-types",
+        "reject",
+        "function",
+        "unused_extern_parameter.wasm"
+      ]
+    },
+    {
+      "name": "gc_exception_field",
+      "wat_sha256": "e482215c6f8a143232773f5d20da87e83311aa51c77c0d6d250553d4ca4b1954",
+      "oracle": "valid_pending_actual",
+      "module_argv": [
+        "rich",
+        "reference-types",
+        "reject",
+        "function",
+        "gc_exception_field.wasm"
+      ]
+    },
+    {
+      "name": "gc_any_field",
+      "wat_sha256": "0e15adffd2c5fa5465c12b115cfd62e32a7a6b3a583351dfb12d72856d68b367",
+      "oracle": "valid_pending_actual",
+      "module_argv": [
+        "rich",
+        "reference-types",
+        "reject",
+        "function",
+        "gc_any_field.wasm"
+      ]
+    },
+    {
+      "name": "mvp_funcref_table_reference_control",
+      "wat_sha256": "070ab369660befe5f2cf4f1a70f1434ffcc5a6cf467cb92eb05f7e9e19b7c3da",
+      "oracle": "valid_pending_actual",
+      "module_argv": [
+        "rich",
+        "reference-types",
+        "accept",
+        "none",
+        "mvp_funcref_table_reference_control.wasm"
+      ]
+    },
+    {
+      "name": "unused_multiple_results",
+      "wat_sha256": "feab11a1522f7cd0fed18c71590e74f78ab9c248d22a95a305e656856067f738",
+      "oracle": "valid_pending_actual",
+      "module_argv": [
+        "rich",
+        "multi-value",
+        "reject",
+        "function",
+        "unused_multiple_results.wasm"
+      ]
+    },
+    {
+      "name": "multiple_parameters_control",
+      "wat_sha256": "5ddcb1ada78f0e19a184d230a574fe1fa20c5eda6ce6069f8383ca479a09c167",
+      "oracle": "valid_pending_actual",
+      "module_argv": [
+        "rich",
+        "multi-value",
+        "accept",
+        "none",
+        "multiple_parameters_control.wasm"
+      ]
+    },
+    {
+      "name": "gc_multiple_fields_control",
+      "wat_sha256": "340f6b2f5e267f5607343d2abeb31d9ac969b7a828a554e9e0c97f3acb92121e",
+      "oracle": "valid_pending_actual",
+      "module_argv": [
+        "rich",
+        "multi-value",
+        "accept",
+        "none",
+        "gc_multiple_fields_control.wasm"
+      ]
+    },
+    {
+      "name": "gc_packed_fields_simd_control",
+      "wat_sha256": "b12d291dc83fc5f23733d107bcf7768c8a964bb47ec2656e9f07b4b548c598a9",
+      "oracle": "valid_pending_actual",
+      "module_argv": [
+        "rich",
+        "simd",
+        "accept",
+        "none",
+        "gc_packed_fields_simd_control.wasm"
+      ]
+    }
+  ],
+  "first_module_cases": [
+    [
+      "rich",
+      "simd",
+      "reject",
+      "function",
+      "gc_simd_field.wasm"
+    ],
+    [
+      "owned",
+      "reference-types",
+      "reject",
+      "function",
+      "unused_extern_parameter.wasm"
+    ],
+    [
+      "borrowed",
+      "multi-value",
+      "reject",
+      "function",
+      "unused_multiple_results.wasm"
+    ]
+  ],
+  "first_initializer_cases": [
+    [
+      "simd",
+      "reject",
+      "gc_simd_field.wasm"
+    ],
+    [
+      "reference-types",
+      "reject",
+      "gc_exception_field.wasm"
+    ]
+  ],
+  "oracle_argv": [
+    [
+      "{wasm_tools}",
+      "parse",
+      "{wat}",
+      "-o",
+      "{wasm}"
+    ],
+    [
+      "{wasm_tools}",
+      "validate",
+      "--features",
+      "all",
+      "{wasm}"
+    ]
+  ],
+  "before_cut": "genuine matching source+headers+SDK/runtime including appliedGC31/EH44/genericR4/FRefR2; no fabricated module or source flag mutation",
+  "profile_expected_module_probes_per_case": {
+    "Ord_int_only": 6,
+    "ROS_int_only": 4,
+    "Ord_combined": 16,
+    "ROS_combined": 12
+  },
+  "additional_decoder_roles": [
+    {
+      "name": "unused_simd_parameter",
+      "roles": [
+        "owned",
+        "borrowed"
+      ]
+    },
+    {
+      "name": "unused_extern_parameter",
+      "roles": [
+        "owned",
+        "borrowed"
+      ]
+    },
+    {
+      "name": "unused_multiple_results",
+      "roles": [
+        "owned",
+        "borrowed"
+      ]
+    },
+    {
+      "name": "multiple_parameters_control",
+      "roles": [
+        "owned",
+        "borrowed"
+      ]
+    }
+  ],
+  "after_metadata_qualification": "actual parsed source -> genuine deep copy -> real initialized runtime type flags equal independent WAT-derived expected bits; available=0 BEFORE is not after proof",
+  "compiler_negative_error_contract": "actual invalid parse domain + exact feature_required/feature/subject/value (SIMD123/ref112/multi96)",
+  "must_enable_llvm_roles_for_combined": true,
+  "production_metadata_fields": "type declarations only; table/global/element/local families remain separate scope"
+}

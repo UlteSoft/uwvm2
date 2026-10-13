@@ -1,0 +1,59 @@
+{
+  "ROS_product_qualified": false,
+  "SDK_compilation_qualified": false,
+  "VM_performed": false,
+  "actual_CG_init_only_after": [
+    10154
+  ],
+  "actual_memory_events_after": {
+    "high": 0,
+    "low": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_group_kill": 0,
+    "oom_kill": 0
+  },
+  "actual_peak_RSS_bytes": 68198400,
+  "actual_selected_files_and_links": 4117,
+  "actual_selected_regular_bytes": 484593691,
+  "actual_ticket_retired": true,
+  "all_original_known_PIDFDs_ready": true,
+  "all_original_stages_returncode_zero": true,
+  "archive_bytes": 164624792,
+  "archive_members": 30469,
+  "archive_sha256": "3768988b151c20f965679062b065c63a977d6bbb9f47fd83695ec2c40790c18f",
+  "cgroup_memory_max_bytes": 68719476736,
+  "cgroup_swap_max_bytes": 0,
+  "compiler_performed": false,
+  "excluded_exact_test_aliases": [
+    {
+      "actual_census_sha256": "af78b60a1478e59816a7990526af42de95b5331f1247b50db8cf853988194e7d",
+      "kind": "symlink",
+      "path": "usr/lib/libxo/encoder/test.enc",
+      "reason": "fixed non-SDK libxo test encoder alias",
+      "upstream_target": "/usr/tests/lib/libxo/libenc_test.so"
+    }
+  ],
+  "executed_stages": 1,
+  "existing_archive_after_match": true,
+  "local_all_ten_raw_byte_hashes_independently_verified": true,
+  "network_performed": false,
+  "original_R2_failure_preserved": true,
+  "original_child": {
+    "actual_reaped_returncode": 0,
+    "birth": 4065750,
+    "original_PIDFD_ready": true,
+    "pid": 349429
+  },
+  "original_receipts_sha256": "2c1e97af646b1f83e6af9383355205afd8d65b24e1b324d93ec52cdc6d9e7a61",
+  "original_retirement_bridge_sha256": "70911a222148fc0f489fb628d7024b05d707840bb7191557f41e3c575176fa45",
+  "planned_stages": 1,
+  "provider_actual_sha256": "250aa737639c465c746a3332ffa59c8503d1cb399ba8b7c110b8d4ced31cf93a",
+  "schema": "uwvm-freebsd-SDK-selected-extraction-actual-evidence-v1",
+  "scope": "Exact official archive selected SDK dataset only",
+  "selected_extraction_passed": true,
+  "small_evidence_archive_sha256": "48d0ac3acf2a716dbedf241367a28d5a4b291cab473a8b67b6cbccedeb4d4d8c",
+  "small_evidence_manifest_sha256": "a5a4914906db88f4ea5e269c24d44400cfd8daa76fd0b73561a7f16f7a5fb11f",
+  "ticket_id": "989872fb103d4042a689c6a813c08d12",
+  "wall_seconds": 8.524419225999736
+}

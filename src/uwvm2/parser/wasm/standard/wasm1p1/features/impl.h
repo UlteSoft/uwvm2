@@ -13,6 +13,7 @@
 # include "feature_def.h"
 # include "types.h"
 # include "data_count_section.h"
+# include "tag_section.h"
 # include "data_section.h"
 # include "element_section.h"
 # include "sequence.h"

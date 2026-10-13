@@ -33,6 +33,11 @@ base_flags=(
     -U_M_ARM64EC
     -U__CYGWIN__
     -U__ILP32__
+    -U__ELF__
+    -U__arm__
+    -U__thumb__
+    -U__ARM_DWARF_EH__
+    -U__USING_SJLJ_EXCEPTIONS__
     -I"$repo_root/src"
 )
 
@@ -119,21 +124,41 @@ trap 'rm -rf "$matrix_tmp"' EXIT
 printf '%s\n' '/* synthetic header for __has_include(<unwind.h>) */' >"$matrix_tmp/unwind.h"
 
 check_platform unsupported 0 0
-check_platform apple-arm64 1 0 -D__APPLE__=1 -D__aarch64__=1
-check_platform linux-x86_64 1 0 -D__linux__=1 -D__x86_64__=1
-check_platform freebsd-x86_64 1 0 -D__FreeBSD__=1 -D__x86_64__=1
-check_platform linux-aarch64 0 0 -D__linux__=1 -D__aarch64__=1
-check_platform linux-x86_64-ilp32 0 0 -D__linux__=1 -D__x86_64__=1 -D__ILP32__=1
+check_platform apple-arm64 1 0 -D__APPLE__=1 -D__MACH__=1 -D__aarch64__=1
+check_platform linux-x86_64 1 0 -D__linux__=1 -D__ELF__=1 -D__x86_64__=1
+check_platform freebsd-x86_64 1 0 -D__FreeBSD__=1 -D__ELF__=1 -D__x86_64__=1
+check_platform linux-aarch64 1 0 -D__linux__=1 -D__ELF__=1 -D__aarch64__=1
+check_platform linux-x86_64-ilp32 1 0 -D__linux__=1 -D__ELF__=1 -D__x86_64__=1 -D__ILP32__=1
+# The object/unwind ABI admits these CPUs; the generated-chain probe decides
+# whether the installed provider and actual generated code can unwind at runtime.
+check_platform linux-i386 1 0 -D__linux__=1 -D__ELF__=1 -D__i386__=1
+check_platform linux-riscv64 1 0 -D__linux__=1 -D__ELF__=1 -D__riscv=1 -D__riscv_xlen=64
+check_platform linux-powerpc64 1 0 -D__linux__=1 -D__ELF__=1 -D__powerpc64__=1
+check_platform linux-s390x 1 0 -D__linux__=1 -D__ELF__=1 -D__s390x__=1
+check_platform linux-mips64 1 0 -D__linux__=1 -D__ELF__=1 -D__mips__=1
+check_platform linux-sparc64 1 0 -D__linux__=1 -D__ELF__=1 -D__sparc__=1
+check_platform linux-loongarch64 1 0 -D__linux__=1 -D__ELF__=1 -D__loongarch64=1
+check_platform freebsd-aarch64 1 0 -D__FreeBSD__=1 -D__ELF__=1 -D__aarch64__=1
+check_platform elf-future-dwarf-cpu 1 0 -D__ELF__=1
+check_platform linux-arm-ehabi 0 0 -D__linux__=1 -D__ELF__=1 -D__arm__=1
+check_platform linux-thumb-ehabi 0 0 -D__linux__=1 -D__ELF__=1 -D__thumb__=1
+check_platform linux-arm-dwarf 1 0 -D__linux__=1 -D__ELF__=1 -D__arm__=1 -D__ARM_DWARF_EH__=1
+check_platform linux-thumb-dwarf 1 0 -D__linux__=1 -D__ELF__=1 -D__thumb__=1 -D__ARM_DWARF_EH__=1
+check_platform elf-sjlj 0 0 -D__ELF__=1 -D__USING_SJLJ_EXCEPTIONS__=1
+check_platform macho-sjlj 0 0 -D__APPLE__=1 -D__MACH__=1 -D__USING_SJLJ_EXCEPTIONS__=1
 check_platform win64-x86_64 1 1 -D_WIN32=1 -D_WIN64=1 -D__x86_64__=1
 check_platform win64-arm64 1 1 -D_WIN32=1 -D_WIN64=1 -D__aarch64__=1
 check_platform win64-arm64ec 0 0 -D_WIN32=1 -D_WIN64=1 -D__aarch64__=1 -D__arm64ec__=1
 check_platform win64-cygwin 0 0 -D_WIN32=1 -D_WIN64=1 -D__x86_64__=1 -D__CYGWIN__=1
 
-check_runtime backend-off-linux 0 0 0 0 0 0 -nostdinc -I"$matrix_tmp" -D__linux__=1 -D__x86_64__=1
-check_runtime linux-no-unwind-header 1 0 0 0 0 0 -nostdinc -DUWVM_RUNTIME_LLVM_JIT=1 -D__linux__=1 -D__x86_64__=1
-check_runtime linux-with-unwind-header 1 1 0 1 1 0 -nostdinc -I"$matrix_tmp" -DUWVM_RUNTIME_LLVM_JIT=1 -D__linux__=1 -D__x86_64__=1
-check_runtime freebsd-with-unwind-header 1 1 0 1 1 0 -nostdinc -I"$matrix_tmp" -DUWVM_RUNTIME_LLVM_JIT=1 -D__FreeBSD__=1 -D__x86_64__=1
-check_runtime apple-with-unwind-header 1 1 0 1 1 0 -nostdinc -I"$matrix_tmp" -DUWVM_RUNTIME_LLVM_JIT=1 -D__APPLE__=1 -D__aarch64__=1
+check_runtime backend-off-linux 0 0 0 0 0 0 -nostdinc -I"$matrix_tmp" -D__linux__=1 -D__ELF__=1 -D__x86_64__=1
+check_runtime linux-no-unwind-header 1 0 0 0 0 0 -nostdinc -DUWVM_RUNTIME_LLVM_JIT=1 -D__linux__=1 -D__ELF__=1 -D__x86_64__=1
+check_runtime linux-with-unwind-header 1 1 0 1 1 0 -nostdinc -I"$matrix_tmp" -DUWVM_RUNTIME_LLVM_JIT=1 -D__linux__=1 -D__ELF__=1 -D__x86_64__=1
+check_runtime linux-aarch64-with-unwind-header 1 1 0 1 1 0 -nostdinc -I"$matrix_tmp" -DUWVM_RUNTIME_LLVM_JIT=1 -D__linux__=1 -D__ELF__=1 -D__aarch64__=1
+check_runtime linux-riscv-with-unwind-header 1 1 0 1 1 0 -nostdinc -I"$matrix_tmp" -DUWVM_RUNTIME_LLVM_JIT=1 -D__linux__=1 -D__ELF__=1 -D__riscv=1
+check_runtime linux-arm-ehabi-with-unwind-header 0 0 0 0 0 0 -nostdinc -I"$matrix_tmp" -DUWVM_RUNTIME_LLVM_JIT=1 -D__linux__=1 -D__ELF__=1 -D__arm__=1
+check_runtime freebsd-with-unwind-header 1 1 0 1 1 0 -nostdinc -I"$matrix_tmp" -DUWVM_RUNTIME_LLVM_JIT=1 -D__FreeBSD__=1 -D__ELF__=1 -D__x86_64__=1
+check_runtime apple-with-unwind-header 1 1 0 1 1 0 -nostdinc -I"$matrix_tmp" -DUWVM_RUNTIME_LLVM_JIT=1 -D__APPLE__=1 -D__MACH__=1 -D__aarch64__=1
 check_runtime win64-x86_64 1 0 1 1 1 1 -nostdinc -DUWVM_RUNTIME_LLVM_JIT=1 -D_WIN32=1 -D_WIN64=1 -D__x86_64__=1
 check_runtime win64-arm64 1 0 1 1 1 1 -nostdinc -DUWVM_RUNTIME_LLVM_JIT=1 -D_WIN32=1 -D_WIN64=1 -D__aarch64__=1
 check_runtime win64-arm64ec 0 0 0 0 0 0 -nostdinc -DUWVM_RUNTIME_LLVM_JIT=1 -D_WIN32=1 -D_WIN64=1 -D__aarch64__=1 -D__arm64ec__=1

@@ -1,0 +1,216 @@
+{
+  "schema": "uwvm-wasm-container-boundaries-qualified-20261007",
+  "passed": true,
+  "source_cut": "source212",
+  "source_identities": {
+    "uwvm2": "sha256:c9052516f4bead683100a034f39d8c4b843ffda562c530e2702f366080bf6fa6",
+    "uwvm2-ros": "sha256:6a98e1dd7c2b4031cdd94f3c7a6b62146b83d70767794073e6dc2016442c2c58"
+  },
+  "latest_tree_qualified": false,
+  "actual_matrix_VM_sessions": 144,
+  "additional_smoke_VM_sessions": 6,
+  "successful_natural_guest_exit_zero_sessions": 50,
+  "expected_fatal_trap_VM_sessions": 100,
+  "additional_old_table_window_failure_control_VM_sessions": 1,
+  "additional_actual_managed_timeout_VM_sessions": 2,
+  "total_VM_PIDFD_proofs": 153,
+  "exact_preopcode_value_pauses": 750,
+  "exact_table_pages": 1700,
+  "exact_empty_table_pages": 500,
+  "exact_GC_member_pages": 1200,
+  "production_Cpp_changed_by_this_followup": false,
+  "paired_source_file_hashes": {
+    "uwvm2/test/0018.debugger/run_wasm_live_containers_cli.py": "284e5f3b068ace4d7478204e54b6fc5396e6beddaed07170059c15d470233e9c",
+    "uwvm2/test/0018.debugger/wasm_container_boundary_cases.py": "64c1a55f6fc90c4b7c5568f984e213e341c9aa757ba301f9ea25d647c624be79",
+    "uwvm2/test/0018.debugger/run_wasm_empty_table_cli.py": "0bc6a5d8e299fd130b081887cd79b20e2ff864b7e32ec172ad98d61da80b83c3",
+    "uwvm2/test/0018.debugger/run_wasm_dropped_elem_traps_cli.py": "013db011b25bf7d2b3014daf43c22a2cf5901ed8a0c2ea68e16f5057f4305c03",
+    "uwvm2/test/0018.debugger/run_wasm_opcode_step_cli.py": "f3c4448b26a6c3b4e26811cd1c2ef4fb016b49b85ab1036418d94e3b45b7d412",
+    "uwvm2-ros/test/0018.debugger/run_wasm_live_containers_cli.py": "284e5f3b068ace4d7478204e54b6fc5396e6beddaed07170059c15d470233e9c",
+    "uwvm2-ros/test/0018.debugger/wasm_container_boundary_cases.py": "64c1a55f6fc90c4b7c5568f984e213e341c9aa757ba301f9ea25d647c624be79",
+    "uwvm2-ros/test/0018.debugger/run_wasm_empty_table_cli.py": "0bc6a5d8e299fd130b081887cd79b20e2ff864b7e32ec172ad98d61da80b83c3",
+    "uwvm2-ros/test/0018.debugger/run_wasm_dropped_elem_traps_cli.py": "013db011b25bf7d2b3014daf43c22a2cf5901ed8a0c2ea68e16f5057f4305c03",
+    "uwvm2-ros/test/0018.debugger/run_wasm_opcode_step_cli.py": "f3c4448b26a6c3b4e26811cd1c2ef4fb016b49b85ab1036418d94e3b45b7d412"
+  },
+  "timeout_runner_sha256": "b893e012b18e49f8803770779723f4c6c9d7b6e0fc45f73f1fac7509573d5638",
+  "preexecution_input_hash_count": 30401,
+  "scope": {
+    "empty_table32_table64_queries": true,
+    "table_grow_success_failure_zero": true,
+    "actual_call_indirect": true,
+    "dropped_nonzero_array_new_elem_init_elem_traps": true,
+    "generic_typed_funcref": true,
+    "exact_preopcode_operand_preview": true,
+    "actual_preopcode_GC_catchpoint": true,
+    "actual_after_failure_trap_pause": false,
+    "post_failure_state_inspection": false,
+    "full_Core3_debug_coverage": false,
+    "debug_off_performance_qualification": false
+  },
+  "delivery": {
+    "passed": true,
+    "main_delivery": {
+      "passed": true,
+      "qualified_sha256": "631496fca0bc7d6952e27ea2251e84cc5c1cc9842f75265d4a84628b8763f574",
+      "archive_sha256": "6f850fbf7b490a63f1a2d883fb63e1b59148a3ca598412e11479f4799aeaf2a8",
+      "archive_bytes": 9267903,
+      "member_count": 1161,
+      "manifest_sha256": "07798e6cf6de8d0fa4b906c23768f42ef9b602b4c05ff65ff813b0cddd5d5fde",
+      "source_cut": "source212",
+      "source_identities": {
+        "uwvm2": "sha256:c9052516f4bead683100a034f39d8c4b843ffda562c530e2702f366080bf6fa6",
+        "uwvm2-ros": "sha256:6a98e1dd7c2b4031cdd94f3c7a6b62146b83d70767794073e6dc2016442c2c58"
+      },
+      "latest_tree_qualified": false,
+      "qualified_VM_sessions": 150,
+      "additional_old_helper_control_VM_sessions": 1,
+      "VM_PIDFD_proofs": 151,
+      "payload_command_root_PIDFD_proofs": 27,
+      "exact_value_pauses": 750,
+      "table_pages": 1700,
+      "empty_table_pages": 500,
+      "GC_member_pages": 1200,
+      "all_guarded_roots_actually_reaped_zero": true,
+      "foreign_processes_signalled": false,
+      "foreign_processes_adopted": false,
+      "final_memory_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "final_global_free_bytes": 62967980032,
+      "folder_high_water_bytes": 15614676992,
+      "owned_observed_RSS_peak_bytes": 549167104,
+      "guarded_roots": [
+        {
+          "pid": 308805,
+          "pidfd_readable": true,
+          "actual_reaped_returncode": 0
+        },
+        {
+          "pid": 329981,
+          "pidfd_readable": true,
+          "actual_reaped_returncode": 0
+        }
+      ]
+    },
+    "additional_timeout_VM_sessions": 2,
+    "total_newly_qualified_VM_sessions_including_controls": 153,
+    "total_exact_VM_PIDFD_proofs": 153,
+    "timeout_qualification_sha256": "42a40bbb04651f37b465d48e44a65280caba462eb4b4f95d7671204e8af47240",
+    "timeout_archive": {
+      "passed": true,
+      "archive_sha256": "54e811058ab403894c3fd59d24d31406010b0894c3d953672ac599b8d4693428",
+      "archive_bytes": 1460606,
+      "member_count": 19,
+      "files": {
+        "run_wasm_managed_timeout_cli.py": {
+          "size": 3072,
+          "sha256": "b893e012b18e49f8803770779723f4c6c9d7b6e0fc45f73f1fac7509573d5638"
+        },
+        "timeout_batch.py": {
+          "size": 755,
+          "sha256": "0145fd109efaeaa41b5073cf4afe9e598401b6493be6ea8e0758c43111bcc9fb"
+        },
+        "owned_subprocess.py": {
+          "size": 2296,
+          "sha256": "e58b38375f216d0c6a947129408e092f2fbc7a88cf18c721ff9de65de0573925"
+        },
+        "timeout-commands.json": {
+          "size": 2945,
+          "sha256": "0af9fc31843b0f1f20b4e9b2411463ed690840ae493876d356db81d204c1d50d"
+        },
+        "timeout-controls-plan.json": {
+          "size": 623,
+          "sha256": "610db43db165962adc99a2c9eb3221830bdbaf16b3b8a6a5255e4b8868f8ea64"
+        },
+        "timeout-controls-profiles.json": {
+          "size": 52,
+          "sha256": "de828cc579dd9811ccd46b1a00217dc35876756972af42e1ad6a95c8782a1e82"
+        },
+        "timeout-controls-status.json": {
+          "size": 149,
+          "sha256": "00916bee5da3f5e841ae40ac84ba47bc0b15e317d66c43843a16002cc87e8f3e"
+        },
+        "timeout-inputs.json": {
+          "size": 7106634,
+          "sha256": "29492dd0a598d70872e998345ac45bd10912edccc6245f1627ca3a9c98614cb0"
+        },
+        "timeout-processes.json": {
+          "size": 4655,
+          "sha256": "3d6e8ef482a8f9954f93e2181ce4261119f427c7da3717735b411667483aa2a0"
+        },
+        "TIMEOUT-QUALIFIED.json": {
+          "size": 9279,
+          "sha256": "42a40bbb04651f37b465d48e44a65280caba462eb4b4f95d7671204e8af47240"
+        },
+        "timeout-controls-evidence/000-command.json": {
+          "size": 528,
+          "sha256": "81bb160420551c43b840c2513c154cd866195354eeb9f36dd3235856b033dfac"
+        },
+        "timeout-controls-evidence/000-timeout-controls/receipts.json": {
+          "size": 20801,
+          "sha256": "077f2d9c51371e1feb610b1be331f177bf38cb427d6dd96fd6e054b1f7ba77b6"
+        },
+        "timeout-controls-evidence/000-timeout-controls/timeout-controls.log": {
+          "size": 176,
+          "sha256": "55672cf9a002967fda480905ecc6399ec73b0d0f0011aa24a2a400d632fd21ca"
+        },
+        "uwvm2-timeout-results/result.json": {
+          "size": 1474,
+          "sha256": "cb6d1074eacc7283dc47a3c1fa8a196d95d8ebecc8eabe87a6040acf9f55b17d"
+        },
+        "uwvm2-timeout-results/managed-timeout.log": {
+          "size": 766,
+          "sha256": "ae8b7d32b244794c3455e396294db8b5e217441b18abb2b97b674ad0c1d8017a"
+        },
+        "uwvm2-ros-timeout-results/result.json": {
+          "size": 1480,
+          "sha256": "07a8eb65087c55e2c335663062d2d2e2cbe6cc1516ff75ba57979b940dcab464"
+        },
+        "uwvm2-ros-timeout-results/managed-timeout.log": {
+          "size": 770,
+          "sha256": "619566fbfc62488bbd84574e0440fd1d4f73fdf596a29590962251202665e5d5"
+        },
+        "uwvm2-timeout-output.log": {
+          "size": 1196,
+          "sha256": "7c6d8f73fb8b477f49cd5410b83f90712594c8fa1035d84ea8c3a0e9a5b306e7"
+        },
+        "uwvm2-ros-timeout-output.log": {
+          "size": 1202,
+          "sha256": "d5da99d910b81a52dd1e76f1c17990f43501649b4c289ef3a2b079a5001d1430"
+        }
+      }
+    },
+    "final_global_free_bytes": 62940336128,
+    "final_memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    },
+    "folder_high_water_bytes": 15783518208,
+    "foreign_processes_signalled": false,
+    "foreign_processes_adopted": false,
+    "all_controlled_roots_retired": true
+  },
+  "local_metadata_verification": {
+    "passed": true,
+    "metadata_verification_only": true,
+    "additional_timeout_archive_members_verified": 19,
+    "main_archive_members_verified": 1161,
+    "paired_executed_source_hashes_verified": 12,
+    "total_VM_PIDFD_proofs": 153,
+    "main_archive_sha256": "6f850fbf7b490a63f1a2d883fb63e1b59148a3ca598412e11479f4799aeaf2a8",
+    "timeout_archive_sha256": "54e811058ab403894c3fd59d24d31406010b0894c3d953672ac599b8d4693428"
+  },
+  "qualification": "/Users/liyinan/Documents/MacroModel/wasm-core3-debug-audit-20261007-r1/wasm-container-boundaries-20261007-root3/QUALIFIED.json",
+  "qualification_sha256": "631496fca0bc7d6952e27ea2251e84cc5c1cc9842f75265d4a84628b8763f574",
+  "main_evidence": "/Users/liyinan/Documents/MacroModel/wasm-core3-debug-audit-20261007-r1/wasm-container-boundaries-20261007-root3/evidence.tar.gz",
+  "timeout_evidence": "/Users/liyinan/Documents/MacroModel/wasm-core3-debug-audit-20261007-r1/wasm-container-boundaries-20261007-root3/timeout-evidence.tar.gz",
+  "retained_prior_failed_audit": "Previous source212 function matrix passed, but outer PIDFD sampling missed 10 short command roots. The failed lifecycle audit was preserved in the main archive; the final rerun owns VM and command-root PIDFDs explicitly."
+}

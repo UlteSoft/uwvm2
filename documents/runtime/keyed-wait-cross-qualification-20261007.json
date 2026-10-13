@@ -1,0 +1,97 @@
+{
+  "scope": "finite real worker wait/pause/close utility execution in both repositories, native x86_64 and seven QEMU Linux architectures",
+  "source_cuts": {
+    "uwvm2": "sha256:c9052516f4bead683100a034f39d8c4b843ffda562c530e2702f366080bf6fa6",
+    "uwvm2-ros": "sha256:6a98e1dd7c2b4031cdd94f3c7a6b62146b83d70767794073e6dc2016442c2c58"
+  },
+  "profiles": [
+    {
+      "profile": "x86_64",
+      "machine": 62,
+      "bits": 64,
+      "byte_order": "little",
+      "cases": 8,
+      "result_sha256": "6b2f1a86690b5e595fcadc5cfb1219b5c8089b2e5eb7bc38ff1fbb067ed14c95"
+    },
+    {
+      "profile": "aarch64",
+      "machine": 183,
+      "bits": 64,
+      "byte_order": "little",
+      "cases": 8,
+      "result_sha256": "fe7beb3edc7ea749c591533889ebf637804e8b2e5dc862dfe3b3d088d2ead1d5"
+    },
+    {
+      "profile": "i686",
+      "machine": 3,
+      "bits": 32,
+      "byte_order": "little",
+      "cases": 8,
+      "result_sha256": "77d3bd26ebb7192c569e28fe8e1d1bf6385bd78b2d1751a7c006d79264b44177"
+    },
+    {
+      "profile": "riscv64",
+      "machine": 243,
+      "bits": 64,
+      "byte_order": "little",
+      "cases": 8,
+      "result_sha256": "30923297d5e8d40e0d2f720027475a320a44f86742264b9569e626fe0a24b3f9"
+    },
+    {
+      "profile": "ppc64",
+      "machine": 21,
+      "bits": 64,
+      "byte_order": "big",
+      "cases": 8,
+      "result_sha256": "e21f3fd070ee018aea52e3dda4454389b52ea51e50f79bd1d88d42fecce6687a"
+    },
+    {
+      "profile": "mips64",
+      "machine": 8,
+      "bits": 64,
+      "byte_order": "big",
+      "cases": 8,
+      "result_sha256": "dbfd992f04f211fa9e01d98c1994049113ffa5d06a00337554d91937673c4f26"
+    },
+    {
+      "profile": "sparc64",
+      "machine": 43,
+      "bits": 64,
+      "byte_order": "big",
+      "cases": 8,
+      "result_sha256": "47e8a00cd932b93438aebe746a22b7e41f145ed06ac82f76d735571dd1e90f16"
+    },
+    {
+      "profile": "loongarch64",
+      "machine": 258,
+      "bits": 64,
+      "byte_order": "little",
+      "cases": 8,
+      "result_sha256": "435104a0501b86728cce0c1c3e0fdcc545e213efdbf1cc8f275215dbd5044c0f"
+    }
+  ],
+  "actual_compiles": 64,
+  "actual_executions": 64,
+  "positive_executions": 48,
+  "expected_failure_executions": 16,
+  "durable_close_cells": 640,
+  "durable_close_worker_lifecycles": 1280,
+  "durable_close_pause_episodes": 1280,
+  "durable_close_worker_pause_observations": 2560,
+  "runner_packets": {
+    "seven_profiles": "test260",
+    "mips64": "test277"
+  },
+  "MIPS_original_executable_stack_contract": true,
+  "full_VM_JIT_ASM_parity": false,
+  "whole_instance_restore": false,
+  "performance_qualification": false,
+  "passed": true,
+  "cgroup_memory_max_bytes": 68719476736,
+  "cgroup_swap_max_bytes": 0,
+  "qualified_evidence_path": "/Users/liyinan/Documents/MacroModel/wasm-core3-debug-audit-20261007-r1/QUALIFIED281.json",
+  "qualified_evidence_sha256": "dc65dfa2d094331d049000487a27cc7594f550cf51f834c23607278df2c5f4ca",
+  "audit_scope": "all eight exact frozen result sets, source dependencies, provider bytes, actual phase results, ELF identity and PIDFD/reaped roots; failed preparation/link histories retained",
+  "maximum_sampled_owned_rss_bytes": 506675200,
+  "MIPS_note": "Unmodified Debian MIPS64 CRT/libc contract: executable GNU_STACK flags 7. Other seven profiles require non-executable stacks."
+}

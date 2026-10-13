@@ -73,6 +73,21 @@ class PragmaOnceGuardTests(unittest.TestCase):
 
 
 class ModuleDependencyTests(unittest.TestCase):
+    def test_local_named_helper_requires_its_real_module(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'impl.h'
+            source.write_text('#ifndef UWVM_MODULE\n#include "policy.h"\n#endif\n')
+            (root / 'policy.h').write_text('#pragma once\n')
+            (root / 'policy.cppm').write_text('export module example.core.policy;\n')
+            required = MODULE_CHECKER.extract_guarded_includes(
+                source.read_text(), base_module='example.core', source_path=str(source))
+            self.assertEqual(required, ['example.core.policy'])
+            self.assertEqual(MODULE_CHECKER.extract_guarded_includes(
+                source.read_text(), source_path=str(source)), required)
+            self.assertFalse(MODULE_CHECKER.compare_dependency_coverage([':policy'], required)[0])
+            self.assertTrue(MODULE_CHECKER.compare_dependency_coverage(['example.core.policy'], required)[0])
+
     def test_implementation_coroutine_header_is_checked_by_main(self) -> None:
         previous_root = MODULE_CHECKER.SRC_ROOT
         previous_repo = MODULE_CHECKER.REPO_ROOT

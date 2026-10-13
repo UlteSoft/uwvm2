@@ -1,0 +1,46 @@
+{
+  "schema": "uwvm-eh-zero-local-source-v1",
+  "native_execution_passed": false,
+  "cases": [
+    {
+      "name": "zero_local_exn",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a0601040100690b",
+      "sha256": "01623d8a295f49003feb6f5ad7a5abe67dde9ecb1776cfe95f96448abd146843",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "local",
+      "official_oracle_expected": "valid",
+      "zero_count_type_offset": 36,
+      "before_source_prediction": "source prediction: existing local carrier gate rejects correctly"
+    },
+    {
+      "name": "zero_local_noexn",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a070105010063740b",
+      "sha256": "befca94ce57d2fa7798097c9ca1c83d615e5b163a401803af04293c2f1843d30",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "local",
+      "official_oracle_expected": "valid",
+      "zero_count_type_offset": 36,
+      "before_source_prediction": "source prediction: existing local carrier gate rejects correctly"
+    },
+    {
+      "name": "zero_local_nonnull_exn",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a070105010064690b",
+      "sha256": "f9c433fbb4aa501b10ace26c701091a5f4d49b6e6dc8aa5ec0d58b6165ce1cef",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "local",
+      "official_oracle_expected": "valid",
+      "zero_count_type_offset": 36,
+      "before_source_prediction": "source prediction: existing local carrier gate rejects correctly"
+    },
+    {
+      "name": "zero_local_nonnull_noexn",
+      "hex": "0061736d0100000001040160000003020100070a01065f737461727400000a070105010064740b",
+      "sha256": "5ae6f7f7885479afca9397b0528cef19a9abb002e1fce27474e2e9cdf2b0831b",
+      "expected_without_exceptions": "reject",
+      "expected_subject": "local",
+      "official_oracle_expected": "valid",
+      "zero_count_type_offset": 36,
+      "before_source_prediction": "source prediction: existing local carrier gate rejects correctly"
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "scope": "bounded source-only allocator/ABI design; no runtime/compiler/perf invocation",
+  "wasmtime_commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b",
+  "openjdk_source_tag": "jdk-25+36",
+  "openjdk_commit": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+  "openjdk_tag_objects": [
+    "e8600ecfd0aed19084116e66c79aeecac1aa8811"
+  ],
+  "sources": [
+    {
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b",
+      "path": "crates/cranelift/src/func_environ/gc/copying.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/cranelift/src/func_environ/gc/copying.rs",
+      "file": "build/wasm3-evidence/gc-pool-abi-design-20260928/bytecodealliance__wasmtime__crates__cranelift__src__func_environ__gc__copying.rs",
+      "bytes": 17475,
+      "sha256": "a6ac6f742b68c1390d78c973b6e31809e2ad1a84366684b09e9dfd84b231b733"
+    },
+    {
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b",
+      "path": "crates/environ/src/gc.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/environ/src/gc.rs",
+      "file": "build/wasm3-evidence/gc-pool-abi-design-20260928/bytecodealliance__wasmtime__crates__environ__src__gc.rs",
+      "bytes": 20715,
+      "sha256": "d220abdb097f05999b2733319bc7c3de30fcf282098051beb506fcaabde8df90"
+    },
+    {
+      "repository": "bytecodealliance/wasmtime",
+      "commit": "46c23a87dac1465986a8ad53ba6a7ae49372857b",
+      "path": "crates/environ/src/gc/copying.rs",
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasmtime/46c23a87dac1465986a8ad53ba6a7ae49372857b/crates/environ/src/gc/copying.rs",
+      "file": "build/wasm3-evidence/gc-pool-abi-design-20260928/bytecodealliance__wasmtime__crates__environ__src__gc__copying.rs",
+      "bytes": 7348,
+      "sha256": "842ff09ff6aeaa4a634ab1849b176465b670c0b2daed90a318413f2d2d161e29"
+    },
+    {
+      "repository": "openjdk/jdk",
+      "commit": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "path": "src/hotspot/share/gc/shared/threadLocalAllocBuffer.inline.hpp",
+      "url": "https://raw.githubusercontent.com/openjdk/jdk/6c48f4ed707bf0b15f9b6098de30db8aae6fa40f/src/hotspot/share/gc/shared/threadLocalAllocBuffer.inline.hpp",
+      "file": "build/wasm3-evidence/gc-pool-abi-design-20260928/openjdk__jdk__src__hotspot__share__gc__shared__threadLocalAllocBuffer.inline.hpp",
+      "bytes": 3807,
+      "sha256": "67eddfd13783c30f759455ff64143678192dfc805b1390891793e30daa079883"
+    },
+    {
+      "repository": "openjdk/jdk",
+      "commit": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "path": "src/hotspot/share/gc/shared/threadLocalAllocBuffer.cpp",
+      "url": "https://raw.githubusercontent.com/openjdk/jdk/6c48f4ed707bf0b15f9b6098de30db8aae6fa40f/src/hotspot/share/gc/shared/threadLocalAllocBuffer.cpp",
+      "file": "build/wasm3-evidence/gc-pool-abi-design-20260928/openjdk__jdk__src__hotspot__share__gc__shared__threadLocalAllocBuffer.cpp",
+      "bytes": 18373,
+      "sha256": "5c62fabb39c8d937be4118ba9ff5ee3ca2f309f0657b09506f9720c151f67868"
+    },
+    {
+      "repository": "openjdk/jdk",
+      "commit": "6c48f4ed707bf0b15f9b6098de30db8aae6fa40f",
+      "path": "src/hotspot/share/gc/shared/memAllocator.cpp",
+      "url": "https://raw.githubusercontent.com/openjdk/jdk/6c48f4ed707bf0b15f9b6098de30db8aae6fa40f/src/hotspot/share/gc/shared/memAllocator.cpp",
+      "file": "build/wasm3-evidence/gc-pool-abi-design-20260928/openjdk__jdk__src__hotspot__share__gc__shared__memAllocator.cpp",
+      "bytes": 15806,
+      "sha256": "5283714a483faeba94bac2a28df890dafbb99c14f992d0b300d34e74a4d458be"
+    }
+  ],
+  "reused_sources": [
+    {
+      "path": "benchmark/0004.wasm3-core/WASMTIME49_EH_SOURCE_PINS_20260928.json",
+      "sha256": "1e3b60a2337c7489eb3f43462a85cb13728dddf806590e8a346419a6db4faf48",
+      "includes": [
+        "crates/wasmtime/src/runtime/vm/gc/enabled/copying.rs",
+        "crates/wasmtime/src/runtime/vm/gc/enabled/drc.rs",
+        "crates/cranelift/src/func_environ/gc.rs"
+      ]
+    }
+  ]
+}

@@ -176,6 +176,21 @@ struct emitter
 
     [[nodiscard]] ::llvm::Value* float_sign(::llvm::Value* raw, unsigned bits, bool negate) const noexcept
     {
+        if(target().isMIPS() && target().isArch64Bit() && !has_feature("msa"))
+        {
+            // InstCombine turns vector sign masks into byte operations; the no-MSA backend then emits
+            // sixteen byte loads and repacks them. A transient integer mask legalizes into two GPR words.
+            // Keep the canonical vector SSA/call type, and map Wasm sign bytes through native byte order.
+            ::llvm::APInt sign_mask{128u, 0u};
+            for(unsigned lane{}; lane != 128u / bits; ++lane)
+            {
+                auto const sign_byte{(lane + 1u) * (bits / 8u) - 1u};
+                sign_mask.setBit((little_endian() ? sign_byte : 15u - sign_byte) * 8u + 7u);
+            }
+            auto scalar{b.CreateBitCast(raw, b.getIntNTy(128u))};
+            auto mask{::llvm::ConstantInt::get(b.getContext(), negate ? sign_mask : ~sign_mask)};
+            return b.CreateBitCast(negate ? b.CreateXor(scalar, mask) : b.CreateAnd(scalar, mask), raw->getType());
+        }
         auto value{lanes(raw, bits)};
         if(target().isMIPS() && has_feature("msa"))
         {
@@ -187,6 +202,45 @@ struct emitter
         }
         return pack(negate ? b.CreateXor(value, number(value->getType(), 1ull << (bits - 1u)))
                            : b.CreateAnd(value, number(value->getType(), (1ull << (bits - 1u)) - 1u)));
+    }
+
+    [[nodiscard]] ::llvm::Value* round_mips64_scalar(::llvm::Value* raw_bytes, unsigned bits,
+                                                    ::llvm::Intrinsic::ID operation) const noexcept
+    {
+        // N64 has 64-bit FPRs. Explicit rounding opcodes do not depend on FCSR's rounding mode.
+        // Only convert |x| < 2^mantissa: the integer result and its conversion back are exact;
+        // larger finite values are already integral. Sanitize the other lanes before conversion,
+        // then retain their input bits and quiet NaNs without relying on the host NaN encoding.
+        auto raw{lanes(raw_bytes, bits)};
+        auto integer_type{b.getIntNTy(bits)};
+        auto fp_type{bits == 32u ? b.getFloatTy() : b.getDoubleTy()};
+        auto n{[&](::std::uint64_t value) { return ::llvm::ConstantInt::get(integer_type, value); }};
+        unsigned mantissa{bits == 32u ? 23u : 52u}, bias{bits == 32u ? 127u : 1023u};
+        char const* const names[2][4]{
+            {"ceil.w.s $0, $1\n\tcvt.s.w $0, $0", "floor.w.s $0, $1\n\tcvt.s.w $0, $0",
+             "trunc.w.s $0, $1\n\tcvt.s.w $0, $0", "round.w.s $0, $1\n\tcvt.s.w $0, $0"},
+            {"ceil.l.d $0, $1\n\tcvt.d.l $0, $0", "floor.l.d $0, $1\n\tcvt.d.l $0, $0",
+             "trunc.l.d $0, $1\n\tcvt.d.l $0, $0", "round.l.d $0, $1\n\tcvt.d.l $0, $0"}};
+        unsigned index{operation == ::llvm::Intrinsic::ceil ? 0u : operation == ::llvm::Intrinsic::floor ? 1u :
+                       operation == ::llvm::Intrinsic::trunc ? 2u : 3u};
+        auto signature{::llvm::FunctionType::get(fp_type, {fp_type}, false)};
+        auto instruction{::llvm::InlineAsm::get(signature, names[bits == 32u ? 0u : 1u][index], "=f,f", false)};
+        ::llvm::Value* result{::llvm::PoisonValue::get(raw->getType())};
+        for(unsigned lane{}; lane != 128u / bits; ++lane)
+        {
+            auto value{b.CreateExtractElement(raw, b.getInt32(lane))};
+            auto magnitude{b.CreateAnd(value, n((1ull << (bits - 1u)) - 1u))};
+            auto small{b.CreateICmpULT(magnitude, n(static_cast<::std::uint64_t>(bias + mantissa) << mantissa))};
+            auto input{b.CreateBitCast(b.CreateSelect(small, value, n(0u)), fp_type)};
+            auto rounded{b.CreateBitCast(b.CreateCall(signature, instruction, {input}), integer_type)};
+            auto selected{b.CreateSelect(small, rounded, value)};
+            // Conversion of a negative fraction to integer zero loses its sign.
+            selected = b.CreateOr(selected, b.CreateAnd(value, n(1ull << (bits - 1u))));
+            auto nan{b.CreateICmpUGT(magnitude, n(bits == 32u ? 0x7f800000ull : 0x7ff0000000000000ull))};
+            selected = b.CreateOr(selected, b.CreateSelect(nan, n(1ull << (mantissa - 1u)), n(0u)));
+            result = b.CreateInsertElement(result, selected, b.getInt32(lane));
+        }
+        return pack(result);
     }
 
     // Exact IEEE rounding using integer vectors for targets whose LLVM vector FP-rounding legalization is broken.
@@ -482,6 +536,17 @@ struct emitter
     auto const unary_intrinsic{[&](unsigned bits, ::llvm::Intrinsic::ID id, bool fp = false) noexcept -> ::llvm::Value*
     {
         auto value{e.lanes(a, bits, fp)};
+        if(e.target().isMIPS() && e.target().isArch64Bit() && e.target().getEnvironment() == ::llvm::Triple::GNUABI64 &&
+           !e.has_feature("msa") && fp && (id == ::llvm::Intrinsic::ceil || id == ::llvm::Intrinsic::floor ||
+            id == ::llvm::Intrinsic::trunc || id == ::llvm::Intrinsic::roundeven))
+        {
+#if (defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)) && (defined(_SOFT_FLOAT) || defined(__mips_single_float))
+            return e.round_bits(a, bits, id);
+#else
+            if(e.has_feature("soft-float") || e.has_feature("single-float")) { return e.round_bits(a, bits, id); }
+            return e.round_mips64_scalar(a, bits, id);
+#endif
+        }
         if(e.target().isMIPS() && !e.little_endian() && fp && (id == ::llvm::Intrinsic::ceil || id == ::llvm::Intrinsic::floor ||
             id == ::llvm::Intrinsic::trunc || id == ::llvm::Intrinsic::roundeven))
         {
@@ -534,6 +599,30 @@ struct emitter
         case code::v128_andnot: return b.CreateAnd(a, b.CreateNot(c));
         case code::v128_or: return b.CreateOr(a, c);
         case code::v128_xor: return b.CreateXor(a, c);
+        case code::f32x4_relaxed_madd: case code::f32x4_relaxed_nmadd:
+        case code::f64x2_relaxed_madd: case code::f64x2_relaxed_nmadd:
+        {
+            bool const narrow{op == code::f32x4_relaxed_madd || op == code::f32x4_relaxed_nmadd};
+            bool const negative{op == code::f32x4_relaxed_nmadd || op == code::f64x2_relaxed_nmadd};
+            // Preserve the same unfused projection as the interpreter, including signed zero.
+            // Recursive lowering retains target-specific strict FP handling (MIPS/LoongArch/etc.).
+            auto product{emit_value(b, narrow ? code::f32x4_mul : code::f64x2_mul, a, c, nullptr, 0u, nullptr)};
+            if(negative) { product = e.float_sign(product, narrow ? 32u : 64u, true); }
+            return emit_value(b, narrow ? code::f32x4_add : code::f64x2_add, product, d, nullptr, 0u, nullptr);
+        }
+        case code::i16x8_relaxed_dot_i8x16_i7x16_s:
+        case code::i32x4_relaxed_dot_i8x16_i7x16_add_s:
+        {
+            auto type{e.integer(32u, 16u)};
+            auto products{b.CreateMul(b.CreateSExt(e.lanes(a, 8u), type), b.CreateSExt(e.lanes(c, 8u), type))};
+            auto sums{b.CreateAdd(e.slice(products, 0u, 8u, 2u), e.slice(products, 1u, 8u, 2u))};
+            sums = e.intrinsic(::llvm::Intrinsic::smax, e.intrinsic(::llvm::Intrinsic::smin, sums,
+                e.number(sums->getType(), 32767u)), e.number(sums->getType(), static_cast<::std::uint64_t>(-32768)));
+            if(op == code::i16x8_relaxed_dot_i8x16_i7x16_s) { return e.pack(b.CreateTrunc(sums, e.integer(16u))); }
+            auto quads{b.CreateAdd(e.slice(sums, 0u, 4u, 2u), e.slice(sums, 1u, 4u, 2u))};
+            // No NSW/NUW: the accumulator wraps modulo 2^32.
+            return e.pack(b.CreateAdd(quads, e.lanes(d, 32u)));
+        }
         case code::v128_bitselect: return b.CreateOr(b.CreateAnd(a, d), b.CreateAnd(c, b.CreateNot(d)));
         case code::v128_any_true:
             return b.CreateZExt(e.intrinsic(::llvm::Intrinsic::vector_reduce_or,
@@ -769,9 +858,12 @@ struct emitter
 }
 
 // Every load reads EXACTLY the Wasm access width; loadN_zero/splat/extend must not overread a page.
+// Only a proven in-bounds access to owned, unshared memory may be elided or
+// forwarded from a prior volatile store. All potentially faulting/shared accesses
+// stay volatile; stores always retain their observable ordering.
 template <llvm_jit_simd_code Op>
 [[nodiscard]] inline ::llvm::Value* emit_load(::llvm::IRBuilder<>& b, ::llvm::Value* pointer,
-                                              ::llvm::Value* old = nullptr, unsigned lane = 0u) noexcept
+                                              ::llvm::Value* old = nullptr, unsigned lane = 0u, bool preserve_access = true) noexcept
 {
     using code = llvm_jit_simd_code;
     emitter e{b};
@@ -781,7 +873,7 @@ template <llvm_jit_simd_code Op>
         if(e.target().isMIPS() && e.target().isArch32Bit() && e.has_feature("msa"))
         {
             auto load{b.CreateLoad(b.getInt64Ty(), pointer, "simd.memory.load")};
-            load->setVolatile(true); load->setAlignment(::llvm::Align{1u});
+            load->setVolatile(preserve_access); load->setAlignment(::llvm::Align{1u});
             auto little{e.endian(load)};
             ::llvm::Value* words{::llvm::Constant::getNullValue(e.integer(32u))};
             words = b.CreateInsertElement(words, b.CreateTrunc(little, b.getInt32Ty()), b.getInt32(0u));
@@ -798,7 +890,7 @@ template <llvm_jit_simd_code Op>
     else { load_type = b.getIntNTy(bits); }
     auto load{b.CreateLoad(load_type, b.CreatePointerCast(pointer, get_llvm_pointer_type(load_type)), "simd.memory.load")};
     load->setAlignment(::llvm::Align{1u});
-    load->setVolatile(true);
+    load->setVolatile(preserve_access);
     auto value{e.endian(load)};
     if constexpr(Op == code::v128_load) { return e.pack(value); }
     else if constexpr(Op == code::v128_load8x8_s || Op == code::v128_load16x4_s || Op == code::v128_load32x2_s)
@@ -829,6 +921,70 @@ template <llvm_jit_simd_code Op>
     return finalize_llvm_jit_direct_memory_store(b.CreateStore(value, b.CreatePointerCast(pointer, get_llvm_pointer_type(value->getType()))), ::llvm::Align{1u});
 }
 } // namespace simd_ir
+
+
+inline void legalize_llvm_jit_o0_vector_phis(::llvm::Module& module) noexcept
+{
+    auto const target{::llvm::Triple{module.getTargetTriple()}};
+    if(!target.isMIPS() || !target.isArch64Bit()) { return; }
+    auto const bytes{::llvm::FixedVectorType::get(::llvm::Type::getInt8Ty(module.getContext()), 16u)};
+    auto const words{::llvm::FixedVectorType::get(::llvm::Type::getInt64Ty(module.getContext()), 2u)};
+    for(auto& function: module)
+    {
+        if(function.isDeclaration()) { continue; }
+        ::llvm::SmallVector<::llvm::PHINode*, 16> phis{};
+        for(auto& block: function)
+        {
+            auto const insertion{block.getFirstInsertionPt()};
+            if(block.isEHPad() || insertion == block.end()) { continue; }
+            ::llvm::IRBuilder<> probe{::std::addressof(*insertion)};
+            if(simd_ir::emitter{probe}.has_feature("msa")) { continue; }
+            for(auto& phi: block.phis())
+            {
+                if(phi.getType() != bytes) { continue; }
+                bool ordinary_edges{true};
+                for(auto incoming: phi.blocks())
+                {
+                    auto const terminator{incoming->getTerminator()};
+                    if(!::llvm::isa<::llvm::BranchInst, ::llvm::SwitchInst>(terminator))
+                    {
+                        ordinary_edges = false;
+                        break;
+                    }
+                }
+                if(ordinary_edges) { phis.push_back(::std::addressof(phi)); }
+            }
+        }
+        for(auto phi: phis)
+        {
+            // Byte-vector PHIs spill sixteen scalar words in LLVM's no-MSA O0 backend. A word-vector
+            // join spills only two GPRs. Bitcasts preserve every byte on either endian, including NaN
+            // payloads, while operations, call ABI and debug users retain their canonical vector type.
+            auto const replacement{::llvm::PHINode::Create(words, phi->getNumIncomingValues(), phi->getName() + ".words", phi)};
+            replacement->setDebugLoc(phi->getDebugLoc());
+            ::llvm::DenseMap<::llvm::BasicBlock*, ::llvm::Value*> edge_values{};
+            for(unsigned index{}; index != phi->getNumIncomingValues(); ++index)
+            {
+                auto const incoming_block{phi->getIncomingBlock(index)};
+                auto found{edge_values.find(incoming_block)};
+                if(found == edge_values.end())
+                {
+                    ::llvm::IRBuilder<> edge{incoming_block->getTerminator()};
+                    edge.SetCurrentDebugLocation(phi->getDebugLoc());
+                    found = edge_values.try_emplace(incoming_block,
+                        edge.CreateBitCast(phi->getIncomingValue(index), words, "simd.phi.words")).first;
+                }
+                replacement->addIncoming(found->second, incoming_block);
+            }
+            // Keep all PHIs first, including mutually dependent loop PHIs. RAUW also updates their
+            // incoming bitcasts and LLVM debug metadata; duplicate predecessor edges share one cast.
+            ::llvm::IRBuilder<> use{::std::addressof(*phi->getParent()->getFirstInsertionPt())};
+            use.SetCurrentDebugLocation(phi->getDebugLoc());
+            phi->replaceAllUsesWith(use.CreateBitCast(replacement, bytes, "simd.phi.bytes"));
+            phi->eraseFromParent();
+        }
+    }
+}
 
 inline void legalize_llvm_jit_native_vectors(::llvm::Module& module) noexcept
 {

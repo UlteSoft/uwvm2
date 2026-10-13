@@ -21,6 +21,24 @@ end
 ---@type boolean
 local enable_lto = get_config("enable-lto")
 
+local function release_lto_enabled(target)
+    if not enable_lto then
+        return false
+    end
+    -- The qualified N64 native-debug profiles uses GNU gold without an
+    -- LLVM LTO plugin. Apply the same choice to every release-family rule;
+    -- otherwise the default LTO option passes LLVM bitcode to that linker.
+    local triple = string.lower(tostring(get_config("target") or ""))
+    local llvm_triple = string.lower(tostring(get_config("llvm-target") or ""))
+    if target:is_plat("linux") and get_config("use-llvm-compiler") and
+        (get_config("linux-native-debug") or get_config("linux-x64-native-debug")) and
+        (target:is_arch("mips64", "mips64el") or triple:find("^mips64el%-") or llvm_triple:find("^mips64el%-") or
+            triple:find("^mips64%-") or llvm_triple:find("^mips64%-")) then
+        return false
+    end
+    return true
+end
+
 rule("debug", function()
     on_load(function(target)
         target:add("defines", "DEBUG", "_DEBUG")
@@ -39,13 +57,20 @@ rule("release", function()
     on_load(function(target)
         target:add("defines", "NDEBUG")
         target:add("defines", "UWVM_MODE_RELEASE")
-        target:set("optimize", "fastest")
+        local macos_4gib_test = get_config("macos-4gib-test")
+        if macos_4gib_test then
+            assert(target:is_plat("macosx") and target:is_arch("arm64", "aarch64"),
+                "--macos-4gib-test requires macOS ARM64 release mode")
+            target:set("optimize", "none")
+        else
+            target:set("optimize", "fastest")
+        end
         --target:set("fpmodels", "precise")
         local level = strip_level("none")
         if should_strip_symbols(level) then
             target:set("strip", "all")
         end
-        target:set("policy", "build.optimization.lto", enable_lto)
+        target:set("policy", "build.optimization.lto", release_lto_enabled(target) and not macos_4gib_test)
     end)
 end)
 
@@ -59,7 +84,7 @@ rule("minsizerel", function()
         if should_strip_symbols(level) then
             target:set("strip", "all")
         end
-        target:set("policy", "build.optimization.lto", enable_lto)
+        target:set("policy", "build.optimization.lto", release_lto_enabled(target))
     end)
 end)
 
@@ -70,7 +95,7 @@ rule("releasedbg", function()
         target:set("optimize", "fastest")
         --target:set("fpmodels", "precise")
         target:set("symbols", "debug")
-        target:set("policy", "build.optimization.lto", enable_lto)
+        target:set("policy", "build.optimization.lto", release_lto_enabled(target))
         local level = strip_level("none")
         if should_strip_symbols(level) then
             target:set("strip", "all")

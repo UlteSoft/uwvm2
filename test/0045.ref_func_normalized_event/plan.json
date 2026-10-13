@@ -1,0 +1,268 @@
+{
+  "schema": "uwvm-ref-func-modern-finite-source-plan-r1",
+  "source_only": true,
+  "native_executions": 0,
+  "oracle_executions": 0,
+  "production_candidate_manifest_sha256": "d9ecc47f5c601d0c9792b97c41495ad223877bf763459efc7f13f43c34005214",
+  "official_sources": [
+    "https://webassembly.github.io/spec/core/valid/instructions.html#reference-instructions",
+    "https://webassembly.github.io/spec/core/binary/instructions.html#reference-instructions",
+    "https://webassembly.github.io/spec/core/appendix/algorithm.html",
+    "https://github.com/WebAssembly/spec/blob/main/test/core/ref_func.wast",
+    "https://github.com/WebAssembly/spec/blob/main/test/core/call_ref.wast"
+  ],
+  "cases": [
+    {
+      "file": "fixtures/index_and_type_130_call_ref.wat",
+      "valid": true,
+      "entry": "_start",
+      "features": {
+        "reference_types": true,
+        "function_references": true,
+        "gc": false,
+        "exceptions": false
+      },
+      "expected": "_start actually invokes function130 via call_ref type130 and checks42; official dump MUST prove encoded indices and bounded code offsets, not infer from WAT names."
+    },
+    {
+      "file": "fixtures/nonnull_typed_local_call_ref.wat",
+      "valid": true,
+      "entry": "_start",
+      "features": {
+        "reference_types": true,
+        "function_references": true,
+        "gc": false,
+        "exceptions": false
+      },
+      "expected": "ref.func exact nonnull indexed reference initializes a nondefaultable typed local, then its actual call_ref returns42."
+    },
+    {
+      "file": "fixtures/import_provider.wat",
+      "valid": true,
+      "entry": null,
+      "features": {
+        "reference_types": true,
+        "function_references": false,
+        "gc": false,
+        "exceptions": false
+      },
+      "expected": "official oracle/preload provider only; no _start, no standalone guest-execution PASS. Actual exported function type index1 differs from importer expected type index0."
+    },
+    {
+      "file": "fixtures/import_declared_heap_call_ref.wat",
+      "valid": true,
+      "entry": "_start",
+      "features": {
+        "reference_types": true,
+        "function_references": true,
+        "gc": false,
+        "exceptions": false
+      },
+      "expected": "_start executes actual imported reference target35+7=42; importer exact declaration heap0 must remain distinct from resolved provider heap1."
+    },
+    {
+      "file": "fixtures/declared_dead_then_live_call_ref.wat",
+      "valid": true,
+      "entry": "_start",
+      "features": {
+        "reference_types": true,
+        "function_references": true,
+        "gc": false,
+        "exceptions": false
+      },
+      "expected": "dead D2 validates membership but emits no SSA reference; live D2/call_ref actually invokes42."
+    },
+    {
+      "file": "fixtures/legacy_funcref_without_function_references.wat",
+      "valid": true,
+      "entry": "_start",
+      "features": {
+        "reference_types": true,
+        "function_references": false,
+        "gc": false,
+        "exceptions": false
+      },
+      "expected": "legacy D2/D1 executes nonnull test with function-references explicitly OFF; no false GC or typed-function proposal requirement."
+    },
+    {
+      "file": "fixtures/subtyped_function_heap_call_ref.wat",
+      "valid": true,
+      "entry": "_start",
+      "features": {
+        "reference_types": true,
+        "function_references": true,
+        "gc": true,
+        "exceptions": false
+      },
+      "expected": "actual D2 has exact derived nonnull heap; subtype-compatible call_ref base executes42; genuine Core3 sub function declarations."
+    },
+    {
+      "file": "fixtures/invalid_undeclared_dead_reference.wat",
+      "valid": false,
+      "entry": "_start",
+      "features": {
+        "reference_types": true,
+        "function_references": false,
+        "gc": false,
+        "exceptions": false
+      },
+      "expected": "wasm1p1_undeclared_ref_func for valid in-range function0 despite unreachable control; unused-body and dead-path validation are not suppressed."
+    },
+    {
+      "file": "fixtures/invalid_out_of_bounds_u32.wat",
+      "valid": false,
+      "entry": "_start",
+      "features": {
+        "reference_types": true,
+        "function_references": false,
+        "gc": false,
+        "exceptions": false
+      },
+      "expected": "invalid_function_index UINT32_MAX; actual bounded5byte u32 scan must fail index rather than signed decode or unsafe lookup."
+    },
+    {
+      "file": "fixtures/unused_invalid_reference_32.wat",
+      "valid": false,
+      "entry": "_start",
+      "features": {
+        "reference_types": true,
+        "function_references": false,
+        "gc": true,
+        "exceptions": false
+      },
+      "expected": "exact undeclared function1 at unused body31; module admission must reject before _start; latest GC declaration present and explicitly enabled."
+    }
+  ],
+  "official_oracle": {
+    "parse_all_success": 10,
+    "validate_success": 7,
+    "validate_failure": 3,
+    "commands": [
+      "WASM_TOOLS parse INPUT.wat -o OUTPUT.wasm",
+      "WASM_TOOLS validate OUTPUT.wasm",
+      "WASM_TOOLS dump OUTPUT.wasm"
+    ],
+    "tool_qualification": "keeper actual executable SHA, version/help, loader/dependency pins and argv; directory name is not version proof",
+    "invalid_bytes_preserved": true,
+    "encoding_assertions": [
+      {
+        "file": "fixtures/index_and_type_130_call_ref.wat",
+        "required": "actual official dump confirms type130 explicit target signature, actual target function130 and _start localfunction131; code D2 index130 unsigned bytes d2 82 01 and call_ref type130 14 82 01 within genuine expression, copy dump offsets and actual matching byte spans",
+        "not_proof": "counts/name text alone or global byte-sequence grep"
+      },
+      {
+        "file": "fixtures/import_provider.wat",
+        "required": "actual type section has padding0 and target signature1; exported plus defined function0 type1"
+      },
+      {
+        "file": "fixtures/import_declared_heap_call_ref.wat",
+        "required": "actual importer signature0 and imported function0; D2 idx0; call_ref type0; avoid deduplicating/rewriting source bytes"
+      },
+      {
+        "file": "fixtures/unused_invalid_reference_32.wat",
+        "required": "actual32 code bodies; function31 remains unused and targets in-range undeclared1; preserve invalidbytes"
+      }
+    ]
+  },
+  "finite_native_plan": {
+    "first_short_round": [
+      "index_and_type_130_call_ref",
+      "import_declared_heap_call_ref",
+      "invalid_undeclared_dead_reference"
+    ],
+    "mandatory_followup": "unused_invalid_reference_32 cold admission rejection; running only positives cannot prove unused-body validation",
+    "ordinary_modes": [
+      {
+        "compiler": "int",
+        "mode": "full"
+      },
+      {
+        "compiler": "jit",
+        "mode": "full"
+      },
+      {
+        "compiler": "int",
+        "mode": "lazy"
+      },
+      {
+        "compiler": "jit",
+        "mode": "lazy"
+      }
+    ],
+    "ros_modes": [
+      {
+        "compiler": "int",
+        "mode": "full"
+      },
+      {
+        "compiler": "jit",
+        "mode": "full"
+      }
+    ],
+    "separate_lazy_verification": {
+      "mode": "lazy+verification",
+      "qualifier": "separate observation, never treat flag as authoritative retained decoded payload or borrow as plain-lazy PASS"
+    },
+    "common_cli_tokens": [
+      "--runtime-compile-threads",
+      "0",
+      "--runtime-scheduling-policy",
+      "func_count",
+      "1",
+      "--wasm-enable-reference-types",
+      "--wasm-enable-bulk-memory"
+    ],
+    "compiler_mode_tokens": [
+      "--runtime-custom-compiler",
+      "COMPILER",
+      "--runtime-custom-mode",
+      "MODE"
+    ],
+    "feature_tokens": "one explicit enable/disable each for function-references/gc/exceptions per case; capture actual argv and build macros",
+    "entry": "_start on every valid consumer, no unused-function positive or provider no-entry pass",
+    "import_preload_tokens": [
+      "-Wpre",
+      "PROVIDER.wasm",
+      "ref-provider"
+    ],
+    "run_tokens": [
+      "--run",
+      "INPUT.wasm"
+    ],
+    "negative_controls": [
+      {
+        "file": "fixtures/legacy_funcref_without_function_references.wat",
+        "disable": "reference-types",
+        "expected": "exact reference_types/init_ref_func at first D2; legacy elementfuncidx3 depends on bulk-memory which stays ON, MVP table/function declarations need no earlier refs gate"
+      },
+      {
+        "file": "fixtures/index_and_type_130_call_ref.wat",
+        "disable": "function-references",
+        "expected": "D2 allowed with reference-types ON, following call_ref rejected for exact function_references; there is no earlier rich local/ref declaration"
+      },
+      {
+        "file": "fixtures/subtyped_function_heap_call_ref.wat",
+        "disable": "gc",
+        "expected": "exact sub-type/GC declaration failure; not D2-specific control"
+      }
+    ],
+    "not_pass": [
+      "unknown option",
+      "wrong actual mode",
+      "missing LLVM roles/macros",
+      "missing provider or actual invocation",
+      "signal crash",
+      "timeout",
+      "missing emitted module state",
+      "late badbody compile after guest effects"
+    ],
+    "fresh_coherent_sdk_required": "new helper/direct state producer; R12/R13-before headers or runtime SO cannot be mixed with post-D2 source"
+  },
+  "asm_plan": {
+    "executed": false,
+    "require": "original physical imported alias/reference-record symbol and endian packing; actual known_ref_func_index direct-call optimization retained; no new guest construction/trap helper",
+    "int": "unchanged ring handler and module-pointer/u32 immediate; actual combine/delay checked separately",
+    "llvm": "actual cold/warm cache symbols and actual IR/object/ASM snapshots from supported flags after coherent build; existing test/0014.llvm_jit/check_ref_func_codegen.py old-binary comparative thresholds are historical and must not be blindly reused for this semantically unchanged migration"
+  },
+  "scope": "12-leaf D2 event source only; no retained D2/control/call lowering or default lazy/full beforeeffects completeness claim"
+}

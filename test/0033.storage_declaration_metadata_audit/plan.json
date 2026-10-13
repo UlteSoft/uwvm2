@@ -1,0 +1,246 @@
+{
+  "schema": "uwvm-core3-storage-declaration-stage3-source-only-r1",
+  "source_only": true,
+  "oracle_passed": false,
+  "native_execution_passed": false,
+  "guest_execution": 0,
+  "before": "actual matching appliedStage2 all-runtime source/profile",
+  "cases": [
+    {
+      "name": "global_v128",
+      "wat_sha256": "0b0b02fad3bf249807c959a2b6424cf9ab238fc71893427f84c37ed4331ba0c4",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "simd",
+        "reject",
+        "global",
+        "123",
+        "global_v128.wasm"
+      ]
+    },
+    {
+      "name": "table_externref",
+      "wat_sha256": "7184288086e25c63d15ee461e7e9db3f21dbe62eb3f7a5227eb055b8ccb895df",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "reference-types",
+        "reject",
+        "table",
+        "111",
+        "table_externref.wasm"
+      ]
+    },
+    {
+      "name": "element_expression_funcref",
+      "wat_sha256": "49e19541170f61f30c5c0053ec58d7d4681eba53bef22338c9f656b3df88229f",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "reference-types",
+        "reject",
+        "element",
+        "7",
+        "element_expression_funcref.wasm"
+      ]
+    },
+    {
+      "name": "global_funcref",
+      "wat_sha256": "9fd2ed0b8a02bf32e63c9ac8e64bf14b2cf327fb6c7ee6c491397e96c649b943",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "reference-types",
+        "reject",
+        "global",
+        "112",
+        "global_funcref.wasm"
+      ]
+    },
+    {
+      "name": "table_gc_anyref",
+      "wat_sha256": "cdcef172673d650b6d54bdf30478acda866db6fe1ed86daae7ccc9e87bd1fe14",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "reference-types",
+        "reject",
+        "table",
+        "110",
+        "table_gc_anyref.wasm"
+      ]
+    },
+    {
+      "name": "global_gc_anyref",
+      "wat_sha256": "e4bad48c13c8f3a9a32a02c9c6ec71f72478f6735d84921d708fab8ab2492ecf",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "reference-types",
+        "reject",
+        "global",
+        "110",
+        "global_gc_anyref.wasm"
+      ]
+    },
+    {
+      "name": "global_exception_ref",
+      "wat_sha256": "6689f7ef9496e8f121680fc5658a80859f216dce4bb1fe57177acbe44eea4d50",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "reference-types",
+        "reject",
+        "global",
+        "105",
+        "global_exception_ref.wasm"
+      ]
+    },
+    {
+      "name": "element_gc_anyref",
+      "wat_sha256": "79d2276b963660574e9aa9830583ef333f40f66183fc4ec26d0e76855dbe5f58",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "reference-types",
+        "reject",
+        "element",
+        "5",
+        "element_gc_anyref.wasm"
+      ]
+    },
+    {
+      "name": "mvp_table_funcref",
+      "wat_sha256": "070ab369660befe5f2cf4f1a70f1434ffcc5a6cf467cb92eb05f7e9e19b7c3da",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "reference-types",
+        "accept",
+        "none",
+        "0",
+        "mvp_table_funcref.wasm"
+      ]
+    },
+    {
+      "name": "mvp_active_funcidx",
+      "wat_sha256": "8ffc9cec3151706a74fb8188bd1a9d549842ebbf3e5eee9a76792724b5f14dc9",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "reference-types",
+        "accept",
+        "none",
+        "0",
+        "mvp_active_funcidx.wasm"
+      ]
+    },
+    {
+      "name": "numeric_global_simd_control",
+      "wat_sha256": "af13a6f34dc7771ceeece8b07c561745e39bb2103f68f4b20cc8c56debf33f57",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "simd",
+        "accept",
+        "none",
+        "0",
+        "numeric_global_simd_control.wasm"
+      ]
+    },
+    {
+      "name": "import_table_externref",
+      "wat_sha256": "642ab3c41f0c78cd4beb03c5ec382ebb4bf0463c398dbcacd9e97bd8fab6804a",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "--provider",
+        "stage3_provider.wasm",
+        "reference-types",
+        "reject",
+        "table",
+        "111",
+        "import_table_externref.wasm"
+      ]
+    },
+    {
+      "name": "import_global_v128",
+      "wat_sha256": "d2230d6f1e1b06f5f6b897f08e5cd8a3dfa8608db04ba35dd24c9a6b60c926fe",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "--provider",
+        "stage3_provider.wasm",
+        "simd",
+        "reject",
+        "global",
+        "123",
+        "import_global_v128.wasm"
+      ]
+    },
+    {
+      "name": "import_global_externref",
+      "wat_sha256": "3d8d41f0a7016ef172633d49cf1ce1ee8129dfb826cffe5a4fd269ee3f4fa479",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "--provider",
+        "stage3_provider.wasm",
+        "reference-types",
+        "reject",
+        "global",
+        "111",
+        "import_global_externref.wasm"
+      ]
+    },
+    {
+      "name": "import_mvp_table_funcref",
+      "wat_sha256": "deac5c179477b80ad1bc9e7220d4330b883ea40a42bd380df08fe963e703c263",
+      "oracle": "valid_pending_actual",
+      "argv": [
+        "--provider",
+        "stage3_provider.wasm",
+        "reference-types",
+        "accept",
+        "none",
+        "0",
+        "import_mvp_table_funcref.wasm"
+      ]
+    }
+  ],
+  "first_cases": [
+    [
+      "simd",
+      "reject",
+      "global",
+      "123",
+      "global_v128.wasm"
+    ],
+    [
+      "reference-types",
+      "reject",
+      "table",
+      "111",
+      "table_externref.wasm"
+    ],
+    [
+      "reference-types",
+      "reject",
+      "element",
+      "7",
+      "element_expression_funcref.wasm"
+    ]
+  ],
+  "profiles_expected_per_case": {
+    "Ord_combined": 16,
+    "ROS_combined": 12,
+    "Ord_int_only": 6,
+    "ROS_int_only": 4
+  },
+  "llvm_macro_must_be_enabled_for_combined": true,
+  "actual_provider_module_name": "stage3_provider",
+  "oracle_argv": [
+    [
+      "{wasm_tools}",
+      "parse",
+      "{wat}",
+      "-o",
+      "{wasm}"
+    ],
+    [
+      "{wasm_tools}",
+      "validate",
+      "--features",
+      "all",
+      "{wasm}"
+    ]
+  ],
+  "official_spec_source_commit": "2e44bf79e68cc4fe689f43eea8e7d25b6fdfbce1"
+}

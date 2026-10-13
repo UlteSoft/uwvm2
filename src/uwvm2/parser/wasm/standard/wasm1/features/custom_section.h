@@ -45,6 +45,7 @@
 # include <uwvm2/parser/wasm/standard/wasm1/section/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/opcode/impl.h>
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm3/type/custom_section_details.h>
 # include "def.h"
 # include "feature_def.h"
 #endif
@@ -227,269 +228,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
     { return {::std::addressof(custom_section_storage), ::std::addressof(all_sections)}; }
 
-#ifndef UWVM_MODULE
-    // This optional context-print fast path depends on non-exported fast_io protocol internals.
-    namespace details::custom_section_print
+    // Use one public fast_io printer for all character types. The former
+    // char8_t context printer bypassed custom payload summaries entirely.
+    template <::std::integral Char, typename Stream, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline constexpr void print_define(::fast_io::io_reserve_type_t<Char, custom_section_storage_section_details_wrapper_t<Fs...>>,
+        Stream&& stream, custom_section_storage_section_details_wrapper_t<Fs...> details)
     {
-        template <::std::integral char_type, ::std::size_t n>
-        inline constexpr bool emit_literal(char_type*& curr, char_type* end, char_type const (&literal)[n], ::std::size_t& offset) noexcept
+        if(details.custom_section_storage_ptr == nullptr) { ::fast_io::fast_terminate(); }
+        namespace w3 = ::uwvm2::parser::wasm::standard::wasm3::type;
+        ::fast_io::operations::print_freestanding<false>(::std::forward<Stream>(stream), ::fast_io::mnp::code_cvt(u8"Customs:\n"));
+        for(auto const& custom : details.custom_section_storage_ptr->customs)
         {
-            constexpr ::std::size_t literal_size{n - 1uz};
-            auto const remain{literal_size - offset};
-            auto const space{static_cast<::std::size_t>(end - curr)};
-            auto const count{remain < space ? remain : space};
-
-            curr = ::fast_io::freestanding::my_copy_n(literal + offset, count, curr);
-            offset += count;
-
-            if(offset == literal_size)
-            {
-                offset = 0uz;
-                return true;
-            }
-
-            return false;
-        }
-
-        inline constexpr bool emit_u8string(char8_t*& curr,
-                                            char8_t* end,
-                                            ::uwvm2::utils::container::u8string_view view,
-                                            ::std::size_t& offset) noexcept
-        {
-            auto const literal_size{view.size()};
-            auto const remain{literal_size - offset};
-            auto const space{static_cast<::std::size_t>(end - curr)};
-            auto const count{remain < space ? remain : space};
-
-            curr = ::fast_io::freestanding::my_copy_n(view.cbegin() + offset, count, curr);
-            offset += count;
-
-            if(offset == literal_size)
-            {
-                offset = 0uz;
-                return true;
-            }
-
-            return false;
-        }
-
-        template <typename T>
-        inline constexpr bool emit_reserve(char8_t*& curr, char8_t* end, T value, ::std::size_t& offset) noexcept
-        {
-            using value_type = ::std::remove_cvref_t<T>;
-            constexpr ::std::size_t reserve_size{print_reserve_size(::fast_io::io_reserve_type<char8_t, value_type>)};
-
-            if(offset == 0uz && static_cast<::std::size_t>(end - curr) >= reserve_size)
-            {
-                curr = print_reserve_define(::fast_io::io_reserve_type<char8_t, value_type>, curr, value);
-                return true;
-            }
-
-            char8_t buffer[reserve_size];
-            auto const buffer_end{print_reserve_define(::fast_io::io_reserve_type<char8_t, value_type>, buffer, value)};
-            auto const literal_size{static_cast<::std::size_t>(buffer_end - buffer)};
-            auto const remain{literal_size - offset};
-            auto const space{static_cast<::std::size_t>(end - curr)};
-            auto const count{remain < space ? remain : space};
-
-            curr = ::fast_io::freestanding::my_copy_n(buffer + offset, count, curr);
-            offset += count;
-
-            if(offset == literal_size)
-            {
-                offset = 0uz;
-                return true;
-            }
-
-            return false;
-        }
-
-        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(header_literal, "Customs:\n");
-        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(row_prefix, " - custom (");
-        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(row_size_prefix, "): size = ");
-        UWVM_WASM_UTILS_DEFINE_CONTEXT_LITERAL(row_suffix, "\n");
-
-        enum class stage : unsigned char
-        {
-            header,
-            row_prefix,
-            row_name,
-            row_size_prefix,
-            row_size,
-            row_suffix,
-            done
-        };
-
-        struct context
-        {
-            stage curr_stage{};
-            ::std::size_t offset{};
-            ::std::size_t custom_counter{};
-
-            template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-            inline constexpr ::fast_io::context_print_result<char8_t*> print_context_define(
-                custom_section_storage_section_details_wrapper_t<Fs...> const custom_section_details_wrapper,
-                char8_t* curr,
-                char8_t* end) noexcept
-            {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                if(custom_section_details_wrapper.custom_section_storage_ptr == nullptr || custom_section_details_wrapper.all_sections_ptr == nullptr)
-                    [[unlikely]]
-                {
-                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-                }
-#endif
-
-                if(curr == end) [[unlikely]] { return {curr, false}; }
-
-                auto const& customs{custom_section_details_wrapper.custom_section_storage_ptr->customs};
-                auto const custom_size{customs.size()};
-
-                for(;;)
-                {
-                    switch(this->curr_stage)
-                    {
-                        case stage::header:
-                        {
-                            if(!emit_literal(curr, end, header_literal<char8_t>(), this->offset)) { return {curr, false}; }
-                            this->curr_stage = custom_size == 0uz ? stage::done : stage::row_prefix;
-                            break;
-                        }
-                        case stage::row_prefix:
-                        {
-                            if(this->custom_counter == custom_size)
-                            {
-                                this->curr_stage = stage::done;
-                                break;
-                            }
-
-                            if(!emit_literal(curr, end, row_prefix<char8_t>(), this->offset)) { return {curr, false}; }
-                            this->curr_stage = stage::row_name;
-                            break;
-                        }
-                        case stage::row_name:
-                        {
-                            auto const curr_custom_name{customs.index_unchecked(this->custom_counter).custom_name};
-                            if(!emit_u8string(curr, end, curr_custom_name, this->offset)) { return {curr, false}; }
-                            this->curr_stage = stage::row_size_prefix;
-                            break;
-                        }
-                        case stage::row_size_prefix:
-                        {
-                            if(!emit_literal(curr, end, row_size_prefix<char8_t>(), this->offset)) { return {curr, false}; }
-                            this->curr_stage = stage::row_size;
-                            break;
-                        }
-                        case stage::row_size:
-                        {
-                            auto const& curr_custom{customs.index_unchecked(this->custom_counter)};
-                            auto const curr_custom_size{static_cast<::std::size_t>(curr_custom.sec_span.sec_end - curr_custom.custom_begin)};
-                            if(!emit_reserve(curr, end, curr_custom_size, this->offset)) { return {curr, false}; }
-                            this->curr_stage = stage::row_suffix;
-                            break;
-                        }
-                        case stage::row_suffix:
-                        {
-                            if(!emit_literal(curr, end, row_suffix<char8_t>(), this->offset)) { return {curr, false}; }
-                            ++this->custom_counter;
-                            this->curr_stage = stage::row_prefix;
-                            break;
-                        }
-                        case stage::done: return {curr, true};
-                    }
-
-                    if(curr == end) { return {curr, false}; }
-                }
-            }
-        };
-    }  // namespace details::custom_section_print
-#endif
-
-    /// @brief Print the custom section details
-    /// @throws maybe throw fast_io::error, see the implementation of the stream
-    template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, custom_section_storage_section_details_wrapper_t<Fs...>>,
-                                       Stm && stream,
-                                       custom_section_storage_section_details_wrapper_t<Fs...> const custom_section_details_wrapper)
-    {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-        if(custom_section_details_wrapper.custom_section_storage_ptr == nullptr || custom_section_details_wrapper.all_sections_ptr == nullptr) [[unlikely]]
-        {
-            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-        }
-#endif
-
-        if constexpr(::std::same_as<char_type, char>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "Customs:\n"); }
-        else if constexpr(::std::same_as<char_type, wchar_t>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"Customs:\n"); }
-        else if constexpr(::std::same_as<char_type, char8_t>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"Customs:\n"); }
-        else if constexpr(::std::same_as<char_type, char16_t>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"Customs:\n"); }
-        else if constexpr(::std::same_as<char_type, char32_t>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"Customs:\n"); }
-
-        for(auto const& curr_custom: custom_section_details_wrapper.custom_section_storage_ptr->customs)
-        {
-            auto const curr_custom_name{curr_custom.custom_name};
-
-            auto const curr_custom_size{static_cast<::std::size_t>(curr_custom.sec_span.sec_end - curr_custom.custom_begin)};
-
-            if constexpr(::std::same_as<char_type, char>)
-            {
-                ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
-                                                                " - custom (",
-                                                                ::fast_io::mnp::code_cvt(curr_custom_name),
-                                                                "): size = ",
-                                                                curr_custom_size);
-            }
-            else if constexpr(::std::same_as<char_type, wchar_t>)
-            {
-                ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
-                                                                L" - custom (",
-                                                                ::fast_io::mnp::code_cvt(curr_custom_name),
-                                                                L"): size = ",
-                                                                curr_custom_size);
-            }
-            else if constexpr(::std::same_as<char_type, char8_t>)
-            {
-                // No need to convert to UTF-8
-                ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
-                                                                u8" - custom (",
-                                                                curr_custom_name,
-                                                                u8"): size = ",
-                                                                curr_custom_size);
-            }
-            else if constexpr(::std::same_as<char_type, char16_t>)
-            {
-                ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
-                                                                u" - custom (",
-                                                                ::fast_io::mnp::code_cvt(curr_custom_name),
-                                                                u"): size = ",
-                                                                curr_custom_size);
-            }
-            else if constexpr(::std::same_as<char_type, char32_t>)
-            {
-                ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
-                                                                U" - custom (",
-                                                                ::fast_io::mnp::code_cvt(curr_custom_name),
-                                                                U"): size = ",
-                                                                curr_custom_size);
-            }
+            // The custom parser retained three endpoints in the same module
+            // allocation: sec_begin <= custom_begin <= sec_end. Empty payloads
+            // require no read; diagnostic summarization keeps the sec_end bound.
+            auto const payload_size{static_cast<::std::size_t>(custom.sec_span.sec_end - custom.custom_begin)};
+            auto const content_size{static_cast<::std::size_t>(custom.sec_span.sec_end - custom.sec_span.sec_begin)};
+            // [section name] payload ... section_end
+            // [safe        ] unsafe (possibly section_end)
+            //                ^^ begin/end: borrow validated endpoints, never advance a module cursor.
+            auto const payload{w3::custom_payload_details_t{custom.custom_name,
+                reinterpret_cast<::std::byte const*>(custom.custom_begin), reinterpret_cast<::std::byte const*>(custom.sec_span.sec_end)}};
+            ::fast_io::operations::print_freestanding<true>(::std::forward<Stream>(stream), ::fast_io::mnp::code_cvt(u8" - custom ("),
+                w3::escaped_custom_name_t{custom.custom_name}, ::fast_io::mnp::code_cvt(u8"): size = "), ::fast_io::mnp::dec(payload_size),
+                ::fast_io::mnp::code_cvt(u8", content-size = "), ::fast_io::mnp::dec(content_size), payload);
         }
     }
 
-#ifndef UWVM_MODULE
-    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-        requires ::std::same_as<char_type, char8_t>
-    inline constexpr auto print_context_type(::fast_io::io_reserve_type_t<char_type, custom_section_storage_section_details_wrapper_t<Fs...>>) noexcept
-    { return ::fast_io::io_type_t<::uwvm2::parser::wasm::standard::wasm1::features::details::custom_section_print::context>{}; }
-
-    template <::std::integral char_type, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-        requires ::std::same_as<char_type, char8_t>
-    inline constexpr ::std::size_t print_context_static_buffer_size(
-        ::fast_io::io_reserve_type_t<char_type, custom_section_storage_section_details_wrapper_t<Fs...>>) noexcept
-    {
-        constexpr auto buffer_size{::fast_io::details::dynamic_reserve_default_static_stack_size<char_type>()};
-        return buffer_size;
-    }
-#endif
 }
 
 /// @brief Define container optimization operations for use with fast_io

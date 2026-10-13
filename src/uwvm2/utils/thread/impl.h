@@ -24,4 +24,13 @@
 
 #ifndef UWVM_MODULE
 # include "native_thread.h"
+# include "native_thread_join.h"
+# include "keyed_wait_set.h"
+# include "execution_lifetime.h"
+# include "execution_domain.h"
+# include "checkpoint_host_admission.h"
+# include "cooperative_pause_domain.h"
+# include "collection_pause_domain.h"
+# include "immutable_snapshot.h"
+# include "deferred_owner.h"
 #endif

@@ -11,7 +11,8 @@ mkdir -p "$out"
 # path, not an evaluated shell command; invoke again to cover another compiler.
 for opt in O0 O3; do
     "${CXX:-c++}" -std=c++23 "-$opt" -Wall -Wextra -Werror -pthread \
-        -I"$root/src" "$root/test/0017.runtime/native_stack_signal_install.cpp" \
+        -I"$root/src" -I"$root/third-parties/fast_io/include" \
+        "$root/test/0017.runtime/native_stack_signal_install.cpp" \
         -Wl,--wrap=sigaction -o "$out/$opt"
     "$out/$opt"
 done

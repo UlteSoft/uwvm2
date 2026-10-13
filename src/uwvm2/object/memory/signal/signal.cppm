@@ -37,6 +37,11 @@ module;
 #include <uwvm2/utils/macro/push_macros.h>
 // platfrom
 #include <signal.h>
+#if defined(_WIN32) && !defined(__CYGWIN__)
+// Fast_io declares CONTEXT aliases in its global module fragment; importing
+// fast_io does not make that private fragment visible to this named module.
+#include <fast_io.h>
+#endif
 
 export module uwvm2.object.memory.signal:signal;
 

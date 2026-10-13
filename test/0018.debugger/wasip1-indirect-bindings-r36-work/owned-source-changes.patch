@@ -1,0 +1,1122 @@
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime.h
+@@ -587,7 +587,7 @@
+     enum class llvm_jit_checkpoint_prepare_status : unsigned char
+     { prepared_and_discarded, requires_llvm_jit_full, not_selected, invalid_request,
+       unavailable_capture, resource_preparation_declined, engine_preparation_declined, allocation_failed,
+-      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained, dispatch_binding_preparation_declined };
++      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained, dispatch_binding_preparation_declined, indirect_binding_preparation_declined };
+     struct llvm_jit_checkpoint_prepare_request
+     {
+         ::std::array<::std::byte,16u> recording_label{};
+@@ -605,6 +605,8 @@
+         bool include_wasip1{}, require_managed_wasip1_resources{true};
+         // Combined final defined/import cache entries; checked before allocation.
+         ::std::size_t maximum_private_dispatch_bindings{1048576u};
++        // Combined caller type records, table views and per-caller function slots.
++        ::std::size_t maximum_private_indirect_bindings{1048576u};
+     };
+     struct llvm_jit_checkpoint_prepare_result
+     {
+@@ -646,6 +648,10 @@
+         ::std::size_t prepared_runtime_defined_bindings{}, prepared_runtime_import_bindings{};
+         ::std::size_t prepared_runtime_defined_pointer_ranges{};
+         bool runtime_dispatch_bindings_prepared{}; // Private new-source caches; no publication.
++        ::std::size_t prepared_runtime_type_bindings{}, prepared_runtime_table_views{}, prepared_runtime_function_table_views{};
++        ::std::size_t prepared_runtime_indirect_targets{}, prepared_runtime_indirect_defined_targets{}, prepared_runtime_indirect_import_targets{};
++        ::std::size_t prepared_runtime_indirect_null_targets{}, prepared_runtime_indirect_incompatible_targets{};
++        bool runtime_indirect_bindings_prepared{}; // New-source private views; no guest permission.
+     };
+     struct llvm_jit_checkpoint_native_retirement_result
+     {
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_indirect_bindings.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_indirect_bindings.h
+@@ -0,0 +1,228 @@
++// Private candidate member fragment. Compact call_indirect views must borrow
++// final NEW source records, caller type namespaces and NEW engine addresses.
++// No current runtime cache, TLS projection cache or global refresh hook changes.
++#pragma once
++decltype(g_runtime.modules) indirect_dispatch_modules_{};
++bool indirect_bindings_prepared_{};
++
++template<typename Record,typename Selector>
++[[nodiscard]] bool locate_private_dispatch_record(Record const* pointer,Selector select,
++    ::std::size_t& dense,::std::size_t& local) const noexcept
++{
++    dense=local=SIZE_MAX;
++    if(pointer==nullptr) { return false; }
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto const& bound=modules_[owner];
++        // Compare an address token with aligned FINAL vector membership before
++        // reading the candidate pointee, including every imported alias hop.
++        if(checkpoint_world_data::in::details::linked_function_record_index(pointer,select(*bound.actual),local))
++        { dense=bound.new_actual_id;return true; }
++    }
++    return false;
++}
++
++[[nodiscard]] runtime_table_storage_t const* resolve_private_dispatch_table(
++    module_type const& module,::std::size_t index,::std::size_t all_imports) const noexcept
++{
++    namespace st=checkpoint_world_data::st;
++    auto const imported=module.imported_table_vec_storage.size();
++    if(index>=imported)
++    {
++        auto const local=index-imported;
++        return local<module.local_defined_table_vec_storage.size()?
++            ::std::addressof(module.local_defined_table_vec_storage.index_unchecked(local)):nullptr;
++    }
++    auto const* next=::std::addressof(module.imported_table_vec_storage.index_unchecked(index));
++    using kind=st::imported_table_storage_t::imported_table_link_kind;
++    for(::std::size_t step{};step<all_imports;++step)
++    {
++        ::std::size_t dense{},local{};
++        if(!locate_private_dispatch_record(next,[](auto const& m)->auto const& { return m.imported_table_vec_storage; },dense,local))
++        { return nullptr; }
++        auto const& actual=modules_[actual_dense_module_owners_[dense]].actual->imported_table_vec_storage.index_unchecked(local);
++        if(actual.link_kind==kind::imported) { next=actual.target.imported_ptr;continue; }
++        if(actual.link_kind!=kind::defined || !locate_private_dispatch_record(actual.target.defined_ptr,
++            [](auto const& m)->auto const& { return m.local_defined_table_vec_storage; },dense,local))
++        { return nullptr; }
++        return ::std::addressof(modules_[actual_dense_module_owners_[dense]].actual->local_defined_table_vec_storage.index_unchecked(local));
++    }
++    return nullptr; // cycles cannot consume more than the actual import roster
++}
++
++[[nodiscard]] bool prepare_world_indirect_bindings(::std::size_t maximum_bindings,
++    llvm_jit_checkpoint_prepare_result& out)
++{
++    namespace st=checkpoint_world_data::st;
++    if(phase_!=preparation_status::resources_prepared || !dispatch_bindings_prepared_ ||
++       indirect_bindings_prepared_ || !indirect_dispatch_modules_.empty() ||
++       !context_ || !prepared_source_ || prepared_source_->initialized_from_actual_state() ||
++       engines_.size()!=modules_.size() || actual_dense_module_owners_.size()!=modules_.size())
++    { return fail(preparation_status::source_mismatch); }
++    ::std::size_t total{},types{},views{},imported_tables{},targets{},function_views{};
++    auto const reserve_count=[&](::std::size_t count)->bool
++    {
++        if(total>maximum_bindings || count>maximum_bindings-total)
++        { return fail(preparation_status::quota_exceeded); }
++        total+=count;return true;
++    };
++    // Bound alias expansion PER CALLER, not just distinct underlying tables.
++    // Every count and native backing charge precedes cache/view allocation.
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto const& bound=modules_[owner];
++        if(bound.actual==nullptr || bound.new_actual_id>=modules_.size() ||
++           context_->unpublished_file_for_module(bound.actual)!=bound.file)
++        { return fail(preparation_status::source_mismatch); }
++        auto const& module=*bound.actual;auto const& section=module.type_section_storage;
++        auto const count=static_cast<::std::size_t>(section.type_section_count);
++        if(count!=section.type_section_count || count>=UINT32_MAX ||
++           (count!=0u && (section.type_section_begin==nullptr || section.type_section_end==nullptr)) ||
++           ((section.type_section_begin==nullptr)!=(section.type_section_end==nullptr)) ||
++           (section.type_section_begin!=nullptr &&
++            (section.type_section_end<section.type_section_begin ||
++             static_cast<::std::size_t>(section.type_section_end-section.type_section_begin)!=count)))
++        { return fail(preparation_status::type_mismatch); }
++        auto const imports=module.imported_table_vec_storage.size();
++        auto const locals=module.local_defined_table_vec_storage.size();
++        if(!reserve_count(count) || !reserve_count(imports) || !reserve_count(locals)) { return false; }
++        types+=count;views+=imports+locals;imported_tables+=imports;
++        if(module.llvm_jit_call_indirect_table_views.size()!=imports+locals)
++        { return fail(preparation_status::source_mismatch); }
++        for(auto const& view:module.llvm_jit_call_indirect_table_views)
++        { if(view.data_address!=0u || view.size!=0u) { return fail(preparation_status::source_mismatch); } }
++    }
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto const& module=*modules_[owner].actual;
++        for(::std::size_t index{};index<module.llvm_jit_call_indirect_table_views.size();++index)
++        {
++            auto const* table=resolve_private_dispatch_table(module,index,imported_tables);
++            ::std::size_t table_dense{},local{};
++            if(table==nullptr || !locate_private_dispatch_record(table,
++                [](auto const& m)->auto const& { return m.local_defined_table_vec_storage; },table_dense,local))
++            { return fail(preparation_status::invalid_import); }
++            auto const* owner_module=modules_[actual_dense_module_owners_[table_dense]].actual;
++            if(table->owner_module_rt_ptr!=owner_module || table->table_type_ptr==nullptr)
++            { return fail(preparation_status::source_mismatch); }
++            if(st::runtime_table_family(*table)!=st::runtime_table_reference_family::function) { continue; }
++            if(!reserve_count(table->elems.size())) { return false; }
++            targets+=table->elems.size();++function_views;
++        }
++    }
++    using targets_vector=decltype(compiled_module_record::llvm_jit_call_indirect_targets)::value_type;
++    if(!charge_native(modules_.size(),sizeof(compiled_module_record)) ||
++       !charge_native(types,sizeof(::std::size_t)) || !charge_native(views,sizeof(targets_vector)) ||
++       !charge_native(targets,sizeof(runtime_llvm_jit_raw_call_target_t))) { return false; }
++    indirect_dispatch_modules_.resize(modules_.size());
++    ::std::size_t defined{},imports{},nulls{},incompatible{};
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto const& bound=modules_[owner];auto const dense=bound.new_actual_id;
++        auto const& module=*bound.actual;auto& record=indirect_dispatch_modules_.index_unchecked(dense);
++        record.runtime_module=bound.actual;record.type_canon_index=build_type_canon_index(module);
++        if(record.type_canon_index.size()!=module.type_section_storage.type_section_count)
++        { return fail(preparation_status::type_mismatch); }
++        auto& tables=record.llvm_jit_call_indirect_targets;
++        tables.resize(module.llvm_jit_call_indirect_table_views.size());
++        for(::std::size_t index{};index<tables.size();++index)
++        {
++            auto const* table=resolve_private_dispatch_table(module,index,imported_tables);
++            if(table==nullptr) { return fail(preparation_status::invalid_import); }
++            if(st::runtime_table_family(*table)!=st::runtime_table_reference_family::function) { continue; }
++            auto& entries=tables.index_unchecked(index);entries.resize(table->elems.size());
++            for(::std::size_t slot{};slot<entries.size();++slot)
++            {
++                auto const& element=table->elems.index_unchecked(slot);
++                auto& target=entries.index_unchecked(slot);
++                module_type const* actual_module{};
++                st::wasm_binfmt1_final_function_type_t const* actual_type{};
++                ::std::size_t function_dense{},local{};
++                using kind=st::local_defined_table_elem_storage_type_t;
++                switch(element.type)
++                {
++                    case kind::func_ref_defined:
++                    {
++                        auto const* function=element.storage.defined_ptr;
++                        if(function==nullptr) { ++nulls;continue; }
++                        if(!locate_private_dispatch_record(function,
++                            [](auto const& m)->auto const& { return m.local_defined_function_vec_storage; },function_dense,local) ||
++                           function_dense>=engines_.size() || local>=engines_[function_dense]->entries_.size())
++                        { return fail(preparation_status::source_mismatch); }
++                        auto const& entry=engines_[function_dense]->entries_[local];
++                        if(entry.raw==0u || entry.typed==0u) { return fail(preparation_status::source_mismatch); }
++                        target.entry_address=entry.raw;target.typed_entry_address=entry.typed;
++                        actual_module=modules_[actual_dense_module_owners_[function_dense]].actual;
++                        actual_type=function->function_type_ptr;++defined;break;
++                    }
++                    case kind::func_ref_imported:
++                    {
++                        auto const* function=element.storage.imported_ptr;
++                        if(function==nullptr) { ++nulls;continue; }
++                        if(!locate_private_dispatch_record(function,
++                            [](auto const& m)->auto const& { return m.imported_function_vec_storage; },function_dense,local) ||
++                           function_dense>=import_dispatch_bindings_.size() ||
++                           local>=import_dispatch_bindings_.index_unchecked(function_dense).size())
++                        { return fail(preparation_status::invalid_import); }
++                        auto const& cached=import_dispatch_bindings_.index_unchecked(function_dense).index_unchecked(local);
++                        if(cached.origin_module_id!=function_dense) { return fail(preparation_status::invalid_import); }
++                        if(cached.k==cached_import_target::kind::defined)
++                        {
++                            ::std::size_t leaf_dense{},leaf_local{};
++                            if(!locate_private_dispatch_record(cached.u.defined.runtime_func,
++                                [](auto const& m)->auto const& { return m.local_defined_function_vec_storage; },leaf_dense,leaf_local) ||
++                               cached.frame.module_id!=leaf_dense)
++                            { return fail(preparation_status::invalid_import); }
++                            actual_module=modules_[actual_dense_module_owners_[leaf_dense]].actual;
++                            actual_type=cached.u.defined.runtime_func->function_type_ptr;
++                        }
++                        else if(cached.k==cached_import_target::kind::local_imported)
++                        {
++                            actual_module=modules_[actual_dense_module_owners_[function_dense]].actual;
++                            if(function->import_type_ptr==nullptr) { return fail(preparation_status::invalid_import); }
++                            actual_type=function->import_type_ptr->imports.storage.function;
++                        }
++                        else { return fail(preparation_status::unavailable_adapter); }
++                        target.entry_address=reinterpret_cast<::std::uintptr_t>(llvm_jit_raw_call_cached_import_entry);
++                        target.context_address=reinterpret_cast<::std::uintptr_t>(::std::addressof(cached));
++                        ++imports;break;
++                    }
++                    default: return fail(preparation_status::type_mismatch);
++                }
++                if(actual_module==nullptr || runtime_type_index_for_pointer(*actual_module,actual_type)==SIZE_MAX)
++                { return fail(preparation_status::type_mismatch); }
++                // The uncached matcher preserves rich heap/subtype identity and
++                // does not contaminate the OLD world's TLS projection cache.
++                target.encoded_type_id=find_canonical_type_id_for_type_uncached(record,*actual_module,actual_type);
++                // Valid references need not match any callable type in this
++                // caller; retain the sentinel so a later call traps normally.
++                if(target.encoded_type_id==invalid_llvm_jit_encoded_type_id()) { ++incompatible; }
++            }
++        }
++    }
++    if(defined+imports+nulls!=targets) { return fail(preparation_status::source_mismatch); }
++    // All final allocations and possible failures precede private view stores.
++    // Empty GC/extern/exn tables stay empty even with a legacy funcref carrier.
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto& module=*modules_[owner].actual;auto const dense=modules_[owner].new_actual_id;
++        auto const& tables=indirect_dispatch_modules_.index_unchecked(dense).llvm_jit_call_indirect_targets;
++        for(::std::size_t index{};index<tables.size();++index)
++        {
++            auto const& entries=tables.index_unchecked(index);
++            auto& view=module.llvm_jit_call_indirect_table_views.index_unchecked(index);
++            view={};
++            if(!entries.empty())
++            { view={};
++            if(!entries.empty())
++            { view.data_address=reinterpret_cast<::std::uintptr_t>(entries.data());view.size=entries.size(); } }
++        }
++    }
++    indirect_bindings_prepared_=true;
++    out.runtime_indirect_bindings_prepared=true;out.prepared_runtime_type_bindings=types;
++    out.prepared_runtime_table_views=views;out.prepared_runtime_function_table_views=function_views;
++    out.prepared_runtime_indirect_targets=targets;out.prepared_runtime_indirect_defined_targets=defined;
++    out.prepared_runtime_indirect_import_targets=imports;out.prepared_runtime_indirect_null_targets=nulls;
++    out.prepared_runtime_indirect_incompatible_targets=incompatible;
++    return true; // private DATA; no global publication or execution credential
++}
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_preparation_api.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_preparation_api.h
+@@ -66,6 +66,9 @@
+             out.prepared_threads=prepared->prepared_threads_.size();out.prepared_frames=prepared->prepared_frames_;
+             out.status=llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined;
+             if(!prepared->prepare_world_dispatch_bindings(source,request.maximum_private_dispatch_bindings,out))
++            { out.native_payload_bytes=prepared->native_bytes_;out.resource_diagnostic=static_cast<unsigned>(prepared->phase_);return; }
++            out.status=llvm_jit_checkpoint_prepare_status::indirect_binding_preparation_declined;
++            if(!prepared->prepare_world_indirect_bindings(request.maximum_private_indirect_bindings,out))
+             { out.native_payload_bytes=prepared->native_bytes_;out.resource_diagnostic=static_cast<unsigned>(prepared->phase_);return; }
+             out.prepared_root_carriers=prepared->prepared_root_carriers_;
+             out.native_payload_bytes=prepared->native_bytes_;
+--- a/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_resources.h
++++ b/uwvm2-ros/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_resources.h
+@@ -1196,6 +1196,7 @@
+         }
+ # include "uwvm_runtime_checkpoint_world_frames.h"
+ # include "uwvm_runtime_checkpoint_world_function_bindings.h"
++# include "uwvm_runtime_checkpoint_world_indirect_bindings.h"
+ # include "uwvm_runtime_checkpoint_world_roots.h"
+ # include "uwvm_runtime_checkpoint_world_root_workers.h"
+     public:
+--- a/uwvm2-ros/src/uwvm2/uwvm/debugger/wasip1_checkpoint.md
++++ b/uwvm2-ros/src/uwvm2/uwvm/debugger/wasip1_checkpoint.md
+@@ -750,3 +750,11 @@
+ Fresh root resources derive both child base and inheriting rights from one PATH_OPEN parent's inheriting rights, just like the original path_open. The parent does not need to hold those child rights in its own base set. A preexisting matching root can instead authorize reconstruction through its held rights. Closing a target child before import cannot turn a legitimate delegated reconstruction into capability_denied; stronger synchronization still requires its own parent authority.
+ 
+ Portable root lookup checks the saved rights and native flags together on ONE actual target FD. A lower-numbered root with different flags cannot hide a later complete matching or independently mutable root. Separate roots cannot combine PATH_OPEN, inheriting rights or SET_FLAGS to manufacture restoration authority. Native observations and positive/negative selections are cached only within the current closed-gate import, then discarded. See [the root selection regression report](../../../../test/0018.debugger/wasip1_checkpoint_root_selection_test_report.md).
++
++### 新 world 的私有间接调用绑定（R36）
++
++候选 world 在旧 worker 退休前准备 caller-local 类型 canonical 表和 LLVM call_indirect 表视图。表导入的每一跳、表元素的函数指针和最终目标都必须属于新 source 的实际记录；defined 目标指向新 LLVM 引擎，import 目标借用新私有 import cache。Core 3.0 子类型通过未缓存的完整类型匹配投影到调用者类型空间；无匹配的有效引用保留不匹配 sentinel，null 和 GC/extern/exn 表保留原语义。准备过程不修改当前 runtime 的表刷新 hook 或 TLS 类型缓存。
++
++maximum_private_indirect_bindings 默认 1,048,576，合计限制类型记录、所有 caller 的表视图和 function-table 目标槽；import alias 的目标槽按每个 caller 单独计数。超限返回 indirect_binding_preparation_declined，旧 guest 保持同一 pause 和 epoch。结果的 runtime_indirect_bindings_prepared 和目标分类计数只是私有准备诊断，不能执行 guest，也不表示 whole-world publication、恢复线程启动或恢复重放已完成。
++
++Wasm checkpoint 检测到 WASIp1 时仍必须在同一个停止点同时 checkpoint WASIp1；文件内容和外部 I/O 副作用不属于状态回滚。
+--- a/uwvm2-ros/test/0017.runtime/debug_checkpoint_prepared_retirement_runtime.cc
++++ b/uwvm2-ros/test/0017.runtime/debug_checkpoint_prepared_retirement_runtime.cc
+@@ -235,7 +235,9 @@
+ }
+ int main(int argc, char** argv)
+ {
+-    if(argc != 3) { return 64; }
++    if(argc != 3 && argc != 4) { return 64; }
++    bool const exercise_indirect{argc==4};
++    if(exercise_indirect) { REQUIRE(::fast_io::concat_std(::fast_io::mnp::os_c_str(argv[3]))=="indirect"); }
+     auto const policy{::fast_io::concat_std(::fast_io::mnp::os_c_str(argv[2]))};
+     REQUIRE(policy == "instruction" || policy == "unwind");
+     mode::global_runtime_mode = mode::runtime_mode_t::full_compile;
+@@ -362,6 +364,10 @@
+     denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
+     REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined && !denied.operation && !denied.candidate_world_retained);
+     REQUIRE(state->control->capture(state->ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch);
++    invalid=prepare_request;invalid.maximum_private_indirect_bindings=0u;
++    denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
++    REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::indirect_binding_preparation_declined && !denied.operation && !denied.candidate_world_retained && !denied.preparation.runtime_indirect_bindings_prepared);
++    REQUIRE(state->control->capture(state->ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch);
+     invalid=prepare_request;invalid.maximum_private_root_workers=0u;
+     denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
+     ::fast_io::print(::fast_io::err(),"PREPARE_PREFLIGHT denied status=",::fast_io::mnp::dec(static_cast<unsigned>(denied.status)),
+@@ -383,6 +389,14 @@
+         pending.preparation.prepared_runtime_defined_bindings==pending.preparation.functions &&
+         pending.preparation.prepared_runtime_defined_bindings==3u && pending.preparation.prepared_runtime_import_bindings==0u &&
+         pending.preparation.prepared_runtime_defined_pointer_ranges==1u);
++    REQUIRE(pending.preparation.runtime_indirect_bindings_prepared && pending.preparation.prepared_runtime_type_bindings>0u);
++    if(exercise_indirect)
++    {
++        REQUIRE(pending.preparation.prepared_runtime_table_views==3u && pending.preparation.prepared_runtime_function_table_views==2u &&
++            pending.preparation.prepared_runtime_indirect_targets==3u && pending.preparation.prepared_runtime_indirect_defined_targets==2u &&
++            pending.preparation.prepared_runtime_indirect_import_targets==0u && pending.preparation.prepared_runtime_indirect_null_targets==1u &&
++            pending.preparation.prepared_runtime_indirect_incompatible_targets==0u);
++    }
+     auto operation{pending.operation};
+     { ::std::unique_lock lock{windows->mutex};
+       auto const bodies_ready{windows->changed.wait_until(lock,deadline(),[&] { return windows->body_waiters == 2u; })};
+--- a/uwvm2-ros/test/0017.runtime/debug_wasip1_prepared_retirement_runtime.cc
++++ b/uwvm2-ros/test/0017.runtime/debug_wasip1_prepared_retirement_runtime.cc
+@@ -105,7 +105,9 @@
+ static auto short_deadline() { return ::std::chrono::steady_clock::now()+::std::chrono::milliseconds{500}; }
+ int main(int argc,char** argv)
+ {
+-    if(argc!=3) { return 64; }
++    if(argc!=3 && argc!=4) { return 64; }
++    bool const exercise_indirect{argc==4};
++    if(exercise_indirect) { require(::fast_io::concat_std(::fast_io::mnp::os_c_str(argv[3]))=="indirect","indirect fixture selector"); }
+     auto const policy{::fast_io::concat_std(::fast_io::mnp::os_c_str(argv[2]))};
+     require(policy=="instruction" || policy=="unwind","explicit stack policy");
+     mode::global_runtime_mode=mode::runtime_mode_t::full_compile;mode::global_runtime_compiler=mode::runtime_compiler_t::llvm_jit_only;
+@@ -151,11 +153,23 @@
+     auto bindings_refused=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,limited,deadline());
+     require(bindings_refused.status==outcome::preparation_declined && bindings_refused.preparation.status==lib::llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined && !bindings_refused.operation,"private dispatch budget refuses before old worker retirement");
+     require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"dispatch failure leaves original WASI guest unchanged");
++    limited=request;limited.maximum_private_indirect_bindings=0u;
++    auto indirect_refused=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,limited,deadline());
++    require(indirect_refused.status==outcome::preparation_declined && indirect_refused.preparation.status==lib::llvm_jit_checkpoint_prepare_status::indirect_binding_preparation_declined && !indirect_refused.operation && !indirect_refused.candidate_world_retained && !indirect_refused.preparation.runtime_indirect_bindings_prepared,"indirect budget refuses before old WASI worker retirement");
++    require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"indirect failure leaves original WASI guest unchanged");
+     auto pending{lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,request,short_deadline())};
+     ::fast_io::print(::fast_io::out(),"WASIP1_PREPARED_RETIREMENT stage=execution status=",::fast_io::mnp::dec(static_cast<unsigned>(pending.status))," prepare=",::fast_io::mnp::dec(static_cast<unsigned>(pending.preparation.status)),"\n");
+     require(pending.status==outcome::pending_execution && pending.operation && pending.candidate_world_retained,"candidate survives pending execution drain");
+     require(pending.preparation.status==lib::llvm_jit_checkpoint_prepare_status::prepared_and_retained && pending.preparation.data_error==::uwvm2::uwvm::debugger::checkpoint::error::none && pending.preparation.wasip1_installed_privately && pending.preparation.wasip1_prepared_together && pending.preparation.wasip1_environments==1u && pending.preparation.prepared_wasip1_memories==1u && pending.preparation.joined_private_root_workers==1u,"new WASI memory and complete private candidate retained together");
+     require(pending.preparation.runtime_dispatch_bindings_prepared && pending.preparation.prepared_runtime_defined_bindings==pending.preparation.functions && pending.preparation.prepared_runtime_import_bindings>0u && pending.preparation.prepared_runtime_defined_pointer_ranges>0u,"new source owns complete defined and builtin WASI dispatch bindings");
++    require(pending.preparation.runtime_indirect_bindings_prepared && pending.preparation.prepared_runtime_type_bindings>0u,"private caller type bindings prepared");
++    if(exercise_indirect)
++    {
++        require(pending.preparation.prepared_runtime_table_views==1u && pending.preparation.prepared_runtime_function_table_views==1u &&
++            pending.preparation.prepared_runtime_indirect_targets==3u && pending.preparation.prepared_runtime_indirect_defined_targets==1u &&
++            pending.preparation.prepared_runtime_indirect_import_targets==1u && pending.preparation.prepared_runtime_indirect_null_targets==1u &&
++            pending.preparation.prepared_runtime_indirect_incompatible_targets==0u,"private WASI table preserves defined, builtin and null target types");
++    }
+     auto operation{pending.operation};
+     { ::std::unique_lock lock{windows->mutex};require(windows->changed.wait_until(lock,deadline(),[&] { return windows->body_waiters==1u; }),"old native body waits outside guest entry");windows->release_body=true;windows->changed.notify_all();require(windows->changed.wait_until(lock,deadline(),[&] { return windows->tls_waiters==1u; }),"real old TLS destructor delays physical death"); }
+     auto tls{lib::llvm_jit_checkpoint_continue_native_retirement_host_api(operation,short_deadline())};
+--- a/uwvm2-ros/test/0017.runtime/fixtures/debug_checkpoint_indirect_retirement_cohort.wat
++++ b/uwvm2-ros/test/0017.runtime/fixtures/debug_checkpoint_indirect_retirement_cohort.wat
+@@ -0,0 +1,126 @@
++;; Fresh full census input; setup writes, two guests subsequently read only.
++;; Modern memory64/table64, nonnullable typed initializer, GC cycles, EH, SIMD,
++;; extern wrappers and live/dropped passive data/element segments.
++(module
++  (rec (type $node (struct (field (mut (ref null $node))) (field (mut i8)) (field v128))))
++  (type $numbers (array (mut i64)))
++  (type $node-array (array (mut (ref null $node))))
++  (type $callback-type (func (result i32)))
++  (tag $event (param i32 (ref null $node) v128))
++  (table $nodes i64 2 4 (ref null $node))
++  (table $empty i64 0 0 (ref $callback-type) (ref.func $callback))
++  (memory $m i64 3 5)
++  (data $alive "alive\00")
++  (data $gone "gone")
++  (elem $alive-elements (ref $callback-type) (ref.func $callback))
++  (elem $gone-elements (ref $callback-type) (ref.func $callback))
++  (global $object (mut (ref null $node)) (ref.null $node))
++  (global $alias (mut (ref null $node)) (ref.null $node))
++  (global $array (mut (ref null $numbers)) (ref.null $numbers))
++  (global $exception (mut exnref) (ref.null exn))
++  (global $wrapped (mut externref) (ref.null extern))
++  (global $number i64 (i64.const -1))
++  (global $vector v128 (v128.const i32x4 1 2 3 4))
++  (global $large (mut (ref null $numbers)) (ref.null $numbers))
++  (global $distinct (mut (ref null $node-array)) (ref.null $node-array))
++  (global $alias-array (mut (ref null $node-array)) (ref.null $node-array))
++  (global $exception-again (mut exnref) (ref.null exn))
++  (func $setup
++    (local $n (ref $node)) (local $a (ref $numbers))
++    (local $children (ref $node-array)) (local $index i32)
++    i64.const 9 i32.const 171 i32.store8 $m
++    i64.const 131089 i32.const 205 i32.store8 $m
++    data.drop $gone elem.drop $gone-elements
++    ref.null $node i32.const 127 v128.const i32x4 1 2 3 4 struct.new $node local.set $n
++    local.get $n local.get $n struct.set $node 0
++    local.get $n global.set $object local.get $n global.set $alias
++    i64.const 0 local.get $n table.set $nodes i64.const 1 local.get $n table.set $nodes
++    i64.const 10 i64.const 20 i64.const 30 array.new_fixed $numbers 3 local.set $a
++    local.get $a global.set $array
++    local.get $n extern.convert_any global.set $wrapped
++    i64.const 12345 i32.const 1024 array.new $numbers global.set $large
++    i32.const 64 array.new_default $node-array local.set $children
++    loop $initialize-children
++      local.get $children local.get $index
++      ref.null $node local.get $index v128.const i32x4 0 0 0 0 struct.new $node
++      array.set $node-array
++      local.get $index i32.const 1 i32.add local.tee $index i32.const 64 i32.lt_u
++      br_if $initialize-children
++    end
++    local.get $children global.set $distinct
++    ;; Keep a real non-default table run, not two identical default slots.
++    i64.const 1 local.get $children i32.const 0 array.get $node-array table.set $nodes
++    local.get $n i32.const 1024 array.new $node-array global.set $alias-array
++    block $caught (result exnref)
++      try_table (catch_all_ref $caught)
++        i32.const 77 local.get $n v128.const i32x4 5 6 7 8 throw $event
++      end
++      unreachable
++    end
++    global.set $exception
++    ;; Keep the first actual exception root. Re-catching throw_ref can issue a
++    ;; new native carrier token for this SAME immutable Core exception record.
++    block $caught-again (result exnref)
++      try_table (catch_all_ref $caught-again)
++        global.get $exception throw_ref
++      end
++      unreachable
++    end
++    global.set $exception-again)
++  (func $run (result i32)
++    (local $n (ref $node)) (local $a (ref $numbers)) (local $e (ref exn))
++    (local $x (ref extern)) (local $number i64)
++    (local $again (ref exn))
++    (local $retirement-turns i32)
++    global.get $object ref.as_non_null local.set $n
++    global.get $array ref.as_non_null local.set $a
++    global.get $exception ref.as_non_null local.set $e
++    global.get $wrapped ref.as_non_null local.set $x
++    i64.const 1234 local.set $number
++    global.get $exception-again ref.as_non_null local.set $again
++    local.get $number local.get $n
++    ;; Bounded looping keeps both genuine guests available despite OS scheduling.
++    ;; Small static site count avoids thousands of unfolded LLVM EH/debug sites.
++    loop $retirement-spin
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      local.get $retirement-turns i32.const 1 i32.add local.tee $retirement-turns
++      i32.const 65536 i32.lt_u br_if $retirement-spin
++    end
++    drop drop i32.const 42)
++  (func $callback (type $callback-type) i32.const 93)
++
++  ;; R36 private view coverage: null, final defined and/or native import leaf.
++  (table $indirect-bindings 3 funcref)
++  (elem (table $indirect-bindings) (i32.const 1) func $callback $setup)
++)
+--- a/uwvm2-ros/test/0017.runtime/fixtures/debug_wasip1_indirect_prepared_retirement.wat
++++ b/uwvm2-ros/test/0017.runtime/fixtures/debug_wasip1_indirect_prepared_retirement.wat
+@@ -0,0 +1,55 @@
++;; Real WASIp1 imports consume the manager's edited owned environment AFTER
++;; resume. GC syntax/typed roots ensure this is a Core3 stopped-state test.
++(module
++  (type $node (struct (field i32)))
++  (import "wasi_snapshot_preview1" "args_sizes_get" (func $as (param i32 i32) (result i32)))
++  (import "wasi_snapshot_preview1" "args_get" (func $ag (param i32 i32) (result i32)))
++  (import "wasi_snapshot_preview1" "environ_sizes_get" (func $es (param i32 i32) (result i32)))
++  (import "wasi_snapshot_preview1" "environ_get" (func $eg (param i32 i32) (result i32)))
++  (import "wasi_snapshot_preview1" "fd_close" (func $close (param i32) (result i32)))
++  (import "wasi_snapshot_preview1" "fd_read" (func $read (param i32 i32 i32 i32) (result i32)))
++  (import "wasi_snapshot_preview1" "fd_write" (func $write (param i32 i32 i32 i32) (result i32)))
++  (memory (export "memory") 1)
++  (data (i32.const 600) "xyz!")
++  (func (export "run") (result i32)
++    (local $node (ref $node))
++    i32.const 7 struct.new $node local.set $node
++    nop ;; Actual opcode ordinal3: real node root and owned env are live.
++    call $mutate_managed
++    i32.const 0 i32.const 4 call $as if unreachable end
++    i32.const 16 i32.const 128 call $ag if unreachable end
++    i32.const 8 i32.const 12 call $es if unreachable end
++    i32.const 32 i32.const 256 call $eg if unreachable end
++    i32.const 0 i32.load i32.const 2 i32.ne if unreachable end
++    i32.const 4 i32.load i32.const 12 i32.ne if unreachable end
++    i32.const 8 i32.load i32.const 1 i32.ne if unreachable end
++    i32.const 12 i32.load i32.const 19 i32.ne if unreachable end
++    i32.const 20 i32.load i32.const 134 i32.ne if unreachable end
++    i32.const 134 i32.load i32.const 0x65746661 i32.ne if unreachable end
++    i32.const 138 i32.load8_u i32.const 114 i32.ne if unreachable end
++    i32.const 139 i32.load8_u if unreachable end
++    i32.const 32 i32.load i32.const 256 i32.ne if unreachable end
++    i32.const 271 i32.load i32.const 0x0077656e i32.ne if unreachable end
++    ;; Original tracked WASIp1 guest close drops the live FD root after capture.
++    i32.const 151 call $close if unreachable end
++    i32.const 64 i32.const 512 i32.store
++    i32.const 68 i32.const 3 i32.store
++    i32.const 3 i32.const 64 i32.const 1 i32.const 72 call $read if unreachable end
++    i32.const 72 i32.load i32.const 3 i32.ne if unreachable end
++    i32.const 512 i32.load8_u i32.const 65 i32.ne if unreachable end
++    i32.const 513 i32.load8_u if unreachable end
++    i32.const 514 i32.load8_u i32.const 66 i32.ne if unreachable end
++    ;; FD2 aliases FD3: its shared cursor already reached EOF after first read.
++    i32.const 2 i32.const 64 i32.const 1 i32.const 76 call $read if unreachable end
++    i32.const 76 i32.load if unreachable end
++    local.get $node struct.get $node 0 i32.const 84 i32.add)
++  (func $mutate_managed
++    i32.const 80 i32.const 600 i32.store
++    i32.const 84 i32.const 4 i32.store
++    i32.const 3 i32.const 80 i32.const 1 i32.const 88 call $write if unreachable end
++    nop ;; Byte offset33: real guest WASI write has returned, ready for restore.
++  )
++  ;; R36 private view coverage: null, final defined and/or native import leaf.
++  (table $indirect-bindings 3 funcref)
++  (elem (table $indirect-bindings) (i32.const 1) func $as $mutate_managed)
++)
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime.h
+@@ -587,7 +587,7 @@
+     enum class llvm_jit_checkpoint_prepare_status : unsigned char
+     { prepared_and_discarded, requires_llvm_jit_full, not_selected, invalid_request,
+       unavailable_capture, resource_preparation_declined, engine_preparation_declined, allocation_failed,
+-      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained, dispatch_binding_preparation_declined };
++      wasip1_preparation_declined, frame_preparation_declined, root_preparation_declined, worker_root_preparation_declined, prepared_and_retained, dispatch_binding_preparation_declined, indirect_binding_preparation_declined };
+     struct llvm_jit_checkpoint_prepare_request
+     {
+         ::std::array<::std::byte,16u> recording_label{};
+@@ -605,6 +605,8 @@
+         bool include_wasip1{}, require_managed_wasip1_resources{true};
+         // Combined final defined/import cache entries; checked before allocation.
+         ::std::size_t maximum_private_dispatch_bindings{1048576u};
++        // Combined caller type records, table views and per-caller function slots.
++        ::std::size_t maximum_private_indirect_bindings{1048576u};
+     };
+     struct llvm_jit_checkpoint_prepare_result
+     {
+@@ -646,6 +648,10 @@
+         ::std::size_t prepared_runtime_defined_bindings{}, prepared_runtime_import_bindings{};
+         ::std::size_t prepared_runtime_defined_pointer_ranges{};
+         bool runtime_dispatch_bindings_prepared{}; // Private new-source caches; no publication.
++        ::std::size_t prepared_runtime_type_bindings{}, prepared_runtime_table_views{}, prepared_runtime_function_table_views{};
++        ::std::size_t prepared_runtime_indirect_targets{}, prepared_runtime_indirect_defined_targets{}, prepared_runtime_indirect_import_targets{};
++        ::std::size_t prepared_runtime_indirect_null_targets{}, prepared_runtime_indirect_incompatible_targets{};
++        bool runtime_indirect_bindings_prepared{}; // New-source private views; no guest permission.
+     };
+     struct llvm_jit_checkpoint_native_retirement_result
+     {
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_indirect_bindings.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_indirect_bindings.h
+@@ -0,0 +1,228 @@
++// Private candidate member fragment. Compact call_indirect views must borrow
++// final NEW source records, caller type namespaces and NEW engine addresses.
++// No current runtime cache, TLS projection cache or global refresh hook changes.
++#pragma once
++decltype(g_runtime.modules) indirect_dispatch_modules_{};
++bool indirect_bindings_prepared_{};
++
++template<typename Record,typename Selector>
++[[nodiscard]] bool locate_private_dispatch_record(Record const* pointer,Selector select,
++    ::std::size_t& dense,::std::size_t& local) const noexcept
++{
++    dense=local=SIZE_MAX;
++    if(pointer==nullptr) { return false; }
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto const& bound=modules_[owner];
++        // Compare an address token with aligned FINAL vector membership before
++        // reading the candidate pointee, including every imported alias hop.
++        if(checkpoint_world_data::in::details::linked_function_record_index(pointer,select(*bound.actual),local))
++        { dense=bound.new_actual_id;return true; }
++    }
++    return false;
++}
++
++[[nodiscard]] runtime_table_storage_t const* resolve_private_dispatch_table(
++    module_type const& module,::std::size_t index,::std::size_t all_imports) const noexcept
++{
++    namespace st=checkpoint_world_data::st;
++    auto const imported=module.imported_table_vec_storage.size();
++    if(index>=imported)
++    {
++        auto const local=index-imported;
++        return local<module.local_defined_table_vec_storage.size()?
++            ::std::addressof(module.local_defined_table_vec_storage.index_unchecked(local)):nullptr;
++    }
++    auto const* next=::std::addressof(module.imported_table_vec_storage.index_unchecked(index));
++    using kind=st::imported_table_storage_t::imported_table_link_kind;
++    for(::std::size_t step{};step<all_imports;++step)
++    {
++        ::std::size_t dense{},local{};
++        if(!locate_private_dispatch_record(next,[](auto const& m)->auto const& { return m.imported_table_vec_storage; },dense,local))
++        { return nullptr; }
++        auto const& actual=modules_[actual_dense_module_owners_[dense]].actual->imported_table_vec_storage.index_unchecked(local);
++        if(actual.link_kind==kind::imported) { next=actual.target.imported_ptr;continue; }
++        if(actual.link_kind!=kind::defined || !locate_private_dispatch_record(actual.target.defined_ptr,
++            [](auto const& m)->auto const& { return m.local_defined_table_vec_storage; },dense,local))
++        { return nullptr; }
++        return ::std::addressof(modules_[actual_dense_module_owners_[dense]].actual->local_defined_table_vec_storage.index_unchecked(local));
++    }
++    return nullptr; // cycles cannot consume more than the actual import roster
++}
++
++[[nodiscard]] bool prepare_world_indirect_bindings(::std::size_t maximum_bindings,
++    llvm_jit_checkpoint_prepare_result& out)
++{
++    namespace st=checkpoint_world_data::st;
++    if(phase_!=preparation_status::resources_prepared || !dispatch_bindings_prepared_ ||
++       indirect_bindings_prepared_ || !indirect_dispatch_modules_.empty() ||
++       !context_ || !prepared_source_ || prepared_source_->initialized_from_actual_state() ||
++       engines_.size()!=modules_.size() || actual_dense_module_owners_.size()!=modules_.size())
++    { return fail(preparation_status::source_mismatch); }
++    ::std::size_t total{},types{},views{},imported_tables{},targets{},function_views{};
++    auto const reserve_count=[&](::std::size_t count)->bool
++    {
++        if(total>maximum_bindings || count>maximum_bindings-total)
++        { return fail(preparation_status::quota_exceeded); }
++        total+=count;return true;
++    };
++    // Bound alias expansion PER CALLER, not just distinct underlying tables.
++    // Every count and native backing charge precedes cache/view allocation.
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto const& bound=modules_[owner];
++        if(bound.actual==nullptr || bound.new_actual_id>=modules_.size() ||
++           context_->unpublished_file_for_module(bound.actual)!=bound.file)
++        { return fail(preparation_status::source_mismatch); }
++        auto const& module=*bound.actual;auto const& section=module.type_section_storage;
++        auto const count=static_cast<::std::size_t>(section.type_section_count);
++        if(count!=section.type_section_count || count>=UINT32_MAX ||
++           (count!=0u && (section.type_section_begin==nullptr || section.type_section_end==nullptr)) ||
++           ((section.type_section_begin==nullptr)!=(section.type_section_end==nullptr)) ||
++           (section.type_section_begin!=nullptr &&
++            (section.type_section_end<section.type_section_begin ||
++             static_cast<::std::size_t>(section.type_section_end-section.type_section_begin)!=count)))
++        { return fail(preparation_status::type_mismatch); }
++        auto const imports=module.imported_table_vec_storage.size();
++        auto const locals=module.local_defined_table_vec_storage.size();
++        if(!reserve_count(count) || !reserve_count(imports) || !reserve_count(locals)) { return false; }
++        types+=count;views+=imports+locals;imported_tables+=imports;
++        if(module.llvm_jit_call_indirect_table_views.size()!=imports+locals)
++        { return fail(preparation_status::source_mismatch); }
++        for(auto const& view:module.llvm_jit_call_indirect_table_views)
++        { if(view.data_address!=0u || view.size!=0u) { return fail(preparation_status::source_mismatch); } }
++    }
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto const& module=*modules_[owner].actual;
++        for(::std::size_t index{};index<module.llvm_jit_call_indirect_table_views.size();++index)
++        {
++            auto const* table=resolve_private_dispatch_table(module,index,imported_tables);
++            ::std::size_t table_dense{},local{};
++            if(table==nullptr || !locate_private_dispatch_record(table,
++                [](auto const& m)->auto const& { return m.local_defined_table_vec_storage; },table_dense,local))
++            { return fail(preparation_status::invalid_import); }
++            auto const* owner_module=modules_[actual_dense_module_owners_[table_dense]].actual;
++            if(table->owner_module_rt_ptr!=owner_module || table->table_type_ptr==nullptr)
++            { return fail(preparation_status::source_mismatch); }
++            if(st::runtime_table_family(*table)!=st::runtime_table_reference_family::function) { continue; }
++            if(!reserve_count(table->elems.size())) { return false; }
++            targets+=table->elems.size();++function_views;
++        }
++    }
++    using targets_vector=decltype(compiled_module_record::llvm_jit_call_indirect_targets)::value_type;
++    if(!charge_native(modules_.size(),sizeof(compiled_module_record)) ||
++       !charge_native(types,sizeof(::std::size_t)) || !charge_native(views,sizeof(targets_vector)) ||
++       !charge_native(targets,sizeof(runtime_llvm_jit_raw_call_target_t))) { return false; }
++    indirect_dispatch_modules_.resize(modules_.size());
++    ::std::size_t defined{},imports{},nulls{},incompatible{};
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto const& bound=modules_[owner];auto const dense=bound.new_actual_id;
++        auto const& module=*bound.actual;auto& record=indirect_dispatch_modules_.index_unchecked(dense);
++        record.runtime_module=bound.actual;record.type_canon_index=build_type_canon_index(module);
++        if(record.type_canon_index.size()!=module.type_section_storage.type_section_count)
++        { return fail(preparation_status::type_mismatch); }
++        auto& tables=record.llvm_jit_call_indirect_targets;
++        tables.resize(module.llvm_jit_call_indirect_table_views.size());
++        for(::std::size_t index{};index<tables.size();++index)
++        {
++            auto const* table=resolve_private_dispatch_table(module,index,imported_tables);
++            if(table==nullptr) { return fail(preparation_status::invalid_import); }
++            if(st::runtime_table_family(*table)!=st::runtime_table_reference_family::function) { continue; }
++            auto& entries=tables.index_unchecked(index);entries.resize(table->elems.size());
++            for(::std::size_t slot{};slot<entries.size();++slot)
++            {
++                auto const& element=table->elems.index_unchecked(slot);
++                auto& target=entries.index_unchecked(slot);
++                module_type const* actual_module{};
++                st::wasm_binfmt1_final_function_type_t const* actual_type{};
++                ::std::size_t function_dense{},local{};
++                using kind=st::local_defined_table_elem_storage_type_t;
++                switch(element.type)
++                {
++                    case kind::func_ref_defined:
++                    {
++                        auto const* function=element.storage.defined_ptr;
++                        if(function==nullptr) { ++nulls;continue; }
++                        if(!locate_private_dispatch_record(function,
++                            [](auto const& m)->auto const& { return m.local_defined_function_vec_storage; },function_dense,local) ||
++                           function_dense>=engines_.size() || local>=engines_[function_dense]->entries_.size())
++                        { return fail(preparation_status::source_mismatch); }
++                        auto const& entry=engines_[function_dense]->entries_[local];
++                        if(entry.raw==0u || entry.typed==0u) { return fail(preparation_status::source_mismatch); }
++                        target.entry_address=entry.raw;target.typed_entry_address=entry.typed;
++                        actual_module=modules_[actual_dense_module_owners_[function_dense]].actual;
++                        actual_type=function->function_type_ptr;++defined;break;
++                    }
++                    case kind::func_ref_imported:
++                    {
++                        auto const* function=element.storage.imported_ptr;
++                        if(function==nullptr) { ++nulls;continue; }
++                        if(!locate_private_dispatch_record(function,
++                            [](auto const& m)->auto const& { return m.imported_function_vec_storage; },function_dense,local) ||
++                           function_dense>=import_dispatch_bindings_.size() ||
++                           local>=import_dispatch_bindings_.index_unchecked(function_dense).size())
++                        { return fail(preparation_status::invalid_import); }
++                        auto const& cached=import_dispatch_bindings_.index_unchecked(function_dense).index_unchecked(local);
++                        if(cached.origin_module_id!=function_dense) { return fail(preparation_status::invalid_import); }
++                        if(cached.k==cached_import_target::kind::defined)
++                        {
++                            ::std::size_t leaf_dense{},leaf_local{};
++                            if(!locate_private_dispatch_record(cached.u.defined.runtime_func,
++                                [](auto const& m)->auto const& { return m.local_defined_function_vec_storage; },leaf_dense,leaf_local) ||
++                               cached.frame.module_id!=leaf_dense)
++                            { return fail(preparation_status::invalid_import); }
++                            actual_module=modules_[actual_dense_module_owners_[leaf_dense]].actual;
++                            actual_type=cached.u.defined.runtime_func->function_type_ptr;
++                        }
++                        else if(cached.k==cached_import_target::kind::local_imported)
++                        {
++                            actual_module=modules_[actual_dense_module_owners_[function_dense]].actual;
++                            if(function->import_type_ptr==nullptr) { return fail(preparation_status::invalid_import); }
++                            actual_type=function->import_type_ptr->imports.storage.function;
++                        }
++                        else { return fail(preparation_status::unavailable_adapter); }
++                        target.entry_address=reinterpret_cast<::std::uintptr_t>(llvm_jit_raw_call_cached_import_entry);
++                        target.context_address=reinterpret_cast<::std::uintptr_t>(::std::addressof(cached));
++                        ++imports;break;
++                    }
++                    default: return fail(preparation_status::type_mismatch);
++                }
++                if(actual_module==nullptr || runtime_type_index_for_pointer(*actual_module,actual_type)==SIZE_MAX)
++                { return fail(preparation_status::type_mismatch); }
++                // The uncached matcher preserves rich heap/subtype identity and
++                // does not contaminate the OLD world's TLS projection cache.
++                target.encoded_type_id=find_canonical_type_id_for_type_uncached(record,*actual_module,actual_type);
++                // Valid references need not match any callable type in this
++                // caller; retain the sentinel so a later call traps normally.
++                if(target.encoded_type_id==invalid_llvm_jit_encoded_type_id()) { ++incompatible; }
++            }
++        }
++    }
++    if(defined+imports+nulls!=targets) { return fail(preparation_status::source_mismatch); }
++    // All final allocations and possible failures precede private view stores.
++    // Empty GC/extern/exn tables stay empty even with a legacy funcref carrier.
++    for(auto const owner:actual_dense_module_owners_)
++    {
++        auto& module=*modules_[owner].actual;auto const dense=modules_[owner].new_actual_id;
++        auto const& tables=indirect_dispatch_modules_.index_unchecked(dense).llvm_jit_call_indirect_targets;
++        for(::std::size_t index{};index<tables.size();++index)
++        {
++            auto const& entries=tables.index_unchecked(index);
++            auto& view=module.llvm_jit_call_indirect_table_views.index_unchecked(index);
++            view={};
++            if(!entries.empty())
++            { view={};
++            if(!entries.empty())
++            { view.data_address=reinterpret_cast<::std::uintptr_t>(entries.data());view.size=entries.size(); } }
++        }
++    }
++    indirect_bindings_prepared_=true;
++    out.runtime_indirect_bindings_prepared=true;out.prepared_runtime_type_bindings=types;
++    out.prepared_runtime_table_views=views;out.prepared_runtime_function_table_views=function_views;
++    out.prepared_runtime_indirect_targets=targets;out.prepared_runtime_indirect_defined_targets=defined;
++    out.prepared_runtime_indirect_import_targets=imports;out.prepared_runtime_indirect_null_targets=nulls;
++    out.prepared_runtime_indirect_incompatible_targets=incompatible;
++    return true; // private DATA; no global publication or execution credential
++}
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_preparation_api.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_preparation_api.h
+@@ -66,6 +66,9 @@
+             out.prepared_threads=prepared->prepared_threads_.size();out.prepared_frames=prepared->prepared_frames_;
+             out.status=llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined;
+             if(!prepared->prepare_world_dispatch_bindings(source,request.maximum_private_dispatch_bindings,out))
++            { out.native_payload_bytes=prepared->native_bytes_;out.resource_diagnostic=static_cast<unsigned>(prepared->phase_);return; }
++            out.status=llvm_jit_checkpoint_prepare_status::indirect_binding_preparation_declined;
++            if(!prepared->prepare_world_indirect_bindings(request.maximum_private_indirect_bindings,out))
+             { out.native_payload_bytes=prepared->native_bytes_;out.resource_diagnostic=static_cast<unsigned>(prepared->phase_);return; }
+             out.prepared_root_carriers=prepared->prepared_root_carriers_;
+             out.native_payload_bytes=prepared->native_bytes_;
+--- a/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_resources.h
++++ b/uwvm2/src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_world_resources.h
+@@ -1196,6 +1196,7 @@
+         }
+ # include "uwvm_runtime_checkpoint_world_frames.h"
+ # include "uwvm_runtime_checkpoint_world_function_bindings.h"
++# include "uwvm_runtime_checkpoint_world_indirect_bindings.h"
+ # include "uwvm_runtime_checkpoint_world_roots.h"
+ # include "uwvm_runtime_checkpoint_world_root_workers.h"
+     public:
+--- a/uwvm2/src/uwvm2/uwvm/debugger/wasip1_checkpoint.md
++++ b/uwvm2/src/uwvm2/uwvm/debugger/wasip1_checkpoint.md
+@@ -750,3 +750,11 @@
+ Fresh root resources derive both child base and inheriting rights from one PATH_OPEN parent's inheriting rights, just like the original path_open. The parent does not need to hold those child rights in its own base set. A preexisting matching root can instead authorize reconstruction through its held rights. Closing a target child before import cannot turn a legitimate delegated reconstruction into capability_denied; stronger synchronization still requires its own parent authority.
+ 
+ Portable root lookup checks the saved rights and native flags together on ONE actual target FD. A lower-numbered root with different flags cannot hide a later complete matching or independently mutable root. Separate roots cannot combine PATH_OPEN, inheriting rights or SET_FLAGS to manufacture restoration authority. Native observations and positive/negative selections are cached only within the current closed-gate import, then discarded. See [the root selection regression report](../../../../test/0018.debugger/wasip1_checkpoint_root_selection_test_report.md).
++
++### 新 world 的私有间接调用绑定（R36）
++
++候选 world 在旧 worker 退休前准备 caller-local 类型 canonical 表和 LLVM call_indirect 表视图。表导入的每一跳、表元素的函数指针和最终目标都必须属于新 source 的实际记录；defined 目标指向新 LLVM 引擎，import 目标借用新私有 import cache。Core 3.0 子类型通过未缓存的完整类型匹配投影到调用者类型空间；无匹配的有效引用保留不匹配 sentinel，null 和 GC/extern/exn 表保留原语义。准备过程不修改当前 runtime 的表刷新 hook 或 TLS 类型缓存。
++
++maximum_private_indirect_bindings 默认 1,048,576，合计限制类型记录、所有 caller 的表视图和 function-table 目标槽；import alias 的目标槽按每个 caller 单独计数。超限返回 indirect_binding_preparation_declined，旧 guest 保持同一 pause 和 epoch。结果的 runtime_indirect_bindings_prepared 和目标分类计数只是私有准备诊断，不能执行 guest，也不表示 whole-world publication、恢复线程启动或恢复重放已完成。
++
++Wasm checkpoint 检测到 WASIp1 时仍必须在同一个停止点同时 checkpoint WASIp1；文件内容和外部 I/O 副作用不属于状态回滚。
+--- a/uwvm2/test/0017.runtime/debug_checkpoint_prepared_retirement_runtime.cc
++++ b/uwvm2/test/0017.runtime/debug_checkpoint_prepared_retirement_runtime.cc
+@@ -235,7 +235,9 @@
+ }
+ int main(int argc, char** argv)
+ {
+-    if(argc != 3) { return 64; }
++    if(argc != 3 && argc != 4) { return 64; }
++    bool const exercise_indirect{argc==4};
++    if(exercise_indirect) { REQUIRE(::fast_io::concat_std(::fast_io::mnp::os_c_str(argv[3]))=="indirect"); }
+     auto const policy{::fast_io::concat_std(::fast_io::mnp::os_c_str(argv[2]))};
+     REQUIRE(policy == "instruction" || policy == "unwind");
+     mode::global_runtime_mode = mode::runtime_mode_t::full_compile;
+@@ -362,6 +364,10 @@
+     denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
+     REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined && !denied.operation && !denied.candidate_world_retained);
+     REQUIRE(state->control->capture(state->ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch);
++    invalid=prepare_request;invalid.maximum_private_indirect_bindings=0u;
++    denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
++    REQUIRE(denied.status==outcome::preparation_declined && denied.preparation.status==lib::llvm_jit_checkpoint_prepare_status::indirect_binding_preparation_declined && !denied.operation && !denied.candidate_world_retained && !denied.preparation.runtime_indirect_bindings_prepared);
++    REQUIRE(state->control->capture(state->ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch);
+     invalid=prepare_request;invalid.maximum_private_root_workers=0u;
+     denied=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(state->ticket,captured,invalid,deadline());
+     ::fast_io::print(::fast_io::err(),"PREPARE_PREFLIGHT denied status=",::fast_io::mnp::dec(static_cast<unsigned>(denied.status)),
+@@ -383,6 +389,14 @@
+         pending.preparation.prepared_runtime_defined_bindings==pending.preparation.functions &&
+         pending.preparation.prepared_runtime_defined_bindings==3u && pending.preparation.prepared_runtime_import_bindings==0u &&
+         pending.preparation.prepared_runtime_defined_pointer_ranges==1u);
++    REQUIRE(pending.preparation.runtime_indirect_bindings_prepared && pending.preparation.prepared_runtime_type_bindings>0u);
++    if(exercise_indirect)
++    {
++        REQUIRE(pending.preparation.prepared_runtime_table_views==3u && pending.preparation.prepared_runtime_function_table_views==2u &&
++            pending.preparation.prepared_runtime_indirect_targets==3u && pending.preparation.prepared_runtime_indirect_defined_targets==2u &&
++            pending.preparation.prepared_runtime_indirect_import_targets==0u && pending.preparation.prepared_runtime_indirect_null_targets==1u &&
++            pending.preparation.prepared_runtime_indirect_incompatible_targets==0u);
++    }
+     auto operation{pending.operation};
+     { ::std::unique_lock lock{windows->mutex};
+       auto const bodies_ready{windows->changed.wait_until(lock,deadline(),[&] { return windows->body_waiters == 2u; })};
+--- a/uwvm2/test/0017.runtime/debug_wasip1_prepared_retirement_runtime.cc
++++ b/uwvm2/test/0017.runtime/debug_wasip1_prepared_retirement_runtime.cc
+@@ -105,7 +105,9 @@
+ static auto short_deadline() { return ::std::chrono::steady_clock::now()+::std::chrono::milliseconds{500}; }
+ int main(int argc,char** argv)
+ {
+-    if(argc!=3) { return 64; }
++    if(argc!=3 && argc!=4) { return 64; }
++    bool const exercise_indirect{argc==4};
++    if(exercise_indirect) { require(::fast_io::concat_std(::fast_io::mnp::os_c_str(argv[3]))=="indirect","indirect fixture selector"); }
+     auto const policy{::fast_io::concat_std(::fast_io::mnp::os_c_str(argv[2]))};
+     require(policy=="instruction" || policy=="unwind","explicit stack policy");
+     mode::global_runtime_mode=mode::runtime_mode_t::full_compile;mode::global_runtime_compiler=mode::runtime_compiler_t::llvm_jit_only;
+@@ -151,11 +153,23 @@
+     auto bindings_refused=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,limited,deadline());
+     require(bindings_refused.status==outcome::preparation_declined && bindings_refused.preparation.status==lib::llvm_jit_checkpoint_prepare_status::dispatch_binding_preparation_declined && !bindings_refused.operation,"private dispatch budget refuses before old worker retirement");
+     require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"dispatch failure leaves original WASI guest unchanged");
++    limited=request;limited.maximum_private_indirect_bindings=0u;
++    auto indirect_refused=lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,limited,deadline());
++    require(indirect_refused.status==outcome::preparation_declined && indirect_refused.preparation.status==lib::llvm_jit_checkpoint_prepare_status::indirect_binding_preparation_declined && !indirect_refused.operation && !indirect_refused.candidate_world_retained && !indirect_refused.preparation.runtime_indirect_bindings_prepared,"indirect budget refuses before old WASI worker retirement");
++    require(state->control->capture(ticket).result==threads::cooperative_pause_result::paused && lib::observe_compiler_runtime_generation_host_api()==epoch,"indirect failure leaves original WASI guest unchanged");
+     auto pending{lib::llvm_jit_checkpoint_prepare_retire_instance_host_api(ticket,owners,request,short_deadline())};
+     ::fast_io::print(::fast_io::out(),"WASIP1_PREPARED_RETIREMENT stage=execution status=",::fast_io::mnp::dec(static_cast<unsigned>(pending.status))," prepare=",::fast_io::mnp::dec(static_cast<unsigned>(pending.preparation.status)),"\n");
+     require(pending.status==outcome::pending_execution && pending.operation && pending.candidate_world_retained,"candidate survives pending execution drain");
+     require(pending.preparation.status==lib::llvm_jit_checkpoint_prepare_status::prepared_and_retained && pending.preparation.data_error==::uwvm2::uwvm::debugger::checkpoint::error::none && pending.preparation.wasip1_installed_privately && pending.preparation.wasip1_prepared_together && pending.preparation.wasip1_environments==1u && pending.preparation.prepared_wasip1_memories==1u && pending.preparation.joined_private_root_workers==1u,"new WASI memory and complete private candidate retained together");
+     require(pending.preparation.runtime_dispatch_bindings_prepared && pending.preparation.prepared_runtime_defined_bindings==pending.preparation.functions && pending.preparation.prepared_runtime_import_bindings>0u && pending.preparation.prepared_runtime_defined_pointer_ranges>0u,"new source owns complete defined and builtin WASI dispatch bindings");
++    require(pending.preparation.runtime_indirect_bindings_prepared && pending.preparation.prepared_runtime_type_bindings>0u,"private caller type bindings prepared");
++    if(exercise_indirect)
++    {
++        require(pending.preparation.prepared_runtime_table_views==1u && pending.preparation.prepared_runtime_function_table_views==1u &&
++            pending.preparation.prepared_runtime_indirect_targets==3u && pending.preparation.prepared_runtime_indirect_defined_targets==1u &&
++            pending.preparation.prepared_runtime_indirect_import_targets==1u && pending.preparation.prepared_runtime_indirect_null_targets==1u &&
++            pending.preparation.prepared_runtime_indirect_incompatible_targets==0u,"private WASI table preserves defined, builtin and null target types");
++    }
+     auto operation{pending.operation};
+     { ::std::unique_lock lock{windows->mutex};require(windows->changed.wait_until(lock,deadline(),[&] { return windows->body_waiters==1u; }),"old native body waits outside guest entry");windows->release_body=true;windows->changed.notify_all();require(windows->changed.wait_until(lock,deadline(),[&] { return windows->tls_waiters==1u; }),"real old TLS destructor delays physical death"); }
+     auto tls{lib::llvm_jit_checkpoint_continue_native_retirement_host_api(operation,short_deadline())};
+--- a/uwvm2/test/0017.runtime/fixtures/debug_checkpoint_indirect_retirement_cohort.wat
++++ b/uwvm2/test/0017.runtime/fixtures/debug_checkpoint_indirect_retirement_cohort.wat
+@@ -0,0 +1,126 @@
++;; Fresh full census input; setup writes, two guests subsequently read only.
++;; Modern memory64/table64, nonnullable typed initializer, GC cycles, EH, SIMD,
++;; extern wrappers and live/dropped passive data/element segments.
++(module
++  (rec (type $node (struct (field (mut (ref null $node))) (field (mut i8)) (field v128))))
++  (type $numbers (array (mut i64)))
++  (type $node-array (array (mut (ref null $node))))
++  (type $callback-type (func (result i32)))
++  (tag $event (param i32 (ref null $node) v128))
++  (table $nodes i64 2 4 (ref null $node))
++  (table $empty i64 0 0 (ref $callback-type) (ref.func $callback))
++  (memory $m i64 3 5)
++  (data $alive "alive\00")
++  (data $gone "gone")
++  (elem $alive-elements (ref $callback-type) (ref.func $callback))
++  (elem $gone-elements (ref $callback-type) (ref.func $callback))
++  (global $object (mut (ref null $node)) (ref.null $node))
++  (global $alias (mut (ref null $node)) (ref.null $node))
++  (global $array (mut (ref null $numbers)) (ref.null $numbers))
++  (global $exception (mut exnref) (ref.null exn))
++  (global $wrapped (mut externref) (ref.null extern))
++  (global $number i64 (i64.const -1))
++  (global $vector v128 (v128.const i32x4 1 2 3 4))
++  (global $large (mut (ref null $numbers)) (ref.null $numbers))
++  (global $distinct (mut (ref null $node-array)) (ref.null $node-array))
++  (global $alias-array (mut (ref null $node-array)) (ref.null $node-array))
++  (global $exception-again (mut exnref) (ref.null exn))
++  (func $setup
++    (local $n (ref $node)) (local $a (ref $numbers))
++    (local $children (ref $node-array)) (local $index i32)
++    i64.const 9 i32.const 171 i32.store8 $m
++    i64.const 131089 i32.const 205 i32.store8 $m
++    data.drop $gone elem.drop $gone-elements
++    ref.null $node i32.const 127 v128.const i32x4 1 2 3 4 struct.new $node local.set $n
++    local.get $n local.get $n struct.set $node 0
++    local.get $n global.set $object local.get $n global.set $alias
++    i64.const 0 local.get $n table.set $nodes i64.const 1 local.get $n table.set $nodes
++    i64.const 10 i64.const 20 i64.const 30 array.new_fixed $numbers 3 local.set $a
++    local.get $a global.set $array
++    local.get $n extern.convert_any global.set $wrapped
++    i64.const 12345 i32.const 1024 array.new $numbers global.set $large
++    i32.const 64 array.new_default $node-array local.set $children
++    loop $initialize-children
++      local.get $children local.get $index
++      ref.null $node local.get $index v128.const i32x4 0 0 0 0 struct.new $node
++      array.set $node-array
++      local.get $index i32.const 1 i32.add local.tee $index i32.const 64 i32.lt_u
++      br_if $initialize-children
++    end
++    local.get $children global.set $distinct
++    ;; Keep a real non-default table run, not two identical default slots.
++    i64.const 1 local.get $children i32.const 0 array.get $node-array table.set $nodes
++    local.get $n i32.const 1024 array.new $node-array global.set $alias-array
++    block $caught (result exnref)
++      try_table (catch_all_ref $caught)
++        i32.const 77 local.get $n v128.const i32x4 5 6 7 8 throw $event
++      end
++      unreachable
++    end
++    global.set $exception
++    ;; Keep the first actual exception root. Re-catching throw_ref can issue a
++    ;; new native carrier token for this SAME immutable Core exception record.
++    block $caught-again (result exnref)
++      try_table (catch_all_ref $caught-again)
++        global.get $exception throw_ref
++      end
++      unreachable
++    end
++    global.set $exception-again)
++  (func $run (result i32)
++    (local $n (ref $node)) (local $a (ref $numbers)) (local $e (ref exn))
++    (local $x (ref extern)) (local $number i64)
++    (local $again (ref exn))
++    (local $retirement-turns i32)
++    global.get $object ref.as_non_null local.set $n
++    global.get $array ref.as_non_null local.set $a
++    global.get $exception ref.as_non_null local.set $e
++    global.get $wrapped ref.as_non_null local.set $x
++    i64.const 1234 local.set $number
++    global.get $exception-again ref.as_non_null local.set $again
++    local.get $number local.get $n
++    ;; Bounded looping keeps both genuine guests available despite OS scheduling.
++    ;; Small static site count avoids thousands of unfolded LLVM EH/debug sites.
++    loop $retirement-spin
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      nop
++      local.get $retirement-turns i32.const 1 i32.add local.tee $retirement-turns
++      i32.const 65536 i32.lt_u br_if $retirement-spin
++    end
++    drop drop i32.const 42)
++  (func $callback (type $callback-type) i32.const 93)
++
++  ;; R36 private view coverage: null, final defined and/or native import leaf.
++  (table $indirect-bindings 3 funcref)
++  (elem (table $indirect-bindings) (i32.const 1) func $callback $setup)
++)
+--- a/uwvm2/test/0017.runtime/fixtures/debug_wasip1_indirect_prepared_retirement.wat
++++ b/uwvm2/test/0017.runtime/fixtures/debug_wasip1_indirect_prepared_retirement.wat
+@@ -0,0 +1,55 @@
++;; Real WASIp1 imports consume the manager's edited owned environment AFTER
++;; resume. GC syntax/typed roots ensure this is a Core3 stopped-state test.
++(module
++  (type $node (struct (field i32)))
++  (import "wasi_snapshot_preview1" "args_sizes_get" (func $as (param i32 i32) (result i32)))
++  (import "wasi_snapshot_preview1" "args_get" (func $ag (param i32 i32) (result i32)))
++  (import "wasi_snapshot_preview1" "environ_sizes_get" (func $es (param i32 i32) (result i32)))
++  (import "wasi_snapshot_preview1" "environ_get" (func $eg (param i32 i32) (result i32)))
++  (import "wasi_snapshot_preview1" "fd_close" (func $close (param i32) (result i32)))
++  (import "wasi_snapshot_preview1" "fd_read" (func $read (param i32 i32 i32 i32) (result i32)))
++  (import "wasi_snapshot_preview1" "fd_write" (func $write (param i32 i32 i32 i32) (result i32)))
++  (memory (export "memory") 1)
++  (data (i32.const 600) "xyz!")
++  (func (export "run") (result i32)
++    (local $node (ref $node))
++    i32.const 7 struct.new $node local.set $node
++    nop ;; Actual opcode ordinal3: real node root and owned env are live.
++    call $mutate_managed
++    i32.const 0 i32.const 4 call $as if unreachable end
++    i32.const 16 i32.const 128 call $ag if unreachable end
++    i32.const 8 i32.const 12 call $es if unreachable end
++    i32.const 32 i32.const 256 call $eg if unreachable end
++    i32.const 0 i32.load i32.const 2 i32.ne if unreachable end
++    i32.const 4 i32.load i32.const 12 i32.ne if unreachable end
++    i32.const 8 i32.load i32.const 1 i32.ne if unreachable end
++    i32.const 12 i32.load i32.const 19 i32.ne if unreachable end
++    i32.const 20 i32.load i32.const 134 i32.ne if unreachable end
++    i32.const 134 i32.load i32.const 0x65746661 i32.ne if unreachable end
++    i32.const 138 i32.load8_u i32.const 114 i32.ne if unreachable end
++    i32.const 139 i32.load8_u if unreachable end
++    i32.const 32 i32.load i32.const 256 i32.ne if unreachable end
++    i32.const 271 i32.load i32.const 0x0077656e i32.ne if unreachable end
++    ;; Original tracked WASIp1 guest close drops the live FD root after capture.
++    i32.const 151 call $close if unreachable end
++    i32.const 64 i32.const 512 i32.store
++    i32.const 68 i32.const 3 i32.store
++    i32.const 3 i32.const 64 i32.const 1 i32.const 72 call $read if unreachable end
++    i32.const 72 i32.load i32.const 3 i32.ne if unreachable end
++    i32.const 512 i32.load8_u i32.const 65 i32.ne if unreachable end
++    i32.const 513 i32.load8_u if unreachable end
++    i32.const 514 i32.load8_u i32.const 66 i32.ne if unreachable end
++    ;; FD2 aliases FD3: its shared cursor already reached EOF after first read.
++    i32.const 2 i32.const 64 i32.const 1 i32.const 76 call $read if unreachable end
++    i32.const 76 i32.load if unreachable end
++    local.get $node struct.get $node 0 i32.const 84 i32.add)
++  (func $mutate_managed
++    i32.const 80 i32.const 600 i32.store
++    i32.const 84 i32.const 4 i32.store
++    i32.const 3 i32.const 80 i32.const 1 i32.const 88 call $write if unreachable end
++    nop ;; Byte offset33: real guest WASI write has returned, ready for restore.
++  )
++  ;; R36 private view coverage: null, final defined and/or native import leaf.
++  (table $indirect-bindings 3 funcref)
++  (elem (table $indirect-bindings) (i32.const 1) func $as $mutate_managed)
++)

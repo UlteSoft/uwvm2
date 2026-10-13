@@ -112,7 +112,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // Platforms like GitHub CI lose color information when line breaks occur.
         ::fast_io::io::perr(::std::forward<Stm>(stm),
                             // logo
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL),
                             u8"\n",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
                             u8" ----------------------------------------- \n"
@@ -290,9 +290,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // Preventing the wasm32-wasi-uwvm stack from being too small and causing an overflow requires limiting the size of the contents of each print
         ::fast_io::io::perr(u8log_output_ul,
                                 // uwvm
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_PURPLE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_PURPLE),
                                 u8"UlteSoft WebAssembly Virtual Machine 2",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL),
                                 // mode
                                 u8"\nMode: "
 #if defined(UWVM_MODE_RELEASE)
@@ -320,27 +320,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #endif
                                 // Version
                                 u8"\nVersion: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_GREEN),
                                 ::uwvm2::uwvm::custom::uwvm_version,
         // flags
 #if defined(UWVM_VERSION_DEV)
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_CYAN),
                                 u8" [dev]",
 #elif defined(UWVM_VERSION_ALPHA)
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_RED),
                                 u8" [alpha]",
 #elif defined(UWVM_VERSION_BETA)
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_GREEN),
                                 u8" [beta]",
 #elif defined(UWVM_VERSION_RELEASE_CANDIDATE)
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_PURPLE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_PURPLE),
                                 u8" [candidate]",
 #elif defined(UWVM_VERSION_STABLE_RELEASE)
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                 u8" [release]",
 #endif
                                 // git commit data
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL),
 #if defined(UWVM_GIT_COMMIT_DATA)
                                 u8" (",
                                 ::uwvm2::uwvm::custom::git_commit_data,
@@ -1081,10 +1081,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             );
         // wasm feature
         version_u8print_wasm_feature_from_tuple(u8log_output_ul, ::uwvm2::uwvm::wasm::feature::all_features);
+        // all_features registers binary-format parser/storage hooks, not every supported specification.
+        // These extensions share its binfmt-v1 hooks. Dates follow the covers of the repository-linked manuals.
+        ::fast_io::io::perr(u8log_output_ul,
+                            u8"      - WebAssembly Release 2.0 (Draft 2025-01-30)\n"
+                            u8"      - WebAssembly Release 3.0 (Draft 2024-09-21)\n"
+                            u8"      - WebAssembly Release 2.0 + Threads (Draft 2023-10-10)\n");
 
         // other features
         ::fast_io::io::perr(u8log_output_ul,
-        // version_u8print_wasm_feature_from_tuple already print '\n'
+        // The specification list already ends with '\n'.
 #ifdef UWVM_SUPPORT_PRELOAD_DL
                             // Support Preload Dynamic Linking Module (--wasm-register-dl)
                             u8"  * Support Preload Dynamic Linking Module\n"

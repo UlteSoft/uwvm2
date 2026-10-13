@@ -1,0 +1,81 @@
+{
+  "files": {
+    "README.md": {
+      "bytes": 3197,
+      "sha256": "85733cf463e1fbe7b20072ab9d5e955917a34be454e51fc71e2593b909a16499"
+    },
+    "clean-image-r2-actual.json": {
+      "bytes": 5571,
+      "sha256": "b6b1f9841cf01db1deeed0041f8e74fc8dd24c4205ff106db37c604a4e4ac7d8"
+    },
+    "cold-qualified-r2-actual.json": {
+      "bytes": 9935,
+      "sha256": "e6a0f31823819ca265eab8b206e7778fae77627198ac93d1146e6ef145f92d97"
+    },
+    "commands.json": {
+      "bytes": 2029,
+      "sha256": "f7c235db5fc00cf5947850256ba4527b1ff9bdd7a14146af4bd44e5fe36fcb81"
+    },
+    "controller.before-approved-r2.py": {
+      "bytes": 29095,
+      "sha256": "4991b6c5a04f5f7a9d89a100d9aa075367033d9e784ba883af9b86f47fe105cc"
+    },
+    "controller.from-approved-r2.diff": {
+      "bytes": 8751,
+      "sha256": "f0c241b797b24600d881e1752f26f3d48cabf11451c4869892bae787d9540e95"
+    },
+    "freebsd151_serial_controller.py": {
+      "bytes": 34199,
+      "sha256": "0c18ecfd6a0c510c373522265e7b6c6a8dee659b527cc89b5d750eb2a1ea5413"
+    },
+    "freebsd151_serial_seed_r2.py": {
+      "bytes": 12084,
+      "sha256": "ed4c2a275a3d8e4194dc6977badf920459ff531b92092961a5e792847b7919ee"
+    },
+    "freebsd151_serial_vm_prepare.py": {
+      "bytes": 13942,
+      "sha256": "deb4f3935c147f559dd7e94b73237481d550e57d724f8db2ae8886ad61e46ef7"
+    },
+    "host-providers-source-static.json": {
+      "bytes": 61151,
+      "sha256": "f3b7f80dd230c20c2a4c96f825ca62d253b0326f39ca6e846868fe72e7eecce5"
+    },
+    "original-r3-attempt2-actual-rejection.json": {
+      "bytes": 10262,
+      "sha256": "81ecc8aac9a51e66bf7a4f290f8350af2afc2aea9f71bf2ec951d077e4ea5ef6"
+    },
+    "plan.json": {
+      "bytes": 4028,
+      "sha256": "0c882c8a2c4d167f310f88ebb84e6e8d317ae51b37960bd4d9c24fe97a9b9daf"
+    },
+    "prepare.before-approved-r2.py": {
+      "bytes": 13927,
+      "sha256": "d860031bde106cefa5f38eb71657b29f4650d0a3399e859e529b1f506b995e82"
+    },
+    "prepare.from-approved-r2.diff": {
+      "bytes": 1465,
+      "sha256": "501192a8298602f080b955c34f6127c6c717f609199e42844061959b7b88a189"
+    },
+    "source-only-map-parser-check.json": {
+      "bytes": 602,
+      "sha256": "19ccf08d6a2f3396ad45b2b0169487e449b7d624fb967df49d09397cce39a78c"
+    },
+    "supervisor.before-approved-r2.py": {
+      "bytes": 39173,
+      "sha256": "a1fad79a72b5e8cc84af524324b3db2d4e810f21c918eed724afa7502a74427c"
+    },
+    "supervisor.from-approved-r2.diff": {
+      "bytes": 5036,
+      "sha256": "e7a22fd0f80b8ce98325da9e12e2ab5882fc3569f55f02e564e9c4551082c938"
+    },
+    "supervisor.proposal.py": {
+      "bytes": 39211,
+      "sha256": "ac36f0fb88f7a7cd5f979481e718afb7b83f9251280c803778ac8013ee77a355"
+    }
+  },
+  "manifest_sha256": "42af708e1fae58689c10100b94ef538eef07aa386654bd28f5a891f0b1bf3552",
+  "native_or_guest_executed": false,
+  "packet_path": "/tmp/uwvm-qemu-freebsd-anonymous-data-map-source-proposal-20261003-r4",
+  "schema": "uwvm-freebsd-anonymous-data-map-source-proposal-pointer-v1",
+  "source_archive_sha256": "2e619028c43217a7fec414ec036fe5fc63e9eb58c417be0112172f7abfaf9c1d"
+}

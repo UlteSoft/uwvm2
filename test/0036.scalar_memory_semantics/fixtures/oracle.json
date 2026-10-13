@@ -1,0 +1,33 @@
+{
+  "source_only": true,
+  "native_executed": false,
+  "assert_return": 8,
+  "assert_invalid": 10,
+  "complete_unused_valid_polymorphic_bodies": 16,
+  "memory_pages_each": 1,
+  "expected_integer_bit_patterns": [
+    {
+      "value_type": "i32",
+      "result_type": "i32",
+      "bits": 19088743
+    },
+    {
+      "value_type": "i64",
+      "result_type": "i64",
+      "bits": 81985529216486895
+    },
+    {
+      "value_type": "f32",
+      "result_type": "i32",
+      "bits": 3243769856
+    },
+    {
+      "value_type": "f64",
+      "result_type": "i64",
+      "bits": 13847161479280721920
+    }
+  ],
+  "value_Bot_vs_reference_heap_Bot_distinct": true,
+  "runtime_and_assembly_pending": true,
+  "wast_sha256": "b9e14fdffe03045abb24407c39b974eab51065d2dc756c443ad49f4fc9d93361"
+}

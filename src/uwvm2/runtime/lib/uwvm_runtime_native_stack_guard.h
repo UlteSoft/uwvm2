@@ -10,11 +10,13 @@
 #include <limits>
 #include <atomic>
 #include <new>
+#include "uwvm_runtime_posix_abi.h"
 
 // This header is shared by the header and named-module runtime entry points.
 // Native signal state must be per OS thread even when the VM's optional TLS
 // fast path is disabled: a signal handler must never lock the VM thread map.
 #if (defined(__linux__) || defined(__APPLE__)) && !defined(_WIN32)
+# include <fast_io.h>
 # include <pthread.h>
 # include <signal.h>
 # include <sys/mman.h>
@@ -29,17 +31,23 @@
 
 namespace uwvm2::runtime::lib::native_stack
 {
-    // Require the exact native guard address and a nonzero SP below the known
-    // stack top. Do not require SP to be close to the guard: ARM probes ahead
-    // before adjusting SP, while RISC-V may probe at a positive SP offset.
+    // An exact guard-page hit may be a probe ahead of SP. A large C/C++ frame
+    // can also skip the first guard page before touching memory; accept that
+    // lower fault only once SP itself is below the known stack and the fault
+    // lies within one page of SP. This remains a signal-only check, with no
+    // extra instruction in a normal Wasm call or memory access.
     [[nodiscard]] inline constexpr bool is_guard_fault(::std::uintptr_t low,
                                                        ::std::uintptr_t high,
                                                        ::std::size_t page,
                                                        ::std::uintptr_t address,
                                                        ::std::uintptr_t sp) noexcept
     {
-        return page != 0u && low >= page && high > low &&
-               address >= low - page && address < low && sp != 0u && sp < high;
+        if(page == 0u || low < page || high <= low || address >= low || sp == 0u || sp >= high)
+        { return false; }
+        if(address >= low - page) { return true; }
+        if(sp >= low) { return false; }
+        // Compare unsigned distances without an overflow-prone address+page.
+        return address >= sp ? address - sp < page : sp - address < page;
     }
 
 #if (defined(__linux__) || defined(__APPLE__)) && !defined(_WIN32)
@@ -78,7 +86,7 @@ namespace uwvm2::runtime::lib::native_stack
             return true;
         }
         struct ::rlimit limit{};
-        bool const have_limit{::getrlimit(RLIMIT_STACK, &limit) == 0};
+        bool const have_limit{::uwvm2::runtime::lib::posix_abi::getrlimit_noexcept(RLIMIT_STACK, &limit) == 0};
         if(in_cached_stack && have_limit && cache.stack_limit == limit.rlim_cur)
         {
             result = cache.value;
@@ -86,13 +94,13 @@ namespace uwvm2::runtime::lib::native_stack
         }
         cache.valid = false;
         ::pthread_attr_t attributes{};
-        if(::pthread_getattr_np(::pthread_self(), &attributes) != 0) { return false; }
+        if(::uwvm2::runtime::lib::posix_abi::pthread_getattr_np_noexcept(::uwvm2::runtime::lib::posix_abi::pthread_self_noexcept(), &attributes) != 0) { return false; }
         void* base{};
         ::std::size_t size{};
-        auto const status{::pthread_attr_getstack(&attributes, &base, &size)};
+        auto const status{::uwvm2::runtime::lib::posix_abi::pthread_attr_getstack_noexcept(&attributes, &base, &size)};
         ::std::size_t guard_bytes{};
-        bool const fixed_extent{::pthread_attr_getguardsize(&attributes, &guard_bytes) == 0 && guard_bytes >= page};
-        ::pthread_attr_destroy(&attributes);
+        bool const fixed_extent{::uwvm2::runtime::lib::posix_abi::pthread_attr_getguardsize_noexcept(&attributes, &guard_bytes) == 0 && guard_bytes >= page};
+        ::uwvm2::runtime::lib::posix_abi::pthread_attr_destroy_noexcept(&attributes);
         auto const low{reinterpret_cast<::std::uintptr_t>(base)};
         if(status != 0 || size > (::std::numeric_limits<::std::uintptr_t>::max)() - low) { return false; }
         result = {low, low + size, page};
@@ -138,20 +146,26 @@ namespace uwvm2::runtime::lib::native_stack
         // A valid, already populated key normally reuses its existing slot;
         // if the platform cannot retain it, terminate rather than resume with
         // a silently lost ownership/retirement record.
-        if(::pthread_setspecific(alternate_cache_key, &retired_alternate) != 0) { ::_exit(126); }
+# if defined(__APPLE__)
+        if(::uwvm2::runtime::lib::posix_abi::pthread_setspecific_noexcept(alternate_cache_key, &retired_alternate) != 0) { ::uwvm2::runtime::lib::posix_abi::_exit_noexcept(126); }
+# endif
+        // Linux retains this trivial TLS retirement flag through all TSD passes.
+        // Do not re-arm a resource-free destructor there: another thread runtime
+        // (including TSan) can finish its own TSD state before a later extra pass.
+        // A subsequent host destructor reentry uses the uncached scope fallback.
         if(record == &retired_alternate) { return; }
         auto const bytes{record->mapping_bytes};
         ::stack_t current{};
         // Never free a stack still registered with the kernel. If teardown
         // cannot query/disable it, retain the mapping rather than risk UAF.
-        if(::sigaltstack(nullptr, &current) != 0) { return; }
+        if(::uwvm2::runtime::lib::posix_abi::sigaltstack_noexcept(nullptr, &current) != 0) { return; }
         if(!(current.ss_flags & SS_DISABLE) && current.ss_sp == record->payload)
         {
             if(current.ss_flags & SS_ONSTACK) { return; }
             current.ss_flags = SS_DISABLE;
-            if(::sigaltstack(&current, nullptr) != 0) { return; }
+            if(::uwvm2::runtime::lib::posix_abi::sigaltstack_noexcept(&current, nullptr) != 0) { return; }
         }
-        ::munmap(record, bytes);
+        ::uwvm2::runtime::lib::posix_abi::munmap_noexcept(record, bytes);
     }
 
     [[nodiscard]] inline alternate_cache_entry* acquire_cached_alternate(::std::size_t page) noexcept
@@ -160,12 +174,12 @@ namespace uwvm2::runtime::lib::native_stack
         // Keep this check after the live-pointer fast path. Normal warm VM
         // entries gain no extra TLS load/branch from destructor-order safety.
         if(alternate_cache_retired) { return nullptr; }
-        static bool const have_key{::pthread_key_create(&alternate_cache_key, release_cached_alternate) == 0};
+        static bool const have_key{::uwvm2::runtime::lib::posix_abi::pthread_key_create_noexcept(&alternate_cache_key, release_cached_alternate) == 0};
         if(!have_key || page < sizeof(alternate_cache_entry) ||
            page > ((::std::numeric_limits<::std::size_t>::max)() - alternate_stack_bytes) / 3u) { return nullptr; }
         // Only cold entries reach this lookup. A warm entry returned through
         // the TLS pointer above; destructor safety adds no pthread call there.
-        if(::pthread_getspecific(alternate_cache_key) == &retired_alternate)
+        if(::uwvm2::runtime::lib::posix_abi::pthread_getspecific_noexcept(alternate_cache_key) == &retired_alternate)
         {
             alternate_cache_retired = true;
             return nullptr;
@@ -174,19 +188,19 @@ namespace uwvm2::runtime::lib::native_stack
         // Keeping ownership metadata outside the signal stack avoids a heap
         // allocation, and leaves the entire advertised stack span usable.
         auto const bytes{alternate_stack_bytes + page * 3u};
-        void* allocation{::mmap(nullptr, bytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)};
+        void* allocation{::uwvm2::runtime::lib::posix_abi::mmap_noexcept(nullptr, bytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)};
         if(allocation == MAP_FAILED) { return nullptr; }
         auto* payload{static_cast<::std::byte*>(allocation) + page * 2u};
-        if(::mprotect(allocation, page, PROT_READ | PROT_WRITE) != 0 ||
-           ::mprotect(payload, alternate_stack_bytes, PROT_READ | PROT_WRITE) != 0)
+        if(::uwvm2::runtime::lib::posix_abi::mprotect_noexcept(allocation, page, PROT_READ | PROT_WRITE) != 0 ||
+           ::uwvm2::runtime::lib::posix_abi::mprotect_noexcept(payload, alternate_stack_bytes, PROT_READ | PROT_WRITE) != 0)
         {
-            ::munmap(allocation, bytes);
+            ::uwvm2::runtime::lib::posix_abi::munmap_noexcept(allocation, bytes);
             return nullptr;
         }
         auto* record{::new(allocation) alternate_cache_entry{bytes, payload}};
-        if(::pthread_setspecific(alternate_cache_key, record) != 0)
+        if(::uwvm2::runtime::lib::posix_abi::pthread_setspecific_noexcept(alternate_cache_key, record) != 0)
         {
-            ::munmap(allocation, bytes);
+            ::uwvm2::runtime::lib::posix_abi::munmap_noexcept(allocation, bytes);
             return nullptr;
         }
         reusable_alternate = record;
@@ -245,17 +259,18 @@ namespace uwvm2::runtime::lib::native_stack
         {
             struct ::sigaction action{};
             action.sa_handler = SIG_DFL;
-            // Darwin exposes sigemptyset as a function-like macro; do not add
-            // namespace qualification to this POSIX call.
-            static_cast<void>(sigemptyset(&action.sa_mask));
-            ::sigaction(signal, &action, nullptr);
-            ::raise(signal);
+            // The runtime POSIX ABI binds this signal-safe libc symbol through
+            // an explicit noexcept assembler alias, including on Darwin where
+            // the public sigemptyset spelling may be a function-like macro.
+            static_cast<void>(::uwvm2::runtime::lib::posix_abi::sigemptyset_noexcept(&action.sa_mask));
+            ::uwvm2::runtime::lib::posix_abi::sigaction_noexcept(signal, &action, nullptr);
+            ::uwvm2::runtime::lib::posix_abi::raise_noexcept(signal);
             return;
         }
         if(previous.sa_handler == SIG_DFL)
         {
-            ::sigaction(signal, &previous, nullptr);
-            ::raise(signal);
+            ::uwvm2::runtime::lib::posix_abi::sigaction_noexcept(signal, &previous, nullptr);
+            ::uwvm2::runtime::lib::posix_abi::raise_noexcept(signal);
         }
         else if(previous.sa_handler != SIG_IGN)
         {
@@ -273,14 +288,19 @@ namespace uwvm2::runtime::lib::native_stack
             // The ordinary stack is unusable. Avoid allocators, C++ streams,
             // unwinding and general runtime diagnostics in this signal path.
             constexpr char message[]{"uwvm: [fatal] Runtime crash: call stack exhausted (native stack guard).\n"};
-            [[maybe_unused]] auto const written{::write(STDERR_FILENO, message, sizeof(message) - 1u)};
-            ::_exit(127);
+            // [safe message bytes] unsafe (one-past array)
+            // ^^ borrowed message; the trailing NUL is excluded from the count.
+            // One bounded, allocation-free/lock-free native write only. Partial
+            // output or EINTR cannot delay fatal exit on an exhausted stack.
+            [[maybe_unused]] auto const written{::fast_io::posix_write_nothrow(
+                ::fast_io::posix_io_observer{::fast_io::posix_stderr_number}, message, sizeof(message) - 1u)};
+            ::uwvm2::runtime::lib::posix_abi::_exit_noexcept(127);
         }
         // Installing a process-wide disposition exposes it to threads which
         // have not entered scope(), so the local-static initialization guard
         // alone cannot publish the saved actions to this asynchronous reader.
         // Never wait here: this signal may have interrupted the installer.
-        if(!previous_actions_published.load(::std::memory_order_acquire)) { ::_exit(126); }
+        if(!previous_actions_published.load(::std::memory_order_acquire)) { ::uwvm2::runtime::lib::posix_abi::_exit_noexcept(126); }
         forward_signal(signal, info, context, signal == SIGSEGV ? previous_segv : previous_bus,
                        signal == SIGSEGV ? previous_segv_reset : previous_bus_reset);
     }
@@ -301,8 +321,8 @@ namespace uwvm2::runtime::lib::native_stack
             // Host code must serialize its own process-wide handler changes
             // with VM initialization; no query/install pair can arbitrate an
             // unrelated concurrent sigaction replacement.
-            if(::sigaction(SIGSEGV, nullptr, &previous_segv) != 0 ||
-               ::sigaction(SIGBUS, nullptr, &previous_bus) != 0) { return false; }
+            if(::uwvm2::runtime::lib::posix_abi::sigaction_noexcept(SIGSEGV, nullptr, &previous_segv) != 0 ||
+               ::uwvm2::runtime::lib::posix_abi::sigaction_noexcept(SIGBUS, nullptr, &previous_bus) != 0) { return false; }
             previous_actions_published.store(true, ::std::memory_order_release);
             struct ::sigaction action{};
             action.sa_sigaction = signal_handler;
@@ -312,12 +332,12 @@ namespace uwvm2::runtime::lib::native_stack
             // path exits immediately, so it does not need different masks.
             action.sa_flags = SA_SIGINFO | SA_ONSTACK | (previous_segv.sa_flags & (SA_NODEFER | SA_RESTART));
             action.sa_mask = previous_segv.sa_mask;
-            if(::sigaction(SIGSEGV, &action, nullptr) != 0) { return false; }
+            if(::uwvm2::runtime::lib::posix_abi::sigaction_noexcept(SIGSEGV, &action, nullptr) != 0) { return false; }
             action.sa_flags = SA_SIGINFO | SA_ONSTACK | (previous_bus.sa_flags & (SA_NODEFER | SA_RESTART));
             action.sa_mask = previous_bus.sa_mask;
-            if(::sigaction(SIGBUS, &action, nullptr) != 0)
+            if(::uwvm2::runtime::lib::posix_abi::sigaction_noexcept(SIGBUS, &action, nullptr) != 0)
             {
-                ::sigaction(SIGSEGV, &previous_segv, nullptr);
+                ::uwvm2::runtime::lib::posix_abi::sigaction_noexcept(SIGSEGV, &previous_segv, nullptr);
                 return false;
             }
             return true;
@@ -350,12 +370,12 @@ namespace uwvm2::runtime::lib::native_stack
             }
 
             // The base page size does not change during the process lifetime.
-            static auto const page{::sysconf(_SC_PAGESIZE)};
+            static auto const page{::uwvm2::runtime::lib::posix_abi::sysconf_noexcept(_SC_PAGESIZE)};
             if(page <= 0) { return; }
             current.page = static_cast<::std::size_t>(page);
 # if defined(__APPLE__)
-            current.high = reinterpret_cast<::std::uintptr_t>(::pthread_get_stackaddr_np(::pthread_self()));
-            auto const size{::pthread_get_stacksize_np(::pthread_self())};
+            current.high = reinterpret_cast<::std::uintptr_t>(::uwvm2::runtime::lib::posix_abi::pthread_get_stackaddr_np_noexcept(::uwvm2::runtime::lib::posix_abi::pthread_self_noexcept()));
+            auto const size{::uwvm2::runtime::lib::posix_abi::pthread_get_stacksize_np_noexcept(::uwvm2::runtime::lib::posix_abi::pthread_self_noexcept())};
             if(current.high < size) { return; }
             current.low = current.high - size;
 # else
@@ -364,7 +384,7 @@ namespace uwvm2::runtime::lib::native_stack
             // A user-switched fiber is not necessarily the pthread's stack.
             // Never register bounds which do not contain this actual entry.
             if(here < current.low || here >= current.high) { return; }
-            if(::sigaltstack(nullptr, &previous_alt) != 0 || (previous_alt.ss_flags & SS_ONSTACK)) { return; }
+            if(::uwvm2::runtime::lib::posix_abi::sigaltstack_noexcept(nullptr, &previous_alt) != 0 || (previous_alt.ss_flags & SS_ONSTACK)) { return; }
             constexpr ::std::size_t alt_bytes{alternate_stack_bytes};
             if((previous_alt.ss_flags & SS_DISABLE) || previous_alt.ss_size < alt_bytes)
             {
@@ -379,14 +399,14 @@ namespace uwvm2::runtime::lib::native_stack
                     // must not disable the existing uncached safe path.
                     if(current.page > ((::std::numeric_limits<::std::size_t>::max)() - alt_bytes) / 2u) { return; }
                     mapping_bytes = alt_bytes + current.page * 2u;
-                    mapping = ::mmap(nullptr, mapping_bytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+                    mapping = ::uwvm2::runtime::lib::posix_abi::mmap_noexcept(nullptr, mapping_bytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
                     if(mapping == MAP_FAILED) { return; }
                     auto* payload{static_cast<::std::byte*>(mapping) + current.page};
-                    if(::mprotect(payload, alt_bytes, PROT_READ | PROT_WRITE) != 0) { return; }
+                    if(::uwvm2::runtime::lib::posix_abi::mprotect_noexcept(payload, alt_bytes, PROT_READ | PROT_WRITE) != 0) { return; }
                     alternate.ss_sp = payload;
                 }
                 alternate.ss_size = alt_bytes;
-                if(::sigaltstack(&alternate, nullptr) != 0) { return; }
+                if(::uwvm2::runtime::lib::posix_abi::sigaltstack_noexcept(&alternate, nullptr) != 0) { return; }
                 owns_alt = true;
             }
             if(!install_handlers()) { return; }
@@ -409,12 +429,12 @@ namespace uwvm2::runtime::lib::native_stack
             if((previous_alt.ss_flags & SS_DISABLE) && previous_alt.ss_size < MINSIGSTKSZ)
             { previous_alt.ss_size = MINSIGSTKSZ; }
 #endif
-            if(owns_alt && ::sigaltstack(&previous_alt, nullptr) != 0)
+            if(owns_alt && ::uwvm2::runtime::lib::posix_abi::sigaltstack_noexcept(&previous_alt, nullptr) != 0)
             {
                 // Never unmap memory the kernel still considers a signal stack.
-                ::_exit(126);
+                ::uwvm2::runtime::lib::posix_abi::_exit_noexcept(126);
             }
-            if(mapping != MAP_FAILED) { ::munmap(mapping, mapping_bytes); }
+            if(mapping != MAP_FAILED) { ::uwvm2::runtime::lib::posix_abi::munmap_noexcept(mapping, mapping_bytes); }
         }
 
         [[nodiscard]] bool ready() const noexcept { return initialized; }
@@ -423,8 +443,12 @@ namespace uwvm2::runtime::lib::native_stack
     [[noreturn]] inline void setup_failed() noexcept
     {
         constexpr char message[]{"uwvm: [fatal] cannot establish native stack fault handling.\n"};
-        [[maybe_unused]] auto const written{::write(STDERR_FILENO, message, sizeof(message) - 1u)};
-        ::_exit(126);
+        // [safe message bytes] unsafe (one-past array)
+        // ^^ borrowed message; count remains within this complete static array.
+        // Retain the same single-attempt fatal-output policy as the handler.
+        [[maybe_unused]] auto const written{::fast_io::posix_write_nothrow(
+            ::fast_io::posix_io_observer{::fast_io::posix_stderr_number}, message, sizeof(message) - 1u)};
+        ::uwvm2::runtime::lib::posix_abi::_exit_noexcept(126);
     }
 #else
     class scope

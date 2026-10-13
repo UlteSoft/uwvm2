@@ -57,6 +57,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
         ::uwvm2::utils::container::vector<::std::size_t> closes{};
         ::uwvm2::utils::mutex::rwlock_t fds_rwlock{};  // [singleton]
         ::std::size_t fd_limit{};
+
+
+        // Caller holds fds_rwlock. Allocation reuses a dense closed cell
+        // before growing the table; only growth consumes another scan cell.
+        [[nodiscard]] inline constexpr bool fits_allocation_scan_limit(::std::size_t limit) const noexcept
+        {
+            if(this->closes.size() > this->opens.size() || this->opens.size() > limit) { return false; }
+            auto const remaining{limit - this->opens.size()};
+            if(this->renumber_map.size() > remaining) { return false; }
+            return !this->closes.empty() || this->renumber_map.size() < remaining;
+        }
+
+        // Caller holds fds_rwlock. Reserved empty cells occupy allocator slots
+        // just like live descriptors; closed reusable cells do not. A sparse
+        // renumbered FD costs one slot regardless of its numeric value.
+        [[nodiscard]] inline constexpr bool fits_occupied_slot_limit(::std::size_t limit) const noexcept
+        {
+            if(this->closes.size() > this->opens.size()) { return false; }
+            auto const dense_occupied{this->opens.size() - this->closes.size()};
+            return dense_occupied <= limit && this->renumber_map.size() <= limit - dense_occupied;
+        }
     };
 }
 

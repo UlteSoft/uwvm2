@@ -80,11 +80,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             //           ^^ currp1
 
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                 u8"[error] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8"Usage: ",
                                 ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::log_convert_warn_to_fatal),
                                 // print_usage comes with UWVM_COLOR_U8_RST_ALL
@@ -144,11 +144,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         else
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RED),
                                 u8"[error] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8"Usage: ",
                                 ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::log_convert_warn_to_fatal),
                                 // print_usage comes with UWVM_COLOR_U8_RST_ALL

@@ -1,0 +1,144 @@
+{
+  "revision": "R7",
+  "qualified_frozen_source_ids": {
+    "uwvm2": "sha256:b5ed862fcecefd2c08dc678ea6ad993378c6232fc6bcff34723bdf464517aab6",
+    "uwvm2-ros": "sha256:0d7f1fda08f172788410d904309af2d3f8a382e25357e664663d414fd5360154"
+  },
+  "formal_run": {
+    "created_utc": "2026-10-04T17:35:01.879134+00:00",
+    "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope",
+    "memory_max": "68719476736",
+    "swap_max": "0",
+    "memory_before": 56402169856,
+    "events_before": "low 0\nhigh 0\nmax 237173\noom 45\noom_kill 9\noom_group_kill 0\n",
+    "affinity_cpu": 0,
+    "warm_calls": 2,
+    "timed_samples_per_process": 5,
+    "rounds": 3,
+    "admission_bytes": 62277025792,
+    "own_watchdog_bytes": 65498251264,
+    "binary_sha256": {
+      "candidate": "e875bb0f142466ecf53fd3d14626e673e053ab2f00e0d332c772b8e157d055b3",
+      "control": "28b0f57d84321cd5d81934e773cbdda2221d8c44f70934ec5f1a6f527b48e9cc",
+      "leb": "e1281f110b4cdc6855b9d321446c4a364b810f4deec675ec534a361b8f13255d",
+      "ros": "52e8edd19c4ae8ab001b4125aa320ec76d25b8cdac08044c82b92957a27612b7",
+      "prev": "bdbdd11fe0ccfed930be0e22f46669e2370a0c909f4bf2c8274b5952d39e536f"
+    },
+    "memory_after": 61069135872,
+    "events_after": "low 0\nhigh 0\nmax 237173\noom 45\noom_kill 9\noom_group_kill 0\n",
+    "binary_sha256_after": {
+      "candidate": "e875bb0f142466ecf53fd3d14626e673e053ab2f00e0d332c772b8e157d055b3",
+      "control": "28b0f57d84321cd5d81934e773cbdda2221d8c44f70934ec5f1a6f527b48e9cc",
+      "leb": "e1281f110b4cdc6855b9d321446c4a364b810f4deec675ec534a361b8f13255d",
+      "ros": "52e8edd19c4ae8ab001b4125aa320ec76d25b8cdac08044c82b92957a27612b7",
+      "prev": "bdbdd11fe0ccfed930be0e22f46669e2370a0c909f4bf2c8274b5952d39e536f"
+    },
+    "finished_utc": "2026-10-04T17:41:57.494024+00:00"
+  },
+  "counts": {
+    "records": 1129,
+    "cases": 91,
+    "timed_cases": 87,
+    "expected_trap_cases": 4,
+    "vtune": 43,
+    "functional_replays": 116,
+    "managed_pause_cases": 35,
+    "rss_gates": 36,
+    "native_collector_cells": 72
+  },
+  "scope": "frozen Linux /tmp profiles; locally merged concurrent workspace is not a new compiled qualification",
+  "native_arch": "x86_64",
+  "portability_scope": "aarch64/PowerPC64 BE/LE actual fill fragment codegen only, no QEMU, no native performance qualification",
+  "aggregate_pressure_native_supplement": {
+    "revision": "aggregate-pressure",
+    "native_correctness_qualified": true,
+    "performance_matrix_qualified": false,
+    "products": {
+      "candidate": {
+        "control_flow_root_fixtures": 12,
+        "positive_fixtures": 1413,
+        "expected_traps": 117,
+        "invalid_fixtures": 92,
+        "GC_activation_fixtures": 141,
+        "binary_sha256": "04af9eea3bb3ed56d442ff7246d9df58ea5aa7cd98ee9240b2a375cd245467ca",
+        "source_id": "sha256:0094954f48d344a9af81991decbbbacf253b0f1e07b35d3f4972b7a76f71cafc"
+      },
+      "ros": {
+        "control_flow_root_fixtures": 12,
+        "positive_fixtures": 1413,
+        "expected_traps": 117,
+        "invalid_fixtures": 92,
+        "GC_activation_fixtures": 141,
+        "binary_sha256": "62ef95961e50b6a819e4a5246e9bf6cc65f7a6b469e99f5336f490f45eeaaa89",
+        "source_id": "sha256:3d292ed813a1a6cfa85b5ea3cf38220eaa89b517d51ab8a90a9322178d9eb146"
+      }
+    },
+    "flags": [
+      "UWVM_USE_THREAD_LOCAL",
+      "UWVM_EXPERIMENTAL_PRECISE_GC_TRACE_METADATA=1",
+      "UWVM_EXPERIMENTAL_INLINE_GC_TRACE_METADATA=1",
+      "UWVM_EXPERIMENTAL_LOCAL_FULL_GC_EXCEPTIONS=1",
+      "UWVM_EXPERIMENTAL_EXCEPTION_SOURCE_RETENTION=1",
+      "UWVM_EXPERIMENTAL_EXTERNAL_EXCEPTION_HANDLES=1",
+      "UWVM_EXPERIMENTAL_NATIVE_EXCEPTION_ROOTS=1",
+      "UWVM_EXPERIMENTAL_EXCEPTION_GC_GRAPH=1",
+      "UWVM_EXPERIMENTAL_REGISTERED_EXCEPTION_COLLECTION=1",
+      "UWVM_EXPERIMENTAL_GC_ARRAY_BYTE_PRESSURE=1",
+      "UWVM_EXPERIMENTAL_PENDING_NUMERIC_FUSED_CATCH=1",
+      "UWVM_EXPERIMENTAL_GENERAL_GC_SLAB=1",
+      "UWVM_EXPERIMENTAL_PACKED_NUMERIC_ARRAYS=1",
+      "UWVM_EXPERIMENTAL_COLLECTION_LOCAL_MEMBERSHIP=1",
+      "UWVM_EXPERIMENTAL_SINGLE_CAS_GC_PUBLICATION=1"
+    ],
+    "wasm_counts_per_repo": {
+      "returning": 1413,
+      "runtime_traps": 117,
+      "invalid_rejected": 92,
+      "automatic_gc_activation": 141,
+      "control_flow_roots": 12
+    },
+    "native_component_checks": 14572800,
+    "extra_native_cells": {
+      "trace_boundary": 18,
+      "wide_constructor": 10,
+      "binary_cache_identity": 20
+    },
+    "hardware_expected_cells": 2124,
+    "clock_expected_cells": 2118,
+    "notes": "Frozen native products only; full hardware/clock matrix pending. Concurrent local workspaces were not rebuilt as a whole.",
+    "cgroup": "0::/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope\n",
+    "native_arch": "x86_64",
+    "evidence_sha256": {
+      "final-product-qualified.json": "36679f1f8dca412af5cc75297c02c45f468ce4f528014f01be053c63cf804462",
+      "aggregate-pressure-trace-boundary-complete.json": "37b61dfc47e93641eae2e4edf2c117e815f26f842eb020a4df8fedc15985ae35",
+      "aggregate-pressure-wide-constructor-native-qualified.json": "c5ad85e352b7c4a46185e44e77c23043b89a6b6e81841691076747b18f0a292e",
+      "binary-cache-key-native-qualified.json": "139a7d3f1fc422826cecc99e3752f11aa72861eb5e9cad5a7ef4aaee6a96833f"
+    }
+  },
+  "current_production_snapshot_native_integration": {
+    "qualified_main_snapshot": true,
+    "current_main": {
+      "returns": 1413,
+      "runtime_traps": 117,
+      "invalid_rejections": 92,
+      "source_id": "sha256:3af6143af80d56f639d4cc1e224634a8a769e214fb31fc297d93e38b078783d2",
+      "binary_sha256": "c0406055205b3b3592198e4c19813451e69121e680553da804d71014f383a473"
+    },
+    "source_scope": "Immutable production src plus matched fast_io/bizwen/boost headers; configured native LLVM23 SDK plus isolated native X86AsmParser object. This source snapshot is distinct from the aggregate-pressure performance ELF.",
+    "cgroup_memory_max": 68719476736,
+    "cgroup_swap_max": 0,
+    "native_architecture": "x86_64",
+    "current_ros_snapshot": {
+      "qualified": false,
+      "source_id": "sha256:cbd7dae0d4ef11baf55d390119cdf24d8931158d0df016567a92bf84fedc12d5",
+      "expected_llvm": "23.1.1-uwvm-ros.11",
+      "available_sdk": "23.1.1-uwvm-ros.10",
+      "reason": "Pinned-version check rejected current ROS snapshot. Guard preserved. Aggregate-pressure frozen ROS .10 correctness evidence is separate and remains valid; it does not qualify evolving ROS .11 src."
+    },
+    "performance_matrix_qualified": false,
+    "performance_hardware_expected": 2124,
+    "performance_clock_expected": 2118,
+    "evidence_local": "/Users/liyinan/.codex/visualizations/2026/10/04/01a10538-f171-7a53-830e-683e5a35908b/wasm3-optimization/wasm-validation-20261005/current-integration-and-closure-evidence-20261005T1819.tar.gz",
+    "evidence_scope": "Native CLI return/trap/invalid-module correctness. No local build/test execution; no individual automatic-GC pause quantiles or cross-architecture native performance qualification."
+  }
+}

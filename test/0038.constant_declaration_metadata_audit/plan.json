@@ -1,0 +1,299 @@
+{
+  "schema": "uwvm-core3-constant-declaration-stage5-tests-r1",
+  "source_only": true,
+  "production_applied": false,
+  "official_oracle_passed": false,
+  "native_compiled": false,
+  "native_executed": false,
+  "guest_execution": 0,
+  "stable_append_only_feature_values": {
+    "extended_const": 15,
+    "table_initializer": 16
+  },
+  "cli": "[--provider provider.wasm] (extended-const|table-initializer accept|reject mask global|table|element|data extended_opcode file.wasm)...",
+  "observations_per_control_tuple": {
+    "ordinary_combined": 18,
+    "ros_combined": 14,
+    "ordinary_int_only": 8,
+    "ros_int_only": 6
+  },
+  "first_short_round": [
+    "table-initializer reject 1 global 0 explicit_table_zero.wasm",
+    "extended-const reject 2 global 106 global_i32_add.wasm",
+    "extended-const reject 2 data 126 data_i64_mul.wasm"
+  ],
+  "cases": [
+    {
+      "wat": "empty.wat",
+      "mask": 0,
+      "extended_subject": "global",
+      "extended_opcode": 0,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "accept"
+        }
+      ]
+    },
+    {
+      "wat": "mvp_global_const.wat",
+      "mask": 0,
+      "extended_subject": "global",
+      "extended_opcode": 0,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "accept"
+        }
+      ]
+    },
+    {
+      "wat": "implicit_table_zero.wat",
+      "mask": 0,
+      "extended_subject": "global",
+      "extended_opcode": 0,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "accept"
+        }
+      ]
+    },
+    {
+      "wat": "explicit_table_zero.wat",
+      "mask": 1,
+      "extended_subject": "global",
+      "extended_opcode": 0,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "reject"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "accept"
+        }
+      ]
+    },
+    {
+      "wat": "global_i32_add.wat",
+      "mask": 2,
+      "extended_subject": "global",
+      "extended_opcode": 106,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "reject"
+        }
+      ]
+    },
+    {
+      "wat": "global_i64_mul.wat",
+      "mask": 2,
+      "extended_subject": "global",
+      "extended_opcode": 126,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "reject"
+        }
+      ]
+    },
+    {
+      "wat": "global_defined_get.wat",
+      "mask": 2,
+      "extended_subject": "global",
+      "extended_opcode": 35,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "reject"
+        }
+      ]
+    },
+    {
+      "wat": "global_imported_get.wat",
+      "mask": 0,
+      "extended_subject": "global",
+      "extended_opcode": 0,
+      "provider_required": true,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "accept"
+        }
+      ]
+    },
+    {
+      "wat": "data_i32_add.wat",
+      "mask": 2,
+      "extended_subject": "data",
+      "extended_opcode": 106,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "reject"
+        }
+      ]
+    },
+    {
+      "wat": "data_i64_mul.wat",
+      "mask": 2,
+      "extended_subject": "data",
+      "extended_opcode": 126,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "reject"
+        }
+      ]
+    },
+    {
+      "wat": "element_i32_sub.wat",
+      "mask": 2,
+      "extended_subject": "element",
+      "extended_opcode": 107,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "reject"
+        }
+      ]
+    },
+    {
+      "wat": "element_i64_add.wat",
+      "mask": 2,
+      "extended_subject": "element",
+      "extended_opcode": 124,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "reject"
+        }
+      ]
+    },
+    {
+      "wat": "element_value_gc_arithmetic.wat",
+      "mask": 2,
+      "extended_subject": "element",
+      "extended_opcode": 106,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "reject"
+        }
+      ]
+    },
+    {
+      "wat": "gc_i31_independent.wat",
+      "mask": 0,
+      "extended_subject": "global",
+      "extended_opcode": 0,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "accept"
+        }
+      ]
+    },
+    {
+      "wat": "explicit_table_gc_arithmetic.wat",
+      "mask": 3,
+      "extended_subject": "table",
+      "extended_opcode": 106,
+      "provider_required": false,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "reject"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "reject"
+        }
+      ]
+    },
+    {
+      "wat": "imported_table_no_initializer.wat",
+      "mask": 0,
+      "extended_subject": "global",
+      "extended_opcode": 0,
+      "provider_required": true,
+      "controls": [
+        {
+          "feature": "table-initializer",
+          "expected_disabled": "accept"
+        },
+        {
+          "feature": "extended-const",
+          "expected_disabled": "accept"
+        }
+      ]
+    }
+  ]
+}

@@ -20,7 +20,11 @@ namespace
                                         ::std::uintptr_t,
                                         ::std::size_t,
                                         ::std::uintptr_t,
-                                        ::std::size_t) noexcept;
+                                        ::std::size_t)
+#if defined(__cpp_herbception)
+        throws
+#endif
+        ; // Wasm calls may propagate guest_exception; snapshot-only helpers remain noexcept.
     using snapshot_bridge_pointer = ::std::uintptr_t (*)(::std::uintptr_t,
                                                           ::std::size_t,
                                                           ::std::size_t*) noexcept;

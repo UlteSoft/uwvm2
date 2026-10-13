@@ -36,6 +36,8 @@
 # include <limits>
 # include <memory>
 # include <mutex>
+# include <new>
+# include <type_traits>
 # include <utility>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
@@ -44,6 +46,12 @@
 // platform
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <uwvm2/runtime/compiler/shared/strict_float.h>
+#  include <llvm/Config/llvm-config.h>
+#  include <llvm/ADT/SmallPtrSet.h>
+#  include <llvm/ADT/DenseMap.h>
+#  include <llvm/ADT/SmallVector.h>
+#  include <llvm/IR/ValueHandle.h>
+#  include <llvm/IR/ValueSymbolTable.h>
 #  include <llvm/Bitcode/BitcodeReader.h>
 #  include <llvm/Bitcode/BitcodeWriter.h>
 #  include <llvm/IR/Attributes.h>
@@ -60,16 +68,38 @@
 #  include <llvm/IR/Type.h>
 #  include <llvm/IR/Value.h>
 #  include <llvm/IR/Verifier.h>
+#  include <llvm/Transforms/Utils/Cloning.h>
+#  include <llvm/Transforms/Utils/ModuleUtils.h>
+#  include <llvm/Analysis/ValueTracking.h>
+#  include <llvm/Support/KnownBits.h>
 #  include <llvm/Linker/Linker.h>
 #  include <llvm/Support/DynamicLibrary.h>
 #  include <llvm/TargetParser/Host.h>
 #  include <llvm/TargetParser/Triple.h>
+#  include <llvm/Target/TargetMachine.h>
 #  include <llvm/IR/LegacyPassManager.h>
 #  include <llvm/Pass.h>
 #  include <llvm/PassRegistry.h>
+#  if defined(UWVM_EXPERIMENTAL_NATIVE_EH_PRIVATE_LEAF) && UWVM_EXPERIMENTAL_NATIVE_EH_PRIVATE_LEAF == 1
+#   include <llvm/ADT/SmallVector.h>
+#   include <llvm/Support/MemoryBuffer.h>
+#   include <llvm/Support/raw_ostream.h>
+#   include <llvm/Transforms/Utils/Cloning.h>
+#  endif
 #  include <llvm/InitializePasses.h>
 #  include <llvm/Transforms/Scalar/Scalarizer.h>
 # endif
+# include <uwvm2/runtime/exception/pending_numeric_outer.h>
+# include <uwvm2/runtime/compiler/shared/wasm_exception_effect.h>
+#if defined(UWVM_EXPERIMENTAL_NATIVE_EH_LEAF_OBSERVER) && UWVM_EXPERIMENTAL_NATIVE_EH_LEAF_OBSERVER == 1
+# include <array>
+# include <span>
+# include <vector>
+# include <uwvm2/runtime/compiler/shared/wasm_exception_private_leaf_effect.h>
+#endif
+# include <uwvm2/validation/standard/wasm3/relaxed_simd.h>
+# include <uwvm2/validation/standard/wasm3/threads.h>
+# include <uwvm2/validation/standard/wasm3/tail_call.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/uwvm_predefine/io/impl.h>
@@ -84,16 +114,26 @@
 # include <uwvm2/parser/wasm/standard/wasm1p1/features/call_indirect_immediate.h>
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/validation/error/impl.h>
-# include <uwvm2/validation/standard/wasm2/impl.h>
+# include <uwvm2/validation/standard/wasm3/impl.h>
 # include <uwvm2/object/impl.h>
 # include <uwvm2/object/memory/flags/impl.h>
 # include <uwvm2/runtime/compiler/shared/wasm1p1_simd.h>
+# include <uwvm2/runtime/compiler/shared/wasm_threads.h>
+# include <uwvm2/runtime/compiler/shared/wasm_memory64.h>
+# include <uwvm2/runtime/wasm_threads/impl.h>
+# include <uwvm2/runtime/gc/impl.h>
+# include <uwvm2/runtime/checkpoint/materialization.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/memory/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
+# include <uwvm2/uwvm/runtime/validator/validate.h>
+# include <uwvm2/runtime/compiler/shared/wasm_exception_control.h>
+# include <uwvm2/runtime/compiler/llvm_jit/native_exception_symbols.h>
+# include <uwvm2/runtime/compiler/llvm_jit/native_exception_landingpad.h>
+# include <uwvm2/runtime/compiler/llvm_jit/native_provenance.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -106,6 +146,7 @@
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+# include "translate/private_host_object_emission_scope.h"
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 {
     enum class llvm_jit_trap_kind : ::std::uint_least32_t
@@ -119,7 +160,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
         call_indirect_type_mismatch,
         memory_out_of_bounds,
         runtime_invariant_failure,
-        table_out_of_bounds
+        table_out_of_bounds,
+        unaligned_atomic,
+        atomic_wait_non_shared,
+        atomic_wait_cancelled,
+        atomic_wait_unavailable,
+        atomic_wait_limit,
+        null_reference,
+        array_out_of_bounds,
+        gc_allocation_failure,
+        cast_failure
     };
 
     extern "C++"

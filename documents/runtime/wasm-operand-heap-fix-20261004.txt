@@ -1,0 +1,149 @@
+Wasm operand preview 修复与验证（2026-10-04，V5）
+
+两个本机仓库同步修复：uwvm2、uwvm2-ros。
+修复的是 cooperative Wasm opcode stop 的真实 typed operand/local materialization。
+本次没有增加任意 ASM PC 上的 Wasm data stack 还原能力，也没有开放 VM 本身的 ASM 调试。
+
+原问题及实现
+
+1. 原 observation-only 预览复用了 resumable checkpoint 的 32768 字节原生工作区。
+   1000 个 locals 加两个 operands 会超过该工作区，即使 Wasm 合法且元数据预算足够也会拒绝预览。
+   现将 observation-only packet/初始化标记放入实际 debug execution scope 所有的私有堆缓冲区。
+   每个实际函数调用只分配一次；大小为 2 * local_count + 16 * max_typed_slots，最小 1 字节。
+   编译器在完成所有已验证 opcode site 后确定最终分配常量，再优化、封存和发射 object。
+   没有运行时 realloc，不接受 guest 提供的 extent；嵌套调用时各内层 buffer 地址保持稳定。
+   实际 return、typed tail、host tail、frame-exiting EH 在原有 activation leave 前释放对应 top buffer。
+   内存所有权独立于诊断 ledger；诊断身份配额耗尽不会造成合法 guest 提前退出或错误释放。
+   错误的、非 top 的释放请求会失败，不会退休其他 buffer。
+
+2. 原普通执行入口无条件构造 runtime_debug_execution_scope，进入时读取 debug TLS/control。
+   现按真实执行 admission 下保持不可变的配置选择 template<bool Debug> 路径。
+   false specialization 不构造 debug scope，不安装新 arena TLS，也不执行该构造器的 participant probe。
+   selected helper 强制 inline，public entry 保持 noinline，保留原来的 native CFA 边界和 admission。
+   dbg 关闭时，生成的 Wasm 中没有新增 arena allocation/release、typed packet stores 或 materialization。
+   host entry 仍有一次模式选择，原有其它 host/table debug-control 检查没有全面删除。
+   因此这里证明的是本次预览机制的生成代码开销消除，没有宣称整进程绝对零开销。
+
+原 resumable/native restore workspace 仍为 32768 字节；它的 ABI2、cache policy17、原生 owner/provenance
+与 pause/generation/source/root 检查保留。observer cache policy 从12升级为13，旧 observer object 不会混用。
+私有 arena 的分配/释放仅提供 storage，不产生 query、capture、restore 或 PC 权限。
+新增 C++ 诊断与回归测试输出使用 fast_io。
+
+源码入口
+
+src/uwvm2/runtime/lib/uwvm_runtime_debug_operand_workspace.h
+src/uwvm2/runtime/lib/uwvm_runtime_checkpoint_dynamic_materialization.h
+src/uwvm2/runtime/lib/uwvm_runtime_generated_wasm_bridge.h
+src/uwvm2/runtime/lib/uwvm_runtime.default.cpp
+src/uwvm2/runtime/checkpoint/materialization.h
+src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_checkpoint_control_storage_emit.h
+src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_checkpoint_packet_emit.h
+src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_checkpoint_initialization_emit.h
+src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_checkpoint_emit.h
+src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_checkpoint_observer_site_build.h
+src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h
+src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_debug_host_bridge.h
+src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func.h
+
+同时消除了 native_registers.h 中 AArch64 与 ARM 两个局部数组都命名为 arm 的编译冲突。
+没有改动或回退其它 agent 的并发修改。
+
+新增/更新回归
+
+test/0017.runtime/debug_operand_workspace.cc
+  80 层真实独立 buffer、地址稳定、全范围初始化、top-only 释放、double leave、零/溢出拒绝。
+  验证 observer heap fit 与原 native workspace quota 分离。
+test/0017.runtime/debug_checkpoint_complete_cache_identity.cc：observer policy13。
+test/0017.runtime/debug_checkpoint_native_workspace_budget.cc：当前原 resumable policy17。
+test/0018.debugger/run_wasm_operand_preview_cli.py：新增1000/1001/10000 locals 正向精确值预览，
+  70 层真实递归的 quota-unavailable / guest 正常完成测试。
+
+实际 SSH Linux 验证结果
+
+全部 compiler、validator、LLVM/native component、反汇编、VM、QEMU 执行只在指定既有 cgroup 中进行。
+本机只读写源码、拷贝、哈希和整理证据；没有本机运行 compiler、VM 或项目测试。
+
+两个仓库均由本次冻结源码重新编译 runtime、host-api、main 三个 TU 并重新链接。
+runtime/host-api 为 -O1，main 为 -O0，C++26/libc++、threaded、gline-tables-only。
+这不是 release -O3 性能基准。ordinary 使用真实 .9 provider；ROS 使用真实 .10 provider，未放宽 pin。
+ROS 原 full interpreter/full LLVM JIT 的模式限制保留。
+
+原生 x86_64，两种 instruction/unwind 策略：
+- 52 次正向实际 VM operand preview（每仓库13场景 * 2策略），全部精确值断言通过。
+  包括整数/浮点原始bits/SIMD、GC/ref、if/loop、嵌套调用、tail call、EH、atomic wait、
+  300个 live operands 的分页，以及1000/1001/10000 locals。
+  大 locals 的 stop 实际读出 i32=123、i64=456，并能在 drop 后正确读出空 operand stack。
+- 4 次70层递归超 identity quota 场景：明确 unavailable，guest exit0，退出释放正确。
+- 112 次 Core3 debugger smoke（每仓库56次），全部通过；不是穷举 conformance 或完整线程并发证明。
+- 4 次 dbg off/on actual VM object capture；两仓库的 off 数值 leaf 均为9字节、3条指令：
+  movslq %edi,%rax; addq %rsi,%rax; retq $0x8。
+  on 路径查询到实际 i64=1037；完整反汇编与 captured objects 已保存。
+- 4 次真实热替换/script 会话：合法 generation2 替换、非法type/opcode/whole-module拒绝、
+  script fail-stop、step-over/out 回归通过。
+- 8 次真实 resumable profile 编译/执行/capture/query 回归：nested 与 saved-GC，各2策略各2仓库。
+  验证真实 nested calls/catch_ref/throw_ref/GC 的完整 typed 查询与正常 guest 结果。
+  这些运行没有执行 whole-instance restore，测试输出明确 restore=false。
+- 12 个 native component 可执行文件全部通过（每仓库6个），包括原 LLVM reusable-workspace IR、
+  native payload/LLVM verifier、shadow ledger、native quota/cache identity、新heap storage。
+
+QEMU Linux：2个 DATA components * 10架构 * 2仓库 = 40 次实际执行，80个compile/run命令全部通过。
+架构：aarch64、riscv64、i686、powerpc64、powerpc64le、mips64、mips64el、sparc64、loongarch64、s390x。
+检查了目标 ELF machine/class/endian、真实 .d source/header、实际 link inputs、compiler/QEMU fingerprints。
+4866个预先记录的外部输入在运行后保持一致；actual .d 没有未闭合的外部依赖。
+这轮仅验证新storage与原native quota组件；没有重新宣称这些架构的完整 LLVM JIT VM DBG 体验一致。
+
+实际测试源码身份（canonical wasm3_source_fingerprint 算法）
+
+uwvm2:
+sha256:7adb875af46d05209a016b0e7bd240690cf97d81df050247dd933e2a772335fb
+uwvm2-ros:
+sha256:9a4d216fd930d3480678659c63ca43989c11db474cbf1e412e27dfe3d254a861
+
+编译前后和最终实际 compiler .d 闭合检查：source/provider/system header/library 全部通过。
+Wasm operand 修复文件在本机仍与冻结测试内容相同。
+其它 agent 此间修改了 native/language debugger 和 fast_io thread 的若干文件；没有覆盖这些改动。
+native_registers.h 的数组改名仍保留，但该文件后续另有并发修改。
+因此完整可执行资格对应上述快照，不延伸为这些后续改动的完整验证。
+
+cgroup / bounded execution
+
+Boot:484df744-bc84-4acd-9245-801e24c21cfd
+Keeper:PID11866,birth58402,uid1000,sleep infinity
+/system.slice/docker-bec3a6e4e013ba07c1583e46eeb81707c90c59375ae1c208a6bb87cc4f773f45.scope
+memory.max=64GiB,swap.max=0,cpuset=0,2,4,6,16-31；本任务实际 owned descendants affinity16-31。
+Supervisor 使用实际 PIDFD/birth/parent/cgroup 证明，拒绝未知 executable，限制12GiB owned RSS、
+512MiB单输出文件、32MiB日志，并在返回前退休并回收 owned 子树；没有接管或发送信号给其它任务。
+成功 qualification receipts 的 OOM event counter 没有变化。
+共享磁盘/内存紧张中止的早期尝试保留为失败记录，未算作成功。
+早期 tests supervisor 的磁盘实际断言从1GiB改为512MiB，receipt旧 required字段仍写2GiB；
+请以已保存 supervisor代码与实际minimum观察解释这些历史记录。
+后续完整ROS preview、resumable和QEMU测试全部输出到私有tmpfs，使用该文件系统1GiB余量断言，
+并修正 receipt 的 reserve字段；不依赖宿主磁盘余量或清理他人的输出。
+
+证据
+
+SSH control:
+/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/wasm-operand-heap-20261004-r1
+SSH frozen source/build/补充成功证据：
+/dev/shm/wasm-operand-heap-20261004-r1
+native-qualified-results-v5.json 汇总成功原生结果与实际binary/object/.d hashes。
+cross-qualified-results-v5.json 保留40个实际target ELF、input closure与QEMU资格记录。
+uwvm2-build-v5-queued-evidence、uwvm2-ros-build-v5-queued-evidence、components-v5-evidence、
+remaining-native-v5-evidence、resumable-v5-evidence、ros-preview-complete-v5-evidence、
+cross-components-v5-evidence 保存成功controller receipts及日志。
+ordinary 完整preview/Core3/codegen命令的成功receipts位于 cli-v5-attempt2-evidence，
+该批次随后因ROS测试时共享磁盘余量不足中止；ROS完整preview已在tmpfs单独重新全部通过。
+
+本机归档目录：/tmp/wasm-operand-fix-20261004
+最终测试源码归档 tested-source-v5.tar.gz：84377749字节
+SHA256:694ee9aad7101b54de7a0ef192f6a002bb819a8eb7987800f47c13975233b8fe
+最终证据归档 qualified-evidence-v5.tar.gz 的hash见同目录 evidence-archives-v5.json。
+实际两仓库CLI binaries、captured on/off guest objects、命令、receipts、fixtures、输入manifest与日志已保存。
+大 runtime/main/host TU objects仍保留在SSH私有build目录，由最终hash绑定。
+
+仍有明确界限
+
+- debugger activation identity 上限仍为64帧；超过时预览明确不可用，本次只保证合法guest仍执行和清理。
+- observer 元数据仍受配置预算（默认1048576 slots/frame）、地址宽度与实际可用内存限制。
+- 本次没有实现 arbitrary ASM PC 的寄存器/内存映射，也没有增加完整检查点恢复或外部IO回滚保证。
+- 没有使用QEMU DATA组件、3条指令样例或Core3 smoke推断全部架构、全部特性与所有性能保证。

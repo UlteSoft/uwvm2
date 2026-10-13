@@ -29,6 +29,9 @@ case wasm1_code::i32_const:
                                                             ::fast_io::mnp::leb128_get(imm))};
     if(imm_err != ::fast_io::parse_code::ok) [[unlikely]]
     {
+        // [checked const opcode] immediate ... | code_end
+        // [safe opcode byte    ] unsafe (at code_end); this path only copies op_begin.
+        // ^^ err.err_curr borrows the dispatch-checked opcode.
         err.err_curr = op_begin;
         err.err_selectable.invalid_const_immediate.op_code_name = u8"i32.const";
         err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_const_immediate;
@@ -90,6 +93,9 @@ case wasm1_code::i64_const:
                                                             ::fast_io::mnp::leb128_get(imm))};
     if(imm_err != ::fast_io::parse_code::ok) [[unlikely]]
     {
+        // [checked const opcode] immediate ... | code_end
+        // [safe opcode byte    ] unsafe (at code_end); this path only copies op_begin.
+        // ^^ err.err_curr borrows the dispatch-checked opcode.
         err.err_curr = op_begin;
         err.err_selectable.invalid_const_immediate.op_code_name = u8"i64.const";
         err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_const_immediate;
@@ -146,6 +152,9 @@ case wasm1_code::f32_const:
 
     if(static_cast<::std::size_t>(code_end - code_curr) < sizeof(bits)) [[unlikely]]
     {
+        // [checked const opcode] truncated immediate ... | code_end
+        // [safe opcode byte    ] unsafe (at code_end); this path only copies op_begin.
+        // ^^ err.err_curr borrows the dispatch-checked opcode.
         err.err_curr = op_begin;
         err.err_selectable.invalid_const_immediate.op_code_name = u8"f32.const";
         err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_const_immediate;
@@ -204,6 +213,9 @@ case wasm1_code::f64_const:
 
     if(static_cast<::std::size_t>(code_end - code_curr) < sizeof(bits)) [[unlikely]]
     {
+        // [checked const opcode] truncated immediate ... | code_end
+        // [safe opcode byte    ] unsafe (at code_end); this path only copies op_begin.
+        // ^^ err.err_curr borrows the dispatch-checked opcode.
         err.err_curr = op_begin;
         err.err_selectable.invalid_const_immediate.op_code_name = u8"f64.const";
         err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_const_immediate;
@@ -242,444 +254,244 @@ case wasm1_code::f64_const:
 }
 case wasm1_code::i32_eqz:
 {
-    validate_numeric_unary(u8"i32.eqz", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x45u>(u8"i32.eqz")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpEQ(operand.value, ::llvm::ConstantInt::get(operand.value->getType(), 0u))); }))
-            [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i32_eq:
 {
-    validate_numeric_binary(u8"i32.eq", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x46u>(u8"i32.eq")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpEQ(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i32_ne:
 {
-    validate_numeric_binary(u8"i32.ne", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x47u>(u8"i32.ne")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpNE(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i32_lt_s:
 {
-    validate_numeric_binary(u8"i32.lt_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x48u>(u8"i32.lt_s")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSLT(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i32_lt_u:
 {
-    validate_numeric_binary(u8"i32.lt_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x49u>(u8"i32.lt_u")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpULT(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i32_gt_s:
 {
-    validate_numeric_binary(u8"i32.gt_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x4au>(u8"i32.gt_s")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSGT(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i32_gt_u:
 {
-    validate_numeric_binary(u8"i32.gt_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x4bu>(u8"i32.gt_u")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpUGT(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i32_le_s:
 {
-    validate_numeric_binary(u8"i32.le_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x4cu>(u8"i32.le_s")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSLE(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i32_le_u:
 {
-    validate_numeric_binary(u8"i32.le_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x4du>(u8"i32.le_u")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpULE(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i32_ge_s:
 {
-    validate_numeric_binary(u8"i32.ge_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x4eu>(u8"i32.ge_s")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSGE(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i32_ge_u:
 {
-    validate_numeric_binary(u8"i32.ge_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x4fu>(u8"i32.ge_u")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpUGE(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i64_eqz:
 {
-    validate_numeric_unary(u8"i64.eqz", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x50u>(u8"i64.eqz")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpEQ(operand.value, ::llvm::ConstantInt::get(operand.value->getType(), 0u))); }))
-            [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i64_eq:
 {
-    validate_numeric_binary(u8"i64.eq", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x51u>(u8"i64.eq")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpEQ(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i64_ne:
 {
-    validate_numeric_binary(u8"i64.ne", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x52u>(u8"i64.ne")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpNE(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i64_lt_s:
 {
-    validate_numeric_binary(u8"i64.lt_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x53u>(u8"i64.lt_s")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSLT(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i64_lt_u:
 {
-    validate_numeric_binary(u8"i64.lt_u", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x54u>(u8"i64.lt_u")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpULT(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i64_gt_s:
 {
-    validate_numeric_binary(u8"i64.gt_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x55u>(u8"i64.gt_s")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSGT(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i64_gt_u:
 {
-    validate_numeric_binary(u8"i64.gt_u", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x56u>(u8"i64.gt_u")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpUGT(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i64_le_s:
 {
-    validate_numeric_binary(u8"i64.le_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x57u>(u8"i64.le_s")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSLE(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i64_le_u:
 {
-    validate_numeric_binary(u8"i64.le_u", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x58u>(u8"i64.le_u")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpULE(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i64_ge_s:
 {
-    validate_numeric_binary(u8"i64.ge_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x59u>(u8"i64.ge_s")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpSGE(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::i64_ge_u:
 {
-    validate_numeric_binary(u8"i64.ge_u", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
-
+    auto const event{validate_integer_compare.template operator()<0x5au>(u8"i64.ge_u")};
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_binary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) constexpr noexcept
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpUGE(left.value, right.value)); })) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_integer_compare(llvm_jit_emit_state, event)) [[unlikely]]
+        { disable_inline_llvm_jit_emission(); }
     }
-
     break;
 }
 case wasm1_code::f32_eq:

@@ -28,6 +28,7 @@
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 // import
 # include <fast_io.h>
+# include <atomic>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
 #endif
@@ -38,6 +39,17 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
 {
+    // Process-wide diagnostic timestamps are shared by admitted host entries.
+    // Serialize only recording/snapshotting; no generated instruction uses this lock.
+    inline ::std::atomic_flag wasm_time_lock = ATOMIC_FLAG_INIT;
+    struct wasm_time_guard
+    {
+        inline constexpr wasm_time_guard() noexcept
+        { while(wasm_time_lock.test_and_set(::std::memory_order_acquire)) {} }
+        inline constexpr ~wasm_time_guard() { wasm_time_lock.clear(::std::memory_order_release); }
+        wasm_time_guard(wasm_time_guard const&) = delete;
+        wasm_time_guard& operator=(wasm_time_guard const&) = delete;
+    };
     inline ::fast_io::unix_timestamp wasm_start_time{};
     inline ::fast_io::unix_timestamp wasm_end_time{};
     inline bool wasm_start_time_available{};
@@ -62,23 +74,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
 
     UWVM_GNU_COLD inline constexpr void record_total_wasm_time_start() noexcept
     {
+        wasm_time_guard guard{};
         if(wasm_start_time_available) [[unlikely]] { return; }
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_GREEN),
                                 u8"[info]  ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8"Begin running the WASM program. ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_GREEN),
                                 u8"[",
                                 ::uwvm2::uwvm::io::get_local_realtime(),
                                 u8"] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                                 u8"(verbose)\n",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
         }
         wasm_start_time_available = try_get_monotonic_raw_time(wasm_start_time);
         wasm_end_time_available = false;
@@ -86,12 +99,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
 
     UWVM_GNU_COLD inline constexpr void record_total_wasm_time_end() noexcept
     {
+        wasm_time_guard guard{};
         if(!wasm_start_time_available) [[unlikely]] { return; }
         wasm_end_time_available = try_get_monotonic_raw_time(wasm_end_time);
     }
 
     UWVM_GNU_COLD inline constexpr void discard_total_wasm_time_record() noexcept
     {
+        wasm_time_guard guard{};
         wasm_start_time_available = false;
         wasm_end_time_available = false;
     }
@@ -100,24 +115,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
     UWVM_GNU_COLD inline constexpr void print_verbose_total_time(Label && label, ::fast_io::unix_timestamp duration) noexcept
     {
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                             u8"uwvm: ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_GREEN),
                             u8"[info]  ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             label,
                             u8": ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
                             duration,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                             u8"s. ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_GREEN),
                             u8"[",
                             ::uwvm2::uwvm::io::get_local_realtime(),
                             u8"] ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_ORANGE),
                             u8"(verbose)\n",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
     }
 
     /// @brief      Record the process runtime and emit it in verbose logging at scope exit.
@@ -142,11 +157,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::global
 
                 if(!try_get_monotonic_raw_time(end_time)) [[unlikely]] { return; }
 
-                if(wasm_start_time_available)
+                ::fast_io::unix_timestamp duration{};
+                bool available{};
                 {
-                    auto const wasm_stop_time{wasm_end_time_available ? wasm_end_time : end_time};
-                    print_verbose_total_time(u8"Total WASM execution time", wasm_stop_time - wasm_start_time);
+                    wasm_time_guard guard{};
+                    available = wasm_start_time_available;
+                    if(available) { duration = (wasm_end_time_available ? wasm_end_time : end_time) - wasm_start_time; }
                 }
+                if(available) { print_verbose_total_time(u8"Total WASM execution time", duration); }
 
                 print_verbose_total_time(u8"Total process time", end_time - start_time);
             }

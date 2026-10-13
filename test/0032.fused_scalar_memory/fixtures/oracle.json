@@ -1,0 +1,287 @@
+{
+  "source_only": true,
+  "native_executed": false,
+  "expected_values_from_independent_integer_arithmetic": true,
+  "all23_scalar_on_memory32_and_memory64": 46,
+  "load_store_assertions": [
+    {
+      "export": "i32_load_0",
+      "type": "i32",
+      "value": 2214822017
+    },
+    {
+      "export": "i32_load_1",
+      "type": "i64",
+      "value": 578437697899823233
+    },
+    {
+      "export": "i32_load_2",
+      "type": "i32",
+      "value": 2214822017
+    },
+    {
+      "export": "i32_load_3",
+      "type": "i64",
+      "value": 578437697899823233
+    },
+    {
+      "export": "i32_load_4",
+      "type": "i32",
+      "value": -127
+    },
+    {
+      "export": "i32_load_5",
+      "type": "i32",
+      "value": 129
+    },
+    {
+      "export": "i32_load_6",
+      "type": "i32",
+      "value": -32639
+    },
+    {
+      "export": "i32_load_7",
+      "type": "i32",
+      "value": 32897
+    },
+    {
+      "export": "i32_load_8",
+      "type": "i64",
+      "value": -127
+    },
+    {
+      "export": "i32_load_9",
+      "type": "i64",
+      "value": 129
+    },
+    {
+      "export": "i32_load_10",
+      "type": "i64",
+      "value": -32639
+    },
+    {
+      "export": "i32_load_11",
+      "type": "i64",
+      "value": 32897
+    },
+    {
+      "export": "i32_load_12",
+      "type": "i64",
+      "value": -2080145279
+    },
+    {
+      "export": "i32_load_13",
+      "type": "i64",
+      "value": 2214822017
+    },
+    {
+      "export": "i32_store_0",
+      "type": "i32",
+      "value": 2289526357
+    },
+    {
+      "export": "i32_store_1",
+      "type": "i64",
+      "value": 9833440827789222417
+    },
+    {
+      "export": "i32_store_2",
+      "type": "i32",
+      "value": 2289526357
+    },
+    {
+      "export": "i32_store_3",
+      "type": "i64",
+      "value": 9833440827789222417
+    },
+    {
+      "export": "i32_store_4",
+      "type": "i32",
+      "value": 85
+    },
+    {
+      "export": "i32_store_5",
+      "type": "i32",
+      "value": 26197
+    },
+    {
+      "export": "i32_store_6",
+      "type": "i64",
+      "value": 17
+    },
+    {
+      "export": "i32_store_7",
+      "type": "i64",
+      "value": 8721
+    },
+    {
+      "export": "i32_store_8",
+      "type": "i64",
+      "value": 1144201745
+    },
+    {
+      "export": "i64_load_0",
+      "type": "i32",
+      "value": 2214822017
+    },
+    {
+      "export": "i64_load_1",
+      "type": "i64",
+      "value": 578437697899823233
+    },
+    {
+      "export": "i64_load_2",
+      "type": "i32",
+      "value": 2214822017
+    },
+    {
+      "export": "i64_load_3",
+      "type": "i64",
+      "value": 578437697899823233
+    },
+    {
+      "export": "i64_load_4",
+      "type": "i32",
+      "value": -127
+    },
+    {
+      "export": "i64_load_5",
+      "type": "i32",
+      "value": 129
+    },
+    {
+      "export": "i64_load_6",
+      "type": "i32",
+      "value": -32639
+    },
+    {
+      "export": "i64_load_7",
+      "type": "i32",
+      "value": 32897
+    },
+    {
+      "export": "i64_load_8",
+      "type": "i64",
+      "value": -127
+    },
+    {
+      "export": "i64_load_9",
+      "type": "i64",
+      "value": 129
+    },
+    {
+      "export": "i64_load_10",
+      "type": "i64",
+      "value": -32639
+    },
+    {
+      "export": "i64_load_11",
+      "type": "i64",
+      "value": 32897
+    },
+    {
+      "export": "i64_load_12",
+      "type": "i64",
+      "value": -2080145279
+    },
+    {
+      "export": "i64_load_13",
+      "type": "i64",
+      "value": 2214822017
+    },
+    {
+      "export": "i64_store_0",
+      "type": "i32",
+      "value": 2289526357
+    },
+    {
+      "export": "i64_store_1",
+      "type": "i64",
+      "value": 9833440827789222417
+    },
+    {
+      "export": "i64_store_2",
+      "type": "i32",
+      "value": 2289526357
+    },
+    {
+      "export": "i64_store_3",
+      "type": "i64",
+      "value": 9833440827789222417
+    },
+    {
+      "export": "i64_store_4",
+      "type": "i32",
+      "value": 85
+    },
+    {
+      "export": "i64_store_5",
+      "type": "i32",
+      "value": 26197
+    },
+    {
+      "export": "i64_store_6",
+      "type": "i64",
+      "value": 17
+    },
+    {
+      "export": "i64_store_7",
+      "type": "i64",
+      "value": 8721
+    },
+    {
+      "export": "i64_store_8",
+      "type": "i64",
+      "value": 1144201745
+    }
+  ],
+  "malformed_binary_cases": [
+    {
+      "path": "memarg_reserved_bit7.wasm",
+      "expect": "reject",
+      "reason": "reserved alignment flag",
+      "size": 35,
+      "sha256": "55fdc96b258dafe00538a2fe32dc5665de6e62a835c22c24c9f5d784fa3a2a9d"
+    },
+    {
+      "path": "memarg_missing_optional_index.wasm",
+      "expect": "reject",
+      "reason": "optional memory index truncated before offset",
+      "size": 31,
+      "sha256": "6fc310d52265cf37bf049d5cdd4f8b6321f3a3bb71ecfe097d909e80e6ee3175"
+    },
+    {
+      "path": "memarg_bad_optional_index.wasm",
+      "expect": "reject",
+      "reason": "selected memory index1 unavailable",
+      "size": 35,
+      "sha256": "967782eb3450741fa3d693646b03965164f0fea26487896fc5bc3d6ee596deac"
+    },
+    {
+      "path": "memarg_u64_overflow.wasm",
+      "expect": "reject",
+      "reason": "offset exceeds u64",
+      "size": 43,
+      "sha256": "39b54c36daa76aaf268cbaf10ce65628b26834df7c98ee19cee8e9435abcb1e6"
+    },
+    {
+      "path": "memarg_u64_unterminated.wasm",
+      "expect": "reject",
+      "reason": "u64 offset never terminates",
+      "size": 43,
+      "sha256": "5f9cdc054679cbcfd76d45c22bce56dd11b70061029e1bd8e184ea242736e9e6"
+    }
+  ],
+  "features": [
+    "memory64",
+    "multi-memory",
+    "Core3 u64 memarg"
+  ],
+  "requires_actual_reference_tool_qualification": true,
+  "runtime_vs_feature_off_contract": {
+    "memory64-off": "all modules declaring i64 memory rejected before body",
+    "multi-memory-off": "two-memory module and explicit nonzero selected memory rejected",
+    "explicit scoped Core3 memory64-off memory32": "still accepts full Core3 u64 binary encoding when value<2^32; not legacy u32 reader"
+  },
+  "all_products_and_modes_native_pending": true
+}

@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "old_source_id": "sha256:ac49101ff52e6fe7a599442461b7e56f7e3384c645d86f0e0b6373b033ccca68",
+  "patched_cppm_sha256": "34c8d06756a97eff2ccf7b2a1820a38fa6e3c18108ce03e3b43eb4411d8def30",
+  "original_log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/windows-r32-ros-product/uwvm-build.log",
+  "argv_sha256": "d239ef53931a93fc950680eb28c4f955c45f58917184fc98d720ec013e9d1454",
+  "clang": "/tmp/uwvm-window-r5/clang22/clang++",
+  "cgroup_self": "0::/system.slice/docker-b384d4f254a20a178646cf901f3b283ddd686175638889347672241224bcae31.scope",
+  "memory_max": "68719476736",
+  "memory_swap_max": "0",
+  "cpuset_cpus_effective": "0,2,4,6,16-31",
+  "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n",
+  "peak_memory_current_bytes": 34442457088,
+  "watchdog_terminated": false,
+  "elapsed_seconds": 92.06264638900757,
+  "exit_code": 0,
+  "output_pcm": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/windows-r32-run-module-probe/run-patched.pcm",
+  "output_pcm_sha256": "9a30ad9c8f1c876c8cbc822476c41b84e5a4c6a00d16485cb67dcd94ddcad84a",
+  "clang_log": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/windows-r32-run-module-probe/clang.log"
+}

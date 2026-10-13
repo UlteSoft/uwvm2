@@ -194,12 +194,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
         wasip1_sched_yield_ptr_t wasip1_sched_yield_func_ptr{};
 
         bool trace_wasip1_call{};
+        // Optional host console observer; installed only by the debug launcher.
+        // true means the validated write was consumed by its bounded IO pane.
+        bool (*debug_console_write)(int, ::fast_io::io_scatter_t const*, ::std::size_t) noexcept{};
+        ::std::uint64_t debug_trace_identity{};
+        void (*debug_fd_created)(::std::uint64_t) noexcept{};
+        bool (*debug_console_read)(int, ::fast_io::io_scatter_t const*, ::std::size_t, ::std::size_t&) noexcept{};
         trace_wasip1_output_target_t trace_wasip1_output_target{};
         ::uwvm2::utils::container::u8string trace_wasip1_output_file_path_storage{};
         ::fast_io::u8native_file trace_wasip1_output_file{};
         trace_wasip1_group_kind_t trace_wasip1_group_kind{trace_wasip1_group_kind_t::global};
         ::uwvm2::utils::container::u8string trace_wasip1_group_name_storage{};
         bool disable_utf8_check{};
+
+        // Native callers retain the ordinary field. Runtime-managed environments
+        // resolve immediate-caller memory without mutating shared resource policy.
+        memory_type* (*wasip1_memory_resolver)(wasip1_environment const*) noexcept{};
+
+        [[nodiscard]] inline constexpr memory_type* get_memory() const noexcept
+        {
+            return wasip1_memory_resolver == nullptr ? wasip1_memory : wasip1_memory_resolver(this);
+        }
+
     };
 
 }  // namespace uwvm2::imported::wasi::wasip1::environment

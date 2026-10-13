@@ -220,6 +220,16 @@ namespace
 
 int main()
 {
+    // Deferred startup publishes readiness to polling requesters. Polling may
+    // overlap start/stop, but producers must drain before lifecycle stop.
+    {
+        thread_utils::lazy_compile_scheduler scheduler{};
+        std::atomic<bool> done{};
+        std::thread observer{[&]{while(!done.load(std::memory_order_acquire)) {(void)scheduler.running();}}};
+        for(unsigned i{};i!=64;++i)
+        {scheduler.start({.worker_count=2,.queue_capacity=8});scheduler.stop();}
+        done.store(true,std::memory_order_release);observer.join();
+    }
     if(run_native_thread_pool_case() != 0) [[unlikely]] { return 1; }
     if(run_lazy_scheduler_duplicate_case() != 0) [[unlikely]] { return 2; }
     if(run_lazy_scheduler_refill_case() != 0) [[unlikely]] { return 3; }

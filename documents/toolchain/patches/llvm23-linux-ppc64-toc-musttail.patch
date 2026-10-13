@@ -1,0 +1,213 @@
+--- a/llvm/include/llvm/ExecutionEngine/RuntimeDyld.h
++++ b/llvm/include/llvm/ExecutionEngine/RuntimeDyld.h
+@@ -195,6 +195,10 @@
+   /// a loader from generated-header/version metadata alone.
+   static LLVM_ABI unsigned getUWVMELFLoaderCapabilities() noexcept;
+ 
++  /// Exact C musttail with mandatory caller TOC restore in the private PPC64
++  /// JIT ABI. Defined by PowerPC CodeGen, never an inline/version-only claim.
++  static LLVM_ABI unsigned getUWVMPPC64TOCTailABI() noexcept;
++
+   /// Construct a RuntimeDyld instance.
+   LLVM_ABI RuntimeDyld(MemoryManager &MemMgr, JITSymbolResolver &Resolver);
+   RuntimeDyld(const RuntimeDyld &) = delete;
+--- a/llvm/lib/Target/PowerPC/PPCISelLowering.cpp
++++ b/llvm/lib/Target/PowerPC/PPCISelLowering.cpp
+@@ -11,6 +11,7 @@
+ //===----------------------------------------------------------------------===//
+ 
+ #include "PPCISelLowering.h"
++#include "llvm/ExecutionEngine/RuntimeDyld.h"
+ #include "MCTargetDesc/PPCMCTargetDesc.h"
+ #include "MCTargetDesc/PPCPredicates.h"
+ #include "PPC.h"
+@@ -4846,6 +4847,15 @@
+   return SPDiff;
+ }
+ 
++// This query is defined in the actual PowerPC CodeGen archive. A stale
++// backend cannot enable the matching native JIT ABI from headers alone.
++unsigned RuntimeDyld::getUWVMPPC64TOCTailABI() noexcept { return 3u; }
++
++static bool hasUWVMTOCTailABI(const Function *F) {
++  return F && !F->isVarArg() && F->getCallingConv() == CallingConv::C &&
++         F->getFnAttribute("uwvm-ppc64-toc-tail").getValueAsString() == "1";
++}
++
+ static bool isFunctionGlobalAddress(const GlobalValue *CalleeGV);
+ 
+ static bool callsShareTOCBase(const Function *Caller,
+@@ -5017,7 +5027,15 @@
+     bool isCalleeExternalSymbol) const {
+   bool TailCallOpt = getTargetMachine().Options.GuaranteedTailCallOpt;
+ 
+-  if (DisableSCO && !TailCallOpt) return false;
++  // The private JIT ABI forces every non-tail call from/to these entries
++  // through the global-entry indirect sequence, including an explicit TOC
++  // restore. An exact C musttail can therefore change TOC and return to that
++  // original restore without growing a frame or overwriting its TOC slot.
++  bool UWVMMustTail = CB && CB->isMustTailCall() &&
++      hasUWVMTOCTailABI(CallerFunc) && CalleeCC == CallingConv::C &&
++      getTargetMachine().getRelocationModel() == Reloc::Static &&
++      CB->getFunctionType() == CallerFunc->getFunctionType();
++  if (DisableSCO && !TailCallOpt && !UWVMMustTail) return false;
+ 
+   // Variadic argument functions are not supported.
+   if (isVarArg) return false;
+@@ -5053,6 +5071,8 @@
+   // parameters on stack since offsets for the parameter area may be different.
+   if (CallerCC != CalleeCC && needStackSlotPassParameters(Subtarget, Outs))
+     return false;
++
++  if (UWVMMustTail) return true; // byval/varargs/exact prototype checked above
+ 
+   // All variants of 64-bit ELF ABIs without PC-Relative addressing require that
+   // the caller and callee share the same TOC for TCO/SCO. If the caller and
+@@ -5621,7 +5641,9 @@
+   // to incorrect code.
+ 
+   // Start by loading the function address from the descriptor.
+-  SDValue LDChain = getOutputChainFromCallSeq(CallSeqStart);
++  SDValue LDChain = CallSeqStart.getOpcode() == ISD::CALLSEQ_START
++                        ? getOutputChainFromCallSeq(CallSeqStart)
++                        : CallSeqStart; // sibling transfer has no call sequence
+   auto MMOFlags = Subtarget.hasInvariantFunctionDescriptors()
+                       ? (MachineMemOperand::MODereferenceable |
+                          MachineMemOperand::MOInvariant)
+@@ -5731,7 +5753,7 @@
+     // operand: after the chain input but before any other variadic arguments.
+     // For 64-bit ELFv2 ABI with PCRel, do not restore the TOC as it is not
+     // saved or used.
+-    if (isTOCSaveRestoreRequired(Subtarget)) {
++    if (isTOCSaveRestoreRequired(Subtarget) && !CFlags.IsTailCall) {
+       const MCRegister StackPtrReg = Subtarget.getStackPointerRegister();
+ 
+       SDValue StackPtr = DAG.getRegister(StackPtrReg, RegVT);
+@@ -5742,7 +5764,8 @@
+     }
+ 
+     // Add the register used for the environment pointer.
+-    if (Subtarget.usesFunctionDescriptors() && !CFlags.HasNest)
++    if (Subtarget.usesFunctionDescriptors() && !CFlags.HasNest &&
++        !CFlags.IsTailCall)
+       Ops.push_back(DAG.getRegister(Subtarget.getEnvironmentPointerRegister(),
+                                     RegVT));
+ 
+@@ -5755,6 +5778,12 @@
+   // If this is a tail call add stack pointer delta.
+   if (CFlags.IsTailCall)
+     Ops.push_back(DAG.getConstant(SPDiff, dl, MVT::i32));
++
++  // TC_RETURN's fixed operands are callee then stack delta. Descriptor ENV
++  // is only an implicit live input after those operands, never the callee.
++  if (CFlags.IsTailCall && CFlags.IsIndirect &&
++      Subtarget.usesFunctionDescriptors() && !CFlags.HasNest)
++    Ops.push_back(DAG.getRegister(Subtarget.getEnvironmentPointerRegister(), RegVT));
+ 
+   // Add argument registers to the end of the list so that they are known live
+   // into the call.
+@@ -5830,7 +5859,8 @@
+             Callee.getOpcode() == ISD::TargetExternalSymbol ||
+             Callee.getOpcode() == ISD::TargetGlobalAddress ||
+             isa<ConstantSDNode>(Callee) ||
+-            (CFlags.IsIndirect && Subtarget.isUsingPCRelativeCalls())) &&
++            (CFlags.IsIndirect && (Subtarget.isUsingPCRelativeCalls() ||
++             hasUWVMTOCTailABI(&DAG.getMachineFunction().getFunction())))) &&
+            "Expecting a global address, external symbol, absolute value, "
+            "register or an indirect tail call when PC Relative calls are "
+            "used.");
+@@ -5940,6 +5970,7 @@
+       // address of the callee from a function parameter into a virtual
+       // register). It may also be an ExternalSymbolSDNode (ex memcopy).
+       assert((Subtarget.isUsingPCRelativeCalls() ||
++              (Subtarget.is64BitELFABI() && hasUWVMTOCTailABI(&MF.getFunction())) ||
+               isa<GlobalAddressSDNode>(Callee)) &&
+              "Callee should be an llvm::Function object.");
+ 
+@@ -5956,8 +5987,14 @@
+   // When long calls (i.e. indirect calls) are always used, calls are always
+   // made via function pointer. If we have a function name, first translate it
+   // into a pointer.
+-  if (Subtarget.useLongCalls() && isa<GlobalAddressSDNode>(Callee) &&
+-      !isTailCall)
++  auto *Direct = dyn_cast<GlobalAddressSDNode>(Callee);
++  auto *DirectFunction = Direct ? dyn_cast<Function>(Direct->getGlobal()) : nullptr;
++  bool UWVMTOCCall = Subtarget.is64BitELFABI() &&
++      isTOCSaveRestoreRequired(Subtarget) &&
++      (hasUWVMTOCTailABI(&DAG.getMachineFunction().getFunction()) ||
++       hasUWVMTOCTailABI(DirectFunction));
++  if ((Subtarget.useLongCalls() || UWVMTOCCall) &&
++      isa<GlobalAddressSDNode>(Callee) && (!isTailCall || UWVMTOCCall))
+     Callee = LowerGlobalAddress(Callee, DAG);
+ 
+   CallFlags CFlags(
+@@ -6780,8 +6817,7 @@
+   if (CFlags.IsIndirect) {
+     // For 64-bit ELFv2 ABI with PCRel, do not save the TOC of the
+     // caller in the TOC save area.
+-    if (isTOCSaveRestoreRequired(Subtarget)) {
+-      assert(!CFlags.IsTailCall && "Indirect tails calls not supported");
++    if (isTOCSaveRestoreRequired(Subtarget) && !CFlags.IsTailCall) {
+       // Load r2 into a virtual register and store it to the TOC save area.
+       setUsesTOCBasePtr(DAG);
+       SDValue Val = DAG.getCopyFromReg(Chain, dl, PPC::X2, MVT::i64);
+@@ -6811,6 +6847,17 @@
+   if (CFlags.IsTailCall && !IsSibCall)
+     PrepareTailCall(DAG, InGlue, Chain, dl, SPDiff, NumBytes, LROp, FPOp,
+                     TailCallArguments);
++  else if (CFlags.IsTailCall && hasUWVMTOCTailABI(&MF.getFunction())) {
++    // Exact-prototype C siblings reuse the original incoming argument area.
++    // All incoming loads preceded these stores; no retiring alloca is passed.
++    // As in PrepareTailCall, stack writes cannot split a glued physical
++    // argument-copy/MTCTR cluster. End that glue before ordering the stores.
++    InGlue = SDValue();
++    MemOpChains.clear();
++    StoreTailCallArgumentsToStackSlot(DAG, Chain, TailCallArguments, MemOpChains, dl);
++    if (!MemOpChains.empty())
++      Chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other, MemOpChains);
++  }
+ 
+   return FinishCall(CFlags, dl, DAG, RegsToPass, InGlue, Chain, CallSeqStart,
+                     Callee, SPDiff, NumBytes, Ins, InVals, CB);
+@@ -19292,8 +19339,17 @@
+   if (isa<JumpTableSDNode>(GA) || isa<BlockAddressSDNode>(GA))
+     return true;
+ 
+-  if (GlobalAddressSDNode *G = dyn_cast<GlobalAddressSDNode>(GA))
++  if (GlobalAddressSDNode *G = dyn_cast<GlobalAddressSDNode>(GA)) {
++    // Medium-model local symbols normally use a direct TOC-relative address.
++    // MCJIT may allocate these exact opt-in function sections independently;
++    // its TOC16 resolver cannot subtract two unrelated loaded sections. Keep
++    // a real address slot in this module's TOC for their global-entry transfer.
++    // No generic function, TLS, data or foreign ABI is opted into this contract.
++    if (Subtarget.is64BitELFABI() &&
++        hasUWVMTOCTailABI(dyn_cast<Function>(G->getGlobal())))
++      return true;
+     return Subtarget.isGVIndirectSymbol(G->getGlobal());
++  }
+ 
+   return false;
+ }
+--- a/llvm/lib/Target/PowerPC/PPCFastISel.cpp
++++ b/llvm/lib/Target/PowerPC/PPCFastISel.cpp
+@@ -1547,6 +1547,20 @@
+   if (!Callee && !Symbol)
+     return false;
+ 
++  // The private MCJIT TOC-tail ABI requires explicit global-entry transfers
++  // and caller TOC restores for ordinary calls too. FastISel's direct BL/NOP
++  // path bypasses that SelectionDAG contract at O0. Decline these exact
++  // opt-in callers/callees before creating any call instructions.
++  const Function &Caller = FuncInfo.MF->getFunction();
++  const auto HasTOCTailABI = [](const Function *F) {
++    return F && !F->isVarArg() && F->getCallingConv() == CallingConv::C &&
++           F->getFnAttribute("uwvm-ppc64-toc-tail").getValueAsString() == "1";
++  };
++  if (Subtarget->is64BitELFABI() &&
++      (HasTOCTailABI(&Caller) ||
++       HasTOCTailABI(dyn_cast_or_null<Function>(Callee))))
++    return false;
++
+   // Allow SelectionDAG isel to handle tail calls and long calls.
+   if (IsTailCall || Subtarget->useLongCalls())
+     return false;

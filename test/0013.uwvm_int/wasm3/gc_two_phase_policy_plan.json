@@ -1,0 +1,126 @@
+{
+  "schema": "uwvm-gc-two-phase-feature-policy-source-v1",
+  "source_only": true,
+  "native_execution_passed": false,
+  "production_changed_paths": [],
+  "component": "test/0013.uwvm_int/wasm3/gc_two_phase_policy.cc",
+  "first_before_fixture": "mvp",
+  "first_before_expected_normative": "accept all GC-on/off APIs; type requires_gc=false; current failing result is counterexample not PASS",
+  "features_parse_init": {
+    "gc": true,
+    "function_references": true,
+    "exceptions": true,
+    "reference_types": true
+  },
+  "validation_changes": [
+    "disable_gc only"
+  ],
+  "lazy_scope": "ordinary initialized metadata + actual first-use materialization; ROS full only",
+  "fixtures": [
+    {
+      "name": "mvp",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_mvp.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "accept",
+      "encoded_type_section_requires_gc": false
+    },
+    {
+      "name": "legacy_refs",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_legacy_refs.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "accept",
+      "encoded_type_section_requires_gc": false
+    },
+    {
+      "name": "typed_function",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_typed_function.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "accept",
+      "encoded_type_section_requires_gc": false
+    },
+    {
+      "name": "exception_local",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_exception_local.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "accept",
+      "encoded_type_section_requires_gc": false
+    },
+    {
+      "name": "exception_declarations",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_exception_declarations.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "accept",
+      "encoded_type_section_requires_gc": false
+    },
+    {
+      "name": "recursive_group",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_recursive_group.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "reject",
+      "encoded_type_section_requires_gc": true
+    },
+    {
+      "name": "subtype_wrapper",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_subtype_wrapper.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "reject",
+      "encoded_type_section_requires_gc": true
+    },
+    {
+      "name": "struct_type",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_struct_type.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "reject",
+      "encoded_type_section_requires_gc": true
+    },
+    {
+      "name": "array_type",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_array_type.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "reject",
+      "encoded_type_section_requires_gc": true
+    },
+    {
+      "name": "local_any",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_local_any.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "reject",
+      "encoded_type_section_requires_gc": false
+    },
+    {
+      "name": "table_any",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_table_any.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "reject",
+      "encoded_type_section_requires_gc": false
+    },
+    {
+      "name": "global_any",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_global_any.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "reject",
+      "encoded_type_section_requires_gc": false
+    },
+    {
+      "name": "element_any",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_element_any.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "reject",
+      "encoded_type_section_requires_gc": false
+    },
+    {
+      "name": "bottom_local",
+      "wat": "test/0017.runtime/fixtures/gc_two_phase_bottom_local.wat",
+      "fully_enabled_oracle_expected": "valid",
+      "validation_gc_off": "reject",
+      "encoded_type_section_requires_gc": false
+    }
+  ],
+  "strict_negative_future": [
+    "zero-count GC local run using official-valid full binary cell",
+    "imported GC table/global with initialized provider",
+    "GC abstract signature without any GC opcode"
+  ],
+  "after_source_fix_pending_actual_before": true,
+  "fully_enabled_no_declaration_walk_required": true
+}

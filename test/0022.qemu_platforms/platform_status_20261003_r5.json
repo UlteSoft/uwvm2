@@ -1,0 +1,77 @@
+{
+  "schema": "uwvm-qemu-platform-status-evidence-v1",
+  "scope": "resident platform component evidence and pending products; no blanket platform or Core3 acceptance",
+  "completed": [
+    {
+      "kind": "FreeBSD actual four SDK guest components",
+      "both_repositories": true,
+      "profiles": [
+        "eh",
+        "noeh"
+      ],
+      "report_path": "test/0022.qemu_platforms/freebsd_anonymous_map_r4_four_sdk_guest_actual_20261003.json",
+      "report_sha256": "a96ba079eead59caa7e9a5f8e081257d5520ffe1393f36305f7695feb551bed8",
+      "whole_product_qualified": false
+    },
+    {
+      "kind": "Windows four new regular-launcher COFF/PE static cells",
+      "actual_stages": 30,
+      "report_path": "test/0022.qemu_platforms/windows_fixed30_r2_attempt2_four_static_actual_20261003.json",
+      "report_sha256": "0934b13f216730ac3c3922fb1907adedd4f1eddeca973cc07bd89fd2d22881f9",
+      "actual_guest_executed": false,
+      "independent_four_wmain_ASM_peer_sha256": "27b93e5344e686f9c2fa5656ce5d775f217353200903ccb8c048e97b07556ca5",
+      "whole_product_qualified": false
+    }
+  ],
+  "pending_source": [
+    {
+      "kind": "Windows paired component/launcher no-NIC serial guest runner",
+      "packet_manifest_sha256": "6dfcb27c14898ac63d0359d3bede74c467e6262f40894f8f8d22fc297569e499",
+      "actual_guest_executed": false
+    },
+    {
+      "kind": "Windows completed-case serial parser",
+      "packet_manifest_sha256": "49b3a8e489a14e813513b6e16f84e1aa3b8844f9d7a1b8ea8e939c590f966987",
+      "PowerShell_exit_and_post_frame_disposal_qualification": false
+    },
+    {
+      "kind": "Windows fixed readonly-CDROM bootstrap",
+      "packet_manifest_sha256": "51fd7ed41b120d8744d2c2a115e57fef4653923b8c1ce79cae261768bbed9308",
+      "PowerShell_or_QMP_executed": false
+    },
+    {
+      "kind": "Windows original-base readonly full hash finite ONE",
+      "packet_manifest_sha256": "7574bfb8338612edcee3e5670e967980cf8784f309085af646fa1ac7f62d4cd1",
+      "Root_source_review_and_checked_launcher_pending": true,
+      "native_started": false
+    },
+    {
+      "kind": "AArch64 GNU SDK missing exact matching LLVM23 MC components",
+      "packet_manifest_sha256": "f145ad6bfb131d2fe57ea7009607f9170a9d5454153a7ddeb4ddae9829ffaeee",
+      "native_started": false,
+      "ROS_bundled_production_qualified": false
+    },
+    {
+      "kind": "current R12-scope GNU A64/RV64/i386 fresh three TU development plan",
+      "complete_source_plan_sha256": "d4e78db8df4dba753b6c2abc488d8affeb1c59d5b0035c5881967989c11acc4d",
+      "first_i386_ROS_source_cell_sha256": "444e1a865d2877781ac1791e25949868e501d12e82f840970fb9dc8ef4ab62a0",
+      "executable_guard_and_provider_binding_pending": true,
+      "native_started": false
+    }
+  ],
+  "resource_contract": {
+    "all_native_on_SSH_linux_original_cgroup": true,
+    "hard_memory_bytes": 68719476736,
+    "swap_bytes": 0,
+    "native_and_VM_slots_exclusive_with_keeper": true,
+    "Pcore_bench_keeper_exclusive": true,
+    "no_native_Mac": true
+  },
+  "qualification_boundaries": {
+    "missing_SDK_or_architecture_not_pass": true,
+    "standalone_CXX_ABI_not_ROS_bundled_LLVM_acceptance": true,
+    "cold_metadata_or_compile_not_guest_execution": true,
+    "guest_small_components_not_whole_VM_restore_or_whole_product": true
+  },
+  "prior_actual_failures_and_source_packets_preserved": true
+}

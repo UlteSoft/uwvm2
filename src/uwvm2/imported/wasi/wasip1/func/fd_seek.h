@@ -93,14 +93,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::uwvm2::imported::wasi::wasip1::abi::whence_t whence,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t new_offset_ptrsz) noexcept
     {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-        if(env.wasip1_memory == nullptr) [[unlikely]]
-        {
-            // Security issues inherent to virtual machines
-            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-        }
-# endif
-        auto& memory{*env.wasip1_memory};
+        auto const memory_pointer{env.get_memory()};
+        if(memory_pointer == nullptr) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault; }
+        auto& memory{*memory_pointer};
 
         check_wasip1_guest_pointer_alignment<8uz>(new_offset_ptrsz, u8"fd_seek.new_offset (filesize)");
 

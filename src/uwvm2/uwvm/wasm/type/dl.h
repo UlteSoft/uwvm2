@@ -38,6 +38,7 @@
 # include "para.h"
 # include "cwrapper.h"
 # include "preload_module_attribute.h"
+# include "wasip1_api.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -184,6 +185,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         capi_module_name_t capi_module_name{};
         capi_custom_handler_vec_t capi_custom_handler_vec{};
         capi_function_vec_t capi_function_vec{};
+
+        // Function identity belongs to one registration, even when dlopen returns
+        // the same DSO and its getter returns the same static array for aliases.
+        ::uwvm2::utils::container::vector<capi_function_t> owned_function_records{};
+
+        wasm_dl_storage_t() noexcept = default;
+        wasm_dl_storage_t(wasm_dl_storage_t const&) = delete;
+        wasm_dl_storage_t& operator=(wasm_dl_storage_t const&) = delete;
+        wasm_dl_storage_t(wasm_dl_storage_t&&) noexcept = default;
+        wasm_dl_storage_t& operator=(wasm_dl_storage_t&&) noexcept = default;
+
+        inline constexpr void retain_function_records() noexcept
+        {
+            if(!owned_function_records.empty() || capi_function_vec.function_begin == nullptr ||
+               capi_function_vec.function_size == 0uz) { return; }
+            auto const begin{capi_function_vec.function_begin};
+            owned_function_records.reserve(capi_function_vec.function_size);
+            for(::std::size_t i{}; i != capi_function_vec.function_size; ++i)
+            { owned_function_records.emplace_back(begin[i]); }
+            capi_function_vec.function_begin = owned_function_records.data();
+        }
+
     };
 
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
@@ -198,6 +221,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         ::fast_io::native_dll_file import_dll_file{};
         // DL handler
         wasm_dl_storage_t wasm_dl_storage{};
+        // One native setter can also be registered through weak-symbol aliases.
+        uwvm_set_wasip1_host_api_v1_t set_wasip1_host_api_v1{};
         // wasm_parameter_t
         ::uwvm2::uwvm::wasm::type::wasm_parameter_t wasm_parameter{};
         // preload memory attribute

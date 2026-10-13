@@ -25,6 +25,7 @@ module;
 
 export module uwvm2.runtime.compiler.uwvm_int.compile_cu_from_lazy_validator;
 
+export import :checked_plan_lowering;
 export import :translate;
 
 #ifndef UWVM_MODULE

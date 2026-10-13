@@ -1,0 +1,56 @@
+"""Regression: cached stages must attest their own command, not a later row."""
+from pathlib import Path
+import ast, contextlib, hashlib, io, json, tempfile, time, types
+D=Path(__file__).parent
+sha=lambda p:hashlib.file_digest(Path(p).open('rb'),'sha256').hexdigest()
+checks=[]
+def check(name,condition):
+    assert condition,name
+    checks.append(name)
+def load_runner(path,output,rows):
+    tree=ast.parse(path.read_text())
+    function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='run')
+    namespace=dict(O=output,rows=rows,platform='macos',repo='uwvm2',sha=sha,time=time,json=json,env={},early=output/'early.json')
+    def fake_run(args,stdout,stderr,env,timeout):
+        stdout.write(b'compiler completed\n')
+        return types.SimpleNamespace(returncode=0)
+    namespace['subprocess']=types.SimpleNamespace(run=fake_run,STDOUT=-2)
+    exec(compile(ast.Module(body=[function],type_ignores=[]),str(path),'exec'),namespace)
+    return namespace['run']
+def refused(call):
+    try:call()
+    except AssertionError:return True
+    return False
+with tempfile.TemporaryDirectory(prefix='cached-row-',dir=D) as temporary:
+    output=Path(temporary)
+    log=output/'runtime-compile.log';log.write_bytes(b'compiler completed\n')
+    command=['clang++','-c','runtime.default.cpp','-o','runtime.o']
+    compiled=dict(name='runtime-compile',argv=command,exit=0,passed=True,log_sha256=sha(log))
+    later=dict(name='wasm-validate',argv=['wasm-tools','validate','guest.wasm'],exit=0,passed=True)
+    old=D.parent/'wasip1-prepared-retirement-r34-work/cross.py'
+    fixed=D/'cross.py'
+    with contextlib.redirect_stdout(io.StringIO()):
+        check('old cached-stage bug reproduced',load_runner(old,output,[compiled,later])('runtime-compile',command) is None)
+        rows=[compiled,later];before=json.dumps(rows)
+        run=load_runner(fixed,output,rows);actual=run('runtime-compile',command)
+        check('cached return is actual completed stage',actual is compiled)
+        check('cached compile command is correct',actual['argv']==command and actual['argv']!=rows[-1]['argv'])
+        check('cached rows preserved',json.dumps(rows)==before)
+        check('cached argument mismatch rejected',refused(lambda:run('runtime-compile',['other-command'])))
+        log.write_bytes(b'changed log')
+        check('cached log mismatch rejected',refused(lambda:run('runtime-compile',command)))
+        log.write_bytes(b'compiler completed\n')
+        fresh=run('host-api-compile',['clang++','-c','host_api.default.cpp','-o','host-api.o'])
+        check('fresh stage returned',fresh is rows[-1] and fresh['name']=='host-api-compile')
+        check('fresh stage command and log authenticated',fresh['argv'][2]=='host_api.default.cpp' and fresh['log_sha256']==sha(output/'host-api-compile.log'))
+        persisted=json.loads((output/'results.json').read_text())
+        check('fresh completed stage persisted',persisted[-1]==fresh)
+    tree=ast.parse(fixed.read_text())
+    check('qualifications use returned stage',"dict(argv=compiled['argv'],object_sha256=" in fixed.read_text() and "rows[-1]['argv']" not in fixed.read_text())
+    change=json.loads((D/'cross-controller-change.json').read_text())
+    check('historical controller preserved',sha(old)==change['before_sha256'])
+    check('fixed controller matches reviewed bytes',sha(fixed)==change['after_sha256'])
+result=dict(passed=True,checks=checks,checks_passed=len(checks),old_controller_sha256=sha(old),
+            fixed_controller_sha256=sha(fixed),test_sha256=sha(__file__),actual_native_runtime_execution=False)
+(D/'cached-compile-row-regression.json').write_text(json.dumps(result,indent=2)+'\n')
+print('cached compiler command regression:',len(checks),'passed')

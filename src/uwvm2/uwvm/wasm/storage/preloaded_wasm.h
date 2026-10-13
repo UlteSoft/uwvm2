@@ -43,4 +43,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
     /// @note  Must remain unchanged before initialization (to prevent iterator invalidation).
     inline ::uwvm2::utils::container::vector<::uwvm2::uwvm::wasm::type::wasm_file_t>
         preloaded_wasm{};  // [global] No global variable dependencies from other translation units
+    namespace details
+    {
+        // Cold native loader borrow into selected nonmoving full source only.
+        // Reset BEFORE source-owner retirement; never a guest memory guard.
+        inline decltype(preloaded_wasm)* selected_preloaded_wasm{};
+    }
+    [[nodiscard]] inline constexpr decltype(preloaded_wasm)& active_preloaded_wasm() noexcept
+    { return details::selected_preloaded_wasm ? *details::selected_preloaded_wasm : preloaded_wasm; }
 }  // namespace uwvm2::uwvm::wasm::storage

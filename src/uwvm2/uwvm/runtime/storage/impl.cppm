@@ -23,9 +23,17 @@
 module;
 
 export module uwvm2.uwvm.runtime.storage;
+#if defined(UWVM_EXPERIMENTAL_COMPACT_NUMERIC) && UWVM_EXPERIMENTAL_COMPACT_NUMERIC == 1
+export import :compact_numeric;
+#endif
+export import :gc_trace_metadata;
+export import :tag_instance_identity;
 export import :wasm_module;
+export import :gc_static_roots;
 export import :storage;
+export import :builtin_wasip1_loader;
 export import :full;
+export import :source_digest;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

@@ -1,0 +1,860 @@
+{
+  "actual_capture_boundary": {
+    "actual_followup_after_pin": {
+      "bytes": 35829,
+      "original_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-R6-uwvm2-GC-capture-readonly-followup-20261003-r1/followup-after.json",
+      "sha256": "f37b28235c956f7ce8628128883efc1e2d4c5dfe493893253ff04ea03b325224"
+    },
+    "actual_followup_closed": true,
+    "actual_followup_receipts_pin": {
+      "bytes": 20812,
+      "original_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/current-R6-uwvm2-GC-capture-readonly-followup-20261003-r1/receipts.json",
+      "path": "payload/followup-evidence/receipts.json",
+      "sha256": "ca55475907bde86905bbf1a90082800fdd12915f4cc50b7a88a5e0ebcc5f418c"
+    },
+    "actual_object_pins": {
+      "instruction": {
+        "bytes": 2824,
+        "sha256": "4f8c557a5647500e0953b2c1c82b935606397e4ca1932394d9e61d708d1bdbd5"
+      },
+      "unwind": {
+        "bytes": 2568,
+        "sha256": "e191ba157f697a540244a98e336e0ea6b4c67049939f3d9d7771b1a9847034de"
+      }
+    },
+    "actual_objects_maps_helpers_packet_pin": {
+      "bytes": 5063117,
+      "local_path": "/tmp/uwvm-R6-Ord-GC-actual-capture-packet-20261003-r1/raw.tar.gz",
+      "payload_pins_independently_rechecked": 56,
+      "sha256": "c796074062182044b473edec96988075f087758c165395cd0b67c58c05ad4f47"
+    },
+    "actual_two_managed_counter_receipts": {
+      "instruction": {
+        "allocations": 16000000,
+        "attempts": 3906,
+        "collections": 3906,
+        "disabled": 0,
+        "eligible": 3906,
+        "heap_rejections": 0,
+        "pauses": 3906,
+        "peer_skips": 0,
+        "policy_skips": 0,
+        "population_rejections": 0,
+        "reason": 0,
+        "reclaimed": 15997951,
+        "roots_requested": 1
+      },
+      "unwind": {
+        "allocations": 16000000,
+        "attempts": 3906,
+        "collections": 3906,
+        "disabled": 0,
+        "eligible": 3906,
+        "heap_rejections": 0,
+        "pauses": 3906,
+        "peer_skips": 0,
+        "policy_skips": 0,
+        "population_rejections": 0,
+        "reason": 0,
+        "reclaimed": 15997951,
+        "roots_requested": 1
+      }
+    },
+    "bounded_followup_3_stage_rc0_reported_by_keeper": true,
+    "do_not_recapture_or_increase_output_limit": true,
+    "guest_internal_timer_captured": false,
+    "instruction_guest_objectbind_func0_objdump_rc0_reported_by_keeper": true,
+    "original_host_readobj_failure": "32MiB output limit; preserve original failure and absent original capture-after",
+    "original_whole_14_stage_group_passed": false,
+    "two_capture_logs_pending_plan": "native",
+    "two_capture_logs_reported_epoch": 2,
+    "two_capture_logs_reported_module": 0,
+    "unwind_guest_objectbind_func0_objdump_rc0_reported_by_keeper": true
+  },
+  "actual_parent_pins": {
+    "developer_provider_only": true,
+    "expected_returned_state": 493211925,
+    "paired_ROS_runtime_production_qualified": false,
+    "parent": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-full-development-fresh-nativeTLS-20261003-r6-r1-uwvm2",
+    "parent_after_sha256": "92c69a84148084e5bcb61e2f5e601ccbf0d3a37bad9f5fe4b50e29c5ba08c957",
+    "parent_before_sha256": "966a3f6e54186cfe437854065090bc234b302d90214e5b1a2257b2cbcee89260",
+    "parent_closure_sha256": "5ee9e667cec573a34ea8e06248ff889a0f6f46c82748fd0343b86b13c1b54229",
+    "parent_executable_bind_sha256": "807474181b3a720050ab173c90e6c14640d7e6c7708b67e35241f1caf3d4ea5f",
+    "parent_receipts_sha256": "2246d7676c221ab62566c92abb28f95151fe1c98ac176dab34f734dc31adb98a",
+    "parent_retirement_sha256": "e9ef6f2c9c60889f958b3bc92df6f421e2167ff7450a14c05ebac2ca59d3a44a",
+    "product": {
+      "bytes": 94540336,
+      "sha256": "13e649c7eb6b77100b8c9f7b41a4a37c76f29bfdf7c99c0422c0bfd92a4d4a82"
+    },
+    "product_path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-full-development-fresh-nativeTLS-20261003-r6-r1-uwvm2/main",
+    "scope": "untimed R6 fresh all3 immutable16M MCJIT object and host assembly diagnosis; no performance or hardware NI qualification",
+    "source_id": "sha256:871cd9c10be23b679a87b6c157b050954a10455e7b8db425d11b6f45d6587a7f",
+    "tools": {
+      "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/bin/llvm-nm": {
+        "bytes": 144784,
+        "sha256": "8f3b71aa39f5c8c84357f2f45afd069b1ae8e72ebb37543ee93e983a9336ea9c"
+      },
+      "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/bin/llvm-objdump": {
+        "bytes": 853352,
+        "sha256": "0925143d4d994e24f2875b9dd6a7778a880fd8372a60d7053092b59dda4fb7cd"
+      },
+      "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/bin/llvm-readobj": {
+        "bytes": 1947152,
+        "sha256": "cc4a1825e38b09d9522508b50c7b5bafe99af3451ad23b7bc40da4a6d9c9a7b7"
+      }
+    },
+    "wasm": {
+      "bytes": 191,
+      "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-gc-allocation-20260928/gc-allocation/fixtures/gc-allocation-ring-16000000.wasm",
+      "sha256": "66874f9a4a0a5977b4ace1cc702f949c6c2627311dce0bcbe87c818c55516e3e"
+    }
+  },
+  "before_admission_required": [
+    "exact actual parent source/three-object/MD/compiler/RSP/SDK/DSO closure unchanged before/after",
+    "real bounded followup closure and successful capture receipts, never nonexistent original14 after",
+    "fresh actual boot/init PID+birth/exe/proc hash/cgroup identity, not historical authority",
+    "actual64GiB/swap0/P0 CPU/UID+single guestTID guard, profiler on admitted E core",
+    "all compiler/QEMU/other VM/profiler retired before timing; temperature observation only",
+    "actual stopped environment capture absent and actual loaded executable/argv witness"
+  ],
+  "capture_source_plan": {
+    "local_path": "/tmp/uwvm-R6-Ord-GC-capture-review-20261003-r1/plan.json",
+    "local_sha256": "6d01d02e36d9d5f4b02fea665685198f66ddf6432189e08ffe9548ff3341f589",
+    "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-R6-uwvm2-GC-untimed-capture-20261003-r1/plan.json"
+  },
+  "comparison_boundary": {
+    "call_stack_strategy_only_on_same_product": true,
+    "candidate_AB": false,
+    "formal_acceptance": false,
+    "native_component10ns_not_Wasm": true,
+    "old117_118ns_not_current_baseline": true,
+    "sysfs_frequency_is_ROI_effective_frequency": false,
+    "temperature_gate": false
+  },
+  "derived_from": {
+    "bytes": 28637,
+    "path": "current_R6_immutable_GC_three_family_commands_20261003.json",
+    "sha256": "2504bfabae9ad072797a845c3ec235f0c438231c80c758887ab9f817bfd07d01"
+  },
+  "execute_ready": false,
+  "hardware_contract": {
+    "JSON_and_vv_actual_source_crosscheck": true,
+    "actual_PMU_type_config_groupFD_success_FD_proof": true,
+    "enabled_ACK_before_guest_GO": true,
+    "events": [
+      "cpu_core/event=0x3c/",
+      "cpu_core/event=0xc0/"
+    ],
+    "grouped": true,
+    "inherit": false,
+    "owned_perf_PIDFD_SIGINT_after_guest_retired": true,
+    "raw_exact_time_enabled_equals_time_running": true,
+    "reference_cycles": "not in this group; only a separate actual hardware capability control, unavailable stays false",
+    "sampling": false,
+    "scope": "whole original guest singleTID, includes startup/JIT/execution/output",
+    "software_fallback": false,
+    "systemwide": false
+  },
+  "matching_helper_source_pins": [
+    {
+      "bytes": 298999,
+      "local_retained_source_path": "/tmp/uwvm-current-full-development-source-20261003-r6/uwvm-current-full-development-source-20261003-r6/uwvm2/src/uwvm2/uwvm/runtime/storage/gc_object.h",
+      "matches_actual_parent_source_before": true,
+      "relative_path": "src/uwvm2/uwvm/runtime/storage/gc_object.h",
+      "sha256": "18c617171c0debe088ef88fc4e17515f50fbc3a47424d0cd4a87652a6dc7a0f6"
+    },
+    {
+      "bytes": 68465,
+      "local_retained_source_path": "/tmp/uwvm-current-full-development-source-20261003-r6/uwvm-current-full-development-source-20261003-r6/uwvm2/src/uwvm2/uwvm/runtime/storage/wasm_module.h",
+      "matches_actual_parent_source_before": true,
+      "relative_path": "src/uwvm2/uwvm/runtime/storage/wasm_module.h",
+      "sha256": "7c7a86262ba3539d062a8d5d147e7d8a6c4b1182a077c8aecf553bfbf41500c0"
+    },
+    {
+      "bytes": 13733,
+      "local_retained_source_path": "/tmp/uwvm-current-full-development-source-20261003-r6/uwvm-current-full-development-source-20261003-r6/uwvm2/src/uwvm2/runtime/gc/frame_roots.h",
+      "matches_actual_parent_source_before": true,
+      "relative_path": "src/uwvm2/runtime/gc/frame_roots.h",
+      "sha256": "6139cee2d7efe102028af8f6b4d594ad45a60d8c5132ea1339d871408a814fa5"
+    },
+    {
+      "bytes": 914120,
+      "local_retained_source_path": "/tmp/uwvm-current-full-development-source-20261003-r6/uwvm-current-full-development-source-20261003-r6/uwvm2/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h",
+      "matches_actual_parent_source_before": true,
+      "relative_path": "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_emit.h",
+      "sha256": "87388083c3bc3387634c4ab2f0b29ccc57899f5e59824f34c4397d2abce8e067"
+    },
+    {
+      "bytes": 77577,
+      "local_retained_source_path": "/tmp/uwvm-current-full-development-source-20261003-r6/uwvm-current-full-development-source-20261003-r6/uwvm2/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h",
+      "matches_actual_parent_source_before": true,
+      "relative_path": "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_emit.h",
+      "sha256": "c83a2540769cb8028a6174228f73b304d5fa92337b0da714913923cc36eec465"
+    },
+    {
+      "bytes": 16104,
+      "local_retained_source_path": "/tmp/uwvm-current-full-development-source-20261003-r6/uwvm-current-full-development-source-20261003-r6/uwvm2/src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_roots_emit.h",
+      "matches_actual_parent_source_before": true,
+      "relative_path": "src/uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/single_func_gc_roots_emit.h",
+      "sha256": "cb1d2dd535d01522228022bbb8e9e116aca9d76d0c933ddb6df95c686c0796da"
+    }
+  ],
+  "measurement_dependencies": {
+    "R5_stopped_environment_and_terminal_adapters": {
+      "path": "benchmark/0004.wasm3-core/run_general_gc_R5_nativeTLS.py",
+      "sha256": "d96e7eb2795d020ca5bf29800500b98b947db901eb7bf262eff1130da7b863cb"
+    },
+    "host_guard_and_raw_math": {
+      "path": "benchmark/0004.wasm3-core/run_current_host_pcore_hw_counting.py",
+      "sha256": "673d961bb4fd37bd6ed98cc6c486cac3d2dc7fe256230795468ea58db7b42cd5"
+    },
+    "plain_sample": {
+      "path": "benchmark/0004.wasm3-core/run_current_general_gc.py",
+      "sha256": "91ee4854dcf7f176427f5943895bd9f933a5bfa2819c263c30e78774c8beada8"
+    },
+    "spawn_stopped_and_measure": {
+      "path": "benchmark/0004.wasm3-core/run_current_pcore_hw_counting.py",
+      "sha256": "266a56b3389ca5e120a757bd2a7a9b101b834810e5ba53f053b50f536aa425f8"
+    }
+  },
+  "native_execution_by_this_author": false,
+  "new_guard_or_sampler": false,
+  "plain_commands": [
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-full-development-fresh-nativeTLS-20261003-r6-r1-uwvm2/main",
+        "-Rcc",
+        "jit",
+        "-Rcm",
+        "full",
+        "-Rllvm-full-policy",
+        "pb-o3",
+        "-Rllvm-call-stack",
+        "instruction",
+        "-Rllvm-exception-dispatch",
+        "auto",
+        "-Rllvm-cache-path",
+        "disable",
+        "-Rct",
+        "0",
+        "-WFE-gc",
+        "--log-verbose",
+        "-Rclog",
+        "err",
+        "--run",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-gc-allocation-20260928/gc-allocation/fixtures/gc-allocation-ring-16000000.wasm"
+      ],
+      "environment_delta": {
+        "LD_LIBRARY_PATH": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib:/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/x86_64-unknown-linux-gnu:/home/macromodel/Documents/uwvm3-implementation/deps/usr/lib/x86_64-linux-gnu",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RAYON_NUM_THREADS": "1",
+        "UWVM_TEST_CPUSET": "0,2,4,6,16-31"
+      },
+      "expected_self_check": {
+        "final_state": 493211925,
+        "iterations": 16000000,
+        "proof": "Pinned _start traps on final LCG state mismatch; no invented printed return value.",
+        "wasm_sha256": "66874f9a4a0a5977b4ace1cc702f949c6c2627311dce0bcbe87c818c55516e3e"
+      },
+      "fixture": "original-immutable-gc-ring-16000000",
+      "formal_acceptance": false,
+      "gc_counter_contract": {
+        "allocations": 16000000,
+        "attempts": 3906,
+        "collections": 3906,
+        "disabled": 0,
+        "eligible": 3906,
+        "heap_rejections": 0,
+        "pauses": 3906,
+        "peer_skips": 0,
+        "policy_skips": 0,
+        "population_rejections": 0,
+        "reason": 0,
+        "reclaimed": 15997951,
+        "roots_requested": 1
+      },
+      "label": "plain-0-instruction",
+      "profile": "ordinary/nativeTLS/full/pb-o3/instruction/auto",
+      "remove_environment": [
+        "UWVM2_TEST_CAPTURE_NATIVE_JIT_OBJECT",
+        "LD_PRELOAD",
+        "LD_AUDIT",
+        "LD_PROFILE"
+      ],
+      "remove_environment_prefixes": [
+        "VTUNE_",
+        "INTEL_LIBITTNOTIFY"
+      ],
+      "required_runtime_materialization": {
+        "actual_module_and_epoch": "actual recorded only, never permission",
+        "body_fallback": "no",
+        "object_cache": "disabled",
+        "owning_source": "yes",
+        "pending_plan": "native, reobserve in each actual run"
+      },
+      "timing_scope": "internal Wasm setup+loop+table/ref/new/GC+checksum, excludes startup/JIT; whole process separately"
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-full-development-fresh-nativeTLS-20261003-r6-r1-uwvm2/main",
+        "-Rcc",
+        "jit",
+        "-Rcm",
+        "full",
+        "-Rllvm-full-policy",
+        "pb-o3",
+        "-Rllvm-call-stack",
+        "unwind",
+        "-Rllvm-exception-dispatch",
+        "auto",
+        "-Rllvm-cache-path",
+        "disable",
+        "-Rct",
+        "0",
+        "-WFE-gc",
+        "--log-verbose",
+        "-Rclog",
+        "err",
+        "--run",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-gc-allocation-20260928/gc-allocation/fixtures/gc-allocation-ring-16000000.wasm"
+      ],
+      "environment_delta": {
+        "LD_LIBRARY_PATH": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib:/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/x86_64-unknown-linux-gnu:/home/macromodel/Documents/uwvm3-implementation/deps/usr/lib/x86_64-linux-gnu",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RAYON_NUM_THREADS": "1",
+        "UWVM_TEST_CPUSET": "0,2,4,6,16-31"
+      },
+      "expected_self_check": {
+        "final_state": 493211925,
+        "iterations": 16000000,
+        "proof": "Pinned _start traps on final LCG state mismatch; no invented printed return value.",
+        "wasm_sha256": "66874f9a4a0a5977b4ace1cc702f949c6c2627311dce0bcbe87c818c55516e3e"
+      },
+      "fixture": "original-immutable-gc-ring-16000000",
+      "formal_acceptance": false,
+      "gc_counter_contract": {
+        "allocations": 16000000,
+        "attempts": 3906,
+        "collections": 3906,
+        "disabled": 0,
+        "eligible": 3906,
+        "heap_rejections": 0,
+        "pauses": 3906,
+        "peer_skips": 0,
+        "policy_skips": 0,
+        "population_rejections": 0,
+        "reason": 0,
+        "reclaimed": 15997951,
+        "roots_requested": 1
+      },
+      "label": "plain-1-unwind",
+      "profile": "ordinary/nativeTLS/full/pb-o3/unwind/auto",
+      "remove_environment": [
+        "UWVM2_TEST_CAPTURE_NATIVE_JIT_OBJECT",
+        "LD_PRELOAD",
+        "LD_AUDIT",
+        "LD_PROFILE"
+      ],
+      "remove_environment_prefixes": [
+        "VTUNE_",
+        "INTEL_LIBITTNOTIFY"
+      ],
+      "required_runtime_materialization": {
+        "actual_module_and_epoch": "actual recorded only, never permission",
+        "body_fallback": "no",
+        "object_cache": "disabled",
+        "owning_source": "yes",
+        "pending_plan": "native, reobserve in each actual run"
+      },
+      "timing_scope": "internal Wasm setup+loop+table/ref/new/GC+checksum, excludes startup/JIT; whole process separately"
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-full-development-fresh-nativeTLS-20261003-r6-r1-uwvm2/main",
+        "-Rcc",
+        "jit",
+        "-Rcm",
+        "full",
+        "-Rllvm-full-policy",
+        "pb-o3",
+        "-Rllvm-call-stack",
+        "unwind",
+        "-Rllvm-exception-dispatch",
+        "auto",
+        "-Rllvm-cache-path",
+        "disable",
+        "-Rct",
+        "0",
+        "-WFE-gc",
+        "--log-verbose",
+        "-Rclog",
+        "err",
+        "--run",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-gc-allocation-20260928/gc-allocation/fixtures/gc-allocation-ring-16000000.wasm"
+      ],
+      "environment_delta": {
+        "LD_LIBRARY_PATH": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib:/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/x86_64-unknown-linux-gnu:/home/macromodel/Documents/uwvm3-implementation/deps/usr/lib/x86_64-linux-gnu",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RAYON_NUM_THREADS": "1",
+        "UWVM_TEST_CPUSET": "0,2,4,6,16-31"
+      },
+      "expected_self_check": {
+        "final_state": 493211925,
+        "iterations": 16000000,
+        "proof": "Pinned _start traps on final LCG state mismatch; no invented printed return value.",
+        "wasm_sha256": "66874f9a4a0a5977b4ace1cc702f949c6c2627311dce0bcbe87c818c55516e3e"
+      },
+      "fixture": "original-immutable-gc-ring-16000000",
+      "formal_acceptance": false,
+      "gc_counter_contract": {
+        "allocations": 16000000,
+        "attempts": 3906,
+        "collections": 3906,
+        "disabled": 0,
+        "eligible": 3906,
+        "heap_rejections": 0,
+        "pauses": 3906,
+        "peer_skips": 0,
+        "policy_skips": 0,
+        "population_rejections": 0,
+        "reason": 0,
+        "reclaimed": 15997951,
+        "roots_requested": 1
+      },
+      "label": "plain-2-unwind",
+      "profile": "ordinary/nativeTLS/full/pb-o3/unwind/auto",
+      "remove_environment": [
+        "UWVM2_TEST_CAPTURE_NATIVE_JIT_OBJECT",
+        "LD_PRELOAD",
+        "LD_AUDIT",
+        "LD_PROFILE"
+      ],
+      "remove_environment_prefixes": [
+        "VTUNE_",
+        "INTEL_LIBITTNOTIFY"
+      ],
+      "required_runtime_materialization": {
+        "actual_module_and_epoch": "actual recorded only, never permission",
+        "body_fallback": "no",
+        "object_cache": "disabled",
+        "owning_source": "yes",
+        "pending_plan": "native, reobserve in each actual run"
+      },
+      "timing_scope": "internal Wasm setup+loop+table/ref/new/GC+checksum, excludes startup/JIT; whole process separately"
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-full-development-fresh-nativeTLS-20261003-r6-r1-uwvm2/main",
+        "-Rcc",
+        "jit",
+        "-Rcm",
+        "full",
+        "-Rllvm-full-policy",
+        "pb-o3",
+        "-Rllvm-call-stack",
+        "instruction",
+        "-Rllvm-exception-dispatch",
+        "auto",
+        "-Rllvm-cache-path",
+        "disable",
+        "-Rct",
+        "0",
+        "-WFE-gc",
+        "--log-verbose",
+        "-Rclog",
+        "err",
+        "--run",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-gc-allocation-20260928/gc-allocation/fixtures/gc-allocation-ring-16000000.wasm"
+      ],
+      "environment_delta": {
+        "LD_LIBRARY_PATH": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib:/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/x86_64-unknown-linux-gnu:/home/macromodel/Documents/uwvm3-implementation/deps/usr/lib/x86_64-linux-gnu",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RAYON_NUM_THREADS": "1",
+        "UWVM_TEST_CPUSET": "0,2,4,6,16-31"
+      },
+      "expected_self_check": {
+        "final_state": 493211925,
+        "iterations": 16000000,
+        "proof": "Pinned _start traps on final LCG state mismatch; no invented printed return value.",
+        "wasm_sha256": "66874f9a4a0a5977b4ace1cc702f949c6c2627311dce0bcbe87c818c55516e3e"
+      },
+      "fixture": "original-immutable-gc-ring-16000000",
+      "formal_acceptance": false,
+      "gc_counter_contract": {
+        "allocations": 16000000,
+        "attempts": 3906,
+        "collections": 3906,
+        "disabled": 0,
+        "eligible": 3906,
+        "heap_rejections": 0,
+        "pauses": 3906,
+        "peer_skips": 0,
+        "policy_skips": 0,
+        "population_rejections": 0,
+        "reason": 0,
+        "reclaimed": 15997951,
+        "roots_requested": 1
+      },
+      "label": "plain-3-instruction",
+      "profile": "ordinary/nativeTLS/full/pb-o3/instruction/auto",
+      "remove_environment": [
+        "UWVM2_TEST_CAPTURE_NATIVE_JIT_OBJECT",
+        "LD_PRELOAD",
+        "LD_AUDIT",
+        "LD_PROFILE"
+      ],
+      "remove_environment_prefixes": [
+        "VTUNE_",
+        "INTEL_LIBITTNOTIFY"
+      ],
+      "required_runtime_materialization": {
+        "actual_module_and_epoch": "actual recorded only, never permission",
+        "body_fallback": "no",
+        "object_cache": "disabled",
+        "owning_source": "yes",
+        "pending_plan": "native, reobserve in each actual run"
+      },
+      "timing_scope": "internal Wasm setup+loop+table/ref/new/GC+checksum, excludes startup/JIT; whole process separately"
+    }
+  ],
+  "product": {
+    "actual_three_TUs_fresh": true,
+    "bytes": 94540336,
+    "developer_provider_only": true,
+    "paired_ROS_runtime_production_qualified": false,
+    "path": "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-full-development-fresh-nativeTLS-20261003-r6-r1-uwvm2/main",
+    "sha256": "13e649c7eb6b77100b8c9f7b41a4a37c76f29bfdf7c99c0422c0bfd92a4d4a82"
+  },
+  "production_changed": false,
+  "pure_hw_commands": [
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-full-development-fresh-nativeTLS-20261003-r6-r1-uwvm2/main",
+        "-Rcc",
+        "jit",
+        "-Rcm",
+        "full",
+        "-Rllvm-full-policy",
+        "pb-o3",
+        "-Rllvm-call-stack",
+        "instruction",
+        "-Rllvm-exception-dispatch",
+        "auto",
+        "-Rllvm-cache-path",
+        "disable",
+        "-Rct",
+        "0",
+        "-WFE-gc",
+        "--log-verbose",
+        "-Rclog",
+        "err",
+        "--run",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-gc-allocation-20260928/gc-allocation/fixtures/gc-allocation-ring-16000000.wasm"
+      ],
+      "environment_delta": {
+        "LD_LIBRARY_PATH": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib:/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/x86_64-unknown-linux-gnu:/home/macromodel/Documents/uwvm3-implementation/deps/usr/lib/x86_64-linux-gnu",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RAYON_NUM_THREADS": "1",
+        "UWVM_TEST_CPUSET": "0,2,4,6,16-31"
+      },
+      "expected_self_check": {
+        "final_state": 493211925,
+        "iterations": 16000000,
+        "proof": "Pinned _start traps on final LCG state mismatch; no invented printed return value.",
+        "wasm_sha256": "66874f9a4a0a5977b4ace1cc702f949c6c2627311dce0bcbe87c818c55516e3e"
+      },
+      "fixture": "original-immutable-gc-ring-16000000",
+      "formal_acceptance": false,
+      "gc_counter_contract": {
+        "allocations": 16000000,
+        "attempts": 3906,
+        "collections": 3906,
+        "disabled": 0,
+        "eligible": 3906,
+        "heap_rejections": 0,
+        "pauses": 3906,
+        "peer_skips": 0,
+        "policy_skips": 0,
+        "population_rejections": 0,
+        "reason": 0,
+        "reclaimed": 15997951,
+        "roots_requested": 1
+      },
+      "label": "hw-instruction",
+      "profile": "ordinary/nativeTLS/full/pb-o3/instruction/auto",
+      "remove_environment": [
+        "UWVM2_TEST_CAPTURE_NATIVE_JIT_OBJECT",
+        "LD_PRELOAD",
+        "LD_AUDIT",
+        "LD_PROFILE"
+      ],
+      "remove_environment_prefixes": [
+        "VTUNE_",
+        "INTEL_LIBITTNOTIFY"
+      ],
+      "required_runtime_materialization": {
+        "actual_module_and_epoch": "actual recorded only, never permission",
+        "body_fallback": "no",
+        "object_cache": "disabled",
+        "owning_source": "yes",
+        "pending_plan": "native, reobserve in each actual run"
+      },
+      "timing_scope": "internal Wasm setup+loop+table/ref/new/GC+checksum, excludes startup/JIT; whole process separately"
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-full-development-fresh-nativeTLS-20261003-r6-r1-uwvm2/main",
+        "-Rcc",
+        "jit",
+        "-Rcm",
+        "full",
+        "-Rllvm-full-policy",
+        "pb-o3",
+        "-Rllvm-call-stack",
+        "unwind",
+        "-Rllvm-exception-dispatch",
+        "auto",
+        "-Rllvm-cache-path",
+        "disable",
+        "-Rct",
+        "0",
+        "-WFE-gc",
+        "--log-verbose",
+        "-Rclog",
+        "err",
+        "--run",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-gc-allocation-20260928/gc-allocation/fixtures/gc-allocation-ring-16000000.wasm"
+      ],
+      "environment_delta": {
+        "LD_LIBRARY_PATH": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib:/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/x86_64-unknown-linux-gnu:/home/macromodel/Documents/uwvm3-implementation/deps/usr/lib/x86_64-linux-gnu",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RAYON_NUM_THREADS": "1",
+        "UWVM_TEST_CPUSET": "0,2,4,6,16-31"
+      },
+      "expected_self_check": {
+        "final_state": 493211925,
+        "iterations": 16000000,
+        "proof": "Pinned _start traps on final LCG state mismatch; no invented printed return value.",
+        "wasm_sha256": "66874f9a4a0a5977b4ace1cc702f949c6c2627311dce0bcbe87c818c55516e3e"
+      },
+      "fixture": "original-immutable-gc-ring-16000000",
+      "formal_acceptance": false,
+      "gc_counter_contract": {
+        "allocations": 16000000,
+        "attempts": 3906,
+        "collections": 3906,
+        "disabled": 0,
+        "eligible": 3906,
+        "heap_rejections": 0,
+        "pauses": 3906,
+        "peer_skips": 0,
+        "policy_skips": 0,
+        "population_rejections": 0,
+        "reason": 0,
+        "reclaimed": 15997951,
+        "roots_requested": 1
+      },
+      "label": "hw-unwind",
+      "profile": "ordinary/nativeTLS/full/pb-o3/unwind/auto",
+      "remove_environment": [
+        "UWVM2_TEST_CAPTURE_NATIVE_JIT_OBJECT",
+        "LD_PRELOAD",
+        "LD_AUDIT",
+        "LD_PROFILE"
+      ],
+      "remove_environment_prefixes": [
+        "VTUNE_",
+        "INTEL_LIBITTNOTIFY"
+      ],
+      "required_runtime_materialization": {
+        "actual_module_and_epoch": "actual recorded only, never permission",
+        "body_fallback": "no",
+        "object_cache": "disabled",
+        "owning_source": "yes",
+        "pending_plan": "native, reobserve in each actual run"
+      },
+      "timing_scope": "internal Wasm setup+loop+table/ref/new/GC+checksum, excludes startup/JIT; whole process separately"
+    }
+  ],
+  "repository": "uwvm2",
+  "result_columns": [
+    "actual exit/selfcheck+managed counters",
+    "internal_Wasm_execution_ns",
+    "reported_process_ns",
+    "parent_GO_to_reap_wall_ns",
+    "wait4_user_ns",
+    "wait4_sys_ns",
+    "wait4_maxrss",
+    "wholeguest_cycles",
+    "wholeguest_instructions",
+    "exact_PMU_enabled_ns",
+    "exact_PMU_running_ns",
+    "sysfs_frequency_snapshots",
+    "actual_VTune_target_GHz",
+    "actual_VTune_MUX",
+    "actual_identity/closure/noise limits"
+  ],
+  "schema": "uwvm-current-R6-immutable16M-three-family-command-contract-v2",
+  "source_id_external": "sha256:871cd9c10be23b679a87b6c157b050954a10455e7b8db425d11b6f45d6587a7f",
+  "status": "source-only; actual untimed parent/captures/followup verified, fresh timing admission/library closure pending",
+  "vtune_collections": [
+    {
+      "analysis": "hotspots",
+      "environment_delta": {
+        "LD_LIBRARY_PATH": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib:/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/x86_64-unknown-linux-gnu:/home/macromodel/Documents/uwvm3-implementation/deps/usr/lib/x86_64-linux-gnu",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RAYON_NUM_THREADS": "1",
+        "UWVM_TEST_CPUSET": "0,2,4,6,16-31"
+      },
+      "formal_acceptance": false,
+      "guest_cpu": "0",
+      "label": "unwind-hw-hotspots",
+      "must_preserve_actual_Intel_loader_injection": true,
+      "must_use_existing_actual_owned_process_tree_supervisor": true,
+      "profiler_argv_suffix": [
+        "-collect",
+        "hotspots",
+        "-knob",
+        "sampling-mode=hw",
+        "-knob",
+        "enable-stack-collection=true",
+        "-knob",
+        "stack-size=1024",
+        "-knob",
+        "enable-characterization-insights=false",
+        "-run-pass-thru=--perf-threads=none",
+        "-result-dir",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/current-R6-immutable16M-P0-20261003-r1/unwind-hw-hotspots",
+        "--",
+        "taskset",
+        "-c",
+        "0",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-full-development-fresh-nativeTLS-20261003-r6-r1-uwvm2/main",
+        "-Rcc",
+        "jit",
+        "-Rcm",
+        "full",
+        "-Rllvm-full-policy",
+        "pb-o3",
+        "-Rllvm-call-stack",
+        "unwind",
+        "-Rllvm-exception-dispatch",
+        "auto",
+        "-Rllvm-cache-path",
+        "disable",
+        "-Rct",
+        "0",
+        "-WFE-gc",
+        "--log-verbose",
+        "-Rclog",
+        "err",
+        "--run",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-gc-allocation-20260928/gc-allocation/fixtures/gc-allocation-ring-16000000.wasm"
+      ],
+      "profiler_cpu": "16",
+      "profiler_path": "actual inventory pin required; not an executable placeholder",
+      "remove_environment": [
+        "UWVM2_TEST_CAPTURE_NATIVE_JIT_OBJECT",
+        "LD_PRELOAD",
+        "LD_AUDIT",
+        "LD_PROFILE"
+      ]
+    },
+    {
+      "analysis": "uarch-exploration",
+      "environment_delta": {
+        "LD_LIBRARY_PATH": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib:/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/x86_64-unknown-linux-gnu:/home/macromodel/Documents/uwvm3-implementation/deps/usr/lib/x86_64-linux-gnu",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RAYON_NUM_THREADS": "1",
+        "UWVM_TEST_CPUSET": "0,2,4,6,16-31"
+      },
+      "formal_acceptance": false,
+      "guest_cpu": "0",
+      "label": "unwind-hw-uarch",
+      "must_preserve_actual_Intel_loader_injection": true,
+      "must_use_existing_actual_owned_process_tree_supervisor": true,
+      "profiler_argv_suffix": [
+        "-collect",
+        "uarch-exploration",
+        "-knob",
+        "pmu-collection-mode=summary",
+        "-result-dir",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/current-R6-immutable16M-P0-20261003-r1/unwind-hw-uarch",
+        "--",
+        "taskset",
+        "-c",
+        "0",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/builds/current-full-development-fresh-nativeTLS-20261003-r6-r1-uwvm2/main",
+        "-Rcc",
+        "jit",
+        "-Rcm",
+        "full",
+        "-Rllvm-full-policy",
+        "pb-o3",
+        "-Rllvm-call-stack",
+        "unwind",
+        "-Rllvm-exception-dispatch",
+        "auto",
+        "-Rllvm-cache-path",
+        "disable",
+        "-Rct",
+        "0",
+        "-WFE-gc",
+        "--log-verbose",
+        "-Rclog",
+        "err",
+        "--run",
+        "/home/macromodel/Documents/uwvm3-implementation/wasm3-resume-20260924/evidence/bench-core3-c7f9-43a37-gc-allocation-20260928/gc-allocation/fixtures/gc-allocation-ring-16000000.wasm"
+      ],
+      "profiler_cpu": "16",
+      "profiler_path": "actual inventory pin required; not an executable placeholder",
+      "remove_environment": [
+        "UWVM2_TEST_CAPTURE_NATIVE_JIT_OBJECT",
+        "LD_PRELOAD",
+        "LD_AUDIT",
+        "LD_PROFILE"
+      ]
+    }
+  ],
+  "vtune_report_contract": {
+    "JIT": "untimed object does not map anonymous sampled PCs from another process",
+    "MUX_and_lost_samples": "actual recorded; summary mode does not prove coverage1",
+    "first_reports": [
+      "summary",
+      "process/thread/cpu partition",
+      "unfiltered functions with module path/start address"
+    ],
+    "no_cpu_mask_option": "installed actual target previously rejected -cpu-mask; guest taskset plus admission establishes P0",
+    "query_options": [
+      [
+        "-group-by",
+        "?"
+      ],
+      [
+        "-filter",
+        "?"
+      ]
+    ],
+    "stack_warnings": "actual raw preserved; skipped frames forbid complete-stack percentages",
+    "strict_loader_environment": "actual injected Intel library prefixes recorded; mismatch remains qualified=false",
+    "target_filter": "derive actual this-result PID/TID and cpuid=cpu_0 from installed reporthelp; no historical PID"
+  }
+}

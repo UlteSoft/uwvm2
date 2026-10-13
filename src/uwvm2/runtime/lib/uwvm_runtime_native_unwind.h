@@ -25,11 +25,8 @@
 
 #if defined(UWVM_RUNTIME_LLVM_JIT) && UWVM2_RUNTIME_LLVM_JIT_ENABLE_NATIVE_UNWIND_BACKTRACE && !defined(_WIN32) && __has_include(<unwind.h>)
 # include <unwind.h>
+# include <uwvm2/runtime/compiler/llvm_jit/native_unwind_abi.h>
 # define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE 1
-# if defined(__APPLE__)
-extern "C" void __register_frame(void const*);
-extern "C" void __deregister_frame(void const*);
-# endif
 #else
 # define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE 0
 #endif

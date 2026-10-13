@@ -1,0 +1,438 @@
+{
+  "boot_id": "83f582ec-ff7f-41ce-9631-2c0fbb865aeb",
+  "kind": "source-metadata-only",
+  "matrix_complete": false,
+  "new_product_platform_qualification": false,
+  "not_qualified": [
+    "FreeBSD/BSD guest+nativeSDK",
+    "Windows full fresh3TU ABI",
+    "musl",
+    "uclibc",
+    "mlibc",
+    "LLVM-libc",
+    "ROS complete LLVM23 target+pairedC++ABI1+OpenSSL closure"
+  ],
+  "platforms": [
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 17400984,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-aarch64",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-aarch64",
+        "sha256": "8415150d0dcb594d1fd191f210a62643ed86a0562e43c39b02b30cbde0586d9c"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 1716624,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 183,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/aarch64-linux-gnu/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/aarch64-linux-gnu/lib/libc.so.6",
+        "sha256": "0070a484bafec3d1c1b8893f8c1f26b1b52306426bd863e56f92cebfa28e7099"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "aarch64-linux-gnu"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 14804824,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-arm",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-arm",
+        "sha256": "a4aa325a721e0acdba2733276d9cacd23c9380deae30ea32cfad89679f0d67fb"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 1646708,
+        "elf_class": 1,
+        "elf_data": 1,
+        "elf_machine": 40,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/arm-linux-gnueabi/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/arm-linux-gnueabi/lib/libc.so.6",
+        "sha256": "9172e812ceb6c8d8fe82dd684d26bb61248bf042d9e3da27c9fb9d30436c7e12"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "arm-linux-gnueabi"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 14804824,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-arm",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-arm",
+        "sha256": "a4aa325a721e0acdba2733276d9cacd23c9380deae30ea32cfad89679f0d67fb"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 1188032,
+        "elf_class": 1,
+        "elf_data": 1,
+        "elf_machine": 40,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/arm-linux-gnueabihf/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/arm-linux-gnueabihf/lib/libc.so.6",
+        "sha256": "095e28f6dfb93aa05872b5dc54ad54d5ba6db68d1629dfb61994bda8477ee5e5"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "arm-linux-gnueabihf"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 14280504,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-i386",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-i386",
+        "sha256": "8b1378e90a6c308763884b68dd9e037c5b233cbddb8545e5ad2fdc51f38b8cb0"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 2306768,
+        "elf_class": 1,
+        "elf_data": 1,
+        "elf_machine": 3,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/i686-linux-gnu/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/i686-linux-gnu/lib/libc.so.6",
+        "sha256": "1a1c4697799c944850e2500191db9705f961e491808a56848f7acbf8145cf534"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "i686-linux-gnu"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 14145848,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-loongarch64",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-loongarch64",
+        "sha256": "a740e3a6da39dc7e9ac51205d377b85db78fa6fca935250bc16fe23d43688fc2"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 1781816,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 258,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/loongarch64-linux-gnu/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/loongarch64-linux-gnu/lib/libc.so.6",
+        "sha256": "5bed1599fd9cbb420a1473a5841ce16972a4989f85a1d3030cb3668f6c2e3398"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "loongarch64-linux-gnu"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 14690808,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-mips",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-mips",
+        "sha256": "2034ba02359ae22a3476beedf868a268dc53781cc698f432c3a766a4c78c8b6a"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 2104924,
+        "elf_class": 1,
+        "elf_data": 2,
+        "elf_machine": 8,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/mips-linux-gnu/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/mips-linux-gnu/lib/libc.so.6",
+        "sha256": "b06e688127252f9528c0f23240109124f3b95edf09c025d08874015a91465cd2"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "mips-linux-gnu"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 14682616,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-mipsel",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-mipsel",
+        "sha256": "d9e81f274dfe0d7cdbcdd2676bb90e674886c80b4697257292580e0cecbc4781"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 2104924,
+        "elf_class": 1,
+        "elf_data": 1,
+        "elf_machine": 8,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/mipsel-linux-gnu/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/mipsel-linux-gnu/lib/libc.so.6",
+        "sha256": "79ceb1a5864fb492aac013891ec3c12982891f6733f7d8fd0562a8572af6b65d"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "mipsel-linux-gnu"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 14739672,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-mips64",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-mips64",
+        "sha256": "0a500458f272ce621239e0e55046863bdb6d17dde34f018317153f0c8945ef0b"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 2241176,
+        "elf_class": 2,
+        "elf_data": 2,
+        "elf_machine": 8,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/mips64-linux-gnuabi64/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/mips64-linux-gnuabi64/lib/libc.so.6",
+        "sha256": "ccad3b7dd888842cb82abc3c52f8c675746b96bdb2483cc9b92c9cbb073c8d74"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "mips64-linux-gnuabi64"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 14731480,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-mips64el",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-mips64el",
+        "sha256": "d17e71db46982d8c54b51358ce87aa231595465e6ce5563832f10068730cca27"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 2306712,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 8,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/mips64el-linux-gnuabi64/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/mips64el-linux-gnuabi64/lib/libc.so.6",
+        "sha256": "255869977a7893ef87d8eed387bfefa6f3836a18c7f0fafd78082ea113c1628d"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "mips64el-linux-gnuabi64"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 14457688,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-ppc",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-ppc",
+        "sha256": "9b929ae0602f4af2fb9b230ecb2799a20287565728aedcc19210801deb454044"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 2302324,
+        "elf_class": 1,
+        "elf_data": 2,
+        "elf_machine": 20,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/powerpc-linux-gnu/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/powerpc-linux-gnu/lib/libc.so.6",
+        "sha256": "26ed317af67adc7d5823caa8b709e99467926ea51cc5a0d82e7336e065a1772b"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "powerpc-linux-gnu"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 14528376,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-ppc64",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-ppc64",
+        "sha256": "73bee993b987b376b0cae8723347adbe7d8298e2c412452157227f1da5337f79"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 2306240,
+        "elf_class": 2,
+        "elf_data": 2,
+        "elf_machine": 21,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/powerpc64-linux-gnu/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/powerpc64-linux-gnu/lib/libc.so.6",
+        "sha256": "1ae4021d91f125392bec6401d03ecd84d72a495cd2fd2e1ad4712de4d570e6e4"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "powerpc64-linux-gnu"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 14516088,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-ppc64le",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-ppc64le",
+        "sha256": "c27ce8608612f932c280aed87693cd774ea9f6388f929c691b5b9d950ab56e7a"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 2437224,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 21,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/powerpc64le-linux-gnu/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/powerpc64le-linux-gnu/lib/libc.so.6",
+        "sha256": "b2b4dafa58f45221b0c6014a3d74cd0f6f3767e9bbf40512334fc2a4d8aecf1a"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "powerpc64le-linux-gnu"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 15110104,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-riscv64",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-riscv64",
+        "sha256": "269925b42185b3e451cbe287ab8fbfab66ebdf42ce65fd872e8899b863e6f877"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 1401008,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 243,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/riscv64-linux-gnu/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/riscv64-linux-gnu/lib/libc.so.6",
+        "sha256": "26d85188fc5efa513fdda3a26046e5fc53aecffd568cc0a8f9c1d290440a2bdd"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "riscv64-linux-gnu"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 13978648,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-s390x",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-s390x",
+        "sha256": "ab5809a6aca9622994c54c6071dece405aba27ea554fdd0d87ebf82cfd085b9b"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 1978632,
+        "elf_class": 2,
+        "elf_data": 2,
+        "elf_machine": 22,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/s390x-linux-gnu/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/s390x-linux-gnu/lib/libc.so.6",
+        "sha256": "ea43333f9d3ea5e7498dae1e8d95d946db1b0e60edea00ae8172924216b37aab"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "s390x-linux-gnu"
+    },
+    {
+      "compile_accepted": false,
+      "emulator": {
+        "bytes": 13794456,
+        "elf_class": 2,
+        "elf_data": 1,
+        "elf_machine": 62,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-sparc64",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/bin/qemu-sparc64",
+        "sha256": "37dbc84a42308a9ab09a0f93c2723ecfb41afe4e8d4675d3b4feacbc10518f71"
+      },
+      "execution_accepted": false,
+      "libc": {
+        "bytes": 2110080,
+        "elf_class": 2,
+        "elf_data": 2,
+        "elf_machine": 43,
+        "path": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/sparc64-linux-gnu/lib/libc.so.6",
+        "resolved": "/home/macromodel/Documents/uwvm3-implementation/deps/usr/sparc64-linux-gnu/lib/libc.so.6",
+        "sha256": "e1c9e0efb93e8f6fcd6dc245fe748746f85f869ff8dc1ad149867eb9428d76e3"
+      },
+      "libc_candidate": "glibc-name-only-before-execution",
+      "missing": [],
+      "qemu_exists": true,
+      "sdk_include_exists": true,
+      "source_only_inventory": true,
+      "target": "sparc64-linux-gnu"
+    }
+  ],
+  "schema": "uwvm-non-native-provider-inventory-v1"
+}

@@ -1,0 +1,8 @@
+{
+  "upstream_commit": "6dfe1677ab8dffbc6ec13d53a1e0215d75147689",
+  "path": "libunwind/src/AddressSpace.hpp",
+  "upstream_sha256": "66ebbc93ca448bbac17cf5666e417fc8962e67298930d88ff5a3530550699bf3",
+  "patched_sha256": "721c1b5547704d797d31d5de68f0ed4c6d2676ddf032c2622a17e8680df7e8ec",
+  "patch_sha256": "c64e006781daa2ed21f797a06ce613e3253a63202985453f8840a3e5ff95493c",
+  "scope": "one/two-byte ULEB/SLEB numeric decoding; original long/truncated fallback unchanged; paired LLVM23.1.1 x86-64 Linux only qualified"
+}

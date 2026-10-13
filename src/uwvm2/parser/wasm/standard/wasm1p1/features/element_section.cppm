@@ -40,6 +40,7 @@ import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.parser.wasm.standard.wasm1p1.type;
 import :def;
 import :feature_def;
+import :types;
 import :data_section;
 
 #ifndef UWVM_MODULE

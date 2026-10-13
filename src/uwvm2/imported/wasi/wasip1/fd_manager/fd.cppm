@@ -28,6 +28,7 @@ module;
 #include <limits>
 #include <type_traits>
 #include <memory>
+#include <optional>
 #include <new>
 #include <atomic>
 #include <utility>

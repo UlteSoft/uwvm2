@@ -1,0 +1,151 @@
+{
+  "schema": "uwvm-core3-short-actual-native-plan-r1",
+  "source_only": true,
+  "official_oracle_passed": false,
+  "native_execution_passed": false,
+  "production_changed_paths": [],
+  "official_spec_commit": "2e44bf79e68cc4fe689f43eea8e7d25b6fdfbce1",
+  "source_dependencies": [
+    {
+      "path": "test/0024.wasm3_exception_policy_audit/two_phase_policy.cc",
+      "sha256": "0409beb49f6458fd4f3854fcb92044d963166cf35efd075b1b44e6ede29ddd88"
+    },
+    {
+      "path": "test/0024.wasm3_exception_policy_audit/fixtures/table_exn.wat",
+      "sha256": "a5d1c5d5936e012a09ebed5b5e13df794130b92651c7fd356909f94d96cb25a0"
+    },
+    {
+      "path": "test/0024.wasm3_exception_policy_audit/fixtures/unused_type_exn.wat",
+      "sha256": "30c412a86885a7d55a932b0fe3557b40d1429909086b935281c93c84000956a6"
+    },
+    {
+      "path": "test/0024.wasm3_exception_policy_audit/fixtures/provider.wat",
+      "sha256": "3bb30bb98e7f5231c5c43d4f06bf8a3194273e5a3199df851b1170032c020fc5"
+    },
+    {
+      "path": "test/0024.wasm3_exception_policy_audit/binary_zero_locals.json",
+      "sha256": "20d03b93a76ff05df1ab1c41cab93703c024b2bf556473b111f5b2d7a97a9d28"
+    },
+    {
+      "path": "test/0025.wasm3_decl_gate_audit/lazy/legal_recursive_gc.wat",
+      "sha256": "a664500cc4a5134398fe7e9a850e33986c3cdada67371646137fa564f7efc680"
+    },
+    {
+      "path": "test/0025.wasm3_decl_gate_audit/lazy/legal_mem64_table64.wat",
+      "sha256": "0386e998906f5fc6957a31a04ff8db5f0968d54f0054e7b264dc5d94d1f894e8"
+    },
+    {
+      "path": "test/0025.wasm3_decl_gate_audit/lazy/unused_invalid_gc_packed_get.wat",
+      "sha256": "ea0a8058852c7b9cbed232aca3d1c6afbca8c495805edff1c4c8ae524bcdcdeb"
+    },
+    {
+      "path": "test/0025.wasm3_decl_gate_audit/lazy/unused_invalid_try_table_label.wat",
+      "sha256": "9f9e685ac6dc5fa4eaeafd7774f21717abe37ede0699a8f188edceaba3ebf140"
+    }
+  ],
+  "tool_pin": "Keeper must record actual existing wasm-tools version/path/SHA; no new install requested",
+  "runtime_pin": "BEFORE only complete immutable R6 source, actual matching SDK/runtime/product; AFTER requires R7 EH-layout rebuilt runtime",
+  "oracle_argv": [
+    [
+      "{wasm_tools}",
+      "parse",
+      "{wat}",
+      "-o",
+      "{wasm}"
+    ],
+    [
+      "{wasm_tools}",
+      "validate",
+      "--features",
+      "all",
+      "{wasm}"
+    ]
+  ],
+  "invalid_binary_rule": "wasm-tools parse preserves invalid module typing; oracle validate must fail; keep emitted raw bytes and product rejection separate",
+  "component_before_cases": [
+    {
+      "args": [
+        "reject",
+        "table",
+        "table_exn.wasm"
+      ],
+      "expected": "must reject EH; actual accept is expected before counterexample and failing regression, never PASS"
+    },
+    {
+      "args": [
+        "reject",
+        "function",
+        "unused_type_exn.wasm"
+      ],
+      "expected": "must reject unused signature EH; record actual outcome"
+    },
+    {
+      "args": [
+        "reject",
+        "local",
+        "zero_local_nonnull_noexn.wasm"
+      ],
+      "expected": "must reject encoded zero-count local EH; original JSON hex only, not WAT regeneration"
+    }
+  ],
+  "native_default_argv": [
+    "{R6_product}",
+    "-m",
+    "run",
+    "--runtime-custom-compiler",
+    "int",
+    "--runtime-custom-mode",
+    "full",
+    "--wasm-feature-enable-reference-types",
+    "--wasm-feature-enable-function-references",
+    "--wasm-feature-enable-multi-value",
+    "--wasm-feature-enable-gc",
+    "--wasm-feature-enable-exceptions",
+    "--wasm-feature-enable-memory64",
+    "--wasm-feature-enable-table64",
+    "--wasm-feature-enable-table-instructions",
+    "{wasm}"
+  ],
+  "native_cases": [
+    {
+      "name": "caught_ref_rethrow",
+      "wat": "fixtures/caught_ref_rethrow.wat",
+      "oracle": "valid",
+      "runtime": "exit0; _start actually cross-function throw/catch_ref/rethrow/catch payload49",
+      "feature_off": "exceptions"
+    },
+    {
+      "name": "legal_recursive_gc",
+      "wat": "test/0025.wasm3_decl_gate_audit/lazy/legal_recursive_gc.wat",
+      "oracle": "valid",
+      "runtime": "exit0; _start invokes actual recursive struct allocation/read",
+      "feature_off": "gc"
+    },
+    {
+      "name": "legal_mem64_table64",
+      "wat": "test/0025.wasm3_decl_gate_audit/lazy/legal_mem64_table64.wat",
+      "oracle": "valid",
+      "runtime": "exit0; _start invokes i64 memory/table get/set",
+      "feature_off": [
+        "memory64",
+        "table64"
+      ]
+    },
+    {
+      "name": "unused_invalid_gc_packed_get",
+      "wat": "test/0025.wasm3_decl_gate_audit/lazy/unused_invalid_gc_packed_get.wat",
+      "oracle": "invalid",
+      "runtime": "reject load; unused invalid struct.get_s on unpacked i32 may not pass lazy admission"
+    },
+    {
+      "name": "unused_invalid_try_table_label",
+      "wat": "test/0025.wasm3_decl_gate_audit/lazy/unused_invalid_try_table_label.wat",
+      "oracle": "invalid",
+      "runtime": "reject load; invalid outer catch label may not pass lazy admission"
+    }
+  ],
+  "feature_off_rule": "Replace ONLY the matching --wasm-feature-enable-X with --wasm-feature-disable-X; do not add conflicting enable+disable flags. Require related feature diagnostic, not generic crash/reject. GC-off must leave exceptions on and EH-off leave GC on. Test mem64/table64 independently on same combined declarations.",
+  "mode_sequence": "Short round first actual int full; optional jit full and ordinary int lazy/jit lazy only already matched products after first source-correct result. Every legal _start reaches probes. No large matrix/rebuild per probe.",
+  "limits": "All native actions sole keeper SSH Linux shared <=64GiB cgroup; no Mac native; P-core for timed performance only, this is untimed semantic smoke.",
+  "results_rule": "Raw argv, tool/product/headers/source pins, raw status/stdout/stderr, oracle outcome and expected/actual semantic match retained; unavailable backend/SO, parse failure of expected-valid, unrelated crash or diagnostic mismatch are NOT PASS."
+}

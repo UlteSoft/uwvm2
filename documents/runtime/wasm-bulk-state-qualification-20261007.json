@@ -1,0 +1,238 @@
+{
+  "schema": "uwvm-paired-live-bulk-state-debug-qualification-v1",
+  "date": "2026-10-07",
+  "passed": true,
+  "source_cut": "source212",
+  "source_identities": {
+    "uwvm2": "sha256:c9052516f4bead683100a034f39d8c4b843ffda562c530e2702f366080bf6fa6",
+    "uwvm2-ros": "sha256:6a98e1dd7c2b4031cdd94f3c7a6b62146b83d70767794073e6dc2016442c2c58"
+  },
+  "latest_tree_qualified": false,
+  "architectures": [
+    "Linux x86_64 native",
+    "Linux GNU/QEMU RISC-V64",
+    "Linux GNU/QEMU AArch64"
+  ],
+  "full_LLVM_debugger": true,
+  "full_interpreter_execution_qualified": false,
+  "ROS_basic_modes_added": false,
+  "counts": {
+    "matrix_actual_VM_sessions": 192,
+    "additional_smoke_actual_VM_sessions": 2,
+    "total_actual_VM_sessions": 194,
+    "matrix_exact_value_pauses": 7104,
+    "additional_smoke_exact_value_pauses": 74,
+    "total_exact_value_pauses": 7178
+  },
+  "semantic": [
+    {
+      "arch": "native",
+      "repository": "uwvm2",
+      "jit_policy": "default",
+      "actual_VM_sessions": 16,
+      "exact_value_pauses": 592
+    },
+    {
+      "arch": "native",
+      "repository": "uwvm2",
+      "jit_policy": "max",
+      "actual_VM_sessions": 16,
+      "exact_value_pauses": 592
+    },
+    {
+      "arch": "riscv64",
+      "repository": "uwvm2",
+      "jit_policy": "default",
+      "actual_VM_sessions": 16,
+      "exact_value_pauses": 592
+    },
+    {
+      "arch": "riscv64",
+      "repository": "uwvm2",
+      "jit_policy": "max",
+      "actual_VM_sessions": 16,
+      "exact_value_pauses": 592
+    },
+    {
+      "arch": "aarch64",
+      "repository": "uwvm2",
+      "jit_policy": "default",
+      "actual_VM_sessions": 16,
+      "exact_value_pauses": 592
+    },
+    {
+      "arch": "aarch64",
+      "repository": "uwvm2",
+      "jit_policy": "max",
+      "actual_VM_sessions": 16,
+      "exact_value_pauses": 592
+    },
+    {
+      "arch": "native",
+      "repository": "uwvm2-ros",
+      "jit_policy": "default",
+      "actual_VM_sessions": 16,
+      "exact_value_pauses": 592
+    },
+    {
+      "arch": "native",
+      "repository": "uwvm2-ros",
+      "jit_policy": "max",
+      "actual_VM_sessions": 16,
+      "exact_value_pauses": 592
+    },
+    {
+      "arch": "riscv64",
+      "repository": "uwvm2-ros",
+      "jit_policy": "default",
+      "actual_VM_sessions": 16,
+      "exact_value_pauses": 592
+    },
+    {
+      "arch": "riscv64",
+      "repository": "uwvm2-ros",
+      "jit_policy": "max",
+      "actual_VM_sessions": 16,
+      "exact_value_pauses": 592
+    },
+    {
+      "arch": "aarch64",
+      "repository": "uwvm2-ros",
+      "jit_policy": "default",
+      "actual_VM_sessions": 16,
+      "exact_value_pauses": 592
+    },
+    {
+      "arch": "aarch64",
+      "repository": "uwvm2-ros",
+      "jit_policy": "max",
+      "actual_VM_sessions": 16,
+      "exact_value_pauses": 592
+    }
+  ],
+  "fixtures": {
+    "uwvm2/bulk-memory-dst-i32-src-i32": {
+      "expected_pauses": 36,
+      "wasm_sha256": "26e8bc1d1ec6c8d52cb591cfd4aabcc2583761488a66ef06c451a3ebf8ae4893"
+    },
+    "uwvm2/bulk-table-dst-i32-src-i32": {
+      "expected_pauses": 38,
+      "wasm_sha256": "23ca7292d5688f8d8b4dcb6612f3e78f8ef1081d3373743f1082dc45777761e4"
+    },
+    "uwvm2/bulk-memory-dst-i32-src-i64": {
+      "expected_pauses": 36,
+      "wasm_sha256": "edf4ee2d6b44f2d4dc050674fa09ffaf7fe52c48a4bd8fa5a8d179a89d202815"
+    },
+    "uwvm2/bulk-table-dst-i32-src-i64": {
+      "expected_pauses": 38,
+      "wasm_sha256": "12d0be5333498895fcf9d31db7fcd5a247319dbbe32c499e07fd6f40799c87dd"
+    },
+    "uwvm2/bulk-memory-dst-i64-src-i32": {
+      "expected_pauses": 36,
+      "wasm_sha256": "a21c7f51facab8618ee59ee7d19ac695a6aded9bf53b6b7012702e65c217e62e"
+    },
+    "uwvm2/bulk-table-dst-i64-src-i32": {
+      "expected_pauses": 38,
+      "wasm_sha256": "a971fdf4b0090bfdac309f0deb73d2738657f21e86a72b6e00635920623a4497"
+    },
+    "uwvm2/bulk-memory-dst-i64-src-i64": {
+      "expected_pauses": 36,
+      "wasm_sha256": "95c10262c93cfb7706b5197a41a94a85a344a7ec92006b6134b87a2ae4099f62"
+    },
+    "uwvm2/bulk-table-dst-i64-src-i64": {
+      "expected_pauses": 38,
+      "wasm_sha256": "f7778767e7cc96c1217701e069a993f6568a653db808e9ebfd98c511d58e20af"
+    },
+    "uwvm2-ros/bulk-memory-dst-i32-src-i32": {
+      "expected_pauses": 36,
+      "wasm_sha256": "26e8bc1d1ec6c8d52cb591cfd4aabcc2583761488a66ef06c451a3ebf8ae4893"
+    },
+    "uwvm2-ros/bulk-table-dst-i32-src-i32": {
+      "expected_pauses": 38,
+      "wasm_sha256": "23ca7292d5688f8d8b4dcb6612f3e78f8ef1081d3373743f1082dc45777761e4"
+    },
+    "uwvm2-ros/bulk-memory-dst-i32-src-i64": {
+      "expected_pauses": 36,
+      "wasm_sha256": "edf4ee2d6b44f2d4dc050674fa09ffaf7fe52c48a4bd8fa5a8d179a89d202815"
+    },
+    "uwvm2-ros/bulk-table-dst-i32-src-i64": {
+      "expected_pauses": 38,
+      "wasm_sha256": "12d0be5333498895fcf9d31db7fcd5a247319dbbe32c499e07fd6f40799c87dd"
+    },
+    "uwvm2-ros/bulk-memory-dst-i64-src-i32": {
+      "expected_pauses": 36,
+      "wasm_sha256": "a21c7f51facab8618ee59ee7d19ac695a6aded9bf53b6b7012702e65c217e62e"
+    },
+    "uwvm2-ros/bulk-table-dst-i64-src-i32": {
+      "expected_pauses": 38,
+      "wasm_sha256": "a971fdf4b0090bfdac309f0deb73d2738657f21e86a72b6e00635920623a4497"
+    },
+    "uwvm2-ros/bulk-memory-dst-i64-src-i64": {
+      "expected_pauses": 36,
+      "wasm_sha256": "95c10262c93cfb7706b5197a41a94a85a344a7ec92006b6134b87a2ae4099f62"
+    },
+    "uwvm2-ros/bulk-table-dst-i64-src-i64": {
+      "expected_pauses": 38,
+      "wasm_sha256": "f7778767e7cc96c1217701e069a993f6568a653db808e9ebfd98c511d58e20af"
+    }
+  },
+  "scope": {
+    "all_four_memory_address_width_pairs": true,
+    "all_four_table_index_width_pairs": true,
+    "overlap_copy_readback": true,
+    "grow_success_and_failure": true,
+    "dropped_segment_zero_length_one_past": true,
+    "actual_typed_operand_previews": true,
+    "full_Core3_state_coverage": false,
+    "trap_state_coverage": false,
+    "whole_instance_restore": false,
+    "performance_qualification": false
+  },
+  "preexecution_input_hash_count": 30200,
+  "resource": {
+    "owned_RSS_peak_bytes": 312025088,
+    "folder_high_water_bytes": 14389731328,
+    "minimum_global_free_bytes": 67054731264,
+    "all_max_OOM_events_zero": true
+  },
+  "parent_qualifications": {
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/QUALIFIED241.json": "d95fbce7e595652679db48a5e6b6a84d7cf42ce37c18ca88a48cbe447c5b27bc",
+    "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/QUALIFIED308.json": "02d5199dd68adac2dec4e9a9d25711d8e6827e93e788ab79aca0bbddea15df58"
+  },
+  "source_files": {
+    "generator": {
+      "path": "test/0018.debugger/wasm_operand_bulk_state_cases.py",
+      "paired_sha256": "25c24228d41313db1dfc7f5341b8d58ddd83f34c4cd063edacb95185f103e1b1"
+    },
+    "runner": {
+      "path": "test/0018.debugger/run_wasm_bulk_state_cli.py",
+      "paired_sha256": "537ab8f279404738f3a6a11ef4c00d7dfe75cf8344ba819094d25d6da746c87d"
+    }
+  },
+  "production_Cpp_modified": false,
+  "evidence": {
+    "linux_root": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1",
+    "local_root": "/Users/liyinan/Documents/MacroModel/wasm-core3-debug-audit-20261007-r1",
+    "qualification_file": "QUALIFIED346.json",
+    "qualification_sha256": "3b82f92fa6eaa4e655fa53c1cdecb649579463b44c98f560ac4351864a5a8cfd",
+    "archive_file": "delivery347.tar.gz",
+    "archive_sha256": "c009f5b3717d73489ba636ed0235d12406dce2cb82fe2c1ebe9a8a4836330047",
+    "archive_bytes": 7740857,
+    "archive_members": 642,
+    "archive_manifest_sha256": "167705013d98ef98a1bf85874d4132044cfc92bda071c634cd53af8a7f27ea51",
+    "delivery_closure_sha256": "9297cef1fba03b0fdbd3dded6d4830cb43f2ace2239f669de20cd25a10473760",
+    "Mac_metadata_transport_verification_sha256": "a84c2eaf82a11d75a65518cbd8110a895760aae019a5b20e2954f1997c38415e"
+  },
+  "final_delivery_resource": {
+    "folder_high_water_bytes": 14397915136,
+    "final_free_bytes": 67885056000,
+    "memory_events_after": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  }
+}

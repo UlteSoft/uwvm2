@@ -24,6 +24,15 @@ module;
 
 export module uwvm2.utils.thread;
 export import :native_thread;
+export import :native_thread_join;
+export import :keyed_wait_set;
+export import :execution_lifetime;
+export import :execution_domain;
+export import :checkpoint_host_admission;
+export import :cooperative_pause_domain;
+export import :collection_pause_domain;
+export import :immutable_snapshot;
+export import :deferred_owner;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

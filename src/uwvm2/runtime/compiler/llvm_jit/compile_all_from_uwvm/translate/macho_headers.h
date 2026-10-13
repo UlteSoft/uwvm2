@@ -70,6 +70,12 @@
 #undef CPU_SUBTYPE_ARM_V7M
 #pragma push_macro("CPU_SUBTYPE_ARM_V7S")
 #undef CPU_SUBTYPE_ARM_V7S
+#pragma push_macro("CPU_SUBTYPE_ARM_V8M_BASE")
+#undef CPU_SUBTYPE_ARM_V8M_BASE
+#pragma push_macro("CPU_SUBTYPE_ARM_V8M_MAIN")
+#undef CPU_SUBTYPE_ARM_V8M_MAIN
+#pragma push_macro("CPU_SUBTYPE_ARM_V8_1M_MAIN")
+#undef CPU_SUBTYPE_ARM_V8_1M_MAIN
 #pragma push_macro("CPU_SUBTYPE_ARM_XSCALE")
 #undef CPU_SUBTYPE_ARM_XSCALE
 #pragma push_macro("CPU_SUBTYPE_CELERON")
@@ -250,6 +256,9 @@
 #pragma pop_macro("CPU_SUBTYPE_CELERON_MOBILE")
 #pragma pop_macro("CPU_SUBTYPE_CELERON")
 #pragma pop_macro("CPU_SUBTYPE_ARM_XSCALE")
+#pragma pop_macro("CPU_SUBTYPE_ARM_V8_1M_MAIN")
+#pragma pop_macro("CPU_SUBTYPE_ARM_V8M_MAIN")
+#pragma pop_macro("CPU_SUBTYPE_ARM_V8M_BASE")
 #pragma pop_macro("CPU_SUBTYPE_ARM_V7S")
 #pragma pop_macro("CPU_SUBTYPE_ARM_V7M")
 #pragma pop_macro("CPU_SUBTYPE_ARM_V7K")

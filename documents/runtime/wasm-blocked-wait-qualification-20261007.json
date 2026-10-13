@@ -1,0 +1,153 @@
+{
+  "scope": "Authenticated blocked atomic.wait pause/value/resume/notify/managed shutdown plus durable close after resume: paired fresh Linux x86_64 and GNU/QEMU RV64 products; source135 baseline is separate.",
+  "qualification_sha256": "d95fbce7e595652679db48a5e6b6a84d7cf42ce37c18ca88a48cbe447c5b27bc",
+  "qualification_linux_path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/QUALIFIED241.json",
+  "source_identities": {
+    "uwvm2": "sha256:c9052516f4bead683100a034f39d8c4b843ffda562c530e2702f366080bf6fa6",
+    "uwvm2-ros": "sha256:6a98e1dd7c2b4031cdd94f3c7a6b62146b83d70767794073e6dc2016442c2c58"
+  },
+  "source_cuts": {
+    "uwvm2": "source212",
+    "ROS": "source212"
+  },
+  "new_actual_VM_sessions": 320,
+  "all_actual_VM_sessions": 384,
+  "session_breakdown": {
+    "baseline135_single_wait": 64,
+    "new_native_two_worker": 96,
+    "new_rv64_two_worker": 96,
+    "new_blocked_CLI": 64,
+    "new_plain_CLI": 32,
+    "new_lexical_EH_quit_CLI": 32
+  },
+  "two_thread_utility_cells": 80,
+  "two_participant_pause_episodes": 384,
+  "worker_pause_observations": 768,
+  "positive_supervised_commands": 137,
+  "sampled_owned_RSS_peak_bytes": 7138668544,
+  "observed_folder_high_water_bytes": 17160171520,
+  "memory_events": {
+    "low": 0,
+    "high": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_kill": 0,
+    "oom_group_kill": 0
+  },
+  "limits": [
+    "In-flight wait snapshots/retirement remain refused; no world checkpoint/replay qualification.",
+    "Ordinary-path compile-time exclusion is a source property, not an absolute whole-VM timing guarantee.",
+    "Other ISAs, arbitrary schedules and later concurrent source changes are outside this cut."
+  ],
+  "products": {
+    "uwvm2": {
+      "native": {
+        "runtime.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212/uwvm2/runtime.o",
+          "sha256": "6d26b9f3026d3658d22e75d30826f05120f2345eb4a44148a5300736f1bc8a44"
+        },
+        "host.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212/uwvm2/host.o",
+          "sha256": "f1918d5f2d17408cb79afae9956ef587a55e3cf42f590a1ab5ca42afaed87310"
+        },
+        "main.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212/uwvm2/main.o",
+          "sha256": "879db59bf9706aef22b0fd9fb33ddd94a070dc648c5ffcad92afda3f7a758d03"
+        },
+        "uwvm": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212/uwvm2/uwvm",
+          "sha256": "5335c03d39e57c82b0bd71cf36638ee6525d8183a91b89f064811a7d34855f1d"
+        },
+        "blocked-cohort.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212/uwvm2/blocked-cohort.o",
+          "sha256": "3e9c2e3c2491740ae6f82da228cfb5f89a71aa189d2a00f65da9e446777b27ef"
+        },
+        "blocked-cohort": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212/uwvm2/blocked-cohort",
+          "sha256": "8fd9bfee5cddfd87ed267c62e31cbb352fcf2a3a8c181442729a9074bbc77809"
+        }
+      },
+      "rv64": {
+        "runtime.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212-rv/uwvm2/runtime.o",
+          "sha256": "e7a570f18a56d9dd6c0effcda20c3bfe9a8bbd5e641b912c46f67195930d8f99"
+        },
+        "host.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212-rv/uwvm2/host.o",
+          "sha256": "27519597273832fe3bd8bc84a44f6b843ba60bbeaf010dd43cf5d2885d5dd18b"
+        },
+        "main.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212-rv/uwvm2/main.o",
+          "sha256": "54e22063522fc1b994fe1eb91f46803656aab0cbfd1d7cf951509e16064f5469"
+        },
+        "uwvm": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212-rv/uwvm2/uwvm",
+          "sha256": "e7c6fe0191f9ea8138befb8ac79324df078efdb292244ea4e3f389d805ee80d6"
+        },
+        "blocked-cohort.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212-rv/uwvm2/blocked-cohort.o",
+          "sha256": "4c3d6639fcd3fb94f4001207fa7f7f3d17c00850bc348ccf196552d4839c20da"
+        },
+        "blocked-cohort": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212-rv/uwvm2/blocked-cohort",
+          "sha256": "ba15390d0e04b89f2f6f75954c3ee1c9c8da221ae7b43f627ffc1f201fb749ed"
+        }
+      }
+    },
+    "uwvm2-ros": {
+      "native": {
+        "runtime.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212/uwvm2-ros/runtime.o",
+          "sha256": "e52b63f78ce5b4902175842383a794687a8189d441a25666cbf36c50a82f86f3"
+        },
+        "host.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212/uwvm2-ros/host.o",
+          "sha256": "79c4d23cc6539189efcb9351d75c5028bfbcf03adaa926c4fa021921c5a0eecb"
+        },
+        "main.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212/uwvm2-ros/main.o",
+          "sha256": "bfc4ae5b39906f23b700905eaccfb954b6fb12e15a52dacd9c88323ab5d24d6f"
+        },
+        "uwvm": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212/uwvm2-ros/uwvm",
+          "sha256": "932f2eee9f5c3c86fa850ad08f6a5b13d069fe30bdabb9d8c68429cc79ccdd06"
+        },
+        "blocked-cohort.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212/uwvm2-ros/blocked-cohort.o",
+          "sha256": "ceb1d0cfa5ce53f95ecd4d57fba8a7e9ca2afa2dca7e1f980437301d04e5aaa3"
+        },
+        "blocked-cohort": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212/uwvm2-ros/blocked-cohort",
+          "sha256": "2a21cd66163e6ac03a013344b6c70b641588c23309ab8ed29a7f5dc790a25ece"
+        }
+      },
+      "rv64": {
+        "runtime.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212-rv/uwvm2-ros/runtime.o",
+          "sha256": "f055b156afebc74b11b20a101588302fec9407ce7d4f515d18d9f24b89bc5920"
+        },
+        "host.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212-rv/uwvm2-ros/host.o",
+          "sha256": "59c815e618f8b22ae87d785d9247d2b70304d0b56de830ff227d32d743ef1f42"
+        },
+        "main.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212-rv/uwvm2-ros/main.o",
+          "sha256": "5269c00a4af760a69439fc23ae442238561fae0e0f30b555be24d1e26ef8f8d9"
+        },
+        "uwvm": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212-rv/uwvm2-ros/uwvm",
+          "sha256": "976861e111ce40a9a646600e3578ae3981606b2b8ce1fe2f12b585e852ac8f10"
+        },
+        "blocked-cohort.o": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212-rv/uwvm2-ros/blocked-cohort.o",
+          "sha256": "43b9623d60b1699e5baa8dbfe1d865e75d5532851b80e2800e70e616834c3c17"
+        },
+        "blocked-cohort": {
+          "path": "/home/macromodel/Documents/uwvm-debug-recovery-20261006-r2/wasm-core3-debug-20261007-r1/products212-rv/uwvm2-ros/blocked-cohort",
+          "sha256": "89b4da5471bb999d30fc6da2939828a0b1b92465cd9d2dd7b040540f5d344914"
+        }
+      }
+    }
+  },
+  "parent153_sha256": "aab56b33e7ea236efae332c899bc5248ae18127ea40adb0860af42b2b52301cc"
+}

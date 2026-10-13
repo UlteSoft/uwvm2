@@ -36,6 +36,7 @@ module;
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <vector>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
@@ -43,15 +44,26 @@ module;
 // platform
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 # include <llvm/Analysis/TargetTransformInfo.h>
+# include <llvm/Bitcode/BitcodeReader.h>
+# include <llvm/Bitcode/BitcodeWriter.h>
+# include <llvm/Linker/Linker.h>
+# include <llvm/Support/MemoryBuffer.h>
+# include <llvm/Support/raw_ostream.h>
 # include <uwvm2/runtime/compiler/shared/strict_float_jit.h>
 # include <llvm/Config/llvm-config.h>
 # include <llvm/ExecutionEngine/ExecutionEngine.h>
 # include <llvm/ExecutionEngine/MCJIT.h>
 # include <llvm/ExecutionEngine/SectionMemoryManager.h>
+# include <uwvm2/runtime/lib/uwvm_runtime_native_exception_host.h>
 # if defined(__APPLE__) && defined(__aarch64__)
 #  include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/translate/macho_headers.h>
 # endif
 # include <llvm/InitializePasses.h>
+# include <llvm/IR/BasicBlock.h>
+# include <llvm/IR/Constants.h>
+# include <llvm/IR/Instructions.h>
+# include <llvm/IR/Metadata.h>
+# include "checked_whole_local_target_specialization.h"
 # include <llvm/IR/LegacyPassManager.h>
 # include <llvm/IR/Verifier.h>
 # include <llvm/MC/TargetRegistry.h>
@@ -89,12 +101,14 @@ import uwvm2.validation.error;
 import uwvm2.validation.concepts;
 import uwvm2.validation.standard.wasm1;
 import uwvm2.validation.standard.wasm1p1;
-import uwvm2.validation.standard.wasm2;
+import uwvm2.validation.standard.wasm3;
 import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.runtime.storage;
 // The lazy validator invokes the shared SIMD visitor directly; importing the
 // eager LLVM translator does not make that visitor reachable here.
 import uwvm2.runtime.compiler.shared.wasm1p1_simd;
+import uwvm2.runtime.exception;
+import uwvm2.runtime;
 import uwvm2.runtime.compiler.llvm_jit.compile_all_from_uwvm;
 import uwvm2.runtime.llvm_jit_cache;
 

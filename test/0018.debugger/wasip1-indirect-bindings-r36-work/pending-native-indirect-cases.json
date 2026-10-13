@@ -1,0 +1,463 @@
+{
+  "source_manifest_sha256": "2579e98c54ca9e9b5d4e3822d0421ad0b8b34ab03415a4c9127dfa65ee224d2b",
+  "original_native_storage_policy_preserved": true,
+  "executed_native_cases": 0,
+  "pending_native_cases": [
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "policy": "instruction",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "policy": "instruction",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "policy": "unwind",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "linux",
+      "policy": "unwind",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "policy": "instruction",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "policy": "instruction",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "policy": "unwind",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "windows",
+      "policy": "unwind",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "policy": "instruction",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "policy": "instruction",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "policy": "unwind",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "freebsd",
+      "policy": "unwind",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "policy": "instruction",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "policy": "instruction",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "policy": "unwind",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2",
+      "os": "macos",
+      "policy": "unwind",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "policy": "instruction",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "policy": "instruction",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "policy": "unwind",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "linux",
+      "policy": "unwind",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "policy": "instruction",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "policy": "instruction",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "policy": "unwind",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "windows",
+      "policy": "unwind",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "policy": "instruction",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "policy": "instruction",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "policy": "unwind",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "freebsd",
+      "policy": "unwind",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "policy": "instruction",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "policy": "instruction",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "instruction",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "policy": "unwind",
+      "fixture": "debug_checkpoint_prepared_retirement",
+      "wasm": "debug_checkpoint_indirect_retirement_cohort.wasm",
+      "argv": [
+        "debug_checkpoint_prepared_retirement",
+        "debug_checkpoint_indirect_retirement_cohort.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    },
+    {
+      "repo": "uwvm2-ros",
+      "os": "macos",
+      "policy": "unwind",
+      "fixture": "debug_wasip1_prepared_retirement",
+      "wasm": "debug_wasip1_indirect_prepared_retirement.wasm",
+      "argv": [
+        "debug_wasip1_prepared_retirement",
+        "debug_wasip1_indirect_prepared_retirement.wasm",
+        "unwind",
+        "indirect"
+      ],
+      "actual_native_executed": false
+    }
+  ],
+  "prerequisites": [
+    "Recheck actual owned folder below original 6 GiB admission and host disk reserve at least 32 GiB.",
+    "Build/link the exact R36 source overlay with its pinned R34 dependencies and full mode settings.",
+    "Requalify binary/source/dependency hashes; R34 native binaries cannot qualify R36.",
+    "Run Linux and Windows/FreeBSD VMs only in original 64 GiB Linux cgroup.",
+    "Run actual macOS natively with aggregate owned memory at most 2 GiB.",
+    "Physically join/retire all real workers and owned OS processes before reopening or the next suite."
+  ]
+}

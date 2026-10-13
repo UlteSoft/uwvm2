@@ -87,6 +87,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         UWVM_DECLARE_WASM_FEATURE_PAIR(sign_extension)
         UWVM_DECLARE_WASM_FEATURE_PAIR(nontrapping_float_to_int)
         UWVM_DECLARE_WASM_FEATURE_PAIR(simd)
+        UWVM_DECLARE_WASM_FEATURE_PAIR(extended_const)
+        UWVM_DECLARE_WASM_FEATURE_PAIR(table_initializer)
+        UWVM_DECLARE_WASM_FEATURE_PAIR(relaxed_simd)
+        UWVM_DECLARE_WASM_FEATURE_PAIR(multi_memory)
+        UWVM_DECLARE_WASM_FEATURE_PAIR(threads)
+        UWVM_DECLARE_WASM_FEATURE_PAIR(tail_call)
+        UWVM_DECLARE_WASM_FEATURE_PAIR(memory64)
+        UWVM_DECLARE_WASM_FEATURE_PAIR(table64)
+        UWVM_DECLARE_WASM_FEATURE_PAIR(function_references)
+        UWVM_DECLARE_WASM_FEATURE_PAIR(gc)
+        UWVM_DECLARE_WASM_FEATURE_PAIR(exceptions)
 
 #undef UWVM_DECLARE_WASM_FEATURE_PAIR
 #undef UWVM_WASM_FEATURE_CALLBACK_DECL
@@ -150,6 +161,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     UWVM_DEFINE_WASM_FEATURE_PAIR(sign_extension, u8"sign-extension")
     UWVM_DEFINE_WASM_FEATURE_PAIR(nontrapping_float_to_int, u8"nontrapping-float-to-int")
     UWVM_DEFINE_WASM_FEATURE_PAIR(simd, u8"simd")
+    UWVM_DEFINE_WASM_FEATURE_PAIR(extended_const, u8"extended-const")
+    UWVM_DEFINE_WASM_FEATURE_PAIR(table_initializer, u8"table-initializer")
+    UWVM_DEFINE_WASM_FEATURE_PAIR(relaxed_simd, u8"relaxed-simd")
+    UWVM_DEFINE_WASM_FEATURE_PAIR(multi_memory, u8"multi-memory")
+    UWVM_DEFINE_WASM_FEATURE_PAIR(threads, u8"threads")
+    UWVM_DEFINE_WASM_FEATURE_PAIR(tail_call, u8"tail-call")
+    UWVM_DEFINE_WASM_FEATURE_PAIR(memory64, u8"memory64")
+    UWVM_DEFINE_WASM_FEATURE_PAIR(table64, u8"table64")
+    UWVM_DEFINE_WASM_FEATURE_PAIR(function_references, u8"function-references")
+    UWVM_DEFINE_WASM_FEATURE_PAIR(gc, u8"gc")
+    UWVM_DEFINE_WASM_FEATURE_PAIR(exceptions, u8"exceptions")
 
 #undef UWVM_DEFINE_WASM_FEATURE_PAIR
 #undef UWVM_DEFINE_WASM_FEATURE_SWITCH

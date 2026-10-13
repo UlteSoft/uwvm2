@@ -40,6 +40,7 @@ module;
 
 export module uwvm2.runtime.compiler.shared.wasm1p1_simd;
 
+import uwvm2.validation.standard.wasm3.relaxed_simd;
 import fast_io;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.parser.wasm.standard.wasm1p1;

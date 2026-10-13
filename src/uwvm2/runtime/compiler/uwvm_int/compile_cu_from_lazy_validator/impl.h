@@ -22,5 +22,6 @@
 #pragma once
 
 #ifndef UWVM_MODULE
+# include "checked_plan_lowering.h"
 # include "translate.h"
 #endif

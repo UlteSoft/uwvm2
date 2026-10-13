@@ -32,6 +32,7 @@
 // import
 # include <fast_io.h>
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm3/type/value_type.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -48,24 +49,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::global
         wasm_func_imported,
         wasm_func_defined,
         wasm_extern,
-#if 0
-        /// @warning Extension point: wasm3 GC reference kinds live here once the runtime representation is ready.
-        /// @todo wasm3.0
+        // Core 3 reference kinds retain the existing pointer-width payload plus
+        // out-of-band kind. An i31 is never treated as a host pointer.
         wasm_struct,
         wasm_array,
         wasm_exn,
         wasm_i31
-#endif
     };
 
     union wasm_global_ref_storage_u
     {
         void* ptr;
-#if 0
-        /// @warning Extension point: wasm3 immediate reference payloads must be kept synchronized with wasm_ref_kind.
-        /// @todo wasm3.0
         ::uwvm2::parser::wasm::standard::wasm3::type::wasm_i31 wasm_i31;
-#endif
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 func_idx;
     };
 
@@ -74,6 +69,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::global
         wasm_global_ref_storage_u storage;
         ::uwvm2::object::global::wasm_ref_kind kind;
     };
+
+    [[nodiscard]] inline constexpr wasm_global_ref_t make_wasm_i31_reference(::std::int32_t value) noexcept
+    {
+        wasm_global_ref_t result{};
+        result.storage.wasm_i31 = ::uwvm2::parser::wasm::standard::wasm3::type::wasm_i31::from_i32(value);
+        result.kind = wasm_ref_kind::wasm_i31;
+        return result;
+    }
 
     struct wasm_funcref_t
     { ::uwvm2::object::global::wasm_global_ref_t ref; };
@@ -85,6 +88,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::global
     static_assert(sizeof(wasm_externref_t) == sizeof(wasm_global_ref_t));
     static_assert(alignof(wasm_funcref_t) == alignof(wasm_global_ref_t));
     static_assert(alignof(wasm_externref_t) == alignof(wasm_global_ref_t));
+    static_assert(sizeof(wasm_global_ref_storage_u) == sizeof(void*));
+    static_assert(make_wasm_i31_reference(-1).storage.wasm_i31.get_s() == -1);
+    static_assert(make_wasm_i31_reference(-1).kind == wasm_ref_kind::wasm_i31);
 }  // namespace uwvm2::object::global
 
 #ifndef UWVM_MODULE

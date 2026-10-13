@@ -31,7 +31,6 @@ module;
 #include <memory>
 #include <utility>
 #include <type_traits>
-#include <string_view>
 #include <set>  /// @todo replace with btreemap
 #include <map>  /// @todo replace with btreemap
 // platform

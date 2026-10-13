@@ -93,6 +93,7 @@ RUNTIME_API_HEADER = "uwvm2/runtime/lib/uwvm_runtime.h"
 # Omitting them hid real run/API and interpreter SIMD dependency failures.
 STANDALONE_MODULE_HEADERS = {
     RUNTIME_API_HEADER: "uwvm2.runtime",
+    "uwvm2/runtime/compiler/shared/wasm_memory64.h": "uwvm2.runtime.compiler.shared.wasm_memory64",
     "uwvm2/runtime/compiler/shared/wasm1p1_simd.h": "uwvm2.runtime.compiler.shared.wasm1p1_simd",
 }
 FEATURE_CONFIG_PUSH_HEADER = "uwvm2/utils/macro/push_macros.h"
@@ -585,15 +586,23 @@ def extract_guarded_includes(
                 resolved_local_header = is_local and local_header_exists(source_path, hdr)
                 norm = None
                 # Special mapping for relative submodule aggregator paths like "sub/impl.h"
-                if resolved_local_header and base_module and (not ("/" in hdr and hdr.startswith("uwvm2/"))):
+                if resolved_local_header and (base_module or include_local_partitions) and (not ("/" in hdr and hdr.startswith("uwvm2/"))):
                     # relative include
-                    if hdr.endswith("/impl.h") and "/" in hdr:
+                    if base_module and hdr.endswith("/impl.h") and "/" in hdr:
                         sub = hdr[: -len("/impl.h")]
                         # Map to fully-qualified dotted name using base module
                         norm = f"{base_module}.{sub.replace('/', '.')}"
                     elif hdr.endswith(".h") and "/" not in hdr:
-                        # local partition header, map to partition
+                        # Local helpers can own independent named modules to
+                        # break parser/validator dependency cycles. Consult the
+                        # actual module declaration instead of inventing a
+                        # partition that does not exist.
                         norm = f":{hdr[:-2]}"
+                        paired = os.path.join(os.path.dirname(source_path), hdr[:-2] + ".cppm")
+                        if os.path.isfile(paired):
+                            declaration = MODULE_NAME_RE.search(read_text(paired))
+                            if declaration is not None and ":" not in declaration.group(1):
+                                norm = declaration.group(1)
                 if norm is None and (include_local_partitions or not is_local):
                     norm = normalize_header_to_import_name(
                         hdr,

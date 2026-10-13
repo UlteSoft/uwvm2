@@ -47,6 +47,7 @@ import uwvm2.utils.container;
 import uwvm2.utils.debug;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.object;
+import uwvm2.uwvm.runtime.storage;
 import uwvm2.uwvm.wasm.type;
 import :define;
 import :register_ring;

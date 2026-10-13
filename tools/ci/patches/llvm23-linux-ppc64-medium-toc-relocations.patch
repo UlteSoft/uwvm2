@@ -1,0 +1,129 @@
+--- a/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.cpp
++++ b/llvm/lib/ExecutionEngine/RuntimeDyld/RuntimeDyldELF.cpp
+@@ -919,6 +919,10 @@
+   }
+   IsMipsN64ABI = Obj.getFileFormatName() == "elf64-mips";
+ }
++
++// Defined in the actual loader archive: installing a newer declaration alone
++// cannot qualify medium-model cross-section TOC relocations.
++unsigned RuntimeDyld::getUWVMPPC64TOCRelativeRelocations() noexcept { return 1u; }
+ 
+ // Return the .TOC. section and offset.
+ Error RuntimeDyldELF::findPPC64TOCSection(const ELFObjectFileBase &Obj,
+@@ -1604,6 +1608,39 @@
+ void RuntimeDyldELF::resolveRelocation(const RelocationEntry &RE,
+                                        uint64_t Value) {
+   const SectionEntry &Section = Sections[RE.SectionID];
++  if (Arch == Triple::ppc64 || Arch == Triple::ppc64le) {
++    uint32_t Type;
++    switch (RE.RelType) {
++    case ELF::R_PPC64_TOC16:       Type = ELF::R_PPC64_ADDR16; break;
++    case ELF::R_PPC64_TOC16_DS:    Type = ELF::R_PPC64_ADDR16_DS; break;
++    case ELF::R_PPC64_TOC16_LO:    Type = ELF::R_PPC64_ADDR16_LO; break;
++    case ELF::R_PPC64_TOC16_LO_DS: Type = ELF::R_PPC64_ADDR16_LO_DS; break;
++    case ELF::R_PPC64_TOC16_HI:    Type = ELF::R_PPC64_ADDR16_HI; break;
++    case ELF::R_PPC64_TOC16_HA:    Type = ELF::R_PPC64_ADDR16_HA; break;
++    default:
++      return resolveRelocation(Section, RE.Offset, Value, RE.RelType, RE.Addend,
++                               RE.SymOffset, RE.SectionID);
++    }
++    // A medium-model constant pool may live in .rodata rather than .toc.
++    // Both bases are actual final section load addresses, including after a
++    // memory manager remaps either section. Do not cancel unequal bases or
++    // freeze an allocation-time address in the addend.
++    uint64_t Delta = getSectionLoadAddress(RE.Sections.SectionA) -
++                     getSectionLoadAddress(RE.Sections.SectionB);
++    int64_t Displacement = static_cast<int64_t>(Delta + RE.Addend);
++    bool Whole = RE.RelType == ELF::R_PPC64_TOC16 ||
++                 RE.RelType == ELF::R_PPC64_TOC16_DS;
++    bool DS = RE.RelType == ELF::R_PPC64_TOC16_DS ||
++              RE.RelType == ELF::R_PPC64_TOC16_LO_DS;
++    if ((Whole && !isInt<16>(Displacement)) ||
++        (!Whole && !isInt<32>(Displacement)) ||
++        (DS && (Displacement & 3) != 0)) {
++      HasError = true;
++      ErrorStr = "PPC64 TOC-relative relocation is out of range or unaligned";
++      return;
++    }
++    return resolvePPC64Relocation(Section, RE.Offset, Delta, Type, RE.Addend);
++  }
+   return resolveRelocation(Section, RE.Offset, Value, RE.RelType, RE.Addend,
+                            RE.SymOffset, RE.SectionID);
+ }
+@@ -2352,33 +2389,38 @@
+                RelType == ELF::R_PPC64_TOC16_LO_DS ||
+                RelType == ELF::R_PPC64_TOC16_HI ||
+                RelType == ELF::R_PPC64_TOC16_HA) {
+-      // These relocations are supposed to subtract the TOC address from
+-      // the final value.  This does not fit cleanly into the RuntimeDyld
+-      // scheme, since there may be *two* sections involved in determining
+-      // the relocation value (the section of the symbol referred to by the
+-      // relocation, and the TOC section associated with the current module).
+-      //
+-      // Fortunately, these relocations are currently only ever generated
+-      // referring to symbols that themselves reside in the TOC, which means
+-      // that the two sections are actually the same.  Thus they cancel out
+-      // and we can immediately resolve the relocation right now.
+-      switch (RelType) {
+-      case ELF::R_PPC64_TOC16: RelType = ELF::R_PPC64_ADDR16; break;
+-      case ELF::R_PPC64_TOC16_DS: RelType = ELF::R_PPC64_ADDR16_DS; break;
+-      case ELF::R_PPC64_TOC16_LO: RelType = ELF::R_PPC64_ADDR16_LO; break;
+-      case ELF::R_PPC64_TOC16_LO_DS: RelType = ELF::R_PPC64_ADDR16_LO_DS; break;
+-      case ELF::R_PPC64_TOC16_HI: RelType = ELF::R_PPC64_ADDR16_HI; break;
+-      case ELF::R_PPC64_TOC16_HA: RelType = ELF::R_PPC64_ADDR16_HA; break;
+-      default: llvm_unreachable("Wrong relocation type.");
+-      }
+-
++      // Keep both section identities until final relocation. Medium-model
++      // direct references to local constant pools need not reside in .toc.
+       RelocationValueRef TOCValue;
+       if (auto Err = findPPC64TOCSection(Obj, ObjSectionToID, TOCValue))
+         return std::move(Err);
+-      if (Value.SymbolName || Value.SectionID != TOCValue.SectionID)
+-        llvm_unreachable("Unsupported TOC relocation.");
+-      Value.Addend -= TOCValue.Addend;
+-      resolveRelocation(Sections[SectionID], Offset, Value.Addend, RelType, 0);
++      if (Value.SymbolName)
++        return make_error<RuntimeDyldError>(
++            "PPC64 TOC-relative relocation requires a local section");
++      if (Value.SectionID == TOCValue.SectionID) {
++        // Preserve the original same-section fast path: the two bases cancel
++        // independently of allocation/remapping and no section pair is needed.
++        uint32_t Type;
++        switch (RelType) {
++        case ELF::R_PPC64_TOC16:       Type = ELF::R_PPC64_ADDR16; break;
++        case ELF::R_PPC64_TOC16_DS:    Type = ELF::R_PPC64_ADDR16_DS; break;
++        case ELF::R_PPC64_TOC16_LO:    Type = ELF::R_PPC64_ADDR16_LO; break;
++        case ELF::R_PPC64_TOC16_LO_DS: Type = ELF::R_PPC64_ADDR16_LO_DS; break;
++        case ELF::R_PPC64_TOC16_HI:    Type = ELF::R_PPC64_ADDR16_HI; break;
++        case ELF::R_PPC64_TOC16_HA:    Type = ELF::R_PPC64_ADDR16_HA; break;
++        default: llvm_unreachable("Wrong TOC relocation type");
++        }
++        resolveRelocation(Sections[SectionID], Offset,
++                          Value.Addend - TOCValue.Addend, Type, 0);
++        return ++RelI;
++      }
++      RelocationEntry RE(SectionID, Offset, RelType, Value.Addend,
++                         Value.SectionID, 0, TOCValue.SectionID,
++                         TOCValue.Addend, false, 0);
++      addRelocationForSection(RE, Value.SectionID);
++      // Reassigning either base must recompute this same displacement.
++      if (Value.SectionID != TOCValue.SectionID)
++        addRelocationForSection(RE, TOCValue.SectionID);
+     } else {
+       // There are two ways to refer to the TOC address directly: either
+       // via a ELF::R_PPC64_TOC relocation (where both symbol and addend are
+--- a/llvm/include/llvm/ExecutionEngine/RuntimeDyld.h
++++ b/llvm/include/llvm/ExecutionEngine/RuntimeDyld.h
+@@ -199,6 +199,10 @@
+   /// JIT ABI. Defined by PowerPC CodeGen, never an inline/version-only claim.
+   static LLVM_ABI unsigned getUWVMPPC64TOCTailABI() noexcept;
+ 
++  /// Medium-model TOC-relative local-section relocation support. Defined in
++  /// RuntimeDyldELF, independently of PowerPC CodeGen's musttail contract.
++  static LLVM_ABI unsigned getUWVMPPC64TOCRelativeRelocations() noexcept;
++
+   /// Construct a RuntimeDyld instance.
+   LLVM_ABI RuntimeDyld(MemoryManager &MemMgr, JITSymbolResolver &Resolver);
+   RuntimeDyld(const RuntimeDyld &) = delete;

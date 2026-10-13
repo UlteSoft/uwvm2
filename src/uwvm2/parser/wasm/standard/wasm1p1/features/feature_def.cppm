@@ -20,6 +20,7 @@ module;
 #include <cstdint>
 #include <concepts>
 #include <memory>
+#include <limits>
 #include <type_traits>
 #include <utility>
 // macro
@@ -35,6 +36,8 @@ import uwvm2.parser.wasm.concepts;
 import uwvm2.parser.wasm.binfmt.binfmt_ver1;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.parser.wasm.standard.wasm1p1.type;
+import uwvm2.parser.wasm.standard.wasm3.type.recursive_type;
+import uwvm2.parser.wasm.standard.wasm3.type.section_details;
 import :def;
 
 #ifndef UWVM_MODULE

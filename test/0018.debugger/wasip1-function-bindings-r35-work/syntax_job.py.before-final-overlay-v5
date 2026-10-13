@@ -1,0 +1,65 @@
+"""Bounded compiler analysis only. No linking, binary or VM execution."""
+from pathlib import Path
+import hashlib, json, os, resource, shlex, subprocess, sys, tarfile, time
+D=Path(__file__).parent; E=D.parent.parent
+OLD=E/'rounds/wasip1-prepared-retirement-20261008-r34'
+sha=lambda p: hashlib.file_digest(Path(p).open('rb'),'sha256').hexdigest()
+assert '-fsyntax-only' not in sys.argv  # this controller supplies all fixed arguments
+original_cg='0::/system.slice/docker-d3b12e6d323a0f28c2408989fff41a1ca1a991e19945919bc870337dd0afae03.scope\n'
+assert Path('/proc/self/cgroup').read_text()==original_cg
+assert Path('/proc/sys/kernel/random/boot_id').read_text().strip()=='c8d3550f-3a19-40d7-8507-a76c2045ace5'
+inputs=json.loads((D/'syntax-overlay-v1.json').read_text()); S=D/'syntax-overlay-v1'
+S.mkdir(exist_ok=True)
+with tarfile.open(D/'syntax-overlay-v1.tar.gz','r:gz') as archive:
+    seen=set()
+    for item in archive:
+        assert item.isfile() and item.name in inputs and item.name not in seen
+        p=S/item.name; p.parent.mkdir(parents=True,exist_ok=True)
+        data=archive.extractfile(item).read(); assert hashlib.sha256(data).hexdigest()==inputs[item.name]
+        if p.exists(): assert sha(p)==inputs[item.name]
+        else:
+            with p.open('xb') as output: output.write(data)
+            os.chmod(p,0o444)
+        seen.add(item.name)
+    assert seen==set(inputs)
+rows=[]
+for repo in ('uwvm2','uwvm2-ros'):
+    parent=OLD/'repaired-inputs-v8'/repo; root=S/repo
+    library=root/'src/uwvm2/runtime/lib'
+    # The one TU is copied, so quoted includes select this tiny header overlay.
+    # Other original headers remain immutable authenticated parent members.
+    for p in (parent/'src/uwvm2/runtime/lib').iterdir():
+        if not p.is_file(): continue
+        target=library/p.name
+        if target.exists(): continue
+        if p.name=='uwvm_runtime.default.cpp':
+            with target.open('xb') as output: output.write(p.read_bytes())
+            os.chmod(target,0o444)
+        else: target.symlink_to(p)
+    proof=json.loads((OLD/'products-v8/linux-integrated'/repo/'runtime-qualified.json').read_text())
+    assert all(sha(p)==h for p,h in proof['dependencies'].items()),'parent dependency changed'
+    assert sha(library/'uwvm_runtime.default.cpp')==proof['dependencies'][str(parent/'src/uwvm2/runtime/lib/uwvm_runtime.default.cpp')]
+    base=proof['argv'][:proof['argv'].index('-MD')]
+    # Restricted LLVM-only frontend analysis; it is not the full-mode native suite.
+    base=[a for a in base if a!='-DUWVM_USE_UWVM_INT']
+    base[1:1]=['-DUWVM_DISABLE_INT','-fdelayed-template-parsing','-I'+str(root/'src')]
+    for label,source in [('core','test/0017.runtime/debug_checkpoint_prepared_retirement_runtime.cc'),
+                         ('wasip1','test/0017.runtime/debug_wasip1_prepared_retirement_runtime.cc'),
+                         ('runtime','src/uwvm2/runtime/lib/uwvm_runtime.default.cpp')]:
+        command=[*base,'-fsyntax-only',str(root/source)]
+        log=D/(repo+'-'+label+'-syntax-v4.log'); assert not log.exists()
+        started=time.monotonic()
+        with log.open('xb') as output:
+            result=subprocess.run(command,stdout=output,stderr=subprocess.STDOUT,timeout=240,
+                                  env=dict(os.environ,MALLOC_ARENA_MAX='1',TMPDIR=str(D),LD_LIBRARY_PATH='/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib:/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/x86_64-unknown-linux-gnu:/home/macromodel/Documents/uwvm3-implementation/deps/usr/lib/x86_64-linux-gnu'))
+        assert all(sha(S/p)==h for p,h in inputs.items()),'overlay changed'
+        assert all(sha(p)==h for p,h in proof['dependencies'].items()),'parent changed'
+        row=dict(repo=repo,stage=label,argv=command,exit=result.returncode,passed=result.returncode==0,
+                 log_sha256=sha(log),seconds=time.monotonic()-started,source_manifest_sha256=sha(D/'syntax-overlay-v1.json'),
+                 parent_compile_proof_sha256=sha(OLD/'products-v8/linux-integrated'/repo/'runtime-qualified.json'),
+                 compiler_sha256=sha(base[0]),actual_native_runtime_execution=False)
+        rows.append(row); (D/'syntax-results-v4.json').write_text(json.dumps(rows,indent=2)+'\n')
+        print(repo,label,result.returncode,flush=True)
+        if result.returncode: print(log.read_text(errors='replace')[-12000:],flush=True); sys.exit(1)
+(D/'syntax-qualified-v4.json').write_text(json.dumps(dict(passed=True,rows=rows,
+    controller_sha256=sha(__file__),actual_native_runtime_execution=False),indent=2)+'\n')

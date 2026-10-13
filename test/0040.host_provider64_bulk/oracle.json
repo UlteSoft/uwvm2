@@ -1,0 +1,67 @@
+{
+  "schema": "uwvm.host-provider64-bulk.source-oracle.v1",
+  "VM_qualified": false,
+  "wat_sha256": "349c91e780841467ac9075b96814f66131a64c14228b2366c2df236e0fe4d491",
+  "cases": [
+    {
+      "function": 0,
+      "name": "valid",
+      "expected": "return"
+    },
+    {
+      "function": 1,
+      "name": "drop-empty",
+      "expected": "return"
+    },
+    {
+      "function": 2,
+      "name": "fill-high-zero",
+      "expected": "trap"
+    },
+    {
+      "function": 3,
+      "name": "init-high-zero",
+      "expected": "trap"
+    },
+    {
+      "function": 4,
+      "name": "fill-cross-end",
+      "expected": "trap"
+    },
+    {
+      "function": 5,
+      "name": "init-cross-end",
+      "expected": "trap"
+    },
+    {
+      "function": 6,
+      "name": "init-source-zero",
+      "expected": "trap"
+    },
+    {
+      "function": 7,
+      "name": "init-dropped",
+      "expected": "trap"
+    },
+    {
+      "function": 8,
+      "name": "fill-high-length",
+      "expected": "trap"
+    },
+    {
+      "function": 9,
+      "name": "init-u64-max-zero",
+      "expected": "trap"
+    },
+    {
+      "function": 10,
+      "name": "fill-u64-max-one",
+      "expected": "trap"
+    }
+  ],
+  "page_bytes": 65536,
+  "host_memory_implementation": "actual-local_imported_t-native_file-shared-mapping",
+  "ordinary_wasm_native_import_is_not_host_provider_qualification": true,
+  "trap_backing_witness": "whole shared backing file compared after child exit, no fork COW",
+  "physical_runtime_codegen_qualified": false
+}

@@ -29,6 +29,7 @@
 # include <limits>
 # include <type_traits>
 # include <memory>
+# include <optional>
 # include <new>
 # include <atomic>
 # include <utility>
@@ -266,6 +267,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
     struct dir_stack_t
     {
         ::uwvm2::utils::container::vector<dir_stack_entry_ref_t> dir_stack{};
+        // Cold restore may replace the native root handle to restore flags.
+        // Keep its authentic mount owner in the directory chain, so original
+        // path_open copies propagate it to guest-created descendant/dot FDs.
+        // This process identity is never part of portable wire data.
+        ::std::optional<dir_stack_entry_ref_t> checkpoint_mount_origin{};
 
         inline constexpr ::std::size_t stack_size() const noexcept { return this->dir_stack.size(); }
 
@@ -819,8 +825,66 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
     struct wasi_fd_rc_t
     {
         ::std::atomic_size_t refcount{};
+        // Nonzero only for debugger-created anonymous managed files. Identity
+        // survives guest dup/renumber; it is never a native handle or authority.
+        ::std::uint64_t checkpoint_managed_identity{};
+        // Logical provenance only; survives guest aliases and renumbering.
+        ::uwvm2::utils::container::u8string checkpoint_mount{},checkpoint_path{};
+        int checkpoint_stdio_index{-1};
+        bool checkpoint_reopenable{},checkpoint_follow{};
         wasi_fd_storage_t wasi_fd_storage{};
     };
+
+    // Debug metadata must never duplicate an unbounded guest path. Resolve
+    // its complete finite size before allocating any portable provenance.
+    template<typename DirChain>
+    inline void record_checkpoint_path(wasi_fd_rc_t& out,DirChain const& chain,
+        ::uwvm2::utils::container::u8string_view path,bool follow) noexcept
+    {
+        out.checkpoint_mount.clear();out.checkpoint_path.clear();out.checkpoint_reopenable=false;out.checkpoint_follow=follow;
+        if(chain.empty() || chain.front_unchecked().ptr==nullptr || path.empty() || path.size()>4096u) { return; }
+        auto const& root=chain.front_unchecked().ptr->dir_stack.name;
+        if(root.empty() || root.size()>4096u) { return; }
+        auto size=path.size();
+        for(::std::size_t n{1u};n<chain.size();++n)
+        {
+            if(chain.index_unchecked(n).ptr==nullptr) { return; }
+            auto const& component=chain.index_unchecked(n).ptr->dir_stack.name;
+            if(component.empty() || component.size()>=4096u-size) { return; }
+            size+=component.size()+1u;
+        }
+        // Original WASI accepts redundant relative separators and dot
+        // components. Preserve their mounted-file provenance using a canonical
+        // spelling; never fold ".." across a possible symlink boundary.
+        bool canonical{path.front()!=u8'/' && path.back()!=u8'/'};
+        auto append=[&](::uwvm2::utils::container::u8string_view value) noexcept
+        {
+            ::std::size_t start{};
+            for(::std::size_t i{};i<=value.size();++i)
+            {
+                if(i<value.size() && value[i]!=u8'/')
+                { if(value[i]==u8'\\' || value[i]==u8':' || value[i]==u8'\0') { return false; }continue; }
+                auto const length=i-start;
+                if(length==2u && value[start]==u8'.' && value[start+1u]==u8'.') { return false; }
+                if(length!=0u && !(length==1u && value[start]==u8'.'))
+                {
+                    if(!out.checkpoint_path.empty()) { out.checkpoint_path.push_back(u8'/'); }
+                    out.checkpoint_path.append(::uwvm2::utils::container::u8string_view{value.data()+start,length});
+                }
+                start=i+1u;
+            }
+            return true;
+        };
+        for(::std::size_t n{1u};canonical && n<chain.size();++n)
+        {
+            auto const& component=chain.index_unchecked(n).ptr->dir_stack.name;
+            canonical=append(::uwvm2::utils::container::u8string_view{component.data(),component.size()});
+        }
+        if(canonical) { canonical=append(path) && !out.checkpoint_path.empty(); }
+        out.checkpoint_reopenable=canonical;
+        if(canonical) { out.checkpoint_mount=root; }
+        else { out.checkpoint_path.clear(); }
+    }
 
     /// @brief Used to prevent default construction.
     struct wasi_no_construct_t

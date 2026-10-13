@@ -263,6 +263,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         ::std::atomic_flag queue_lock = ATOMIC_FLAG_INIT;
         ::std::atomic_size_t queued_count{};
         ::std::atomic_bool stop_requested{};
+        // running() is queried concurrently with deferred startup. Publish only
+        // after the entire queue and worker set is ready, never a partial count.
+        // start/stop remain owner-serialized lifecycle operations; stop requires
+        // external producers/helpers to have drained before releasing storage.
+        ::std::atomic_bool workers_published{};
         ::std::atomic<unsigned> queue_epoch{};
         lazy_compile_refill_callback_type refill_callback{};
         void* refill_user_data{};
@@ -296,7 +301,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         [[nodiscard]] inline constexpr bool running() const noexcept
         {
 #ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
-            return this->worker_count != 0uz;
+            return this->workers_published.load(::std::memory_order_acquire);
 #else
             return false;
 #endif
@@ -340,6 +345,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
 
         inline constexpr void stop() noexcept
         {
+            this->workers_published.store(false, ::std::memory_order_release);
             this->stop_requested.store(true, ::std::memory_order_release);
             this->wake_all_workers();
 
@@ -945,6 +951,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                 ::std::construct_at(this->worker_handles.buffer + this->worker_count, handle);
                 ++this->worker_count;
             }
+            this->workers_published.store(true, ::std::memory_order_release);
         }
 # ifdef UWVM_CPP_EXCEPTIONS
         catch(...)

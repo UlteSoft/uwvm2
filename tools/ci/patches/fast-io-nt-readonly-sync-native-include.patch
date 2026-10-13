@@ -1,0 +1,12 @@
+--- a/third-parties/fast_io/include/fast_io_hosted/filesystem/native.h
++++ b/third-parties/fast_io/include/fast_io_hosted/filesystem/native.h
+@@ -18,6 +18,9 @@
+ #else
+ #include "nt.h"
+ #include "nt_at.h"
++#if defined(_WIN32) && !defined(_WIN32_WINDOWS) && !defined(__CYGWIN__) && !defined(__WINE__) && !defined(__BIONIC__)
++#include "nt_readonly_sync_nothrow.h"
++#endif
+ #endif
+ #endif
+ 

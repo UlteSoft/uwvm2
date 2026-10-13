@@ -224,16 +224,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 [[maybe_unused]] auto const file_fd_handle{curr_fd_native_observer.native_handle()};
 
 # if defined(_WIN32) && !defined(__CYGWIN__)
-                // Win32 only supports setting flags during creation.
-                if((flags & (::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append | ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync |
-                             ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync | ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync |
-                             ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock)) != ::uwvm2::imported::wasi::wasip1::abi::fdflags_t{})
-                    [[unlikely]]
-                {
-                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-                }
-
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                // Native flags are fixed by this provider's constructor. An
+                // idempotent request succeeds; clearing APPEND must not claim
+                // success while retaining an append-only native handle.
+                auto const current{is_observer ? ::uwvm2::imported::wasi::wasip1::abi::fdflags_t{} :
+                    curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.fdflags};
+                return flags==current ? ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess :
+                    ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
 
 # elif (!defined(__NEWLIB__) || defined(__CYGWIN__)) && __has_include(<dirent.h>) && !defined(_PICOLIBC__) && !(defined(__MSDOS__) || defined(__DJGPP__))
 
@@ -389,6 +386,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 else if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync) ==
                         ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync)
                 {
+                    // Select DSYNC from a cleared full SYNC mask; an existing
+                    // stronger open must not make a refused downgrade look successful.
+                    new_oflags &= ~O_SYNC;
                     new_oflags |= O_DSYNC;
                 }
                 else
@@ -403,6 +403,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 else if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync) ==
                         ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync)
                 {
+                    // Select DSYNC from a cleared full SYNC mask; an existing
+                    // stronger open must not make a refused downgrade look successful.
+                    new_oflags &= ~O_SYNC;
                     new_oflags |= O_DSYNC;
                 }
                 else
@@ -926,6 +929,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 else if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync) ==
                         ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync)
                 {
+                    // Select DSYNC from a cleared full SYNC mask; an existing
+                    // stronger open must not make a refused downgrade look successful.
+                    new_oflags &= ~O_SYNC;
                     new_oflags |= O_DSYNC;
                 }
                 else
@@ -940,6 +946,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 else if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync) ==
                         ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync)
                 {
+                    // Select DSYNC from a cleared full SYNC mask; an existing
+                    // stronger open must not make a refused downgrade look successful.
+                    new_oflags &= ~O_SYNC;
                     new_oflags |= O_DSYNC;
                 }
                 else

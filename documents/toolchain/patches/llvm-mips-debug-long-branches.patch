@@ -1,0 +1,42 @@
+--- a/llvm/lib/Target/Mips/MipsBranchExpansion.cpp
++++ b/llvm/lib/Target/Mips/MipsBranchExpansion.cpp
+@@ -661,7 +661,8 @@
+       BuildMI(*LongBrMBB, Pos, DL,
+               TII->get(STI->inMicroMipsMode() ? Mips::BC_MMR6 : Mips::BC))
+           .addMBB(TgtMBB);
+-    } else if (SameSegmentJump) {
++    } else if (SameSegmentJump &&
++               !MFp->getFunction().hasFnAttribute("uwvm.native.debug.pcrel")) {
+       // Pre R6:
+       // $longbr:
+       //  j $tgt
+@@ -671,6 +672,9 @@
+       BuildMI(*LongBrMBB, Pos, DL, TII->get(Mips::J)).addMBB(TgtMBB);
+       TII->insertNop(*LongBrMBB, Pos, DL)->bundleWithPred();
+     } else {
++      // Static native-debug long edges use a full-width relocated MBB address.
++      // R_MIPS_26 would otherwise introduce a RuntimeDyld trampoline outside
++      // the exact published Wasm function, including same-segment local jumps.
+       // At this point, offset where we need to branch does not fit into
+       // immediate field of the branch instruction and is not in the same
+       // segment as jump instruction. Therefore we will break it into couple
+@@ -707,7 +711,8 @@
+             .addReg(Mips::AT)
+             .addMBB(TgtMBB, MipsII::MO_ABS_LO);
+       }
+-      buildProperJumpMI(LongBrMBB, Pos, DL);
++      if (buildProperJumpMI(LongBrMBB, Pos, DL))
++        TII->insertNop(*LongBrMBB, Pos, DL)->bundleWithPred();
+     }
+   }
+ 
+@@ -888,7 +893,8 @@
+ 
+       if ((Br != End) && Br->isBranch() && !Br->isIndirectBranch() &&
+           (Br->isConditionalBranch() ||
+-           (Br->isUnconditionalBranch() && IsPIC))) {
++           (Br->isUnconditionalBranch() &&
++            (IsPIC || Br->getOpcode() == Mips::B)))) {
+         int64_t Offset = computeOffset(&*Br);
+ 
+         if (ForceLongBranchFirstPass ||

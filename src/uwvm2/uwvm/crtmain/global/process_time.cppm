@@ -21,6 +21,7 @@
  ****************************************/
 
 module;
+#include <atomic>
 
 // macro
 #include <uwvm2/utils/macro/push_macros.h>

@@ -18,6 +18,7 @@
 #if defined(__unix__) || defined(__APPLE__)
 # include <sys/wait.h>
 # include <unistd.h>
+# include "../../posix_noexcept_abi.h"
 #endif
 
 #ifndef UWVM_MODULE
@@ -56,13 +57,25 @@
     (defined(__GNUC__) || defined(__clang__))
 # define UWVM2TEST_WASM_ABI __attribute__((__sysv_abi__))
 #elif defined(__i386__) || defined(_M_IX86)
-# define UWVM2TEST_WASM_ABI UWVM_FASTCALL
+// Production headers restore their private macros before returning to this test.
+// Spell the matching callback convention here instead of referencing UWVM_FASTCALL
+// after its pop_macros.h, which leaves the token undefined on 32-bit x86.
+# if defined(_MSC_VER)
+#  define UWVM2TEST_WASM_ABI __fastcall
+# elif defined(__GNUC__) || defined(__clang__)
+#  define UWVM2TEST_WASM_ABI __attribute__((__fastcall__))
+# else
+#  define UWVM2TEST_WASM_ABI
+# endif
 #else
 # define UWVM2TEST_WASM_ABI
 #endif
 
 namespace uwvm2test::uwvm_int_strict
 {
+#if defined(__unix__) || defined(__APPLE__)
+    namespace posix = ::uwvm2test::posix_abi;
+#endif
     using wasm_op = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
     static_assert(sizeof(wasm_op) == 1);
     using wasm1p1_op = ::uwvm2::parser::wasm::standard::wasm1p1::opcode::op_basic;
@@ -170,26 +183,26 @@ namespace uwvm2test::uwvm_int_strict
     [[nodiscard]] inline int run_in_child_expect_trap_message(char const* expected_message, Fn&& fn)
     {
         int fds[2]{};
-        if(::pipe(fds) != 0) { return fail(__LINE__, "pipe"); }
+        if(posix::pipe_noexcept(fds) != 0) { return fail(__LINE__, "pipe"); }
 
-        pid_t const pid = ::fork();
+        pid_t const pid = posix::fork_noexcept();
         if(pid == 0)
         {
-            ::close(fds[0]);
-            if(::dup2(fds[1], STDERR_FILENO) < 0) { _exit(97); }
-            if(::dup2(fds[1], STDOUT_FILENO) < 0) { _exit(97); }
-            ::close(fds[1]);
+            posix::close_noexcept(fds[0]);
+            if(posix::dup2_noexcept(fds[1], STDERR_FILENO) < 0) { posix::_exit_noexcept(97); }
+            if(posix::dup2_noexcept(fds[1], STDOUT_FILENO) < 0) { posix::_exit_noexcept(97); }
+            posix::close_noexcept(fds[1]);
 # if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
             ::uwvm2::uwvm::io::u8log_output.reopen(::fast_io::io_dup, ::fast_io::u8err());
 # endif
             fn();
-            _exit(98);
+            posix::_exit_noexcept(98);
         }
 
-        ::close(fds[1]);
+        posix::close_noexcept(fds[1]);
         if(pid < 0)
         {
-            ::close(fds[0]);
+            posix::close_noexcept(fds[0]);
             return fail(__LINE__, "fork");
         }
 
@@ -197,20 +210,20 @@ namespace uwvm2test::uwvm_int_strict
         char buf[4096]{};
         for(;;)
         {
-            auto const n = ::read(fds[0], buf, sizeof(buf));
+            auto const n = posix::read_noexcept(fds[0], buf, sizeof(buf));
             if(n > 0)
             {
                 output.append(buf, static_cast<::std::size_t>(n));
                 continue;
             }
             if(n == 0) { break; }
-            ::close(fds[0]);
+            posix::close_noexcept(fds[0]);
             return fail(__LINE__, "read");
         }
-        ::close(fds[0]);
+        posix::close_noexcept(fds[0]);
 
         int status{};
-        if(::waitpid(pid, &status, 0) < 0) { return fail(__LINE__, "waitpid"); }
+        if(posix::waitpid_noexcept(pid, &status, 0) < 0) { return fail(__LINE__, "waitpid"); }
         if(WIFEXITED(status))
         {
             int const ec = WEXITSTATUS(status);
@@ -515,6 +528,15 @@ namespace uwvm2test::uwvm_int_strict
         append_u8(out, static_cast<::std::uint8_t>((bits >> 24) & 0xffu));
     }
 
+    inline void append_u64_leb(byte_vec& out, ::std::uint64_t value)
+    {
+        do
+        {
+            auto byte=static_cast<::std::uint8_t>(value & 127u); value >>= 7;
+            append_u8(out, static_cast<::std::uint8_t>(byte | (value ? 128u : 0u)));
+        } while(value);
+    }
+
     inline void append_f64_ieee(byte_vec& out, double v)
     {
         ::std::uint64_t bits = ::std::bit_cast<::std::uint64_t>(v);
@@ -570,26 +592,30 @@ namespace uwvm2test::uwvm_int_strict
         byte_vec module_utf8{};
         byte_vec name_utf8{};
         ::std::uint8_t elem_type{k_ref_funcref};
-        ::std::uint32_t min{};
-        ::std::uint32_t max{};
+        ::std::uint64_t min{};
+        ::std::uint64_t max{};
         bool has_max{};
+        bool address64{};
     };
 
     struct local_table_entry
     {
         ::std::uint8_t elem_type{k_ref_funcref};
-        ::std::uint32_t min{};
-        ::std::uint32_t max{};
+        ::std::uint64_t min{};
+        ::std::uint64_t max{};
         bool has_max{};
+        bool address64{};
     };
 
     struct import_memory_entry
     {
         byte_vec module_utf8{};
         byte_vec name_utf8{};
-        ::std::uint32_t min{};
-        ::std::uint32_t max{};
+        ::std::uint64_t min{};
+        ::std::uint64_t max{};
         bool has_max{};
+        bool shared{};
+        bool address64{};
     };
 
     struct import_global_entry
@@ -637,15 +663,20 @@ namespace uwvm2test::uwvm_int_strict
 
         bool has_table{};
         ::std::uint8_t table_elem_type{k_ref_funcref};
-        ::std::uint32_t table_min{};
-        ::std::uint32_t table_max{};
+        ::std::uint64_t table_min{};
+        ::std::uint64_t table_max{};
         bool table_has_max{};
+        bool table_address64{};
         ::std::vector<local_table_entry> extra_tables{};
 
+        struct local_memory_entry { ::std::uint64_t min{}, max{}; bool has_max{}, shared{}, address64{}; };
+        ::std::vector<local_memory_entry> extra_memories{};
         bool has_memory{};
-        ::std::uint32_t memory_min{};
-        ::std::uint32_t memory_max{};
+        ::std::uint64_t memory_min{};
+        ::std::uint64_t memory_max{};
         bool memory_has_max{};
+        bool memory_shared{};
+        bool memory_address64{};
         bool export_memory{};
 
         ::std::vector<global_entry> globals{};
@@ -688,7 +719,7 @@ namespace uwvm2test::uwvm_int_strict
             import_tables.push_back(::std::move(im));
         }
 
-        void add_import_memory(char const* module_ascii, char const* name_ascii, ::std::uint32_t min, ::std::uint32_t max, bool has_max)
+        void add_import_memory(char const* module_ascii, char const* name_ascii, ::std::uint64_t min, ::std::uint64_t max, bool has_max, bool shared=false, bool address64=false)
         {
             import_memory_entry im{};
             encode_name_utf8(im.module_utf8, module_ascii);
@@ -696,6 +727,8 @@ namespace uwvm2test::uwvm_int_strict
             im.min = min;
             im.max = max;
             im.has_max = has_max;
+            im.shared = shared;
+            im.address64 = address64;
             import_memories.push_back(::std::move(im));
         }
 
@@ -813,10 +846,10 @@ namespace uwvm2test::uwvm_int_strict
                     append_bytes(sec, im.name_utf8);
                     append_u8(sec, 0x01u);  // kind: table
                     append_u8(sec, im.elem_type);
-                    ::std::uint8_t flags = im.has_max ? 0x01u : 0x00u;
+                    ::std::uint8_t flags = (im.has_max ? 0x01u : 0x00u) | (im.address64 ? 4u : 0u);
                     append_u8(sec, flags);
-                    append_u32_leb(sec, im.min);
-                    if(im.has_max) { append_u32_leb(sec, im.max); }
+                    append_u64_leb(sec, im.min);
+                    if(im.has_max) { append_u64_leb(sec, im.max); }
                 }
 
                 for(auto const& im : import_memories)
@@ -824,10 +857,10 @@ namespace uwvm2test::uwvm_int_strict
                     append_bytes(sec, im.module_utf8);
                     append_bytes(sec, im.name_utf8);
                     append_u8(sec, 0x02u);  // kind: mem
-                    ::std::uint8_t flags = im.has_max ? 0x01u : 0x00u;
+                    ::std::uint8_t flags = (im.has_max ? 0x01u : 0x00u) | (im.shared ? 2u : 0u) | (im.address64 ? 4u : 0u);
                     append_u8(sec, flags);
-                    append_u32_leb(sec, im.min);
-                    if(im.has_max) { append_u32_leb(sec, im.max); }
+                    append_u64_leb(sec, im.min);
+                    if(im.has_max) { append_u64_leb(sec, im.max); }
                 }
 
                 for(auto const& im : import_globals)
@@ -858,31 +891,35 @@ namespace uwvm2test::uwvm_int_strict
                 if(has_table)
                 {
                     append_u8(sec, table_elem_type);
-                    ::std::uint8_t flags = table_has_max ? 0x01u : 0x00u;
+                    ::std::uint8_t flags = (table_has_max ? 0x01u : 0x00u) | (table_address64 ? 4u : 0u);
                     append_u8(sec, flags);
-                    append_u32_leb(sec, table_min);
-                    if(table_has_max) { append_u32_leb(sec, table_max); }
+                    append_u64_leb(sec, table_min);
+                    if(table_has_max) { append_u64_leb(sec, table_max); }
                 }
                 for(auto const& table : extra_tables)
                 {
                     append_u8(sec, table.elem_type);
-                    ::std::uint8_t flags = table.has_max ? 0x01u : 0x00u;
+                    ::std::uint8_t flags = (table.has_max ? 0x01u : 0x00u) | (table.address64 ? 4u : 0u);
                     append_u8(sec, flags);
-                    append_u32_leb(sec, table.min);
-                    if(table.has_max) { append_u32_leb(sec, table.max); }
+                    append_u64_leb(sec, table.min);
+                    if(table.has_max) { append_u64_leb(sec, table.max); }
                 }
                 emit_section(4u, sec);
             }
 
             // memory section (5)
-            if(has_memory)
+            if(has_memory || !extra_memories.empty())
             {
                 byte_vec sec{};
-                append_u32_leb(sec, 1u);
-                ::std::uint8_t flags = memory_has_max ? 0x01u : 0x00u;
-                append_u8(sec, flags);
-                append_u32_leb(sec, memory_min);
-                if(memory_has_max) { append_u32_leb(sec, memory_max); }
+                append_u32_leb(sec, static_cast<::std::uint32_t>((has_memory ? 1u : 0u) + extra_memories.size()));
+                auto emit_memory = [&](::std::uint64_t min, ::std::uint64_t max, bool has_max, bool shared, bool address64)
+                {
+                    append_u8(sec, (has_max ? 0x01u : 0x00u) | (shared ? 2u : 0u) | (address64 ? 4u : 0u));
+                    append_u64_leb(sec, min);
+                    if(has_max) { append_u64_leb(sec, max); }
+                };
+                if(has_memory) { emit_memory(memory_min, memory_max, memory_has_max, memory_shared, memory_address64); }
+                for(auto const& memory: extra_memories) { emit_memory(memory.min, memory.max, memory.has_max, memory.shared, memory.address64); }
                 emit_section(5u, sec);
             }
 
@@ -1090,6 +1127,7 @@ namespace uwvm2test::uwvm_int_strict
     {
         byte_vec const* wasm_bytes{};
         ::uwvm2::utils::container::u8string_view module_name{};
+        wasm_feature_parameter_t const* features{}; // Optional per-module parser/initializer policy.
     };
 
     [[nodiscard]] inline prepared_runtime prepare_runtime_from_wasm(
@@ -1146,12 +1184,13 @@ namespace uwvm2test::uwvm_int_strict
                     pre_begin,
                     pre_end,
                     pre_err,
-                    ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t{});
+                    pl.features == nullptr ? wasm_feature_parameter_t{} : *pl.features);
 
                 ::uwvm2::uwvm::wasm::type::wasm_file_t wf{1u};
                 wf.file_name = u8"uwvm2test_preloaded.wasm";
                 wf.module_name = pl.module_name;
                 wf.binfmt_ver = 1u;
+                if(pl.features != nullptr) { wf.wasm_parameter.binfmt1_para = *pl.features; }
                 wf.wasm_module_storage.wasm_binfmt_ver1_storage = ::std::move(pre_storage);
                 ::uwvm2::uwvm::wasm::storage::preloaded_wasm.emplace_back(::std::move(wf));
             }
@@ -1293,7 +1332,8 @@ namespace uwvm2test::uwvm_int_strict
                               runtime_local_func_t const& rt_fn,
                               byte_vec const& packed_params,
                               opfunc_ptr_t expected0,
-                              opfunc_ptr_t expected1)
+                              opfunc_ptr_t expected1,
+                              [[maybe_unused]] ::std::byte const* relocated_entry = nullptr)
         {
             auto const* const ft = rt_fn.function_type_ptr;
             if(ft == nullptr) { ::fast_io::fast_terminate(); }
@@ -1340,7 +1380,11 @@ namespace uwvm2test::uwvm_int_strict
             ::std::memset(stack_buf.data(), 0xCC, stack_buf.size());
             ::std::byte* operand_base = align_up(stack_buf);
 
-            auto args = make_args(::std::make_index_sequence<tuple_size>{}, fn.op.operands.data(), operand_base, local_base);
+            // A layout diagnostic may supply a fully relocated copy of this
+            // single-function stream. Ownership stays with its caller; ordinary
+            // fixtures always execute the compiler-owned original allocation.
+            auto args = make_args(::std::make_index_sequence<tuple_size>{},
+                                 relocated_entry == nullptr ? fn.op.operands.data() : relocated_entry, operand_base, local_base);
 
             bool hit0{};
             bool hit1{};

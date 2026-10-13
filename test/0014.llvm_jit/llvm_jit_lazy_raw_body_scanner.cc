@@ -15,20 +15,22 @@ namespace
                                 ::std::size_t expected_consumed) noexcept
     {
         auto const* const begin{reinterpret_cast<::std::byte const*>(bytes)};
+        lazy::runtime_module_storage_t module{};
         auto cursor{begin};
         auto const* const end{begin + N};
-        auto const accepted{lazy::details::skip_wasm_instruction_for_direct_call_scan(cursor, end, policy)};
+        auto const accepted{lazy::details::skip_wasm_instruction_for_direct_call_scan(module, cursor, end, policy)};
         return accepted == expected && static_cast<::std::size_t>(cursor - begin) == expected_consumed;
     }
 
     template <::std::size_t N>
     [[nodiscard]] bool scan_all(::std::uint8_t const (&bytes)[N], lazy::parser_feature_parameter_t const* policy) noexcept
     {
+        lazy::runtime_module_storage_t module{};
         auto cursor{reinterpret_cast<::std::byte const*>(bytes)};
         auto const* const end{cursor + N};
         while(cursor != end)
         {
-            if(!lazy::details::skip_wasm_instruction_for_direct_call_scan(cursor, end, policy)) { return false; }
+            if(!lazy::details::skip_wasm_instruction_for_direct_call_scan(module, cursor, end, policy)) { return false; }
         }
         return true;
     }

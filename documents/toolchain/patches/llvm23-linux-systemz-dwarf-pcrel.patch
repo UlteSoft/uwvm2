@@ -1,0 +1,25 @@
+--- a/llvm/lib/Object/RelocationResolver.cpp
++++ b/llvm/lib/Object/RelocationResolver.cpp
+@@ -209,6 +209,8 @@
+   switch (Type) {
+   case ELF::R_390_32:
+   case ELF::R_390_64:
++  case ELF::R_390_PC32:
++  case ELF::R_390_PC64:
+     return true;
+   default:
+     return false;
+@@ -222,6 +224,13 @@
+     return (S + Addend) & 0xFFFFFFFF;
+   case ELF::R_390_64:
+     return S + Addend;
++  // SystemZ emits PC-relative EH-frame relocations alongside private Wasm
++  // DWARF. Resolve the independent object-reader value in section-relative
++  // coordinates; an unrelated valid EH section must not revoke all rows.
++  case ELF::R_390_PC32:
++    return (S + Addend - Offset) & 0xFFFFFFFF;
++  case ELF::R_390_PC64:
++    return S + Addend - Offset;
+   default:
+     llvm_unreachable("Invalid relocation type");
+   }

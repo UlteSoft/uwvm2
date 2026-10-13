@@ -1,0 +1,1 @@
+The macOS native debugger builds mach_exc_server.c from the selected SDK's mach_exc.defs.
