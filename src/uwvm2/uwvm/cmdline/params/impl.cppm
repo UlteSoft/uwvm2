@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -33,6 +33,7 @@ export import :mode;
 export import :debug_test;
 
 // wasm
+export import :security;
 export import :wasm_set_main_module_name;
 export import :wasm_set_start_func;
 export import :wasm_preload_library;
@@ -64,6 +65,7 @@ export import :runtime_llvm_jit_disable_ir_verifaction;
 export import :runtime_llvm_jit_cache_no_sign;
 export import :runtime_llvm_jit_cache_no_verify;
 export import :runtime_llvm_jit_cache_path;
+export import :runtime_llvm_jit_cache_seal_process;
 export import :runtime_debug_int;
 export import :runtime_int;
 export import :runtime_jit;

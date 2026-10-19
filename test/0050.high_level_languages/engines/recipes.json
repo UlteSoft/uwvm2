@@ -1,0 +1,29 @@
+{
+  "scope": "Actual checked CLI recipes; INPUT and OUTPUT are placeholders, not shell interpolation instructions",
+  "wasmtime": {
+    "binary": "/home/macromodel/.wasmtime/bin/wasmtime",
+    "version": "42.0.1 (6844a83b5 2026-02-25)",
+    "run": ["run", "-C", "cache=n,parallel-compilation=n", "-W", "gc=y,function-references=y,tail-call=y,extended-const=y,exceptions=y,memory64=y,multi-memory=y,relaxed-simd=y", "INPUT.wasm"],
+    "mode": "Cranelift JIT, cache disabled"
+  },
+  "wavm": {
+    "binary": "/home/macromodel/Documents/src/WAVM/build-clang/bin/wavm",
+    "version": "0.0.0-prerelease, local tracked modifications, see environment.json",
+    "environment": {
+      "LD_LIBRARY_PATH": "/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib/x86_64-unknown-linux-gnu:/home/macromodel/Documents/tool-chain/x86_64-linux-gnu-llvm/lib"
+    },
+    "run": ["run", "--nocache", "--abi=wasi", "--enable", "all-proposed", "INPUT.wasm"],
+    "precompile_help_checked_only": ["compile", "--enable", "all-proposed", "--format=precompiled-wasm", "INPUT.wasm", "OUTPUT.wasm"],
+    "precompiled_run_help_checked_only": ["run", "--precompiled", "--nocache", "--abi=wasi", "--enable", "all-proposed", "OUTPUT.wasm"],
+    "limitations": ["MoonGC parser rejects type tag 80", "Java/Javy fail LLVM code generation in this existing local build", "C# WASI sock_accept import absent"]
+  },
+  "wasmedge": {
+    "binary": "/tmp/high-level-20261017/engines/wasmedge-0.18.0/bin/wasmedge",
+    "version": "0.18.0 official manylinux_2_28 x86_64 archive",
+    "jit_run": ["--wasm-3", "--run-mode", "jit", "--log-level", "error", "INPUT.wasm"],
+    "interpreter_run": ["--wasm-3", "--run-mode", "interpreter", "--log-level", "error", "INPUT.wasm"],
+    "compile": ["compile", "--wasm-3", "--optimize", "3", "INPUT.wasm", "OUTPUT.so"],
+    "aot_run": ["--wasm-3", "--run-mode", "aot", "--log-level", "error", "OUTPUT.so"],
+    "limitations": ["C#/Javy SIGSEGV in tested JIT mode; their exact modules passed interpreter and AOT", "AOT changes execution artifact: retain original Wasm and derivative native hashes", "AOT compilation and guest-kernel execution are distinct scopes"]
+  }
+}

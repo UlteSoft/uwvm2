@@ -20,6 +20,7 @@
  ****************************************/
 
 module;
+#include <uwvm2/utils/security/wsea.h>
 
 // std
 #include <cstdint>

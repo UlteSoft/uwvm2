@@ -65,6 +65,10 @@ decltype(source_type::builtin_wasip1_vector_begin_) source_initializer_builtin_v
            modules_[owner].new_actual_id!=dense || context_->unpublished_file_for_module(row.module)!=row.file) { return false; }
         // All pointers have matched genuine nonmoving candidate registry/parser
         // members before their phase/name/declaration fields are read.
+        auto const secure_source{row.file->requires_verified_execution_authorization() ||
+            ::uwvm2::utils::security::wsea::module_selected(::std::string_view{
+                reinterpret_cast<char const*>(row.file->file_name.cbegin()), row.file->file_name.size()})};
+        if(secure_source && !row.file->has_verified_execution_authorization()) { return false; }
         auto const& phase=row.module->gc_collection_phase;
         if(phase.initializer_serial!=0u || phase.native_storage_owned || phase.initialized || phase.active_segments_ready) { return false; }
         auto const declaration=prepared_source_->checkpoint_declarations_.find(row.file->module_name);

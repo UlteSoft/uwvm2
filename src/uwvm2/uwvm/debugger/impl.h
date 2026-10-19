@@ -1,4 +1,5 @@
 #pragma once
+#include "language_debug_features.h"
 #ifndef UWVM_MODULE
 # include "console_help.h"
 # include "command.h"
@@ -55,6 +56,11 @@
 # include "source_dwarf_query.h"
 # include "source_dwarf_values.h"
 # include "source_dwarf_objects.h"
+# include "source_pretty_registry.h"
+# if UWVM_DEBUG_LANGUAGE_CPP
+#  include "source_pretty_coroutine.h"
+# endif
+# include "source_pretty_printer.h"
 # if defined(UWVM_USE_LLVM_JIT) || defined(UWVM_USE_DEFAULT_JIT)
 #  include "source_dwarf_index.h"
 # endif

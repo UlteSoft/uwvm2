@@ -47,6 +47,8 @@
 # include <bit>
 # include <array>
 # include <chrono>
+# include <cerrno>
+# include <exception>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
@@ -67,6 +69,13 @@
 # endif
 // platform
 # include <uwvm2/runtime/lib/uwvm_runtime.h>
+# include <uwvm2/runtime/lib/uwvm_runtime_threaded_profile_api.h>
+# if UWVM2_HAS_THREADED_PROFILE_HOST_API
+#  include <uwvm2/runtime/wasm_threads/thread_group.h>
+# endif
+# if defined(__linux__) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS)
+#  include <uwvm2/runtime/lib/uwvm_runtime_threaded_profile_api.h>
+# endif
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/control/impl.h>
@@ -111,10 +120,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
      *          does not provide host-side arguments or inspect host-import ABIs.
      *
      *          Resolution order:
-     *          1. the WebAssembly start section, when present;
-     *          2. an exported function named `_start` from `all_module_export`;
-     *          3. an exported function named `main` from `all_module_export`;
-     *          4. the parsed export section directly, again checking `_start` before `main`.
+     *          1. an exported function named `_start` from `all_module_export`;
+     *          2. an exported function named `main` from `all_module_export`;
+     *          3. the parsed export section directly, again checking `_start` before `main`;
+     *          4. the WebAssembly start section for a module without a command export.
+     *          The module start is instantiated separately before a distinct command entry.
      *
      *          The parsed-export fallback protects the runtime from stale or absent export-map storage.
      *          Every candidate must resolve to a `() -> ()` wasm function.  Imported candidates are accepted
@@ -205,8 +215,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                                        return is_void_to_void_ft(*f->function_type_ptr);
                                                    }};
 
-        // Prefer the start section when present.  The parser stores the optional section as a span, so presence must
-        // be tested with the parser's non-null `sec_begin` sentinel rather than by subtracting span pointers.
+        // Remember the instantiation start as the fallback for a pure core module. A language command can
+        // have both an initializer start section and a distinct exported _start; selecting only the former
+        // silently skips its program. The graph runner executes initialization before the selected command.
+        ::std::size_t module_start_index{};
+        bool module_start_present{};
         auto const all_module_it{::uwvm2::uwvm::wasm::storage::all_module.find(main_module_name)};
         if(all_module_it != ::uwvm2::uwvm::wasm::storage::all_module.end())
         {
@@ -231,7 +244,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             auto const total_n{import_n + rt_it->second.local_defined_function_vec_storage.size()};
                             // The parser validated the start signature. Unlike conventional CLI exports,
                             // a standard start section may also designate an imported host function.
-                            if(idx < total_n) { return idx; }
+                            if(idx < total_n) { module_start_index = idx; module_start_present = true; }
                         }
                     }
                 }
@@ -240,7 +253,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
         }
 
-        // Otherwise, fall back to conventional exported entrypoints from the export map.  `_start` follows WASI and
+        // Prefer conventional exported command entrypoints. `_start` follows WASI and
         // common standalone-wasm conventions; `main` is retained as a compatibility fallback.
         ::std::size_t idx{};
         auto const mit{::uwvm2::uwvm::wasm::storage::all_module_export.find(main_module_name)};
@@ -319,6 +332,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
             }
         }
+
+        if(module_start_present) { return module_start_index; }
 
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                             ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -1220,10 +1235,90 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         ::uwvm2::uwvm::runtime::initializer::apply_runtime_active_segments(main_module_name);
         auto const& start{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<start_section_t>(
             main_module.wasm_module_storage.wasm_binfmt_ver1_storage.sections)};
-        cfg.module_start = !::uwvm2::uwvm::wasm::storage::start_func_call.enabled &&
-                           start.sec_span.sec_begin != nullptr && cfg.entry_function_index == start.start_idx;
+        if(start.sec_span.sec_begin != nullptr)
+        {
+            RunConfig start_cfg{};
+            if constexpr(requires { start_cfg.assume_full_code_verified; })
+            { start_cfg.assume_full_code_verified = cfg.assume_full_code_verified; }
+            start_cfg.entry_function_index = static_cast<::std::size_t>(start.start_idx);
+            start_cfg.module_start = true;
+            run_entry(main_module_name, start_cfg);
+            // A pure core module, or an explicit selection of its initializer, runs it once.
+            if(cfg.entry_function_index == start_cfg.entry_function_index) { return; }
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
+            if constexpr(::std::is_same_v<RunConfig, ::uwvm2::runtime::lib::full_compile_run_config>)
+            {
+                // Cancellation and a managed WASI proc_exit during initialization must not launch the command.
+                if(::uwvm2::runtime::lib::runtime_llvm_jit_debug_registered_worker_stopping_host_api()) { return; }
+            }
+#endif
+        }
+        cfg.module_start = false;
         run_entry(main_module_name, cfg);
     }
+
+#if UWVM2_HAS_THREADED_PROFILE_HOST_API
+    struct threaded_graph_completion
+    {
+        // Observation of explicit HOST policy DATA, not source/spawn authority.
+        // Once selected, rejection/pending MUST NOT fall through to ordinary run.
+        bool policy_selected{};
+        ::uwvm2::runtime::lib::threaded_policy_status selected_policy{::uwvm2::runtime::lib::threaded_policy_status::disabled};
+        ::uwvm2::runtime::lib::threaded_main_status start_status{::uwvm2::runtime::lib::threaded_main_status::disabled};
+        ::uwvm2::runtime::lib::threaded_main_status status{::uwvm2::runtime::lib::threaded_main_status::disabled};
+        ::uwvm2::runtime::lib::threaded_retirement retirement{};
+        ::std::uint32_t code{};
+        unsigned kind{};
+    };
+
+    // A single explicit start attempt. The deadline bounds the real wait, not
+    // cold preparation. Pending retains Runtime ownership; the controller may
+    // subsequently call the actual wait/result APIs ONLY, never this start
+    // helper again. CLI outcome/stop/full-reset/source-release is Root policy.
+    [[nodiscard]] inline threaded_graph_completion run_threaded_full_module_graph(
+        ::uwvm2::utils::container::u8string_view main_module_name,
+        ::uwvm2::runtime::lib::full_compile_run_config const& cfg,
+        ::std::chrono::steady_clock::time_point deadline) noexcept
+    {
+        namespace runtime = ::uwvm2::runtime::lib;
+        threaded_graph_completion completion{};
+        ::uwvm2::runtime::wasm_threads::threaded_profile_limits policy{};
+        auto const selected{runtime::runtime_threaded_profile_policy_host_api(policy)};
+        completion.selected_policy = selected;
+        if(selected==runtime::threaded_policy_status::disabled) { return completion; }
+        completion.policy_selected = true;
+        completion.start_status = completion.status = runtime::threaded_main_status::rejected;
+        if(selected!=runtime::threaded_policy_status::configured) { return completion; }
+        auto const& abi{cfg.entry_abi_buffers};
+        if((abi.param_bytes!=0uz && abi.param_buffer==nullptr) ||
+           (abi.result_bytes!=0uz && abi.result_buffer==nullptr) ||
+           abi.param_bytes>policy.max_value_stack_bytes || abi.result_bytes>policy.max_value_stack_bytes)
+        { return completion; }
+        // Actual canonical code proof precedes ANY active writes or execution.
+        // Root start_main performs graph purity and complete profile shape/code
+        // construction, actual parent active once, private table-view refresh,
+        // then native launch. No ordinary module-start/command runs here.
+        if(!runtime::full_compile_prepare_host_api()) { return completion; }
+        completion.start_status = runtime::runtime_threaded_profile_start_main_host_api(
+            main_module_name,cfg.entry_function_index,{abi.param_buffer,abi.param_bytes},abi.result_bytes);
+        completion.status = completion.start_status;
+        // Even a rejected prelaunch attempt may have sticky actual source
+        // effects and a Runtime-owned retirement record. Do not hide it.
+        completion.retirement = runtime::runtime_threaded_profile_wait_host_api(deadline);
+        if(!completion.retirement.physically_joined)
+        {
+            completion.status = runtime::threaded_main_status::retirement_pending;
+            return completion;
+        }
+        if(completion.start_status==runtime::threaded_main_status::running ||
+           completion.start_status==runtime::threaded_main_status::finished)
+        {
+            completion.status = runtime::runtime_threaded_profile_result_host_api(
+                {abi.result_buffer,abi.result_bytes},&completion.code,&completion.kind);
+        }
+        return completion;
+    }
+#endif
 
     inline constexpr void run_full_module_graph(::uwvm2::utils::container::u8string_view main_module_name,
                                                  ::uwvm2::runtime::lib::full_compile_run_config cfg) noexcept
@@ -2069,7 +2164,37 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // consumes the resulting global command-line/storage state and performs the final ordered load/execute sequence.
 
         bool owned_full_prepared{};
+#if defined(UWVM2_HAS_THREADED_PROFILE_HOST_API) && UWVM2_HAS_THREADED_PROFILE_HOST_API
+        {
+            ::uwvm2::runtime::wasm_threads::threaded_profile_limits selected_thread_limits{};
+            auto const policy{::uwvm2::runtime::lib::runtime_threaded_profile_policy_host_api(selected_thread_limits)};
+            if(policy == ::uwvm2::runtime::lib::threaded_policy_status::busy)
+            { return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error); }
+            if(policy == ::uwvm2::runtime::lib::threaded_policy_status::configured)
+            {
+                namespace mode = ::uwvm2::uwvm::runtime::runtime_mode;
+                // An explicit finite profile never falls back to ordinary
+                // parent code, mapped bytes or a debugger-reserved worker.
+                if(::uwvm2::uwvm::wasm::storage::execute_wasm_mode != ::uwvm2::uwvm::wasm::base::mode::run ||
+                   mode::global_runtime_mode != mode::runtime_mode_t::full_compile)
+                { return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error); }
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+                if(::uwvm2::uwvm::cmdline::params::details::debug_jit_control_fd >= 0 ||
+                   ::uwvm2::uwvm::cmdline::params::details::debug_jit_control_handle != 0u)
+                { return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error); }
+# endif
+                // The actual helper also rejects native DL/weak providers,
+                // retains exact immutable main/preload input bytes BEFORE
+                // parsing and runs the original actual native initializer.
+                auto const prepared{prepare_owned_full_cli_source(true)};
+                if(prepared != static_cast<int>(::uwvm2::uwvm::run::retval::ok)) { return prepared; }
+                owned_full_prepared = true;
+            }
+        }
+#endif
 #if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS)
+        if(!owned_full_prepared)
+        {
         namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
         // Debug/reserved LLVM-full may own a pure-Wasm preload graph. Ordinary
         // full with preload providers retains its previous mapped loader path.
@@ -2101,6 +2226,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             auto const prepared{prepare_owned_full_cli_source(retain_debug_image)};
             if(prepared != static_cast<int>(::uwvm2::uwvm::run::retval::ok)) { return prepared; }
             owned_full_prepared = true;
+        }
         }
 #endif
         if(!owned_full_prepared)
@@ -2454,6 +2580,65 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             [[fallthrough]];
             case ::uwvm2::uwvm::wasm::base::mode::run:
             {
+#if UWVM2_HAS_THREADED_PROFILE_HOST_API
+                {
+                    namespace runtime = ::uwvm2::runtime::lib;
+                    ::uwvm2::runtime::lib::full_compile_run_config threaded_config{};
+                    configure_runtime_entry_buffers(threaded_config, runtime_entry);
+                    auto threaded{run_threaded_full_module_graph(
+                        ::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name, threaded_config,
+                        ::std::chrono::steady_clock::now() + ::std::chrono::milliseconds{100})};
+                    if(threaded.policy_selected)
+                    {
+                        if(threaded.selected_policy != runtime::threaded_policy_status::configured)
+                        { return static_cast<int>(retval::parameter_error); }
+                        bool const accepted{threaded.start_status == runtime::threaded_main_status::running ||
+                            threaded.start_status == runtime::threaded_main_status::finished};
+                        // Start exactly once. A pending cold compiler/native TLS
+                        // retains its actual owner; never recompile/restart or
+                        // fall through to the ordinary parent runner.
+                        while(!threaded.retirement.physically_joined || threaded.retirement.native_error != 0 ||
+                              threaded.retirement.preparing != 0u || threaded.retirement.native_pending != 0u ||
+                              threaded.retirement.compiler_tickets_pending != 0u || threaded.retirement.native_cleanup_pending != 0u)
+                        {
+                            if(threaded.retirement.native_error != 0 && threaded.retirement.native_error != EBUSY)
+                            { ::std::terminate(); } // unknown native ownership cannot be safely unloaded
+                            threaded.retirement = runtime::runtime_threaded_profile_wait_host_api(
+                                ::std::chrono::steady_clock::now() + ::std::chrono::milliseconds{100});
+                        }
+                        if(accepted)
+                        {
+                            auto const& abi{threaded_config.entry_abi_buffers};
+                            threaded.status = runtime::runtime_threaded_profile_result_host_api(
+                                {abi.result_buffer, abi.result_bytes}, &threaded.code, &threaded.kind);
+                        }
+                        int outcome{static_cast<int>(retval::parameter_error)};
+                        if(accepted && threaded.status == runtime::threaded_main_status::finished)
+                        {
+                            using kind = ::uwvm2::runtime::wasm_threads::termination_kind;
+                            if(threaded.kind == static_cast<unsigned>(kind::main_return)) { outcome = 0; }
+                            else if(threaded.kind == static_cast<unsigned>(kind::proc_exit))
+                            { outcome = static_cast<int>(threaded.code & 255u); }
+                        }
+                        if(outcome == static_cast<int>(retval::parameter_error))
+                        { ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output, u8"uwvm: [error] Unable to run the requested Wasm threads profile.\n"); }
+                        // Real full Source reset is a second phase AFTER native
+                        // join. Its actual deleter completion gates re-opening;
+                        // an externally retained prepared owner keeps it pending.
+                        for(;;)
+                        {
+                            runtime::reset_runtime_state_host_api();
+                            ::std::uint32_t ignored_code{}; unsigned ignored_kind{};
+                            auto const& abi{threaded_config.entry_abi_buffers};
+                            auto const remaining{runtime::runtime_threaded_profile_result_host_api(
+                                {abi.result_buffer, abi.result_bytes}, &ignored_code, &ignored_kind)};
+                            if(remaining == runtime::threaded_main_status::disabled) { break; }
+                            ::std::this_thread::sleep_for(::std::chrono::milliseconds{10});
+                        }
+                        return outcome;
+                    }
+                }
+#endif
 # if ((defined(__linux__) && defined(SYS_pidfd_open) && defined(SCM_CREDENTIALS)) || \
       (defined(__APPLE__) && defined(__MACH__)) || (defined(_WIN32) && !defined(__CYGWIN__))) && \
      defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)

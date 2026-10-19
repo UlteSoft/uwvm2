@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
+# v7 SOURCE successor; raw fixture signatures are not kernel-origin authentication.
 """Check separately compiled ordinary/ROS cache_product_isolation fixtures.
 
 Uses a fresh directory and identical embedder contexts, not CLI defaults.
-Objects are inert test bytes. A signed cache is an integrity check, not an
-access-control boundary against an attacker who can replace files as this user.
+All positives are bounded inert memory DATA; paths compare namespaces only.
+Public fixture signatures are not kernel-origin authentication. Real persistent
+sync/async/load APIs are exercised separately and must refuse absent admission.
 """
 import argparse
 import hashlib
@@ -30,11 +32,15 @@ def run(product, *arguments):
     (args.out/'results.json').write_text(json.dumps(rows, indent=2)+'\n')
     if result.returncode:
         raise RuntimeError(row)
-    return dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
+    fields = dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
+    assert fields.get('codec_data_only') == '1' and fields.get('native_cache_replay') == '0'
+    if arguments:
+        assert fields.get('standalone_persistent_refused') == '1'
+    return fields
 
 defaults = {p: run(p) for p in binaries}
 for product, values in defaults.items():
-    assert values['product'] == product and values['version'] == '5'
+    assert values['product'] == product and values['version'] == '7'
     assert product in values['default']
     abi = bytes.fromhex(values['abi-hex'])
     assert (product+'-runtime-abi-v27').encode() in abi
@@ -53,7 +59,8 @@ for mode in ('signed', 'unsigned'):
     # The caller-supplied root/key/ABI are identical: storage must namespace
     # itself, including callers that bypass environment/CLI context creation.
     shared = args.out/mode/'shared'
-    own = {p: Path(run(p, 'write', shared, mode)['path']) for p in binaries}
+    models = {p: run(p, 'write', shared, mode) for p in binaries}
+    own = {p: Path(model['path']) for p,model in models.items()}
     assert own['uwvm2'] != own['uwvm2ros']
     for product, path in own.items():
         assert run(product, 'policy-v1', args.out/mode/product/'policy-v1', mode)['status'] == 'context-mismatch'
@@ -73,19 +80,20 @@ for mode in ('signed', 'unsigned'):
         assert run(product, 'function-calls-v26', args.out/mode/product/'function-calls-v26', mode)['status'] == 'context-mismatch'
         assert path.relative_to(shared).parts[0] == product
         assert path.name.startswith(product+'-') and path.suffix == '.uwvm-ljc'
-        assert path.is_file()
-        foreign = own['uwvm2ros' if product == 'uwvm2' else 'uwvm2']
+        assert not path.exists(), 'inert DATA must not publish a persistent object'
+        foreign = models['uwvm2ros' if product == 'uwvm2' else 'uwvm2']['blob-hex']
         for mutation, status in (('none', 'invalid-magic'), ('own-magic', 'context-mismatch')):
             root = args.out/mode/product/mutation
             run(product, 'load-foreign', root, mode, foreign, mutation, status)
-        run(product, 'load-foreign', args.out/mode/product/'v4', mode,
-            path, 'version4', 'unsupported-version')
+        for old in (4, 5, 6):
+            run(product, 'load-foreign', args.out/mode/product/f'v{old}', mode,
+                models[product]['blob-hex'], f'version{old}', 'unsupported-version')
         if mode == 'signed':
             run(product, 'load-foreign', args.out/mode/product/'payload', mode,
-                path, 'payload', 'signature-mismatch')
+                models[product]['blob-hex'], 'payload', 'signature-mismatch')
 
-summary = dict(passed=True, invocations=len(rows), format_version=5,
+summary = dict(passed=True, invocations=len(rows), format_version=7, codec_data_only=True, native_cache_replay=False,
                binary_sha256={p: hashlib.sha256(b.read_bytes()).hexdigest() for p, b in binaries.items()},
-               scope='serializer, path, context and signature; no native object execution')
+               scope='memory DATA serializer/parser/context/raw fixture signature plus standalone persistent refusal; no authenticated production CLI cache hit')
 (args.out/'summary.json').write_text(json.dumps(summary, indent=2)+'\n')
 print(json.dumps(summary))

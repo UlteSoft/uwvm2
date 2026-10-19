@@ -83,6 +83,67 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         // ordinary entry fast-path branch is added. Owner must outlive token.
         [[nodiscard]] maintenance_transition try_maintenance_transition()
         { return maintenance_transition{*this}; }
+        // Host-only private execution gate for an explicitly selected profile.
+        // It closes existing PUBLIC admission while retaining this exact real
+        // generation. It conveys no Wasm/restore/source/provider permission.
+        // A Runtime profile separately authenticates those and owns every native
+        // participant. Ordinary try_enter() and its generated code are unchanged.
+        class private_generation_gate
+        {
+            friend class execution_domain;
+            execution_domain* owner_{};
+            ::std::shared_ptr<execution_lifetime> actual_;
+            private_generation_gate(execution_domain& owner,
+                ::std::shared_ptr<execution_lifetime> actual) noexcept
+                : owner_{::std::addressof(owner)}, actual_{::std::move(actual)} {}
+        public:
+            private_generation_gate() noexcept = default;
+            private_generation_gate(private_generation_gate const&) = delete;
+            private_generation_gate& operator=(private_generation_gate const&) = delete;
+            private_generation_gate(private_generation_gate&& other) noexcept
+                : owner_{::std::exchange(other.owner_, nullptr)}, actual_{::std::move(other.actual_)} {}
+            private_generation_gate& operator=(private_generation_gate&& other) noexcept
+            {
+                if(this != ::std::addressof(other))
+                { owner_ = ::std::exchange(other.owner_, nullptr); actual_ = ::std::move(other.actual_); }
+                return *this;
+            }
+            [[nodiscard]] explicit operator bool() const noexcept { return owner_ != nullptr && actual_; }
+            // Real lifetime admission, never a fabricated ACK or an open flag.
+            // Owner must outlive this gate. Administrative stop still closes it.
+            [[nodiscard]] lease try_enter() const
+            {
+                if(owner_ == nullptr || !actual_) { return {}; }
+                ::std::lock_guard lock{owner_->admission_mutex};
+                if(owner_->accepting || owner_->current.get() != actual_.get() ||
+                   owner_->current.owner_before(actual_) || actual_.owner_before(owner_->current) ||
+                   actual_->stop_requested()) { return {}; }
+                return actual_->try_enter();
+            }
+        };
+        // Caller owns the ACTUAL generic maintenance mutex. This is cold, does
+        // not stop the generation, and succeeds only before any public entry.
+        // A discarded token deliberately leaves public admission closed: it
+        // must not accidentally reopen an incomplete/pending profile.
+        [[nodiscard]] private_generation_gate suspend_public_admission(maintenance_transition const& transition)
+        {
+            if(transition.owner_ != this || !transition.lock_.owns_lock()) { return {}; }
+            ::std::lock_guard lock{admission_mutex};
+            if(!accepting || !current->quiescent_configuration_ready()) { return {}; }
+            accepting = false;
+            return private_generation_gate{*this, current};
+        }
+        // Invoke only after real profile native joins, all owned code/world/
+        // provider pins and REAL execution leases have left. Pending cannot pass.
+        [[nodiscard]] bool reopen_public_admission(maintenance_transition const& transition,
+            private_generation_gate& gate)
+        {
+            if(transition.owner_ != this || !transition.lock_.owns_lock() || gate.owner_ != this || !gate.actual_) { return false; }
+            ::std::lock_guard lock{admission_mutex};
+            if(accepting || current.get() != gate.actual_.get() || current.owner_before(gate.actual_) ||
+               gate.actual_.owner_before(current) || !current->quiescent_configuration_ready()) { return false; }
+            accepting = true; gate.owner_ = nullptr; gate.actual_.reset(); return true;
+        }
         explicit execution_domain(::std::size_t max_concurrent)
             : capacity{max_concurrent}, current{::std::make_shared<execution_lifetime>(max_concurrent)} {}
         execution_domain(execution_domain const&) = delete;

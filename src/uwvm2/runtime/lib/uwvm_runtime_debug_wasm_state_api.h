@@ -5,8 +5,8 @@
 #pragma once
 #if defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD)
     extern "C++" ::uwvm2::uwvm::debugger::wasm_state::view llvm_jit_debug_query_wasm_state_host_api(
-        ::uwvm2::utils::thread::cooperative_pause_domain::pause_ticket const& ticket,
-        ::std::span<llvm_jit_checkpoint_thread_capture_owner const> supplied,
+        [[maybe_unused]] ::uwvm2::utils::thread::cooperative_pause_domain::pause_ticket const& ticket,
+        [[maybe_unused]] ::std::span<llvm_jit_checkpoint_thread_capture_owner const> supplied,
         ::uwvm2::uwvm::debugger::wasm_state::request const& selection) noexcept
     {
         namespace ws = ::uwvm2::uwvm::debugger::wasm_state;

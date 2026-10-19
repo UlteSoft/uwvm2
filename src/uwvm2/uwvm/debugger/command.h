@@ -9,6 +9,7 @@
 # include <cstddef>
 # include <cstdint>
 # include <limits>
+# include <memory>
 # include <fast_io.h>
 # include <fast_io_dsal/string_view.h>
 # include <uwvm2/utils/control/protocol.h>
@@ -17,6 +18,7 @@
 # include "wasm_mutation.h"
 # include "wasm_path.h"
 # include "wasip1_state.h"
+# include "source_pretty_registry.h"
 # include "console_help_catalog.h"
 #endif
 #ifndef UWVM_MODULE_EXPORT
@@ -25,9 +27,9 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
 {
     inline constexpr ::std::size_t max_command_bytes{512};
-    inline constexpr ::std::size_t max_input_command_bytes{wasip1_state::maximum_command_bytes}; // Long input is restricted to WASIp1 text edits; raw memory remains <=1024.
+    inline constexpr ::std::size_t max_input_command_bytes{wasip1_state::maximum_command_bytes}; // Long input is restricted to bounded WASIp1 edits and HOST pretty-printer configuration.
     using command_text_view = ::fast_io::string_view;
-    enum class console_command_kind { assembly_breakpoint, module_list, protocol, source_step, source_breakpoint, source_locals, assembly_step, replacement_file, help, quit, unsupported, invalid, empty, assembly_disassemble, assembly_disassemble_range, wasm_event, wasm_script, assembly_registers, source_type, source_value, assembly_next, source_frame, wasm_state, wasip1_state, wasm_path, wasm_mutation, wasm_step, breakpoint_control, assembly_finish, execution_relocate };
+    enum class console_command_kind { assembly_breakpoint, module_list, protocol, source_step, source_breakpoint, source_locals, assembly_step, replacement_file, help, quit, unsupported, invalid, empty, assembly_disassemble, assembly_disassemble_range, wasm_event, wasm_script, assembly_registers, source_type, source_value, assembly_next, source_frame, wasm_state, wasip1_state, wasm_path, wasm_mutation, wasm_step, breakpoint_control, assembly_finish, execution_relocate, source_print_options, source_printer_config };
     enum class unavailable_step_level { none, source, assembly };
     enum class source_step_policy { into, over, out };
     enum class source_run_to_policy { none, until, advance };
@@ -36,6 +38,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
     enum class breakpoint_action { enable, disable, ignore, condition };
     enum class console_launch_action { none, run, start, start_wasm, start_instruction, kill };
     enum class relocation_level { source, wasm, assembly };
+    enum class source_print_action { set_pretty, show_pretty, set_elements, show_elements, list_printers };
+    inline constexpr ::std::size_t maximum_source_print_elements{4096u};
     struct console_command
     {
         console_command_kind kind{console_command_kind::invalid};
@@ -63,6 +67,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         bool source_selected_finish{};
         // Human CLI display preferences only; never capture/read credentials.
         bool concise_source_locals{}, concise_backtrace{};
+        // HOST display/read budgets only; no new runtime operation or read authority.
+        bool source_raw{}, source_print_explicit_override{};
+        ::std::size_t source_print_elements{200u};
+        source_print_action source_print_policy{};
+        ::std::shared_ptr<source_pretty_registry::registry const> source_printers{};
+        source_pretty_registry::request source_printer_request{}; // HOST configuration DATA; never a runtime operation.
         source_run_to_policy source_run_to{}; // bounded host scheduling DATA, not a frame credential.
         ::std::uint64_t requested_step_thread{};
         ::std::uint64_t disassembly_stop_identifier{}, disassembly_count{};
@@ -94,6 +104,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         ::std::uint64_t relocation_target{};
         bool relocation_absolute{};
         bool source_frame_explicit{}; // per-request ordinal, never activation/read authority.
+    };
+    // Console-owned preferences survive a CLI run/restart. Explicit /r and /p
+    // apply to one query; changing a preference never captures a source value.
+    struct console_print_preferences
+    {
+        bool pretty{true};
+        ::std::size_t elements{200u};
+        ::std::shared_ptr<source_pretty_registry::registry const> source_printers{};
+        void apply(console_command& command) const noexcept
+        {
+            command.source_printers = command.kind == console_command_kind::source_value ? source_printers : nullptr;
+            if(command.kind != console_command_kind::source_value && command.kind != console_command_kind::source_locals) { return; }
+            if(!command.source_print_explicit_override) { command.source_raw = !pretty; }
+            command.source_print_elements = elements;
+        }
+        void update(console_command const& command) noexcept
+        {
+            if(command.kind != console_command_kind::source_print_options) { return; }
+            if(command.source_print_policy == source_print_action::set_pretty) { pretty = !command.source_raw; }
+            else if(command.source_print_policy == source_print_action::set_elements && command.source_print_elements <= maximum_source_print_elements)
+            { elements = command.source_print_elements; }
+        }
+        [[nodiscard]] source_pretty_registry::error configure(source_pretty_registry::request const& request) noexcept
+        { return source_pretty_registry::apply_request(source_printers.get(),request,source_printers); }
     };
     [[nodiscard]] inline constexpr ::fast_io::string_view unsupported_step_message(console_command const& command) noexcept
     {
@@ -219,6 +253,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 result.breakpoint_initial_ignore = true; result.breakpoint_ignore = count; return result;
             }
         }
+        if(head == "pretty-printer")
+        {
+            auto request{source_pretty_registry::parse_host_command(::std::string_view{line.data(),line.size()})};
+            if(request.operation == source_pretty_registry::action::invalid) { return {}; }
+            console_command result{console_command_kind::source_printer_config};
+            result.source_printer_request = ::std::move(request); return result;
+        }
         if(line.size()>max_command_bytes)
         {
             constexpr ::fast_io::string_view raw_memory_prefix{"set wasm memory "};
@@ -226,6 +267,49 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             bool const wasip1{details::command_prefix_end(line, wasip1_prefix) != ::fast_io::containers::npos};
             bool const memory{line.size() <= 1024u && details::command_prefix_end(line, raw_memory_prefix) != ::fast_io::containers::npos};
             if(!wasip1 && !memory) { return {}; }
+        }
+        // Formatting preferences are consumed by the human HOST console.
+        // Deliberately leave operation/payload unset: a private controller or
+        // transport cannot turn these commands into guest control operations.
+        if(head == "set" || head == "show" || head == "info")
+        {
+            auto cursor{details::skip_command_space(line, head_end)};
+            auto const word{[&]() noexcept
+            { auto const begin{cursor}; cursor = details::command_word_end(line, cursor);
+              auto const token{line.subview(begin, cursor - begin)}; cursor = details::skip_command_space(line, cursor); return token; }};
+            auto const category{word()};
+            if(head == "info" && category == "pretty-printer")
+            {
+                if(cursor != line.size()) { return {}; }
+                console_command result{console_command_kind::source_print_options};
+                result.source_print_policy = source_print_action::list_printers; return result;
+            }
+            if((head == "set" || head == "show") && category == "print")
+            {
+                auto const option{word()};
+                if(option != "pretty" && option != "elements") { return {}; }
+                console_command result{console_command_kind::source_print_options};
+                if(head == "show")
+                {
+                    if(cursor != line.size()) { return {}; }
+                    result.source_print_policy = option == "pretty" ? source_print_action::show_pretty : source_print_action::show_elements;
+                    return result;
+                }
+                auto const value{word()};
+                if(cursor != line.size()) { return {}; }
+                if(option == "pretty")
+                {
+                    if(value != "on" && value != "off") { return {}; }
+                    result.source_print_policy = source_print_action::set_pretty; result.source_raw = value == "off";
+                }
+                else
+                {
+                    ::std::uint64_t count{};
+                    if(!details::parse_decimal(value, count) || count > maximum_source_print_elements) { return {}; }
+                    result.source_print_policy = source_print_action::set_elements; result.source_print_elements = static_cast<::std::size_t>(count);
+                }
+                return result;
+            }
         }
         // WASIp1 is a separate host-environment debugger level. The parser owns
         // opaque argument/environment bytes; it grants no guest descriptor or
@@ -472,7 +556,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             result.operation = ::uwvm2::utils::control::operation::locals;
             auto cursor{name_end}; auto const skip{[&]() noexcept
             { while(cursor < line.size() && ::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor; } }};
-            skip(); auto expression_begin{cursor};
+            skip();
+            if(result.kind == console_command_kind::source_value)
+            {
+                auto const option_end{details::command_word_end(line, cursor)};
+                auto const option{line.subview(cursor, option_end - cursor)};
+                if(option == "/r" || option == "--raw" || option == "/p" || option == "--pretty" || option == "--")
+                {
+                    result.source_print_explicit_override = option != "--";
+                    result.source_raw = option == "/r" || option == "--raw";
+                    cursor = option_end; skip();
+                }
+            }
+            auto expression_begin{cursor};
             auto const word{[&]() noexcept
             { auto const begin{cursor}; while(cursor < line.size() && !::fast_io::char_category::c_space::char_is(line[cursor])) { ++cursor; }
               auto const token{line.subview(begin,cursor-begin)}; skip(); return token; }};

@@ -1,4 +1,5 @@
 module;
+#include "language_debug_features.h"
 export module uwvm2.uwvm.debugger;
 export import uwvm2.uwvm.debugger.wasip1_calls;
 export import :console_help_catalog;
@@ -59,6 +60,11 @@ export import :source_dwarf_query;
 export import :source_dwarf_values;
 export import :source_type_declarators;
 export import :source_dwarf_objects;
+export import uwvm2.uwvm.debugger.source_pretty_registry;
+#if UWVM_DEBUG_LANGUAGE_CPP
+export import :source_pretty_coroutine;
+#endif
+export import :source_pretty_printer;
 export import :source_dwarf_index;
 #define UWVM_MODULE
 #define UWVM_MODULE_EXPORT export

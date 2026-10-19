@@ -1,0 +1,2 @@
+# Example binaries are regenerated from their WAT or language sources.
+*.wasm

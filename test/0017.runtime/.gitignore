@@ -1,0 +1,2 @@
+*.json
+!language_debug_capabilities_*.json

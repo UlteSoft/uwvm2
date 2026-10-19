@@ -31,6 +31,9 @@ control_flow_stack.push_back({
     .end_label_id = func_end_label_id,
     .else_label_id = SIZE_MAX
 });
+// [allocated function end label] -> [live function control frame 0].
+labels.index_unchecked(func_end_label_id).end_frame_index = 0uz;
+
 
 // start parse the code
 auto code_curr{code_begin};
@@ -47,7 +50,7 @@ auto const to_wasm1_value_type{[](curr_operand_stack_value_type type) constexpr 
 auto const opcode_byte{[](wasm1p1_code opcode) constexpr noexcept -> wasm_byte { return static_cast<wasm_byte>(opcode); }};
 auto const opcode_u32{[&](wasm1p1_code opcode) constexpr noexcept -> wasm_u32 { return static_cast<wasm_u32>(opcode_byte(opcode)); }};
 
-auto const is_reference_value_type{[](curr_operand_stack_value_type type) constexpr noexcept -> bool
+[[maybe_unused]] auto const is_reference_value_type{[](curr_operand_stack_value_type type) constexpr noexcept -> bool
                                    { return type == curr_operand_stack_value_type::funcref ||
                                             type == curr_operand_stack_value_type::externref ||
                                             static_cast<unsigned>(type) == 0x69u; }};
@@ -476,6 +479,8 @@ auto const enter_control_frame{
                                       .else_label_id = else_label_id,
                                       .wasm_code_curr_at_start_label = wasm_code_curr_at_start_label});
 
+        // Bind only this live frame. A reused depth is rechecked by label identity.
+        labels.index_unchecked(end_label_id).end_frame_index = control_flow_stack.size() - 1uz;
         is_polymorphic = false;
         // push_ctrl reifies declared parameters even after an unreachable parent.
         // Only the dead execution model is rebuilt; live entry caches are unchanged.

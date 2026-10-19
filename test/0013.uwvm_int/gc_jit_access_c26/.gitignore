@@ -1,0 +1,18 @@
+# Profiling/codegen outputs; preserve source WAT and oracle/config inputs.
+*.json
+!cases.json
+!*oracle*.json
+!*config*.json
+!specs/**/*.json
+*.txt
+!README*.txt
+*.asm
+*.s
+*.ll
+*.clif
+*.mca
+/profiles/**/*.cfg
+/profiles/**/*.options
+/bindings/
+/candidate/
+/frozen-private-source*/

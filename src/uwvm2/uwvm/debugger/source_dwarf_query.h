@@ -34,9 +34,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
     // Only the current physical frame can be expanded. No LLVM API/expression,
     // source file, native pointer, caller PC, local or memory value is accessed.
     [[nodiscard]] inline inline_query_error query_inline_frames(::std::span<scope_record const> scopes,
-        ::std::uint64_t pc, ::std::vector<inline_frame>& out, inline_query_limits const& cap = {}) noexcept
+        ::std::uint64_t pc, ::std::vector<inline_frame>& out, inline_query_limits const& cap = {}, owned_scope_paths const* scope_owner = nullptr,
+        ::std::size_t* physical_record_index = nullptr) noexcept
     {
         out.clear();
+        if(physical_record_index!=nullptr) { *physical_record_index=no_record; }
 #if defined(__cpp_exceptions) || defined(_CPPUNWIND)
         try
         {
@@ -48,7 +50,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
             { return inline_query_error::limit_exceeded; }
             concrete_scope_path path{};
             scope_path_limits const path_cap{cap.max_scopes, cap.max_ranges, cap.max_depth, cap.max_frames + 1u};
-            auto const selected{query_concrete_scope_path(scopes, pc, path, path_cap)};
+            auto const selected{query_concrete_scope_path(scopes, pc, path, path_cap, scope_owner)};
             switch(selected)
             {
                 case scope_path_error::none: break;
@@ -78,7 +80,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
                     ::fast_io::concat_std(::std::string_view{scope.call_file}), scope.call_line, scope.call_column});
             }
             ::std::reverse(pending.begin(), pending.end());
-            out = ::std::move(pending); return inline_query_error::none;
+            if(path.record_indices.empty()) { return inline_query_error::malformed; }
+            out = ::std::move(pending);
+            // Return only the already validated metadata index for this same
+            // PC/cap/owner path, after all display-string limits succeeded.
+            // This carries no source, stop, frame or memory-read authority.
+            if(physical_record_index!=nullptr) { *physical_record_index=path.record_indices.front(); }
+            return inline_query_error::none;
 #if defined(__cpp_exceptions) || defined(_CPPUNWIND)
         }
         catch(...) { out.clear(); return inline_query_error::allocation_failure; }

@@ -285,11 +285,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     case console_command_kind::wasm_event:
                     case console_command_kind::wasm_script:
                     case console_command_kind::replacement_file:
+                    case console_command_kind::source_print_options:
+                    case console_command_kind::source_printer_config:
                     case console_command_kind::module_list:
                     case console_command_kind::protocol: break;
                 }
-                auto const reply{control.execute(command)};
-                if(!send_text(details::format_reply(reply, command))) { return; }
+                if(!send_text(details::execute_control_command(control, command))) { return; }
             }
         }
     };

@@ -59,6 +59,7 @@ export import :runtime_llvm_jit_full_policy;
 export import :runtime_llvm_jit_exception_dispatch;
 export import :runtime_llvm_jit_call_stack;
 export import :runtime_llvm_jit_cache_path;
+export import :runtime_llvm_jit_cache_seal_process;
 export import :runtime_debug_int;
 export import :runtime_int;
 export import :runtime_jit;

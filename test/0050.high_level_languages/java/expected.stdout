@@ -1,0 +1,3 @@
+java semantics: PASS
+classes arrays exceptions strings utf16 long allocation-cycles gc-request
+checksum=-2080261270

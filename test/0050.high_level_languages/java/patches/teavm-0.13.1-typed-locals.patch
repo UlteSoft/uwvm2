@@ -1,0 +1,30 @@
+--- a/org/teavm/backend/wasm/generate/DwarfFunctionGenerator.java
++++ b/org/teavm/backend/wasm/generate/DwarfFunctionGenerator.java
+@@ -111,10 +111,10 @@
+             writer.ref(classGen.getTypePtr(descriptor.parameterType(i)), Blob::writeInt);
+ 
+             var operations = new Blob();
+-            operations.writeByte(DW_OP_WASM_LOCATION).writeByte(0).writeLEB(i + 1);
+-            if (local.getJavaType() == VariableType.OBJECT) {
+-                operations.writeByte(DW_OP_STACK_VALUE);
+-            }
++            // Wasm locals include parameters and are indexed from zero. The
++            // Java variable is the local's value, not guest memory at its bits.
++            operations.writeByte(DW_OP_WASM_LOCATION).writeByte(0).writeLEB(local.getIndex());
++            operations.writeByte(DW_OP_STACK_VALUE);
+             writer.writeLEB(operations.size());
+             operations.newReader(writer::write).readRemaining();
+         }
+@@ -129,10 +129,8 @@
+             writer.ref(classGen.getTypePtr(local.getJavaType()), Blob::writeInt);
+ 
+             var operations = new Blob();
+-            operations.writeByte(DW_OP_WASM_LOCATION).writeByte(0).writeLEB(i + 1);
+-            if (local.getJavaType() == VariableType.OBJECT) {
+-                operations.writeByte(DW_OP_STACK_VALUE);
+-            }
++            operations.writeByte(DW_OP_WASM_LOCATION).writeByte(0).writeLEB(local.getIndex());
++            operations.writeByte(DW_OP_STACK_VALUE);
+             writer.writeLEB(operations.size());
+             operations.newReader(writer::write).readRemaining();
+         }

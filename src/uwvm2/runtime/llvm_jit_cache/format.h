@@ -31,6 +31,7 @@
 # include <cstring>
 # include <limits>
 # include <memory>
+# include "runtime_origin.h"
 # include <utility>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
@@ -58,11 +59,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         isa_mismatch,             // Native code cannot be reused across incompatible target triples or CPU features.
         context_mismatch,         // ABI, LLVM, or codegen policy differs from the environment that produced the blob.
         signature_missing,        // Verification is enabled, but the blob was produced without an identity signature.
-        signature_mismatch,       // The signed bytes no longer match the deterministic cache identity.
+        signature_mismatch,       // The signed bytes fail mandatory kernel-origin authentication.
         unsupported_signature,    // The signature kind is unknown or unavailable in this build.
         unsupported_compression,  // The payload codec is unknown to this reader.
         decompression_failed,     // The compressed payload is invalid after all metadata checks passed.
-        size_limit_exceeded       // The object is larger than the caller's configured safety limit.
+        size_limit_exceeded,      // The object is larger than the caller's configured safety limit.
+        process_not_sealed,        // Actual PR_GET_DUMPABLE must be zero; process policy is never changed.
+        origin_authentication_required,
+        origin_admission_unavailable,
+        kernel_origin_unavailable
     };
 
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view cache_status_name(cache_status status) noexcept
@@ -82,6 +87,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             case cache_status::unsupported_signature: return u8"unsupported-signature";
             case cache_status::unsupported_compression: return u8"unsupported-compression";
             case cache_status::decompression_failed: return u8"decompression-failed";
+            case cache_status::process_not_sealed: return u8"process-not-sealed";
+            case cache_status::origin_authentication_required: return u8"origin-authentication-required";
+            case cache_status::origin_admission_unavailable: return u8"origin-admission-unavailable";
+            case cache_status::kernel_origin_unavailable: return u8"kernel-origin-unavailable";
             case cache_status::size_limit_exceeded: return u8"size-limit-exceeded";
         }
         return u8"unknown";
@@ -104,6 +113,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
     inline constexpr ::std::size_t cache_ed25519_seed_size{32uz};
 
+    enum class cache_disable_reason { requested, process_not_sealed, authentication_required, admission_unavailable };
+
     struct cache_policy
     {
         bool enable{true};                                               // A single switch keeps all cache I/O opt-in at call sites.
@@ -111,7 +122,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         bool verify_signature{true};                                     // Readers verify by default because cached code is executable native code.
         compression_kind compression{compression_kind::uwvm_native_lz};  // Native-LZ is the default balance for object-file-like byte streams.
         ::std::size_t max_object_bytes{512uz * 1024uz * 1024uz};         // The limit bounds memory use before allocation or decompression.
+        cache_disable_reason disabled_reason{cache_disable_reason::requested}; // Diagnostic DATA, never authority.
     };
+
+    [[nodiscard]] inline constexpr cache_status cache_disabled_status(cache_policy const& policy) noexcept
+    {
+        switch(policy.disabled_reason)
+        {
+            case cache_disable_reason::process_not_sealed: return cache_status::process_not_sealed;
+            case cache_disable_reason::authentication_required: return cache_status::origin_authentication_required;
+            case cache_disable_reason::admission_unavailable: return cache_status::origin_admission_unavailable;
+            default: return cache_status::disabled; // Cannot claim an accepted object via diagnostic DATA.
+        }
+    }
 
     struct cache_context
     {
@@ -119,13 +142,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         ::uwvm2::utils::container::u8string cache_key{};       // The semantic key names the source/module identity before ISA hardening is added.
         ::uwvm2::utils::container::u8string target_triple{};   // The target triple is part of the ABI of generated machine code.
         ::uwvm2::utils::container::u8string cpu_name{};        // CPU selection can change instruction scheduling and enabled code paths.
+        ::uwvm2::utils::container::u8string data_layout{};     // Actual LLVM DataLayout is independent of triple/CPU selection.
         ::uwvm2::utils::container::u8string cpu_features{};    // Feature bits prevent AVX/SIMD or similar code from crossing host boundaries.
         ::uwvm2::utils::container::u8string llvm_version{};    // LLVM upgrades can change object emission even for identical IR.
         ::uwvm2::utils::container::u8string uwvm_abi{};        // Runtime ABI changes invalidate calls, relocations, and imported symbols.
         ::uwvm2::utils::container::u8string codegen_policy{};  // Optimization policy participates because it affects emitted native code.
-        ::uwvm2::utils::container::array<::std::byte, cache_ed25519_seed_size> signature_seed{};  // The seed binds signatures to this cache identity.
+        ::uwvm2::utils::container::array<::std::byte, cache_ed25519_seed_size> signature_seed{};  // Public context seed only; persistent I/O derives a temporary kernel-origin private seed.
+        ::uwvm2::utils::container::array<::std::byte, 32uz> self_executable_sha256{};
+        bool has_self_executable_sha256{};  // Final store/load checks compare this against the authenticated process identity.
         bool has_signature_seed{};     // A missing seed disables signing/verification instead of producing weak output.
         bool cache_key_is_complete{};  // Complete keys skip module hashing when the caller already supplied full identity.
+        runtime_origin::reference origin{}; // Weak only; NEVER serialized, keyed, or source-owning.
     };
 
     struct cache_load_result
@@ -174,9 +201,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                                 ::std::byte{'J'},
                                                 ::std::byte{'C'},
                                                 ::std::byte{0x01u}};
-    // v5 adds mandatory product-domain metadata and namespaced storage. Reject
-    // v4 instead of migrating executable objects with no product provenance.
-    inline constexpr ::std::uint_least32_t cache_format_version{5u};
+    // v6 requires the real executing binary SHA256 and actual DataLayout.
+    // v5 objects are not migrated: matching manual build/version strings cannot
+    // establish native runtime compatibility across different executables.
+    inline constexpr ::std::uint_least32_t cache_format_version{7u};
     inline constexpr ::std::size_t cache_fixed_header_size{64uz};
     inline constexpr ::std::size_t cache_sha256_digest_size{32uz};
     inline constexpr ::std::size_t cache_ed25519_signature_size{64uz};
@@ -382,23 +410,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     {
         ::uwvm2::utils::container::vector<::std::byte> out{};
         out.reserve(details::key_value_size(u8"target", ctx.target_triple.size()) + details::key_value_size(u8"cpu", ctx.cpu_name.size()) +
-                    details::key_value_size(u8"features", ctx.cpu_features.size()));
+                    details::key_value_size(u8"features", ctx.cpu_features.size()) + details::key_value_size(u8"layout", ctx.data_layout.size()));
         // ISA fields are isolated so a target miss can be reported before more general context validation.
         details::append_key_value(out, u8"target", ctx.target_triple);
         details::append_key_value(out, u8"cpu", ctx.cpu_name);
         details::append_key_value(out, u8"features", ctx.cpu_features);
+        details::append_key_value(out, u8"layout", ctx.data_layout);
         return out;
     }
 
     [[nodiscard]] inline constexpr ::uwvm2::utils::container::vector<::std::byte> make_context_metadata(cache_context const& ctx) noexcept
     {
         ::uwvm2::utils::container::vector<::std::byte> out{};
-        out.reserve(details::key_value_size(u8"product", cache_product_name.size()) +
+        out.reserve(details::key_value_size(u8"origin-auth", sizeof(u8"kernel-user-keyring-hmac-sha256-ed25519-v1") - 1u) + details::key_value_size(u8"product", cache_product_name.size()) +
                     details::key_value_size(u8"key", ctx.cache_key.size()) + details::key_value_size(u8"llvm", ctx.llvm_version.size()) +
-                    details::key_value_size(u8"uwvm_abi", ctx.uwvm_abi.size()) + details::key_value_size(u8"codegen", ctx.codegen_policy.size()));
+                    details::key_value_size(u8"uwvm_abi", ctx.uwvm_abi.size()) + details::key_value_size(u8"codegen", ctx.codegen_policy.size()) +
+                    details::key_value_size(u8"self-executable-sha256", ctx.self_executable_sha256.size()));
         // This fixed product field is authenticated and included in the path
         // digest; changing only a filename or the public magic cannot bypass it.
         details::append_key_value(out, u8"product", cache_product_name);
+        details::append_key_value(out, u8"origin-auth", u8"kernel-user-keyring-hmac-sha256-ed25519-v1");
+        details::append_key_value_bytes(out, u8"self-executable-sha256", ctx.self_executable_sha256.data(), ctx.self_executable_sha256.size());
         // Context metadata captures the non-ISA inputs that can silently change symbol layout or object contents.
         details::append_key_value(out, u8"key", ctx.cache_key);
         details::append_key_value(out, u8"llvm", ctx.llvm_version);
@@ -456,7 +488,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 
         if(static_cast<::std::size_t>(last - first) != total) [[unlikely]] { return cache_status::malformed; }
 
-        // Views point into the mapped file to avoid copies; size validation above must therefore be exact.
+        // Views point into the owned immutable byte snapshot; size validation above must therefore be exact.
         auto cursor{first + cache_fixed_header_size};
         view.isa_metadata = cursor;
         cursor += static_cast<::std::size_t>(view.header.isa_metadata_size);

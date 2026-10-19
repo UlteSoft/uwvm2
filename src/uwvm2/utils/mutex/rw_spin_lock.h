@@ -80,7 +80,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
         // ARM / AArch64: use YIELD-style builtin if available
 # if UWVM_HAS_BUILTIN(__builtin_aarch64_yield)
         __builtin_aarch64_yield();
-# elif UWVM_HAS_BUILTIN(__builtin_arm_yield)
+# elif UWVM_HAS_BUILTIN(__builtin_arm_yield) && \
+    ((defined(__ARM_ARCH) && __ARM_ARCH >= 7) || defined(__ARM_ARCH_6K__) || defined(__ARM_ARCH_6ZK__) || \
+     defined(__ARM_ARCH_6M__) || defined(__ARM_ARCH_6T2__))
         __builtin_arm_yield();
 # else
         ::std::atomic_signal_fence(::std::memory_order_seq_cst);

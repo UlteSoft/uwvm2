@@ -1,0 +1,34 @@
+# Language producer inputs stay in Git; execution evidence is regenerated.
+*.json
+!package.json
+!package-lock.json
+!global.json
+!moon.mod.json
+!moon.pkg.json
+!cases.json
+!*-cases.json
+!recipes.json
+!support-matrix.json
+!versions.json
+!*-plan.json
+/engines/*/
+/recovery*/
+**/recovery*/
+**/qualification-*/
+**/candidate-*/
+**/fd-readdir-r*/
+**/*-audit-r*/
+**/*-analysis-r*/
+**/*-diagnostic-r*/
+**/*-static-r*/
+/python/debug-memory-analysis/
+/python/debug-producer/evidence-sources/
+/python/debug-full-*/
+/python/fd-readdir-candidate/
+/wasi-readdir/before/
+/wasi-readdir/candidate/
+
+# Captured engine help, environment inventories and run-specific source audits.
+/engines/*.txt
+**/*-source-review-r*/
+**/*-source-analysis-r*/

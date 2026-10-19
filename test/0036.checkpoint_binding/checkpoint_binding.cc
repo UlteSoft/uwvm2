@@ -1,3 +1,4 @@
+// v7 raw signer/verifier exercises fixture DATA only, not kernel-origin authentication.
 // Actual owned file/hash and actual signed cache-format component. Never a
 // loaded-runtime build issuer, executed-cache receipt, stop or restore proof.
 #include <uwvm2/uwvm/debugger/checkpoint_binding_dependency_contract.h>
@@ -79,6 +80,9 @@ int main(int argc, char** argv)
     cache::details::append_cache_key_value(ctx.cache_key, u8"wasm", u8"fixture-A");
     ctx.target_triple = u8"component-target"; ctx.cpu_name = u8"component-cpu"; ctx.cpu_features = u8"component-feature";
     ctx.llvm_version = u8"component-provider"; ctx.uwvm_abi = u8"component-abi"; ctx.codegen_policy = u8"component-policy";
+    ctx.data_layout = u8"component-layout";
+    ctx.self_executable_sha256[0u] = ::std::byte{0x42u}; ctx.has_self_executable_sha256 = true;
+    REQUIRE(ctx.origin.expired()); // Synthetic image/seed fields are DATA, never an actual origin.
     ctx.signature_seed[0u] = ::std::byte{0x42u}; ctx.has_signature_seed = true; ctx.cache_key_is_complete = true;
     // This test seed is not runtime/cache admission authority. Actual signing
     // and verification establish only this component's codec/context evidence.
@@ -94,14 +98,17 @@ int main(int argc, char** argv)
     REQUIRE(cache::parse_cache_blob(actual_b.image->bytes().data(), actual_b.image->bytes().data() + actual_b.image->size(), cb_view) == cache::cache_status::ok);
     // Alter the real cache header through a bounded fast_io LE writer. The
     // cache parser must reject its unsupported version before metadata/payload.
+    cache::cache_blob_view wrong_view{};
+    for(auto legacy_version : {5u, 6u})
+    {
     auto wrong_cache_format{a}; REQUIRE(wrong_cache_format.size() >= 12u);
     // [magic8][version4][remaining...>=0] exclusive_end
     // [safe] complete 12byte bound BEFORE base+8/base+12 cursor formation.
     auto* format_begin{reinterpret_cast<unsigned char*>(wrong_cache_format.data()) + 8u};
     ::fast_io::basic_obuffer_view<unsigned char> format_out{format_begin, format_begin + 4u};
-    ::fast_io::print(format_out, ::fast_io::mnp::le_put<32>(cache::cache_format_version - 1u));
-    cache::cache_blob_view wrong_view{};
+    ::fast_io::print(format_out, ::fast_io::mnp::le_put<32>(legacy_version));
     REQUIRE(cache::parse_cache_blob(wrong_cache_format.cbegin(), wrong_cache_format.cend(), wrong_view) == cache::cache_status::unsupported_version);
+    }
     auto cross_product_cache{a}; REQUIRE(cross_product_cache.size() >= 8u);
     // [actual fixed8 other-product magic][owned real cache bytes>=8] end
     // [safe] BOTH fixed source and destination bounds precede byte copy.
@@ -257,5 +264,5 @@ int main(int argc, char** argv)
     for(auto byte : digest.digest) { ::fast_io::print(::fast_io::out(), ::fast_io::mnp::hex<false, true>(::std::to_integer<unsigned char>(byte))); }
     ::fast_io::print(::fast_io::out(), " bundle_digest=");
     for(auto byte : bundle_digest.digest) { ::fast_io::print(::fast_io::out(), ::fast_io::mnp::hex<false, true>(::std::to_integer<unsigned char>(byte))); }
-    ::fast_io::print(::fast_io::out(), " complete_modules=2 complete_objects=3 canonical_data_only=1 loaded_build_cache_issuer=0 whole_restore=0\n");
+    ::fast_io::print(::fast_io::out(), " complete_modules=2 complete_objects=3 canonical_data_only=1 fixture_codec_only=1 origin_authenticated=0 legacy_cache_versions_rejected=2 loaded_build_cache_issuer=0 whole_restore=0\n");
 }

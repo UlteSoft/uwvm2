@@ -456,6 +456,12 @@ template <auto Function>
     {
         function = ::llvm::Function::Create(function_type, ::llvm::Function::ExternalLinkage, symbol_name_ref, llvm_module);
     }
+    switch(threaded_host_emission_scope::bind(llvm_module,*function,function_address))
+    {
+        case threaded_host_emission_scope::selection::owned: return function;
+        case threaded_host_emission_scope::selection::rejected: return nullptr;
+        case threaded_host_emission_scope::selection::ordinary: break;
+    }
     ::llvm::sys::DynamicLibrary::AddSymbol(symbol_name_ref, reinterpret_cast<void*>(function_address));
 #if defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
     // The nearby pointer carrier uses R_RISCV_64 to rebind a far bridge on
@@ -512,6 +518,13 @@ template <auto Function>
     auto const insertion_block{ir_builder.GetInsertBlock()};
     auto const insertion_function{insertion_block == nullptr ? nullptr : insertion_block->getParent()};
     auto const insertion_module{insertion_function == nullptr ? nullptr : insertion_function->getParent()};
+    switch(threaded_host_emission_scope::select(insertion_module))
+    {
+        case threaded_host_emission_scope::selection::owned:
+            return get_llvm_host_pointer_value(ir_builder,threaded_host_emission_scope::object_address(host_address),pointer_type);
+        case threaded_host_emission_scope::selection::rejected: return nullptr;
+        case threaded_host_emission_scope::selection::ordinary: break;
+    }
     switch(private_host_object_emission_scope::select(insertion_module))
     {
         case private_host_object_emission_scope::selection::wrong_module: return nullptr;
@@ -1862,6 +1875,26 @@ template <typename Element>
     using function_link_kind = ::uwvm2::uwvm::runtime::storage::imported_function_link_kind;
 
     runtime_direct_callee_resolution_t result{.state_valid = true};
+    if(threaded_host_emission_scope::selected())
+    {
+        if(compiler_registry!=nullptr || !threaded_host_emission_scope::owns_module(runtime_module))return {};
+        auto const imported=runtime_module.imported_function_vec_storage.size();
+        if(static_cast<::std::size_t>(func_index)<imported)
+        {
+            // The typed World factory and actual Runtime import admission own
+            // provider/principal/generation. Never follow a parent Wasm callee.
+            auto const& record=runtime_module.imported_function_vec_storage.index_unchecked(func_index);
+            if(record.link_kind==function_link_kind::defined||record.link_kind==function_link_kind::imported||
+               record.link_kind==function_link_kind::unresolved)return {};
+            result.function_type_ptr=resolve_runtime_callee_function_type(runtime_module,func_index);
+            return result.function_type_ptr==nullptr?runtime_direct_callee_resolution_t{}:result;
+        }
+        auto const local=static_cast<::std::size_t>(func_index)-imported;
+        if(local>=runtime_module.local_defined_function_vec_storage.size())return {};
+        result.function_type_ptr=runtime_module.local_defined_function_vec_storage.index_unchecked(local).function_type_ptr;
+        if(result.function_type_ptr==nullptr)return {};
+        result.direct_callable=true;result.func_index=func_index;return result;
+    }
     if(compiler_registry != nullptr)
     {
         bool member{};
@@ -11528,6 +11561,12 @@ template <bool Tail = false>
     else
     {
         auto table_view_begin{runtime_module_ptr->llvm_jit_call_indirect_table_views.data()};
+        if(threaded_host_emission_scope::selected())
+        {
+            if(!threaded_host_emission_scope::owns_module(*runtime_module_ptr))return false;
+            table_view_begin=reinterpret_cast<::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_view_t*>(
+                threaded_host_emission_scope::owned_table_views());
+        }
         if(table_view_begin == nullptr) [[unlikely]] { return false; }
 
         // The table view is a compact runtime-maintained snapshot: one entry per table with a target-record base address and
@@ -12285,6 +12324,52 @@ template <llvm_jit_simd_code Op,
         constexpr auto access_size{llvm_jit_simd_details::simd_memory_access_size<Op>()};
         if(auto pointer{emit_llvm_jit_direct_memory_pointer(state, static_offset, access_size, address.value, Kind == simd_kind::memory_store)}; pointer != nullptr)
         {
+            if(threaded_host_emission_scope::selected())
+            {
+                // The existing SIMD semantic emitter operates on PRIVATE entry
+                // scratch. Only exact accessed shared bytes use atomic cells.
+                // Alloca is hoisted to entry, so loops consume no growing stack.
+                static_assert(access_size>0u&&access_size<=16u);
+                auto scratch{create_v128_buffer(nullptr,get_llvm_string_ref(u8"threaded.simd.scratch"))};
+                if(scratch==nullptr)return false;
+                auto i8{ir_builder.getInt8Ty()};
+                auto private_bytes{ir_builder.CreatePointerCast(scratch,get_llvm_pointer_type(i8))};
+                auto shared_bytes{ir_builder.CreatePointerCast(pointer,get_llvm_pointer_type(i8))};
+                if constexpr(Kind==simd_kind::memory_load)
+                {
+                    // Initialize inaccessible lanes to defined private zero;
+                    // existing exact-size SIMD semantics select actual lanes.
+                    ir_builder.CreateStore(::llvm::Constant::getNullValue(llvm_v128_type),scratch);
+                    for(::std::size_t i{};i<access_size;++i)
+                    {
+                        auto shared_cell{ir_builder.CreateGEP(i8,shared_bytes,ir_builder.getInt64(i))};
+                        auto byte{ir_builder.CreateLoad(i8,shared_cell,"threaded.simd.load.byte")};
+                        byte->setAtomic(::llvm::AtomicOrdering::Monotonic);
+                        byte->setAlignment(::llvm::Align{1u});byte->setVolatile(true);
+                        auto private_cell{ir_builder.CreateGEP(i8,private_bytes,ir_builder.getInt64(i))};
+                        ir_builder.CreateStore(byte,private_cell)->setAlignment(::llvm::Align{1u});
+                    }
+                    auto value{simd_ir::emit_load<Op>(ir_builder,scratch,vector_value.value,lane,false)};
+                    if(value==nullptr)return false;
+                    operand_stack.push_back({.type=runtime_operand_stack_value_type::v128,.value=value});
+                    return true;
+                }
+                else
+                {
+                    if(simd_ir::emit_store<Op>(ir_builder,scratch,vector_value.value,lane)==nullptr)return false;
+                    for(::std::size_t i{};i<access_size;++i)
+                    {
+                        auto private_cell{ir_builder.CreateGEP(i8,private_bytes,ir_builder.getInt64(i))};
+                        auto byte{ir_builder.CreateLoad(i8,private_cell)};
+                        byte->setAlignment(::llvm::Align{1u});
+                        auto shared_cell{ir_builder.CreateGEP(i8,shared_bytes,ir_builder.getInt64(i))};
+                        auto store{ir_builder.CreateStore(byte,shared_cell)};
+                        store->setAtomic(::llvm::AtomicOrdering::Monotonic);
+                        store->setAlignment(::llvm::Align{1u});store->setVolatile(true);
+                    }
+                    return true;
+                }
+            }
             if constexpr(Kind == simd_kind::memory_load)
             {
                 auto value{simd_ir::emit_load<Op>(ir_builder, pointer, vector_value.value, lane,
@@ -13509,6 +13594,31 @@ template<bool NormalizedScalarMemory, bool NormalizedPageMemory = false, bool No
             auto type{get_llvm_type_from_wasm_value_type(llvm_context, result_type)};
             if(type == nullptr || load_bytes * 8uz > type->getScalarSizeInBits()) { return nullptr; }
             auto integer_type{ir_builder.getIntNTy(static_cast<unsigned>(load_bytes * 8uz))};
+            if(threaded_host_emission_scope::selected())
+            {
+                // Threaded profile plain shared accesses may tear, but cannot
+                // be LLVM non-atomic races with another guest/Host byte copy.
+                // Actual atomic Wasm opcodes retain their separate SC lowering.
+                auto i8{ir_builder.getInt8Ty()};
+                auto bytes{ir_builder.CreatePointerCast(pointer,get_llvm_pointer_type(i8))};
+                ::llvm::Value* assembled{::llvm::ConstantInt::get(integer_type,0u)};
+                for(::std::size_t i{};i<load_bytes;++i)
+                {
+                    auto cell{ir_builder.CreateGEP(i8,bytes,ir_builder.getInt64(i))};
+                    auto byte{ir_builder.CreateLoad(i8,cell,"threaded.plain.load.byte")};
+                    byte->setAtomic(::llvm::AtomicOrdering::Monotonic);
+                    byte->setAlignment(::llvm::Align{1u});byte->setVolatile(true);
+                    auto widened{ir_builder.CreateZExtOrTrunc(byte,integer_type)};
+                    if(i!=0u)widened=ir_builder.CreateShl(widened,i*8u);
+                    assembled=ir_builder.CreateOr(assembled,widened);
+                }
+                if(type->isFloatingPointTy())
+                {
+                    if(load_bytes*8uz!=type->getScalarSizeInBits())return nullptr;
+                    return ir_builder.CreateBitCast(assembled,type);
+                }
+                return ir_builder.CreateIntCast(assembled,type,signed_load);
+            }
             auto load{ir_builder.CreateLoad(integer_type, ir_builder.CreatePointerCast(pointer, get_llvm_pointer_type(integer_type)), "memory.load")};
             load->setAlignment(alignment);
             load->setVolatile(true);
@@ -13531,6 +13641,23 @@ template<bool NormalizedScalarMemory, bool NormalizedPageMemory = false, bool No
             if(store_bytes * 8uz > bits) { return nullptr; }
             auto integer_type{ir_builder.getIntNTy(static_cast<unsigned>(store_bytes * 8uz))};
             auto value_bits{ir_builder.CreateBitCast(value, ir_builder.getIntNTy(bits))};
+            if(threaded_host_emission_scope::selected())
+            {
+                auto integer{ir_builder.CreateIntCast(value_bits,integer_type,false)};
+                auto i8{ir_builder.getInt8Ty()};
+                auto bytes{ir_builder.CreatePointerCast(pointer,get_llvm_pointer_type(i8))};
+                ::llvm::StoreInst* last{};
+                for(::std::size_t i{};i<store_bytes;++i)
+                {
+                    auto shifted{i==0u?integer:ir_builder.CreateLShr(integer,i*8u)};
+                    auto byte{ir_builder.CreateZExtOrTrunc(shifted,i8)};
+                    auto cell{ir_builder.CreateGEP(i8,bytes,ir_builder.getInt64(i))};
+                    last=ir_builder.CreateStore(byte,cell);
+                    last->setAtomic(::llvm::AtomicOrdering::Monotonic);
+                    last->setAlignment(::llvm::Align{1u});last->setVolatile(true);
+                }
+                return last;
+            }
             auto stored{simd_ir::emitter{ir_builder}.endian(ir_builder.CreateIntCast(value_bits, integer_type, false))};
             return finalize_llvm_jit_direct_memory_store(
                 ir_builder.CreateStore(stored, ir_builder.CreatePointerCast(pointer, get_llvm_pointer_type(integer_type))), alignment);

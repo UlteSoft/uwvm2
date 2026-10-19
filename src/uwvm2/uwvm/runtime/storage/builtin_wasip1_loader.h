@@ -118,40 +118,59 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full
             }};
             if(!copy(signature.parameter,result.parameters,result.parameter_count) ||
                !copy(signature.result,result.results,result.result_count)) { return false; }
-            // Bind the ENTIRE ordered known interface, including names and
-            // signature types. Equal ABI shapes or a reordered optional tuple
-            // must not accidentally mean the same persisted host function.
-            if(known.size() > 128u) { return false; }
-            ::fast_io::sha256_context hash{};
-            auto const hash_number{[&](::std::uint64_t value) noexcept
+            // The typed compile-time interface is immutable for this binary.
+            // Cache only its fingerprint, never membership, source identity,
+            // stop state, signature output or guest-memory access authority.
+            // The current_member/index/signature checks above run every time.
+            struct known_interface_fingerprint
             {
-                ::std::array<unsigned char,8u> bytes{};
-                // [owned8 LE output bytes][one-past] end
-                // [safe] fixed extent BEFORE constructing/advancing cursors.
-                ::fast_io::basic_obuffer_view<unsigned char> out{bytes.data(),bytes.data()+bytes.size()};
-                ::fast_io::io::print(out,::fast_io::mnp::le_put<64u>(value));
-                hash.update(reinterpret_cast<::std::byte const*>(bytes.data()),
-                    reinterpret_cast<::std::byte const*>(bytes.data()+bytes.size()));
-            }};
-            hash_number(builtin_wasip1_function_data::interface_revision);hash_number(known.size());
-            for(::std::size_t position{};position != known.size();++position)
-            {
-                auto const& entry{known[position]};auto const name{entry.function_name};
-                if(entry.index != position || name.empty() || name.size() > 1024u || name.data() == nullptr) { return false; }
-                // [known compile-time UTF8 name0..size<=1024][one-past] end
-                // [safe] owned literal extent BEFORE any pointer advance.
-                hash_number(position);hash_number(name.size());
-                auto const* first{reinterpret_cast<::std::byte const*>(name.data())};hash.update(first,first+name.size());
-                ::std::array<unsigned char,16u> parameters{},results{};unsigned parameter_count{},result_count{};
-                if(!copy(entry.function_type.parameter,parameters,parameter_count) ||
-                   !copy(entry.function_type.result,results,result_count)) { return false; }
-                hash_number(parameter_count);hash_number(result_count);
-                // copy() proves each count<=16 before these fixed array end
-                // pointers are formed, including zero-arity signatures.
-                auto const* p{reinterpret_cast<::std::byte const*>(parameters.data())};hash.update(p,p+parameter_count);
-                auto const* r{reinterpret_cast<::std::byte const*>(results.data())};hash.update(r,r+result_count);
-            }
-            hash.do_final();hash.digest_to_byte_ptr(result.interface_sha256.data());
+                ::std::array<::std::byte,32u> digest{};
+                bool valid{};
+            };
+            // C++ local-static initialization serializes concurrent first use.
+            // The two references are consumed only during initialization;
+            // neither reference nor the local lambda is retained in the cache.
+            static known_interface_fingerprint const interface_fingerprint{
+                [&known, &copy]() noexcept -> known_interface_fingerprint
+                {
+                    known_interface_fingerprint fingerprint{};
+                    // Bind the complete ordered interface, including names
+                    // and signatures, with the unchanged revision-1 encoding.
+                    if(known.size() > 128u) { return known_interface_fingerprint{}; }
+                    ::fast_io::sha256_context hash{};
+                    auto const hash_number{[&](::std::uint64_t value) noexcept
+                    {
+                        ::std::array<unsigned char,8u> bytes{};
+                        // [owned8 LE output bytes][one-past] end
+                        // [safe] fixed extent BEFORE constructing/advancing cursors.
+                        ::fast_io::basic_obuffer_view<unsigned char> out{bytes.data(),bytes.data()+bytes.size()};
+                        ::fast_io::io::print(out,::fast_io::mnp::le_put<64u>(value));
+                        hash.update(reinterpret_cast<::std::byte const*>(bytes.data()),
+                            reinterpret_cast<::std::byte const*>(bytes.data()+bytes.size()));
+                    }};
+                    hash_number(builtin_wasip1_function_data::interface_revision);hash_number(known.size());
+                    for(::std::size_t position{};position != known.size();++position)
+                    {
+                        auto const& entry{known[position]};auto const name{entry.function_name};
+                        if(entry.index != position || name.empty() || name.size() > 1024u || name.data() == nullptr) { return known_interface_fingerprint{}; }
+                        // [known compile-time UTF8 name0..size<=1024][one-past] end
+                        // [safe] owned literal extent BEFORE any pointer advance.
+                        hash_number(position);hash_number(name.size());
+                        auto const* first{reinterpret_cast<::std::byte const*>(name.data())};hash.update(first,first+name.size());
+                        ::std::array<unsigned char,16u> parameters{},results{};unsigned parameter_count{},result_count{};
+                        if(!copy(entry.function_type.parameter,parameters,parameter_count) ||
+                           !copy(entry.function_type.result,results,result_count)) { return known_interface_fingerprint{}; }
+                        hash_number(parameter_count);hash_number(result_count);
+                        // copy() proves each count<=16 before these fixed array end
+                        // pointers are formed, including zero-arity signatures.
+                        auto const* p{reinterpret_cast<::std::byte const*>(parameters.data())};hash.update(p,p+parameter_count);
+                        auto const* r{reinterpret_cast<::std::byte const*>(results.data())};hash.update(r,r+result_count);
+                    }
+                    hash.do_final();hash.digest_to_byte_ptr(fingerprint.digest.data());
+                    fingerprint.valid=true;return fingerprint;
+                }()};
+            if(!interface_fingerprint.valid) { return false; }
+            result.interface_sha256=interface_fingerprint.digest;
             output=result;return true;
 #else
             (void)actual;(void)index;(void)output;return false;
@@ -174,6 +193,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full
                actual.index_unchecked(selected_->ordinal_).ptr != selected_->implementation_) { return false; }
             selected_.reset(); actual.pop_back(); return true;
         }
+        // The threaded loader also owns concrete ROS/threads providers. If no
+        // WASIp1 builtin was actually recorded there is nothing of ours to pop;
+        // leave that other prefix to its own real typed factory retirement.
+        [[nodiscard]] static bool retire_recorded_builtin_after_source_drain() noexcept
+        {
+            if(!::uwvm2::uwvm::wasm::storage::all_module.empty()) { return false; }
+            return !selected_ || retire_actual_builtin_after_source_drain();
+        }
         // Sole issuer performs the real original insertion itself from the
         // exact builtin concrete type. No module pointer, type name, caller
         // ready bool, imported target or external registration is accepted.
@@ -185,9 +212,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full
             auto const ordinal{actual.size()};
             selected_.reset(); // A previous setup identity never survives reuse.
             actual.emplace_back(::uwvm2::uwvm::imported::wasi::wasip1::local_imported::wasip1_local_imported_module);
-            // Only debugger-owned immutable sources need the provenance record.
-            // Ordinary loaders retain their original allocation/call behavior.
-            if(!::uwvm2::uwvm::wasm::storage::active_execute_wasm().has_owned_source_image()) { return true; }
+            // Actual typed factory provenance also authenticates ordinary mapped
+            // Full cache admission. This records identity, never a Guest grant.
+            [[maybe_unused]] bool const required_for_debug{::uwvm2::uwvm::wasm::storage::active_execute_wasm().has_owned_source_image()};
             if(ordinal >= actual.size() || actual.size()-ordinal != 1u) { return false; }
 # if defined(UWVM_CPP_EXCEPTIONS)
             try
@@ -198,7 +225,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full
                     new builtin_wasip1_loader_identity{implementation,ordinal}};
                 result->canonical_owner_=result;selected_=::std::move(result);return true;
             }
-            catch(...) { return false; } // No source/publication can seal this failed setup.
+            // Ordinary OOM preserves the previous native-loading result while
+            // leaving no identity: persistent cache then fails closed. Debug
+            // captures still require their original mandatory provenance.
+            catch(...) { return !required_for_debug; }
 # else
             // Original no-EH native loading still succeeds. These builds cannot
             // issue an executable/debug capture or a provider identity: leaving

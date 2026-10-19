@@ -438,6 +438,10 @@ class SourceFrameTests(unittest.TestCase):
         for ordinal, frame in enumerate(frames):
             scopes = self.send("scopes", frameId=frame["id"])["body"]["scopes"]
             expected = ["Source variables", "Wasm locals", "WASIp1 arguments", "WASIp1 environment", "WASIp1 descriptors", "WASIp1 preopens"] if ordinal == 2 else ["Caller variables unavailable"] if ordinal == 3 else ["Source variables"]
+            if ordinal == 2 and hasattr(self.adapter, "ros_scope_stops"):
+                expected += ["ROS capabilities (process-owned)", "ROS instances (backend sessions)", "ROS event queues (metadata only)"]
+                self.assertTrue(all(row["expensive"] and row["variablesReference"] > 0 for row in scopes[6:]))
+                self.assertFalse(any(command.startswith(("info ros", "trace ros")) for command in self.broker.commands))
             self.assertEqual([row["name"] for row in scopes], expected)
             if ordinal == 2:
                 reply = self.send("variables", variablesReference=scopes[1]["variablesReference"])

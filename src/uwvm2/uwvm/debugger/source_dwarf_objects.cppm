@@ -16,6 +16,7 @@ module;
 export module uwvm2.uwvm.debugger:source_dwarf_objects;
 import fast_io;
 import :source_dwarf_types;
+import :source_scope_path;
 import :source_dwarf_query;
 import :source_dwarf_values;
 import :source_dwarf_variants;

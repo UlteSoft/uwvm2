@@ -1,0 +1,16 @@
+/*.json
+!*_cases.json
+*-work/**/*.json
+!*-work/**/spec.json
+!*-work/**/*cases.json
+!*-work/**/*plan.json
+!*-work/**/*config*.json
+!*-work/**/*oracle*.json
+
+# Source backups, patched snapshots and captured diagnostics from debugger runs.
+*-work/before*/
+*-work/qualified*/
+*-work/frozen-*
+*-work/*.patch
+*-work/*.txt
+!*-work/README*.txt

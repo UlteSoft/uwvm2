@@ -24,6 +24,9 @@
 
 #ifndef UWVM_MODULE
 // std
+# if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE) && defined(__linux__) && !defined(UWVM_MODULE)
+#  include <uwvm2/runtime/lib/threaded_exception_abi.h>
+# endif
 # include <atomic>
 # include <bit>
 # include <climits>
@@ -147,6 +150,7 @@
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 # include "translate/private_host_object_emission_scope.h"
+# include "translate/threaded_host_emission_scope.h"
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 {
     enum class llvm_jit_trap_kind : ::std::uint_least32_t

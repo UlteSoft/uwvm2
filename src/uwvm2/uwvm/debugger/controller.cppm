@@ -46,6 +46,7 @@ import uwvm2.utils.thread;
 import uwvm2.runtime;
 import uwvm2.runtime.exception;
 import :command;
+import uwvm2.uwvm.debugger.source_pretty_registry;
 import :breakpoint_index;
 import :management_wait_interrupt;
 import :source_map;

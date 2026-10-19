@@ -1,0 +1,23 @@
+[
+  {
+    "name": "java-teavm-perf-timed-200m",
+    "language": "java",
+    "target": "teavm-wasi",
+    "mode": "release",
+    "purpose": "ordinary-long",
+    "rounds": 200000000,
+    "iterations": 200000000,
+    "expected_checksum": 4822258612557296351,
+    "clock_kind": "monotonic-ns",
+    "wasm": "/tmp/high-level-20261017/java/target/perf-timed/java-perf-timed.wasm",
+    "wasm_sha256": "52505d5526e09f85c7e4b7e9781f38aabcbe7c3c35c3ca7642a280572e6757ee",
+    "args": ["200000000"],
+    "checks": ["checksum=4822258612557296351"],
+    "kernel_time": "ns",
+    "kernel_clock": "monotonic",
+    "clock_line_prefix": "Kernel ns: ",
+    "checksum_line": "checksum=4822258612557296351",
+    "generated_source": "/tmp/high-level-20261017/java/src/main/java/uwvm/hll/PerfTimed.java",
+    "oracle": "/tmp/high-level-20261017/java/perf-timed-200m-reference/report.json"
+  }
+]

@@ -1,0 +1,35 @@
+[
+  {
+    "name": "csharp-mono-wasm-profile-100000000",
+    "language": "csharp",
+    "target": "mono-wasm",
+    "backend": "mono-interpreter",
+    "optimization": "release",
+    "rounds": 100000000,
+    "wasm": "/tmp/high-level-20261017/csharp/target/build-profile/AppBundle/highlevel-csharp-profile.wasm",
+    "wasm_sha256": "4281f6a2a6d380b8909708560ae7d5ed6121317df047daf3340ab15572fd2271",
+    "expected_checksum": 3872049787,
+    "clock_kind": "monotonic-ticks",
+    "mode": "release",
+    "purpose": "hardware-gated",
+    "checks": [
+      "csharp classes=42 arrays=55 strings=7 exceptions=3 iterations=100000000 checksum=3872049787"
+    ],
+    "kernel_time": "ticks",
+    "kernel_clock": "monotonic",
+    "args": [
+      "100000000"
+    ],
+    "clock_line_prefix": "csharp kernel iterations=100000000 ticks=",
+    "checksum_line": "csharp classes=42 arrays=55 strings=7 exceptions=3 iterations=100000000 checksum=3872049787",
+    "generated_source": "/home/macromodel/Documents/uwvm-hll-20261017/csharp/src/profile-only/ProgramProfile.cs",
+    "oracle": "/home/macromodel/Documents/uwvm-hll-20261017/csharp/profile-only-results/references/report.json",
+    "gate_stream": "stdout",
+    "gate_ready": "UWVM_PROFILE_READY",
+    "gate_done": "UWVM_PROFILE_DONE",
+    "gate_release": "G",
+    "gate_finish": "D",
+    "gate_ready_timeout": 900,
+    "kernel_timeout": 28
+  }
+]

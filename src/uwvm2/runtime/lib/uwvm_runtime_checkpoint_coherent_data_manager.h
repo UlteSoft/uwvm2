@@ -462,6 +462,31 @@ extern "C++"
             { out.observation = status::invalid_management_entry; return out; }
             if(!ticket || supplied.empty() || supplied.size() > thread_limit)
             { out.observation = status::incomplete_cohort; return out; }
+#if UWVM2_HAS_THREADED_PROFILE_HOST_API
+            // Only the actual state-writing/preparing variants need this cold
+            // exclusion. Plain coherent DATA/capture keeps its original path.
+            namespace wasi_action = ::uwvm2::uwvm::debugger::wasip1_state;
+            bool const writes_wasip1{wasip1_requested != nullptr &&
+                (wasip1_requested->operation == wasi_action::action::replace_argument ||
+                 wasip1_requested->operation == wasi_action::action::insert_argument ||
+                 wasip1_requested->operation == wasi_action::action::remove_argument ||
+                 wasip1_requested->operation == wasi_action::action::set_environment ||
+                 wasip1_requested->operation == wasi_action::action::remove_environment ||
+                 wasip1_requested->operation == wasi_action::action::reduce_rights ||
+                 wasip1_requested->operation == wasi_action::action::create_file ||
+                 wasip1_requested->operation == wasi_action::action::duplicate_descriptor ||
+                 wasip1_requested->operation == wasi_action::action::close_descriptor)};
+            bool const needs_threaded_cold_exclusion{mutating != nullptr || retiring != nullptr || preparing != nullptr ||
+                capsule_restore != nullptr || (capsule_requested != nullptr && capsule_requested->portable_restore) ||
+                (group_restore != nullptr && !group_restore->capture_portable) || writes_wasip1};
+            // Both operands are same-type prvalues: guaranteed C++17 elision,
+            // not a move or persistence of the native-thread-affine mutex owner.
+            auto threaded_cold_exclusion{needs_threaded_cold_exclusion
+                ? runtime_threaded_profile_try_management_host_api(threaded_management_kind::incremental_mutation)
+                : threaded_management_exclusion{}};
+            if(needs_threaded_cold_exclusion && !threaded_cold_exclusion)
+            { out.observation = status::invalid_management_entry; return out; }
+#endif
             try
             {
                 // Management takes a REAL generation lease directly. Do not
@@ -592,6 +617,11 @@ extern "C++"
                     // lease -> domain -> nonwaiting gate close -> genuine N GC
                     // exclusion -> publication. Reverse release precedes resume.
                     runtime_state_publication_guard publication{};
+#if UWVM2_HAS_THREADED_PROFILE_HOST_API
+                    if(needs_threaded_cold_exclusion && !runtime_threaded_profile_recheck_management_host_api(
+                        threaded_cold_exclusion, threaded_management_kind::incremental_mutation))
+                    { out.observation = status::invalid_management_entry; return; }
+#endif
                     // No lifetime mutex is nested below publication: this real
                     // token reads only its owned generation's stopping atomic.
                     if(lease.stop_requested()) { out.observation = status::execution_stopping; return; }

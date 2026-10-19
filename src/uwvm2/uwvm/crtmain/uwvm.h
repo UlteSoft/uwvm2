@@ -32,6 +32,7 @@
 # include <utility>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 // import
 # include <fast_io.h>
@@ -57,6 +58,8 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#include "cache_seal_process.h"
+
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm
 {
     /// @brief      uwvm c++ uz u8 main function
@@ -65,6 +68,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
     /// @return     exit value
     inline constexpr int uwvm_uz_u8main(::std::size_t argc, char8_t const* const* argv) noexcept
     {
+#if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        // Only callbacks from this parse may request a policy change. Help and
+        // failed parses return below without ever entering the cold helper.
+        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_cache_seal_process_requested = false;
+#endif
 #if defined(UWVM_MACOS_4GIB_TEST)
         using parsing_return_val = ::uwvm2::uwvm::crtmain::low_memory::parse_status;
         auto const parsing_result{::uwvm2::uwvm::crtmain::low_memory::parse(argc, argv)};
@@ -94,6 +102,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
                 ::std::unreachable();
             }
         }
+
+#if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        if(!::uwvm2::uwvm::crtmain::apply_explicit_llvm_cache_process_seal())
+        { return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error); }
+#endif
 
 #if defined(UWVM_MACOS_4GIB_TEST)
         return ::uwvm2::uwvm::crtmain::low_memory::run();
@@ -230,5 +243,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
 #ifndef UWVM_MODULE
 // macro
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

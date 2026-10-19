@@ -1,13 +1,13 @@
-// Build this fixture separately against each product. The driver deliberately
-// supplies identical context fields and one shared root; no generated code is
-// executed. This tests the real serializer, namespace and loader, including
-// rejection after a foreign object's filename/magic have been rewritten.
+// v7 successor: raw fixture codec signatures are strictly inert memory DATA.
+// Genuine persistent sync/async/load refusal is separate; no CLI hit is claimed.
+// Build separately for each product. The driver supplies identical contexts
+// and roots. All positive roundtrips/foreign mutations use bounded inert memory
+// DATA; paths are computed for namespace comparison only, never published.
+// No generated code or authenticated production object is executed.
 #include <algorithm>
 #include <cstddef>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <iterator>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -17,6 +17,7 @@
 #else
 import uwvm2.runtime.llvm_jit_cache;
 #endif
+#include "llvm_jit_cache_data_test_helpers.h"
 
 namespace cache = ::uwvm2::runtime::llvm_jit_cache;
 template <typename String>
@@ -32,6 +33,9 @@ static cache::cache_context context(char const* root, bool signed_blob)
     ctx.target_triple = u8"identical-test-target";
     ctx.cpu_name = u8"identical-test-cpu";
     ctx.cpu_features = u8"identical-test-features";
+    ctx.data_layout = u8"identical-test-layout";
+    ctx.self_executable_sha256[0u] = std::byte{0x42u};
+    ctx.has_self_executable_sha256 = true; // Synthetic DATA, not actual image proof.
     ctx.llvm_version = u8"identical-test-llvm";
     ctx.uwvm_abi = u8"deliberately-identical-embedder-abi";
     ctx.codegen_policy = u8"identical-test-policy";
@@ -42,7 +46,8 @@ static cache::cache_context context(char const* root, bool signed_blob)
 
 int main(int argc, char** argv)
 {
-    static_assert(cache::cache_format_version == 5u);
+    static_assert(cache::cache_format_version == 7u);
+    std::cout << "codec_data_only=1\nnative_cache_replay=0\n";
     if(argc == 1)
     {
         std::cout << "product=" << text(cache::cache_product_name) << "\nversion=" << cache::cache_format_version
@@ -92,26 +97,33 @@ int main(int argc, char** argv)
         ctx.signature_seed = cache::collect_signature_seed(ctx);
     }
     cache::cache_policy policy{};
-    // ROS's CLI never disables signatures. Exercise the low-level unsigned
-    // API too so product separation cannot accidentally depend on that policy.
+    // Signed and unsigned fixture DATA use the same namespace/context checks.
+    // The production persistent API refuses the unsigned policy separately.
     policy.generate_signature = signed_blob;
     policy.verify_signature = signed_blob;
     policy.compression = cache::compression_kind::none;
     constexpr std::byte payload[]{std::byte{0x01}, std::byte{0x23}, std::byte{0x45}, std::byte{0x67},
                                   std::byte{0x89}, std::byte{0xab}, std::byte{0xcd}, std::byte{0xef}};
-    auto const stored{cache::store_object(ctx, payload, sizeof(payload), policy)};
+    if(!cache_data_test::standalone_refuses(ctx)) { return 18; }
+    std::cout << "standalone_persistent_refused=1\n";
+    cache_data_test::bytes blob{};
+    auto const stored{cache::details::build_cache_blob(ctx,payload,sizeof(payload),policy,blob)};
     if(stored != cache::cache_status::ok) { return 3; }
     auto const path{text(cache::cache_file_path(ctx))};
     std::cout << "product=" << text(cache::cache_product_name) << "\npath=" << path << '\n';
-    auto const own{cache::load_object(ctx, policy)};
-    if(own.status != cache::cache_status::ok || own.signature_verified != signed_blob ||
+    std::cout << "blob-hex=";
+    constexpr char hex_digits[]{"0123456789abcdef"};
+    for(auto byte:blob){auto value=std::to_integer<unsigned char>(byte);std::cout<<hex_digits[value>>4]<<hex_digits[value&15];}
+    std::cout<<'\n';
+    auto const own{cache_data_test::decode(ctx,policy,blob)};
+    if(own.status != cache::cache_status::ok || own.codec_signature_verified != signed_blob ||
        own.object.size() != sizeof(payload) || !std::equal(own.object.cbegin(), own.object.cend(), payload)) { return 4; }
 
     if(old_call_policy || old_table_policy || old_memory_policy || old_hot_metadata_policy || old_owner_policy || old_shared_type_policy || old_ordered_size_policy || old_atomic_bridge_policy || old_atomic_scalar_policy || old_typed_call_policy || old_unqualified_tail_policy || old_tuple_tail_policy || old_wide_memory_policy || old_wide_table_policy || old_function_interval_policy)
     {
         // Model an embedder that reuses its cache key, source ID and all other
-        // context fields. Even a legitimately signed old-policy object must
-        // not be replayed after the live probe starts using noabicalls.
+        // context fields. A raw signed fixture for the old ABI must fail the
+        // DATA context comparison after the ABI metadata changes.
         auto previous{ctx};
         if(old_table_policy || old_memory_policy || old_hot_metadata_policy || old_owner_policy || old_shared_type_policy || old_ordered_size_policy || old_atomic_bridge_policy || old_atomic_scalar_policy || old_typed_call_policy || old_unqualified_tail_policy || old_tuple_tail_policy || old_wide_memory_policy || old_wide_table_policy || old_function_interval_policy)
         {
@@ -127,44 +139,34 @@ int main(int argc, char** argv)
         else { previous.uwvm_abi = u8"full-width-c-abi-v1"; }
         previous.signature_seed = cache::collect_signature_seed(previous);
         auto const previous_path{text(cache::cache_file_path(previous))};
-        // Context changes already namespace the filename. Also force the old
-        // valid blob into the new filename to exercise the loader's independent
-        // context check, rather than accidentally testing only path separation.
-        if(previous_path == path || cache::store_object(previous, payload, sizeof(payload), policy) != cache::cache_status::ok) { return 12; }
-        ::std::error_code copy_error{};
-        ::std::filesystem::copy_file(previous_path, path, ::std::filesystem::copy_options::overwrite_existing, copy_error);
-        if(copy_error) { return 14; }
-        auto rejected{cache::load_object(ctx, policy)};
+        // Compare computed paths, then independently compare old fixture DATA
+        // under the new metadata. Neither path is read or written.
+        cache_data_test::bytes previous_blob{};
+        if(previous_path==path||cache::details::build_cache_blob(previous,payload,sizeof(payload),policy,previous_blob)!=cache::cache_status::ok)return 12;
+        auto rejected{cache_data_test::decode(ctx,policy,previous_blob)};
         std::cout << "status=" << text(cache::cache_status_name(rejected.status)) << '\n';
-        if(rejected.status != cache::cache_status::context_mismatch || !rejected.object.empty() || rejected.signature_verified) { return 13; }
+        if(rejected.status != cache::cache_status::context_mismatch || !rejected.object.empty() || rejected.codec_signature_verified) { return 13; }
     }
     else if(std::string_view{argv[1]} == "load-foreign")
     {
         if(argc != 7) { return 5; }
-        std::ifstream input{argv[4], std::ios::binary};
-        if(!input) { return 6; }
-        std::vector<char> blob{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
-        if(blob.size() < cache::cache_fixed_header_size) { return 7; }
+        cache_data_test::bytes foreign{};
+        if(!cache_data_test::unhex(argv[4],foreign)||foreign.size()<cache::cache_fixed_header_size)return 6;
         auto const mutation{std::string_view{argv[5]}};
         if(mutation == "own-magic")
         {
-            for(std::size_t i{}; i != 8; ++i) { blob[i] = static_cast<char>(cache::cache_magic[i]); }
+            for(std::size_t i{}; i != 8; ++i) { foreign[i] = cache::cache_magic[i]; }
         }
-        else if(mutation == "version4")
+        else if(mutation == "version4" || mutation == "version5" || mutation == "version6")
         {
-            blob[8] = 4; blob[9] = blob[10] = blob[11] = 0;
+            foreign[8] = static_cast<std::byte>(mutation.back() - '0');foreign[9]=foreign[10]=foreign[11]=std::byte{};
         }
-        else if(mutation == "payload") { blob.back() ^= 1; }
+        else if(mutation == "payload") { foreign.back() ^= std::byte{1}; }
         else if(mutation != "none") { return 8; }
-        {
-            std::ofstream output{path, std::ios::binary | std::ios::trunc};
-            output.write(blob.data(), static_cast<std::streamsize>(blob.size()));
-            if(!output) { return 9; }
-        }
-        auto rejected{cache::load_object(ctx, policy)};
+        auto rejected{cache_data_test::decode(ctx,policy,foreign)};
         auto const status{text(cache::cache_status_name(rejected.status))};
         std::cout << "status=" << status << '\n';
-        if(status != argv[6] || !rejected.object.empty() || rejected.signature_verified) { return 10; }
+        if(status != argv[6] || !rejected.object.empty() || rejected.codec_signature_verified) { return 10; }
     }
     else if(std::string_view{argv[1]} != "write") { return 11; }
     return 0;

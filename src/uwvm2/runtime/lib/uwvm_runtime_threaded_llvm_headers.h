@@ -1,0 +1,30 @@
+#pragma once
+// Include at translation-unit scope, before namespace uwvm2::runtime::lib.
+// Source-only threaded candidate: no ordinary entry selects this backend.
+#include <array>
+#include <vector>
+#include <string>
+#include <span>
+#include <memory>
+#include <atomic>
+#include <stop_token>
+#include <uwvm2/object/memory/linear/threaded_grow_types.h>
+#include <llvm/CodeGen/MachineFunctionPass.h>
+#include <llvm/CodeGen/MachineFrameInfo.h>
+#include <llvm/CodeGen/TargetFrameLowering.h>
+#include <llvm/CodeGen/TargetRegisterInfo.h>
+#include <llvm/CodeGen/TargetSubtargetInfo.h>
+#include <llvm/IR/CFG.h>
+#include <llvm/IR/Verifier.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/Support/MemoryBuffer.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/Object/ObjectFile.h>
+#include <llvm/Object/ELFObjectFile.h>
+#include <llvm/BinaryFormat/ELF.h>
+#include <llvm/Support/Memory.h>
+#include <llvm/Support/Process.h>
+#include <llvm/ExecutionEngine/RTDyldMemoryManager.h>
+#include <uwvm2/runtime/wasm_threads/thread_group.h>
+#include <uwvm2/uwvm/runtime/initializer/threaded_child_world.h>

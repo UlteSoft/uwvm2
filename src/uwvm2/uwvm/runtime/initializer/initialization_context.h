@@ -5,7 +5,7 @@
 extern ::uwvm2::utils::container::u8string_view current_initializing_module_name;
 extern bool import_alias_sanity_checked;
 
-enum class initialization_purpose : unsigned char { ordinary, unpublished_restore };
+enum class initialization_purpose : unsigned char { ordinary, unpublished_restore, threaded_child };
 
 template <initialization_purpose Purpose>
 class initialization_context final
@@ -118,6 +118,107 @@ public:
         ::std::shared_ptr<::uwvm2::uwvm::runtime::storage::gc_lease_owner> const& leases,
         ::uwvm2::uwvm::runtime::storage::gc_function_type_match_callback callback) const noexcept(Purpose == initialization_purpose::ordinary);
 };
+
+#ifndef UWVM_MODULE
+// A private independent child registry borrow, never a restore credential.
+template<>
+class initialization_context<initialization_purpose::threaded_child> final
+{
+    friend class ::uwvm2::uwvm::runtime::initializer::ThreadedChildWorld;
+    using registry = ::uwvm2::uwvm::runtime::initializer::threaded_single_entry_view<::uwvm2::uwvm::runtime::storage::wasm_module_storage_t>;
+    using declaration_map = ::uwvm2::uwvm::runtime::initializer::threaded_single_entry_view<::uwvm2::uwvm::wasm::type::all_module_t>;
+    using export_map = decltype(::uwvm2::uwvm::wasm::storage::all_module_export);
+    using reset_map = ::uwvm2::uwvm::wasm::storage::configured_module_import_reset_map_t;
+    using memory_map = ::uwvm2::uwvm::wasm::storage::configured_module_memory_limit_map_t;
+    registry* registry_{};
+    declaration_map* declarations_{};
+    export_map* exports_{};
+    reset_map* resets_{};
+    memory_map* memory_limits_{};
+    ::uwvm2::utils::container::u8string_view* current_{};
+    bool* sanity_{};
+    initializer_limit_t const* limits_{};
+    ::std::weak_ptr<::uwvm2::uwvm::runtime::initializer::ThreadedChildWorld const> const* owner_{};
+    explicit initialization_context(registry& modules, declaration_map& modules_decl,
+        export_map& exports, reset_map& resets, memory_map& memories,
+        ::uwvm2::utils::container::u8string_view& current, bool& sanity,
+        initializer_limit_t const& caps,
+        ::std::weak_ptr<::uwvm2::uwvm::runtime::initializer::ThreadedChildWorld const> const& owner) noexcept
+        : registry_{::std::addressof(modules)}, declarations_{::std::addressof(modules_decl)},
+          exports_{::std::addressof(exports)}, resets_{::std::addressof(resets)},
+          memory_limits_{::std::addressof(memories)}, current_{::std::addressof(current)},
+          sanity_{::std::addressof(sanity)}, limits_{::std::addressof(caps)}, owner_{::std::addressof(owner)} {}
+public:
+    initialization_context(initialization_context const&) = delete;
+    initialization_context& operator=(initialization_context const&) = delete;
+    [[nodiscard]] constexpr registry& modules() const noexcept
+    {
+        return *registry_;
+    }
+    [[nodiscard]] constexpr auto& declarations() const noexcept
+    {
+        return *declarations_;
+    }
+    [[nodiscard]] constexpr auto& exports() const noexcept
+    {
+        return *exports_;
+    }
+    [[nodiscard]] constexpr reset_map& import_reset_policy() const noexcept
+    {
+        return *resets_;
+    }
+    [[nodiscard]] constexpr memory_map& memory_limit_policy() const noexcept
+    {
+        return *memory_limits_;
+    }
+    [[nodiscard]] constexpr auto& current_module() const noexcept
+    {
+        return *current_;
+    }
+    [[nodiscard]] constexpr bool& alias_sanity() const noexcept
+    {
+        return *sanity_;
+    }
+    [[nodiscard]] constexpr initializer_limit_t const& limits() const noexcept
+    {
+        return *limits_;
+    }
+    [[nodiscard]] constexpr auto* find_import_reset(::uwvm2::utils::container::u8string_view name) const noexcept
+    {
+        auto& policy{import_reset_policy()}; auto const found{policy.find(name)};
+        return found == policy.end() ? nullptr : ::std::addressof(found->second);
+    }
+    [[nodiscard]] constexpr ::uwvm2::uwvm::wasm::storage::configured_import_reset_t const*
+        find_import_rewrite(::uwvm2::utils::container::u8string_view name,
+            ::uwvm2::utils::container::u8string_view imported_module,
+            ::uwvm2::utils::container::u8string_view imported_name) const noexcept
+    {
+        auto const* rules{find_import_reset(name)};
+        if(rules == nullptr) { return nullptr; }
+        // [source-owned bounded rule vector] end
+        // [safe] compare native string views only; returned rule lives with source.
+        for(auto const& rule : *rules)
+        {
+            if(rule.import_module_name == imported_module && rule.import_extern_name == imported_name)
+            { return ::std::addressof(rule); }
+        }
+        return nullptr;
+    }
+    [[nodiscard]] constexpr auto const* find_memory_limit(::uwvm2::utils::container::u8string_view name) const noexcept
+    {
+        auto const& policy{memory_limit_policy()}; auto const found{policy.find(name)};
+        return found == policy.cend() ? nullptr : ::std::addressof(found->second);
+    }
+    [[nodiscard]] ::std::shared_ptr<::uwvm2::uwvm::runtime::storage::gc_lease_owner> make_lease_owner() const;
+    [[nodiscard]] ::std::shared_ptr<::uwvm2::uwvm::runtime::storage::tag_instance_identity const> make_tag_identity() const;
+    void prepare_table(::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t&, ::std::size_t) const noexcept;
+    [[nodiscard]] ::std::shared_ptr<::uwvm2::uwvm::runtime::storage::gc_object_store> make_store(
+        ::uwvm2::uwvm::runtime::storage::gc_type::recursive_type_section const& section,
+        ::std::shared_ptr<::uwvm2::uwvm::runtime::storage::gc_lease_owner> const& leases,
+        ::uwvm2::uwvm::runtime::storage::gc_function_type_match_callback callback) const ;
+};
+
+#endif
 
 // The ordinary specialization is EMPTY: no staged pointers, member zeroing,
 // source pins or runtime purpose branch can enter existing initialization/GC callbacks.

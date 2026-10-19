@@ -16,7 +16,9 @@ Build-time `xmake f ...` switches are documented separately in [`../xmake-option
 
 - [Parsing And Paths](parsing-and-paths.md): argument preprocessing, duplicate handling, `--run`, strict parsing, file path classes, and Windows NT `::NT::` paths.
 - [Global And Debug Commands](global-debug.md): `--help`, `--mode`, `--run`, `--version`, and `--debug-test`.
+- [Language Debugger Build Options](language-debug-build.md): independent language switches, macros, explicit selection and build validation.
 - [WebAssembly Commands](wasm.md): module loading, explicit start-function invocation, preload modules, native dynamic libraries, import binding rewrites, weak symbols, parser limits, initializer limits, memory limits, preload memory attributes, and strict memory growth.
+- [Secure Module Verification](../security/wsea.md): opt-in `--secure module`, `--secure help/status`, `--help secure`, protected offline policy, signatures and revocation evidence.
 - [Runtime Commands](runtime.md): runtime mode/compiler selection, shortcut conflicts, LLVM IR verifier control, compile-thread resolution, scheduling, and compiler logs.
 - [Logging Commands](logging.md): diagnostic output routing, color policy, warning enable/disable/fatal conversion, verbose mode, and Windows ANSI mode.
 - [WASI Commands](wasi.md): core WASI option, WASI Preview 1 global/single/group targets, environment variables, mounts, trace output, sockets, and target override rules.

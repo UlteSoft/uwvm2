@@ -7,6 +7,18 @@ formatting to the profile's single serializer, which traverses the entire tuple.
 Its static overload formats DATA and cannot create a compilation profile or mint
 execution, stop, snapshot or restore authority.
 
+## Current dependency successor
+
+This dependency-only successor targets cache format7 and keeps the component's
+explicit compile-time format assertion. It must be composed with the reviewed
+v7 cache core, not built against the still-v5 predecessor. The test remains pure
+metadata/key DATA: no cache publication, native object replay or origin issuer
+is introduced. The tuple's state schema, native continuation ABI and profile
+policies are independent of this cache format change. Actual v7 compilation and
+Linux execution remain pending; no older receipt is promoted.
+
+## Historical v5 tuple-correction baseline
+
 The cache file format remains v5 and the runtime ABI remains v27. The tuple's
 field/revision values are unchanged. Adding its tenth value changes the existing
 `checkpoint-typed-entry-policy` value; mandatory context comparison and the path

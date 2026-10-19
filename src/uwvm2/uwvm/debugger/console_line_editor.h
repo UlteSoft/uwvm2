@@ -32,6 +32,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_editing
     // HOST command vocabulary. Argument completion is delegated to the normal
     // management thread; this editor has no filesystem or stop authority.
     inline constexpr completion_word completion_words[]{
+        {"set print pretty on", false}, {"set print pretty off", false}, {"show print pretty", false},
+        {"set print elements", true}, {"show print elements", false}, {"info pretty-printer", false},
+        {"print /r", true}, {"print /p", true}, {"print --raw", true}, {"print --pretty", true},
+        {"pretty-printer sequence", true}, {"pretty-printer string", true}, {"pretty-printer pointer", true}, {"pretty-printer optional", true},
+        {"pretty-printer delete", true}, {"pretty-printer enable", true}, {"pretty-printer disable", true}, {"pretty-printer list", false},
         {"apropos", true},
         {"path create", true}, {"path extend", true}, {"path members", true}, {"path clear", false},
         {"advance", true}, {"until", true}, {"condition", true}, {"display", true}, {"info display", false}, {"undisplay", true},

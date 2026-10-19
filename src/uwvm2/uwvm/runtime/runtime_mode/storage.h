@@ -271,6 +271,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     /// @brief Whether runtime LLVM JIT cache path mode was explicitly configured.
     inline bool runtime_llvm_jit_cache_path_existed{};  // [global]
 
+    // Host CLI request/status only. These never mint a cache origin ticket.
+    inline bool runtime_llvm_jit_cache_seal_process_existed{};
+    inline bool global_runtime_llvm_jit_cache_seal_process_requested{};
+    // One-way failure: a later cache-path option cannot reactivate persistence.
+    inline bool global_runtime_llvm_jit_cache_seal_process_failed{};
+
     /// @brief Runtime LLVM JIT cache path mode.
     inline runtime_llvm_jit_cache_path_mode_t global_runtime_llvm_jit_cache_path_mode{runtime_llvm_jit_cache_path_mode_t::default_path};  // [global]
 

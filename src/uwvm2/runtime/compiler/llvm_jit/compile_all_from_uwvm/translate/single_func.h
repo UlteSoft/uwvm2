@@ -2536,6 +2536,10 @@ namespace details
                                                                            ::std::vector<::uwvm2::validation::standard::wasm3::validated_call_dependency>* lazy_call_dependencies = nullptr,
                                                                            bool* lazy_call_dependencies_overflow = nullptr) UWVM_THROWS
     {
+        if(threaded_host_emission_scope::selected() &&
+           (options.compilation_mode!=llvm_jit_compilation_mode::full || options.compiler_registry!=nullptr ||
+            !threaded_host_emission_scope::owns_module(curr_module)))
+        { runtime_storage_bug(); } // Exact native-owned child, never parent registry fallback.
         if(options.compiler_registry != nullptr)
         {
             if(options.compilation_mode != llvm_jit_compilation_mode::full) { runtime_storage_bug(); }

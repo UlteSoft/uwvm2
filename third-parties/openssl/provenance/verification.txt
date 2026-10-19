@@ -1,0 +1,15 @@
+Source preparation date: 2026-10-18 UTC
+Official release page: https://www.openssl-library.org/source/
+Official key bundle: https://www.openssl-library.org/source/pubkeys.asc
+Isolated GnuPG home: temporary, independent of the user's trust database.
+SHA256 archive: 603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a
+Official checksum: exact match.
+GnuPG result: GOODSIG 64ED7B1DCCE71CB2 OpenSSL <openssl@openssl.org>
+VALIDSIG C46ED3F2CBEFDA1FDAADA44264ED7B1DCCE71CB2 2026-09-29 1790690724 0 4 0 1 10 00 B146647E45A7B33947AB226B2A2C87D161692D40
+The VALIDSIG primary fingerprint was compared with the fingerprint on the
+OpenSSL official HTTPS release page. GnuPG owner trust was intentionally not
+assigned; its TRUST_UNDEFINED warning does not establish or defeat this
+explicit fingerprint comparison. No local/global key or trust store changed.
+The complete archive was extracted without modifications. Its 5779 regular
+source files are covered by sources.sha256. No archive links/devices were
+accepted, and no archive member escaped the release directory.

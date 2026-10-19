@@ -15,6 +15,23 @@ The distinct host/extern-wrapper/GC/i31 identities and complete logical state
 representation retain state6's structural validation; the file codec does not
 supply the missing actual runtime exporters or type/continuation verification.
 
+## Current cache dependency: v7 successor
+
+Required cache-object identities use cache format7 and the actual
+`binding::cache_format_revision` contract. Formats5 and6 fail as
+`unsupported_cache_version`; there is no automatic legacy upgrade. Envelope4,
+identity revision2 and state schema6 retain their independent layouts. The
+dependency equality assertion against the real cache core remains mandatory in
+header and module builds, including the actual CLI debugger include/import path.
+
+This source must be composed with the reviewed v7 core before building. It does
+not turn a detached cache-format object into an accepted runtime cache receipt,
+create a genuine origin issuer, or enable the process-bound debug cache. The
+current component fixture/oracle sources below describe the retained v5 plan;
+their exact v7 API and DATA-wire reconciliation remains separate and unqualified.
+No candidate compilation, component run, authenticated cache replay or restore
+acceptance is claimed by this dependency-only change.
+
 ## File layout
 
 The 160-byte outer header is:
@@ -118,7 +135,7 @@ unbound state file, an unknown schema or an incompatible cache as
 an executable checkpoint. Target build/source/cache receipt authentication and
 whole runtime resource/continuation transaction are pending.
 
-## Fresh finite tests
+## Historical v5 component test plan (not v7 qualification)
 
 New C++ fixture uses actual private owned files, real signed cache-format blobs
 from the existing complete-bundle fixture and actual Ed25519 verification. Three
@@ -163,6 +180,8 @@ canonical flag-one, zero-carrier descriptor; it is not an initialized null,
 element, frame operand, GC field or retained root. Empty/nonempty descriptor
 rules are checked by the state graph validator before output publication.
 
+
+## Historical schema6 migration notes (v5 cache baseline)
 
 State schema6 additionally binds preserved exception diagnostic origin/name
 payloads and the explicit unknown instruction/generation markers. Inner state

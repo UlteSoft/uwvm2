@@ -601,6 +601,9 @@ case wasm1_code::else_:
         }
     }
 
+    // Publish/normalize the real then-to-end edge before saving its model.
+    prepare_control_end_edge(bytecode, if_frame);
+
     if_frame.then_polymorphic_end = is_polymorphic;
 
     if constexpr(stacktop_enabled)
@@ -836,73 +839,46 @@ case wasm1_code::end:
         }
     }
 
-    // A branch to this end may arrive with a different register-ring cursor from a live
-    // fallthrough. In particular, a try_table catch-only predecessor starts with a freshly
-    // materialized payload, while a normal protected call can branch with its result cached.
-    // Normalize only the conflicting fallthrough edge to the already published branch state.
-    // This is translation-time selection: matching joins and functions without such a join
-    // emit no extra runtime instructions.
+    // Resolve an implicit false arm using its actual entry model. Only a
+    // conflicting pre-existing target needs a cold conversion thunk. A matching
+    // false arm keeps its direct jump, past the then fallthrough repair.
     if constexpr(stacktop_enabled && !strict_cf_entry_like_call)
     {
-        if(codegen_reachable && !is_polymorphic && frame.stacktop_has_end_state)
+        if(frame.type == block_type::if_ && frame.codegen_entry_reachable)
         {
-            auto const& target_types{frame.codegen_operand_stack_at_end};
-            auto const& target_pos{frame.stacktop_currpos_at_end};
-            bool const same_state{
-                curr_stacktop.i32_stack_top_curr_pos == target_pos.i32_stack_top_curr_pos &&
-                curr_stacktop.i64_stack_top_curr_pos == target_pos.i64_stack_top_curr_pos &&
-                curr_stacktop.f32_stack_top_curr_pos == target_pos.f32_stack_top_curr_pos &&
-                curr_stacktop.f64_stack_top_curr_pos == target_pos.f64_stack_top_curr_pos &&
-                curr_stacktop.v128_stack_top_curr_pos == target_pos.v128_stack_top_curr_pos &&
-                stacktop_memory_count == frame.stacktop_memory_count_at_end &&
-                stacktop_cache_count == frame.stacktop_cache_count_at_end &&
-                stacktop_cache_i32_count == frame.stacktop_cache_i32_count_at_end &&
-                stacktop_cache_i64_count == frame.stacktop_cache_i64_count_at_end &&
-                stacktop_cache_f32_count == frame.stacktop_cache_f32_count_at_end &&
-                stacktop_cache_f64_count == frame.stacktop_cache_f64_count_at_end};
-            if(!same_state)
+            auto const saved{save_control_edge_model()};
+            curr_stacktop = frame.stacktop_currpos_at_else_entry;
+            stacktop_memory_count = frame.stacktop_memory_count_at_else_entry;
+            stacktop_cache_count = frame.stacktop_cache_count_at_else_entry;
+            stacktop_cache_i32_count = frame.stacktop_cache_i32_count_at_else_entry;
+            stacktop_cache_i64_count = frame.stacktop_cache_i64_count_at_else_entry;
+            stacktop_cache_f32_count = frame.stacktop_cache_f32_count_at_else_entry;
+            stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_else_entry;
+            codegen_operand_stack = frame.codegen_operand_stack_at_else_entry;
+            is_polymorphic = false; codegen_reachable = true;
+            auto& implicit_frame{control_flow_stack.back_unchecked()};
+            auto const thunk_start{thunks.size()};
+            if(prepare_control_end_edge(thunks, implicit_frame))
             {
-                auto const count{codegen_operand_stack.size()};
-                if(count != target_types.size() || frame.stacktop_memory_count_at_end > count ||
-                   frame.stacktop_cache_count_at_end != count - frame.stacktop_memory_count_at_end) [[unlikely]]
-                { ::fast_io::fast_terminate(); }
-                for(::std::size_t index{}; index != count; ++index)
-                {
-                    if(codegen_operand_stack.index_unchecked(index).type != target_types.index_unchecked(index).type) [[unlikely]]
-                    { ::fast_io::fast_terminate(); }
-                }
-                // [live fallthrough operand frame][cached suffix] -> complete memory tuple.
-                // [safe                            ] the current type stack supplies every spill width.
-                stacktop_flush_all_to_operand_stack(bytecode);
-                // Empty caches make cursor reassignment a compiler-only operation. The target snapshot
-                // came from a validated branch to this exact frame and has the same carrier tuple.
-                curr_stacktop = target_pos;
-                codegen_operand_stack = target_types;
-                while(stacktop_memory_count != frame.stacktop_memory_count_at_end)
-                {
-                    auto const vt{codegen_operand_stack.index_unchecked(stacktop_memory_count - 1uz).type};
-                    if(!stacktop_enabled_for_vt(vt)) [[unlikely]] { ::fast_io::fast_terminate(); }
-                    auto const begin{stacktop_range_begin_pos(vt)};
-                    auto const end{stacktop_range_end_pos(vt)};
-                    auto const cached{stacktop_cache_count_for_range(begin, end)};
-                    if(cached >= end - begin) [[unlikely]] { ::fast_io::fast_terminate(); }
-                    auto const slot{stacktop_ring_advance_next(stacktop_currpos_for_range(begin, end), cached, begin, end)};
-                    // [fully materialized operand prefix][one complete value] -> cached target suffix.
-                    // [safe                            ^^^^^^^^^^^^^^^^^^^] the validated snapshot bounds each fill.
-                    emit_stacktop_fill1_typed_to(bytecode, slot, vt);
-                    --stacktop_memory_count;
-                    ++stacktop_cache_count;
-                    ++stacktop_cache_count_ref_for_vt(vt);
-                }
-                if(stacktop_cache_count != frame.stacktop_cache_count_at_end ||
-                   stacktop_cache_i32_count != frame.stacktop_cache_i32_count_at_end ||
-                   stacktop_cache_i64_count != frame.stacktop_cache_i64_count_at_end ||
-                   stacktop_cache_f32_count != frame.stacktop_cache_f32_count_at_end ||
-                   stacktop_cache_f64_count != frame.stacktop_cache_f64_count_at_end) [[unlikely]]
-                { ::fast_io::fast_terminate(); }
+                auto& label{labels.index_unchecked(frame.else_label_id)};
+                label.in_thunk = true; label.offset = thunk_start;
+                emit_br_to(thunks, frame.end_label_id, true);
             }
+            // This is now the false arm's END layout, for an unreachable then.
+            implicit_frame.stacktop_currpos_at_else_entry = curr_stacktop;
+            implicit_frame.stacktop_memory_count_at_else_entry = stacktop_memory_count;
+            implicit_frame.stacktop_cache_count_at_else_entry = stacktop_cache_count;
+            implicit_frame.stacktop_cache_i32_count_at_else_entry = stacktop_cache_i32_count;
+            implicit_frame.stacktop_cache_i64_count_at_else_entry = stacktop_cache_i64_count;
+            implicit_frame.stacktop_cache_f32_count_at_else_entry = stacktop_cache_f32_count;
+            implicit_frame.stacktop_cache_f64_count_at_else_entry = stacktop_cache_f64_count;
+            implicit_frame.codegen_operand_stack_at_else_entry = codegen_operand_stack;
+            restore_control_edge_model(saved);
         }
     }
+
+    // Every incoming edge uses the same published cache/carrier layout.
+    normalize_stacktop_to_control_end(bytecode, frame);
 
     // Lower `end` marker: materialize branch target labels (no runtime opcode is emitted for `end` itself).
     //
@@ -934,7 +910,8 @@ case wasm1_code::end:
     {
         // `if` without `else` uses the end as the false target. Validation above guarantees that the untouched
         // block parameters on that path are exactly the declared result tuple.
-        if(frame.else_label_id != SIZE_MAX) { set_label_offset(frame.else_label_id, bytecode.size()); }
+        if(frame.else_label_id != SIZE_MAX && !labels.index_unchecked(frame.else_label_id).in_thunk)
+        { set_label_offset(frame.else_label_id, bytecode.size()); }
     }
 
     operand_stack_truncate_to(base);

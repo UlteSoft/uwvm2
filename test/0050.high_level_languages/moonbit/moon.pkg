@@ -1,0 +1,11 @@
+options(
+  "is-main": true,
+  link: {
+    "wasm": {
+      "exports": [ "workload" ],
+      "export-memory-name": "memory",
+      "heap-start-address": 1024,
+    },
+    "wasm-gc": { "exports": [ "workload" ], "export-memory-name": "memory" },
+  },
+)

@@ -34,7 +34,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_frames
     // instances, then THIS physical function. Callers are deliberately absent:
     // an unwind label alone cannot authenticate that activation's local values.
     [[nodiscard]] inline error current_frames(::std::span<dwarf::scope_record const> scopes, ::std::uint64_t pc,
-        ::std::vector<frame>& out, limits const& cap = {}) noexcept
+        ::std::vector<frame>& out, limits const& cap = {}, dwarf::owned_scope_paths const* scope_owner = nullptr) noexcept
     {
         out.clear();
 #if defined(__cpp_exceptions) || defined(_CPPUNWIND)
@@ -42,7 +42,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_frames
         {
 #endif
             dwarf::concrete_scope_path selected{};
-            auto const status{dwarf::query_concrete_scope_path(scopes, pc, selected, cap.path)};
+            auto const status{dwarf::query_concrete_scope_path(scopes, pc, selected, cap.path, scope_owner)};
             switch(status)
             {
                 case dwarf::scope_path_error::none: break;
@@ -83,10 +83,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_frames
     }
     struct language_context { ::std::uint64_t language{}; bool tinygo_producer{}, zig_producer{}; };
     [[nodiscard]] inline error current_language(::std::span<dwarf::scope_record const> scopes, ::std::uint64_t pc,
-        ::std::size_t selected, language_context& out, limits const& cap = {}) noexcept
+        ::std::size_t selected, language_context& out, limits const& cap = {}, dwarf::owned_scope_paths const* scope_owner = nullptr) noexcept
     {
         out = {}; ::std::vector<frame> frames{};
-        auto const status{current_frames(scopes,pc,frames,cap)};
+        auto const status{current_frames(scopes,pc,frames,cap,scope_owner)};
         if(status != error::none) { return status; }
         if(selected >= frames.size()) { return error::bounds; }
         auto const index{frames[selected].scope_index};
@@ -137,7 +137,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_frame_variables
     [[nodiscard]] inline error named(::std::span<dwarf::scope_record const> scopes,
         ::std::span<dwarf::variable_record const> variables, ::std::size_t type_count,
         ::std::uint64_t pc, ::std::size_t frame_ordinal, ::std::string_view name,
-        selection& out, limits const& cap = {}) noexcept
+        selection& out, limits const& cap = {}, dwarf::owned_scope_paths const* scope_owner = nullptr) noexcept
     {
         out = {};
 #if defined(__cpp_exceptions) || defined(_CPPUNWIND)
@@ -147,7 +147,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_frame_variables
             if(name.empty() || name.size() > cap.max_name_bytes) { return error::unavailable; }
             if(variables.size() > cap.max_variables || type_count > cap.max_types) { return error::limit_exceeded; }
             ::std::vector<frames::frame> path{};
-            switch(frames::current_frames(scopes, pc, path, cap.frame_limits))
+            switch(frames::current_frames(scopes, pc, path, cap.frame_limits, scope_owner))
             {
                 case frames::error::none: break;
                 case frames::error::unavailable: return error::unavailable;

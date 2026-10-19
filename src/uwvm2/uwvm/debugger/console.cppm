@@ -20,6 +20,7 @@ module;
 #endif
 export module uwvm2.uwvm.debugger:console;
 import fast_io;
+import uwvm2.uwvm.debugger.source_pretty_registry;
 import :console_help;
 import :console_messages;
 import :console_module_help;

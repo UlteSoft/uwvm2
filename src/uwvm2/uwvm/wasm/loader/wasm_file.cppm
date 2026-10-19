@@ -20,6 +20,9 @@
  ****************************************/
 
 module;
+#include <uwvm2/utils/security/wsea.h>
+#include <string>
+#include <string_view>
 
 // std
 #include <cstddef>

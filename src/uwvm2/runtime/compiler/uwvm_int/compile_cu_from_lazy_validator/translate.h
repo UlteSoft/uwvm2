@@ -2250,7 +2250,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                           lazy_module_storage_t& storage,
                                                           lazy_compile_options& options,
                                                           ::std::size_t local_function_index,
-                                                          ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+                                                          [[maybe_unused]] ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
         {
             if(storage.checked_plan)
             {

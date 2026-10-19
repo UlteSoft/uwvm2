@@ -266,6 +266,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         ::uwvm2::utils::control::control_session session_{};
         ::std::shared_ptr<domain_type> domain_;
         ::std::mutex mutex_{};
+        console_print_preferences transport_source_print_{};
         ::std::condition_variable changed_{};
         domain_type::pause_ticket pause_{};
         ::std::uint64_t next_stop_identifier_{1u}, stop_identifier_{};
@@ -1308,7 +1309,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 source.binding.owner_before(source_frame_cursor_.binding)))
             { result.status = control_error::invalid_state; return source_caller_route::rejected; }
             ::std::vector<source_frames::frame> frames{};
-            if(source_frames::current_frames(source.dwarf->scopes(), actual.source.code_offset, frames) != source_frames::error::none || frames.empty())
+            if(source_frames::current_frames(source.dwarf->scopes(), actual.source.code_offset, frames, {}, source.dwarf->scope_paths()) != source_frames::error::none || frames.empty())
             { result.status = control_error::source_location_unmapped; return source_caller_route::rejected; }
             auto const ordinal{command.source_frame_explicit ? command.source_frame_ordinal : source_frame_cursor_.ordinal};
             if(ordinal < frames.size()) { return source_caller_route::current; }
@@ -1402,12 +1403,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                         { ::fast_io::freestanding::my_memcpy(copied[i].bytes.data(), locals.values[i].native_bytes.data(), copied[i].bytes.size()); }
                     }
                     ::std::vector<source_frames::frame> frames{};
-                    if(source_frames::current_frames(source.dwarf->scopes(), actual.source.code_offset, frames) != source_frames::error::none || frames.empty())
+                    if(source_frames::current_frames(source.dwarf->scopes(), actual.source.code_offset, frames, {}, source.dwarf->scope_paths()) != source_frames::error::none || frames.empty())
                     { result.status = control_error::source_location_unmapped; return false; }
                     auto const anchor{frames.size() - 1u}; // Actual physical scope, not another inline frame.
                     auto const status{source_dwarf::query_numeric_variables(source.dwarf->scopes(), source.dwarf->types(),
                         source.dwarf->variables(), actual.source.code_offset, {copied.data(), locals.values.size()},
-                        static_cast<::std::size_t>(locals.total_count), result.source_locals)};
+                        static_cast<::std::size_t>(locals.total_count), result.source_locals, {}, source.dwarf->scope_paths(), source.dwarf->numeric_validation())};
                     if(status != source_dwarf::inline_query_error::none)
                     { result.status = control_error::source_location_unmapped; return false; }
                     source_frame_variables::error filter_error{source_frame_variables::error::none};
@@ -1415,7 +1416,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     {
                         source_frame_variables::selection selected{};
                         auto const status{source_frame_variables::named(source.dwarf->scopes(), source.dwarf->variables(), source.dwarf->types().size(),
-                            actual.source.code_offset, anchor, ::std::string_view{value.name}, selected)};
+                            actual.source.code_offset, anchor, ::std::string_view{value.name}, selected, {}, source.dwarf->scope_paths())};
                         if(status != source_frame_variables::error::none && status != source_frame_variables::error::unavailable) { filter_error = status; }
                         return status != source_frame_variables::error::none || selected.variable_identity != value.identity;
                     });
@@ -1504,7 +1505,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                        actual.source.runtime_epoch != state.caller.runtime_epoch || actual.source.function_generation != state.caller.function_generation)
                     { return false; }
                     ::std::vector<source_frames::frame> frames{};
-                    if(source_frames::current_frames(state.source.dwarf->scopes(), actual.source.code_offset, frames) != source_frames::error::none || frames.empty())
+                    if(source_frames::current_frames(state.source.dwarf->scopes(), actual.source.code_offset, frames, {}, state.source.dwarf->scope_paths()) != source_frames::error::none || frames.empty())
                     { return false; }
                     // [owned actual caller scope path ... physical last] end
                     // [safe] nonempty bounded path proved BEFORE back(). No
@@ -1597,7 +1598,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             }
             auto const queried{source_dwarf::query_numeric_variables(source.dwarf->scopes(), source.dwarf->types(),
                 source.dwarf->variables(), position.code_offset, {copied.data(), record.captured_count}, record.total_count,
-                result.source_locals)};
+                result.source_locals, {}, source.dwarf->scope_paths(), source.dwarf->numeric_validation())};
             if(queried == source_dwarf::inline_query_error::none && frame_anchor)
             {
                 // All values already came from this private copied capture.
@@ -1607,7 +1608,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 {
                     source_frame_variables::selection chosen{};
                     auto const status{source_frame_variables::named(source.dwarf->scopes(), source.dwarf->variables(),
-                        source.dwarf->types().size(), position.code_offset, *frame_anchor, value.name, chosen)};
+                        source.dwarf->types().size(), position.code_offset, *frame_anchor, value.name, chosen, {}, source.dwarf->scope_paths())};
                     if(status != source_frame_variables::error::none && status != source_frame_variables::error::unavailable)
                     { filter_error = status; }
                     return status != source_frame_variables::error::none || chosen.variable_identity != value.identity;
@@ -1690,7 +1691,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             if(!command.source_frame_explicit && !saved) { return control_error::none; }
             auto const ordinal{command.source_frame_explicit ? command.source_frame_ordinal : source_frame_cursor_.ordinal};
             ::std::vector<source_frames::frame> frames{};
-            if(source_frames::current_frames(source.dwarf->scopes(), actual.source.code_offset, frames) != source_frames::error::none)
+            if(source_frames::current_frames(source.dwarf->scopes(), actual.source.code_offset, frames, {}, source.dwarf->scope_paths()) != source_frames::error::none)
             { return control_error::source_location_unmapped; }
             if(ordinal >= frames.size())
             {
@@ -1709,6 +1710,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             { return control_error::invalid_state; }
             anchor = index; return control_error::none;
 #else
+            (void)record; (void)command; (void)actual; (void)source; (void)result;
             return control_error::source_debug_info_unavailable;
 #endif
         }
@@ -1750,6 +1752,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             // [owned source modules ... checked module] end
             // [safe                                   ] module < size BEFORE narrow/index.
             auto const& source{source_modules_[static_cast<::std::size_t>(location.code_unit)]};
+            source_dwarf::object_validation_scope const type_validation{source.dwarf ? source.dwarf->object_validation() : nullptr};
             if(source.dwarf_status != source_dwarf::error::none || !source.dwarf || !source.binding)
             { result.status = control_error::source_debug_info_unavailable; return; }
             ::uwvm2::runtime::lib::llvm_jit_debug_source_activation_snapshot actual{};
@@ -1762,7 +1765,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                actual.activation.frames.empty())
             { result.status = control_error::source_location_unmapped; return; }
             ::std::vector<source_frames::frame> current{};
-            auto const queried{source_frames::current_frames(source.dwarf->scopes(), actual.source.code_offset, current)};
+            auto const queried{source_frames::current_frames(source.dwarf->scopes(), actual.source.code_offset, current, {}, source.dwarf->scope_paths())};
             if(queried != source_frames::error::none || current.empty())
             { result.status = control_error::source_location_unmapped; return; }
             if(actual.activation.frames.size() - 1u > (::std::numeric_limits<::std::size_t>::max)() - current.size())
@@ -1838,6 +1841,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             source_frame_cursor_.scope = chosen.scope; source_frame_cursor_.ordinal = selected; source_frame_cursor_.binding = source.binding;
             result.source_frames_available = true; result.selected_source_frame = selected; result.source_frame_thread = record.participant;
 #else
+            (void)record; (void)command;
             result.status = control_error::source_debug_info_unavailable;
 #endif
 #if defined(__cpp_exceptions) || defined(_CPPUNWIND)
@@ -1859,7 +1863,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
 #if defined(UWVM_USE_LLVM_JIT) || defined(UWVM_USE_DEFAULT_JIT)
             if(!source.dwarf) { return source_scalar_expression::language_semantics::shared_numeric; }
             source_frames::language_context language{};
-            if(source_frames::current_language(source.dwarf->scopes(),actual_pc,frame_anchor.value_or(0u),language) != source_frames::error::none)
+            if(source_frames::current_language(source.dwarf->scopes(),actual_pc,frame_anchor.value_or(0u),language, {}, source.dwarf->scope_paths()) != source_frames::error::none)
             { return source_scalar_expression::language_semantics::shared_numeric; }
             return source_scalar_expression::language_from_dwarf(language.language,language.tinygo_producer,language.zig_producer);
 #else
@@ -1882,6 +1886,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             // [controller-owned source modules ... checked code_unit] end
             // [safe                                                   ] checked BEFORE narrowing/subscript.
             auto const& source{caller == nullptr ? source_modules_[static_cast<::std::size_t>(location.code_unit)] : *caller->source};
+            source_dwarf::object_validation_scope const type_validation{source.dwarf ? source.dwarf->object_validation() : nullptr};
             if(source.dwarf_status != source_dwarf::error::none || !source.dwarf || !source.binding)
             { result.status = control_error::source_debug_info_unavailable; return; }
             ::fast_io::array<::uwvm2::runtime::lib::llvm_jit_checkpoint_thread_capture_owner, 256u> captures{};
@@ -1947,7 +1952,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                         // The true caller API supplied its sealed callsite PC and
                         // saved native locals. A leaf PC/ordinal cannot replace it.
                         ::std::vector<source_frames::frame> frames{};
-                        if(source_frames::current_frames(source.dwarf->scopes(), actual.source.code_offset, frames) != source_frames::error::none || frames.empty())
+                        if(source_frames::current_frames(source.dwarf->scopes(), actual.source.code_offset, frames, {}, source.dwarf->scope_paths()) != source_frames::error::none || frames.empty())
                         { result.status = control_error::source_location_unmapped; return false; }
                         frame_anchor = frames.size() - 1u; // This saved physical caller's concrete scope.
                     }
@@ -1979,7 +1984,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     {
                         auto const atom{[&](source_dwarf::location_plan& item)
                         {
-                            if(item.kind != source_dwarf::plan_kind::wasm_local_value && item.kind != source_dwarf::plan_kind::wasm_local_frame_base) { return; }
+                            if(item.kind != source_dwarf::plan_kind::wasm_local_value && item.kind != source_dwarf::plan_kind::wasm_local_frame_base &&
+                               item.kind != source_dwarf::plan_kind::wasm_local_guest_offset) { return; }
                             ::std::size_t base{}, count{saved_locals.values.size()};
                             if(item.storage == source_dwarf::wasm_location_space::operand) { base=count;count=saved_locals.operands.size(); }
                             else if(item.storage == source_dwarf::wasm_location_space::global) { base=count+saved_locals.operands.size();count=saved_locals.globals.size(); }
@@ -2000,7 +2006,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     {
                     source_dwarf::variable_selection selected{};
                     auto status{source_dwarf::query_named_variable(scopes, types, source.dwarf->variables(), actual.source.code_offset,
-                        expression.root_name, selected, {}, frame_anchor)};
+                        expression.root_name, selected, {}, frame_anchor, source.dwarf->scope_paths(), source.dwarf->numeric_validation())};
                     if(status != source_dwarf::inline_query_error::none || selected.type >= types.size())
                     { result.status = control_error::source_location_unmapped; return false; }
                     auto width{reader.address_bytes()};
@@ -2083,13 +2089,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                             target = ::std::move(object.bytes); return true; // complete owned bytes only.
                         }};
                         if(selected.location.kind == source_dwarf::plan_kind::absolute_guest_offset ||
-                           selected.location.kind == source_dwarf::plan_kind::frame_relative_offset)
+                           selected.location.kind == source_dwarf::plan_kind::frame_relative_offset ||
+                           selected.location.kind == source_dwarf::plan_kind::frame_relative_indirect_offset ||
+                           selected.location.kind == source_dwarf::plan_kind::wasm_local_guest_offset)
                         {
                             ::std::uint64_t offset{};
                             if(selected.location.kind == source_dwarf::plan_kind::absolute_guest_offset)
                             {
                                 if(source_dwarf::resolve_absolute_guest_offset(selected.location, offset) != source_dwarf::object_location_error::none)
                                 { result.status = control_error::source_location_unmapped; return false; }
+                            }
+                            else if(selected.location.kind == source_dwarf::plan_kind::wasm_local_guest_offset)
+                            {
+                                if(source_dwarf::resolve_local_guest_offset(selected.location,{copied.data(),captured_count},total_count,offset) !=
+                                   source_dwarf::object_location_error::none)
+                                { result.status=control_error::source_location_unmapped;return false; }
                             }
                             else
                             {
@@ -2100,10 +2114,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                                 //  ^^ existing role-aware frame-base plan consumes copied carriers only.
                                 auto frame_base{scopes[selected.physical_scope].frame_base};
                                 for(auto& entry : frame_base) { remap(entry.plan); }
-                                if(source_dwarf::resolve_frame_relative_offset(selected.location, frame_base,
-                                    actual.source.code_offset, {copied.data(), captured_count}, total_count, offset) !=
-                                    source_dwarf::object_location_error::none)
-                                { result.status = control_error::source_location_unmapped; return false; }
+                                if(selected.location.address_bytes!=width)
+                                { result.status = control_error::source_location_unmapped;return false; }
+                                auto const resolved{selected.location.kind==source_dwarf::plan_kind::frame_relative_indirect_offset ?
+                                    source_dwarf::resolve_indirect_frame_offset(selected.location,frame_base,actual.source.code_offset,
+                                        {copied.data(),captured_count},total_count,read,offset) :
+                                    source_dwarf::resolve_frame_relative_offset(selected.location,frame_base,actual.source.code_offset,
+                                        {copied.data(),captured_count},total_count,offset)};
+                                if(resolved!=source_dwarf::object_location_error::none)
+                                { result.status = control_error::source_location_unmapped;return false; }
                             }
                             if(!read(offset, extent, bytes)) { result.status = control_error::source_location_unmapped; return false; }
                         }
@@ -2155,7 +2174,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                         // transaction from the actual returned Code PC. Guest
                         // locals/type/member text do not create a read token.
                         status = source_language_expression::value(types, selected.type, expression.steps,
-                            ::std::move(bytes), ::std::move(known), width, read, result.source_object_type, {32u - issued_copies}, pointer_known);
+                            ::std::move(bytes), ::std::move(known), width, read, result.source_object_type,
+                            {32u - issued_copies,command.source_raw,command.source_print_elements,command.source_printers.get()}, pointer_known);
                         if(status == source_dwarf::inline_query_error::none)
                         { result.source_object_value_available = true; return true; }
                     }
@@ -2251,7 +2271,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 if(result.status == control_error::none) { result.status = control_error::source_location_unmapped; }
             }
 #else
-            (void)record; (void)command; (void)expression; result.status = control_error::source_debug_info_unavailable;
+            (void)record; (void)command; (void)expression; (void)caller; (void)scalar;
+            result.status = control_error::source_debug_info_unavailable;
 #endif
         }
 
@@ -2303,7 +2324,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 {
                     source_dwarf::variable_selection selected{};
                     auto const selected_status{source_dwarf::query_named_variable(source.dwarf->scopes(),source.dwarf->types(),source.dwarf->variables(),
-                        actual.source.code_offset,expression.root_name,selected,{},frame_anchor)};
+                        actual.source.code_offset,expression.root_name,selected,{},frame_anchor, source.dwarf->scope_paths(), source.dwarf->numeric_validation())};
                     if(selected_status != source_dwarf::inline_query_error::none || selected.type >= source.dwarf->types().size()) { return false; }
                     if(size)
                     {
@@ -2314,13 +2335,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                         out = {layout[0u].byte_size,static_cast<unsigned>(width)*8u,true}; return true;
                     }
                     if(!expression.steps.empty()) { needs_memory = true; return false; }
+                    if(source_dwarf::object_details::cxx_reference_spelling(source.dwarf->types()[selected.type]))
+                    { needs_memory = true; return false; }
                     if(!selected.location_available) { return false; }
                     if(selected.location.storage != source_dwarf::wasm_location_space::local ||
                        ::std::any_of(selected.location.pieces.begin(),selected.location.pieces.end(),[](auto const& piece)
                            { return piece.atom.storage != source_dwarf::wasm_location_space::local; }))
                     { needs_memory = true; return false; }
                     if(selected.location.kind == source_dwarf::plan_kind::absolute_guest_offset ||
-                       selected.location.kind == source_dwarf::plan_kind::frame_relative_offset)
+                       selected.location.kind == source_dwarf::plan_kind::frame_relative_offset ||
+                       selected.location.kind == source_dwarf::plan_kind::frame_relative_indirect_offset)
                     { needs_memory = true; return false; }
                     source_dwarf::numeric_variable value{};
                     source_dwarf::value_details::copy_value(selected.location,source.dwarf->types()[selected.type],
@@ -2337,7 +2361,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     // queries must still use the same actual selected frame.
                     source_dwarf::variable_selection selected{};
                     if(source_dwarf::query_named_variable(source.dwarf->scopes(),source.dwarf->types(),source.dwarf->variables(),
-                        actual.source.code_offset,expression.root_name,selected,{},frame_anchor) != source_dwarf::inline_query_error::none ||
+                        actual.source.code_offset,expression.root_name,selected,{},frame_anchor, source.dwarf->scope_paths(), source.dwarf->numeric_validation()) != source_dwarf::inline_query_error::none ||
                        selected.type >= source.dwarf->types().size()) { return false; }
                     ::std::vector<source_dwarf::object_node> layout{};
                     if(source_language_expression::type(source.dwarf->types(),selected.type,expression.steps,width,layout) !=
@@ -2452,10 +2476,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             ::std::string_view name{selector.root_name};
             source_dwarf::variable_selection selected{};
             auto status{source_dwarf::query_named_variable(source.dwarf->scopes(), source.dwarf->types(), source.dwarf->variables(),
-                actual.source.code_offset, name, selected, {}, frame_anchor)};
+                actual.source.code_offset, name, selected, {}, frame_anchor, source.dwarf->scope_paths(), source.dwarf->numeric_validation())};
             if(status == source_dwarf::inline_query_error::none && command.kind == console_command_kind::source_value && parsed_expression.steps.empty() && selected.type < source.dwarf->types().size())
             {
                 auto const& type{source.dwarf->types()[selected.type]};
+                // Aggregate printers share the canonical stopped-memory
+                // transaction. Direct scalars/constants retain their existing
+                // capture path and do not acquire extra memory prerequisites.
+                if(!command.source_raw &&
+                   (((source_dwarf::cxx_language(type.language) || type.language == 0x1cu || command.source_printers) &&
+                     (type.kind == source_dwarf::type_kind::structure || type.kind == source_dwarf::type_kind::class_type)) ||
+                    type.kind == source_dwarf::type_kind::array))
+                { source_expression_locked(record,command,parsed_expression,result); return; }
                 if((selected.location.kind == source_dwarf::plan_kind::composite_value && type.kind != source_dwarf::type_kind::scalar) ||
                    type.kind == source_dwarf::type_kind::pointer || type.name == "&str" || type.name == "&mut str" ||
                    (source_language_expression::details::go_language(type) && type.kind == source_dwarf::type_kind::structure &&
@@ -2503,6 +2535,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     ::std::any_of(selected.location.pieces.begin(),selected.location.pieces.end(),[](auto const& piece)
                         { return piece.atom.storage != source_dwarf::wasm_location_space::local; })))
                 { source_expression_locked(record,command,parsed_expression,result); return; }
+                if(command.kind==console_command_kind::source_value &&
+                   (selected.location.kind==source_dwarf::plan_kind::frame_relative_indirect_offset ||
+                    selected.location.kind==source_dwarf::plan_kind::wasm_local_guest_offset))
+                { source_expression_locked(record,command,parsed_expression,result);return; }
                 if(selected.location.kind != source_dwarf::plan_kind::frame_relative_offset && !absolute_object)
                 {
                     // A numeric captured slot is not a materialized aggregate
@@ -2523,7 +2559,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     }
                     status = source_dwarf::query_numeric_variables(source.dwarf->scopes(), source.dwarf->types(),
                         source.dwarf->variables(), actual.source.code_offset, {copied.data(), record.captured_count},
-                        record.total_count, result.source_locals);
+                        record.total_count, result.source_locals, {}, source.dwarf->scope_paths(), source.dwarf->numeric_validation());
                     if(status == source_dwarf::inline_query_error::none)
                     {
                         ::std::erase_if(result.source_locals, [&](auto const& variable) { return variable.identity != selected.identity; });
@@ -2585,7 +2621,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 source_dwarf::variable_selection confirmed{};
                 ::std::uint64_t confirmed_offset{};
                 if(source_dwarf::query_named_variable(scopes, source.dwarf->types(), source.dwarf->variables(),
-                       object.position.source.code_offset, name, confirmed, {}, frame_anchor) != source_dwarf::inline_query_error::none ||
+                       object.position.source.code_offset, name, confirmed, {}, frame_anchor, source.dwarf->scope_paths(), source.dwarf->numeric_validation()) != source_dwarf::inline_query_error::none ||
                    confirmed.identity != selected.identity || confirmed.type != selected.type || !confirmed.location_available ||
                    confirmed.scope != selected.scope || confirmed.physical_scope != selected.physical_scope ||
                    confirmed.global != selected.global || confirmed.static_storage != selected.static_storage ||
@@ -2681,7 +2717,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 auto const line{source->lines.lookup(current.source.module, current.source.code_offset)};
                 if(!line) { return control_error::none; }
                 source_dwarf::concrete_scope_path path{};
-                auto const selected{source_dwarf::query_concrete_scope_path(source->dwarf->scopes(), current.source.code_offset, path)};
+                auto const selected{source_dwarf::query_concrete_scope_path(source->dwarf->scopes(), current.source.code_offset, path, {}, source->dwarf->scope_paths())};
                 if(selected == source_dwarf::scope_path_error::unavailable || selected == source_dwarf::scope_path_error::ambiguous)
                 {
                     // An overlapping compiler scope cannot supply a statement
@@ -2743,7 +2779,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                             {
                                 if(!source.dwarf || source.dwarf_status != source_dwarf::error::none) { return control_error::source_debug_info_invalid; }
                                 source_dwarf::concrete_scope_path path{};
-                                if(source_dwarf::query_concrete_scope_path(source.dwarf->scopes(),pc,path) != source_dwarf::scope_path_error::none ||
+                                if(source_dwarf::query_concrete_scope_path(source.dwarf->scopes(),pc,path, {}, source.dwarf->scope_paths()) != source_dwarf::scope_path_error::none ||
                                    !source_step::details::prefix(position.scope_path,path.physical_and_inline)) { continue; }
                             }
                             found = true;
@@ -2867,7 +2903,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                         auto const line{source.lines.lookup(actual.source.module, actual.source.code_offset)};
                         if(!line) { state.error = control_error::none; return true; }
                         source_dwarf::concrete_scope_path path{};
-                        auto const status{source_dwarf::query_concrete_scope_path(source.dwarf->scopes(), actual.source.code_offset, path)};
+                        auto const status{source_dwarf::query_concrete_scope_path(source.dwarf->scopes(), actual.source.code_offset, path, {}, source.dwarf->scope_paths())};
                         if(status == source_dwarf::scope_path_error::unavailable) { state.error = control_error::none; return true; }
                         if(status != source_dwarf::scope_path_error::none || path.physical_and_inline.empty())
                         { state.error = status == source_dwarf::scope_path_error::ambiguous ? control_error::source_location_unmapped : control_error::source_debug_info_invalid; return false; }
@@ -4563,7 +4599,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                        position.module == member.location.code_unit && position.function == member.location.function &&
                        position.runtime_epoch == member.location.code_generation)
                     {
-                        auto const queried{source_dwarf::query_inline_frames(source.dwarf->scopes(), position.code_offset, saved.source_inline_frames)};
+                        auto const queried{source_dwarf::query_inline_frames(source.dwarf->scopes(), position.code_offset, saved.source_inline_frames, {}, source.dwarf->scope_paths())};
                         saved.source_inline_available = queried == source_dwarf::inline_query_error::none;
                         switch(queried)
                         {
@@ -4703,6 +4739,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     if(found && !emit(name,function.function,offset)) { return false; }
                 }
             }
+#else
+            (void)module_id; (void)prefix; (void)emit;
 #endif
             return true;
         }
@@ -4724,7 +4762,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             target.invalidated.assign(target.functions.size(), false);
             target.source_points.assign(target.functions.size(), 2u);
             target.status = invalid_metadata ? source_map_error::malformed :
-                source_map::parse(id, sections, target.lines);
+                source_map::parse(id, sections, target.lines, {.isolate_ambiguous_ranges=true});
             target.line_only = target.status == source_map_error::none &&
                 sections.debug_line.empty() && sections.source_map_declared;
             if(target.status == source_map_error::none)
@@ -4901,7 +4939,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 mapped_sections.compilation_directories = directories;
                 // Reparse only the runtime-bound copied module. Paths and CU
                 // offsets grant no source file read or native PC authority.
-                target.status = source_map::parse(id, mapped_sections, target.lines);
+                target.status = source_map::parse(id, mapped_sections, target.lines, {.isolate_ambiguous_ranges=true});
             }
             target.dwarf_status = status; target.dwarf = ::std::move(metadata); target.binding = ::std::move(binding);
             target.wasm_runtime_epoch = image.runtime_epoch;
@@ -5042,6 +5080,43 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         }
         [[nodiscard]] controller_reply inspect()
         { auto result{snapshot()}; synchronize_session(result); return result; }
+
+        // These are authenticated HOST transport preferences. They create no
+        // runtime operation, source stop, guest memory token or launch grant.
+        // The retained command owns its immutable registry throughout execute.
+        void apply_transport_source_print(console_command& command)
+        { ::std::lock_guard lock{mutex_}; transport_source_print_.apply(command); }
+        [[nodiscard]] ::std::string configure_transport_source_print(console_command const& command)
+        {
+            ::std::lock_guard lock{mutex_};
+            if(admission_ != control_error::none) { return "error: debugger transport is unavailable\n"; }
+            if(command.payload_size != 0u || command.wait_for_event || command.run_from_entry ||
+               command.launch_action != console_launch_action::none || command.operation != operation{})
+            { return "error: malformed source printer configuration\n"; }
+            if(command.kind == console_command_kind::source_printer_config)
+            {
+                auto const status{transport_source_print_.configure(command.source_printer_request)};
+                if(status != source_pretty_registry::error::none)
+                { return ::fast_io::concat_std("error: ",source_pretty_registry::error_text(status),"\n"); }
+                if(command.source_printer_request.operation == source_pretty_registry::action::list)
+                { return source_pretty_registry::describe(transport_source_print_.source_printers.get()); }
+                return source_pretty_registry::acknowledge(command.source_printer_request);
+            }
+            if(command.kind != console_command_kind::source_print_options ||
+               (command.source_print_policy == source_print_action::set_elements && command.source_print_elements > maximum_source_print_elements))
+            { return "error: malformed source printer configuration\n"; }
+            transport_source_print_.update(command);
+            switch(command.source_print_policy)
+            {
+                case source_print_action::set_pretty: case source_print_action::show_pretty:
+                    return transport_source_print_.pretty ? "Pretty printing of source values is on.\n" : "Pretty printing of source values is off.\n";
+                case source_print_action::set_elements: case source_print_action::show_elements:
+                    return ::fast_io::concat_std("Source pretty-printer element limit is ",::fast_io::mnp::dec(transport_source_print_.elements),".\n");
+                case source_print_action::list_printers:
+                    return source_pretty_registry::describe(transport_source_print_.source_printers.get());
+            }
+            return "error: malformed source printer configuration\n";
+        }
 
         [[nodiscard]] controller_reply execute(console_command const& command, management_wait_interrupt interrupt)
         { return execute(command, ::std::chrono::seconds{2}, interrupt); }

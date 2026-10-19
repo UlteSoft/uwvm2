@@ -1,0 +1,6 @@
+# Raw malformed WebAssembly fixtures are source test inputs.
+!/memarg_bad_optional_index.wasm
+!/memarg_missing_optional_index.wasm
+!/memarg_reserved_bit7.wasm
+!/memarg_u64_overflow.wasm
+!/memarg_u64_unterminated.wasm

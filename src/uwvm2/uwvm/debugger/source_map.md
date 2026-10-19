@@ -16,7 +16,13 @@ budgets are 16 MiB per supplied section, 1 Mi rows, 65,536 paths, 4,096 units,
 4,096 bytes per path, and 8 MiB total path bytes. Caller-selected budgets have
 hard ceilings. It rejects truncated LEBs and units, address overflow, offsets
 past Code content, unterminated line sequences, invalid file/directory indexes,
-and overlapping line ranges. A terminal `end_sequence` address is exclusive.
+and, by default, overlapping line ranges. The runtime opts into bounded overlap
+isolation for linked modules whose folded code has multiple CU records. An
+endpoint sweep retains only addresses with exactly one active row; conflicting
+intervals return no source location, even when the two paths look alike. Unique
+prefixes/tails remain mapped, and malformed input and all hard limits still
+reject atomically. This adds no source-file read or execution authority. A
+terminal `end_sequence` address is exclusive.
 The sole out-of-Code address exception is an all-ones `DW_LNE_set_address`
 tombstone from a linker-discarded function. The parser consumes that complete
 line sequence without publishing any of its rows; other out-of-range addresses

@@ -94,7 +94,12 @@ class SourceValuesTests(unittest.TestCase):
 
     def source_reference(self):
         scopes = self.scopes()
-        self.assertEqual([row["name"] for row in scopes], ["Source variables", "Wasm locals", "WASIp1 arguments", "WASIp1 environment", "WASIp1 descriptors", "WASIp1 preopens"])
+        expected = ["Source variables", "Wasm locals", "WASIp1 arguments", "WASIp1 environment", "WASIp1 descriptors", "WASIp1 preopens"]
+        if hasattr(self.adapter, "ros_scope_stops"):
+            expected += ["ROS capabilities (process-owned)", "ROS instances (backend sessions)", "ROS event queues (metadata only)"]
+            self.assertTrue(all(row["expensive"] and row["variablesReference"] > 0 for row in scopes[6:]))
+            self.assertFalse(any(command.startswith(("info ros", "trace ros")) for command in self.broker.commands))
+        self.assertEqual([row["name"] for row in scopes], expected)
         return scopes[0]["variablesReference"]
 
     def test_numeric_values_are_read_only_display_leaves(self):

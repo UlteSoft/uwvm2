@@ -1,3 +1,4 @@
+// v7 component signatures are raw fixture DATA, not authenticated runtime cache acceptance.
 // Structural Core3 DATA / genuine file & signed-cache codec test; not a VM checkpoint.
 #include <uwvm2/uwvm/debugger/checkpoint_envelope.h>
 #include <uwvm2/runtime/checkpoint/materialization.h>
@@ -176,6 +177,9 @@ int main(int argc, char** argv)
     cache::details::append_cache_key_value(base.cache_key, u8"wasm", u8"fixture-A");
     base.target_triple=u8"component-target"; base.cpu_name=u8"component-cpu"; base.cpu_features=u8"component-feature";
     base.llvm_version=u8"component-provider"; base.uwvm_abi=u8"component-abi"; base.codegen_policy=u8"component-policy";
+    base.data_layout=u8"component-layout";
+    base.self_executable_sha256[0u]=::std::byte{0x42u};base.has_self_executable_sha256=true;
+    REQUIRE(base.origin.expired()); // Synthetic DATA; not actual executable/kernel-origin proof.
     base.signature_seed[0u]=::std::byte{0x42u}; base.has_signature_seed=true; base.cache_key_is_complete=true;
     auto c0{base}, c1{base}, c2{base};
     for(auto* context : {&c0,&c1}) { cache::details::append_cache_key_value(context->cache_key,u8"module-ordinal",u8"0");
@@ -205,7 +209,10 @@ int main(int argc, char** argv)
     REQUIRE(semantics.observation==cp::state_identity::status::derived_data && semantics.functions.size()==id.modules.size());
     for(::std::size_t i{};i!=id.modules.size();++i) { id.modules[i].effective_function_generation_closure=semantics.functions[i]; }
     id.deterministic_event_prefix=semantics.events;
-    REQUIRE(bind::validate_shape(id)==bind::status::identical_data); auto actual{target(id)};
+    REQUIRE(bind::validate_shape(id)==bind::status::identical_data);
+    for(auto old : {5u,6u}) { auto legacy{id};legacy.objects[0].format=old;
+        REQUIRE(bind::validate_shape(legacy)==bind::status::unsupported_cache_version); }
+    auto actual{target(id)};
     auto bytes{encode(state,id)}; env::decoded_file_data decoded{};
     REQUIRE(env::decode(bytes,actual,decoded).observation==env::status::decoded_data && decoded.saved==state && decoded.identity==id);
     REQUIRE(!decoded.grants_restore_authority() && !decoded.identity.grants_restore_authority());
@@ -299,5 +306,5 @@ int main(int argc, char** argv)
     ::fast_io::io::print("CHECKPOINT_ENVELOPE endian=",::fast_io::mnp::os_c_str(::std::endian::native==::std::endian::big?"big":"little"),
         " negatives=",::fast_io::mnp::dec(negatives)," truncations=",::fast_io::mnp::dec(bytes.size())," bytes=",::fast_io::mnp::dec(bytes.size())," file_sha=");
     for(auto byte:hash(bytes)){::fast_io::io::print(::fast_io::mnp::hex<false,true>(::std::to_integer<unsigned char>(byte)));}
-    ::fast_io::io::println(" two_distinct_saved_bodies_one_target=1 canonical_data_only=1 loaded_build_cache_issuer=0 whole_restore=0");
+    ::fast_io::io::println(" two_distinct_saved_bodies_one_target=1 canonical_data_only=1 fixture_codec_only=1 origin_authenticated=0 legacy_cache_versions_rejected=2 loaded_build_cache_issuer=0 whole_restore=0");
 }

@@ -1,0 +1,14 @@
+# Generated execution evidence and copied build/source snapshots.
+**/*-evidence*/
+**/evidence/
+**/results/
+**/*.tar.gz
+**/*.tgz
+**/*.log
+**/*.stdout
+**/*.stderr
+**/*.jsonl
+/runtime/*qualification*.json
+/runtime/*runtime-20*.json
+/runtime/*protocol-20*.json
+/final-*/**/*.json

@@ -100,10 +100,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
                                                              .is_exist{::std::addressof(details::mode_is_exist)}};
     // Share --mode's duplicate-selection flag: argument order must not silently
     // turn an explicit debugger launch back into a normal run. Startup applies
-    // the same LLVM/full defaults and incompatible-backend fatal as -m debug-jit.
+    // the same LLVM/full defaults and incompatible-backend fatal as -m debug.
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_debug_jit{
         .name{u8"--runtime-debug"},
-        .describe{u8"Shortcut for -m debug-jit; enter the built-in LLVM JIT full debugger."},
+        .describe{u8"Shortcut for -m debug; enter the built-in LLVM JIT full debugger."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_debug_jit_alias), 1uz}},
         .handle{::std::addressof(details::runtime_debug_jit_callback)},
         .is_exist{::std::addressof(details::mode_is_exist)},
@@ -114,14 +114,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .usage{u8"<connected-fd>"},
         .handle{::std::addressof(details::debug_jit_control_fd_callback)},
         .is_exist{::std::addressof(details::debug_jit_control_fd_is_exist)},
-        .cate{::uwvm2::utils::cmdline::categorization::runtime}};
+        .cate{::uwvm2::utils::cmdline::categorization::debug}};
     inline constexpr ::uwvm2::utils::cmdline::parameter debug_jit_control_handle{
         .name{u8"--debug-jit-control-handle"},
         .describe{u8"Windows only: opt in to LLVM-full late debugger commands from a direct-parent inherited private pipe HANDLE."},
         .usage{u8"<connected-decimal-handle>"},
         .handle{::std::addressof(details::debug_jit_control_handle_callback)},
         .is_exist{::std::addressof(details::debug_jit_control_handle_is_exist)},
-        .cate{::uwvm2::utils::cmdline::categorization::runtime}};
+        .cate{::uwvm2::utils::cmdline::categorization::debug}};
 #if defined(__clang__)
 # pragma clang diagnostic pop
 #endif

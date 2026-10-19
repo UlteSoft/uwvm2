@@ -1,0 +1,72 @@
+[
+  {
+    "name": "default",
+    "args": [],
+    "exit_code": 0,
+    "stdout": "csharp classes=42 arrays=55 strings=7 exceptions=3 iterations=20000 checksum=2356050119\n",
+    "stderr": ""
+  },
+  {
+    "name": "iterations-100000",
+    "args": [
+      "100000"
+    ],
+    "exit_code": 0,
+    "stdout": "csharp classes=42 arrays=55 strings=7 exceptions=3 iterations=100000 checksum=2903468964\n",
+    "stderr": ""
+  },
+  {
+    "name": "iterations-1000000",
+    "args": [
+      "1000000"
+    ],
+    "exit_code": 0,
+    "stdout": "csharp classes=42 arrays=55 strings=7 exceptions=3 iterations=1000000 checksum=592549767\n",
+    "stderr": ""
+  },
+  {
+    "name": "iterations-0",
+    "args": [
+      "0"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "csharp invalid iterations\n"
+  },
+  {
+    "name": "iterations--1",
+    "args": [
+      "-1"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "csharp invalid iterations\n"
+  },
+  {
+    "name": "iterations-100000001",
+    "args": [
+      "100000001"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "csharp invalid iterations\n"
+  },
+  {
+    "name": "iterations-x",
+    "args": [
+      "x"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "csharp invalid iterations\n"
+  },
+  {
+    "name": "iterations-99999999999999999999",
+    "args": [
+      "99999999999999999999"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "csharp invalid iterations\n"
+  }
+]

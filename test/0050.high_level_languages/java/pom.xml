@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>uwvm.high-level-languages</groupId>
+  <artifactId>java-semantics</artifactId>
+  <version>1.0.0</version>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <teavm.version>0.13.1</teavm.version>
+    <teavm.target>WEBASSEMBLY_WASI</teavm.target>
+    <teavm.output>wasi</teavm.output>
+    <teavm.optimization>FULL</teavm.optimization>
+    <fixture.main>uwvm.hll.Semantics</fixture.main>
+    <fixture.file>java-semantics.wasm</fixture.file>
+  </properties>
+  <dependencies>
+    <dependency><groupId>org.teavm</groupId><artifactId>teavm-classlib</artifactId><version>${teavm.version}</version></dependency>
+    <!-- The legacy WASI backend reads RuntimeClass/Allocator from this artifact
+         through the application classpath, independently of the Maven plugin. -->
+    <dependency><groupId>org.teavm</groupId><artifactId>teavm-core</artifactId><version>${teavm.version}</version><scope>provided</scope></dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-resources-plugin</artifactId><version>3.3.1</version></plugin>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.1</version></plugin>
+      <plugin>
+        <groupId>org.teavm</groupId><artifactId>teavm-maven-plugin</artifactId><version>${teavm.version}</version>
+        <executions><execution><phase>process-classes</phase><goals><goal>compile</goal></goals></execution></executions>
+        <configuration>
+          <mainClass>${fixture.main}</mainClass>
+          <targetType>${teavm.target}</targetType>
+          <targetDirectory>${project.build.directory}/${teavm.output}</targetDirectory>
+          <targetFileName>${fixture.file}</targetFileName>
+          <optimizationLevel>${teavm.optimization}</optimizationLevel>
+          <minifying>false</minifying>
+          <debugInformationGenerated>true</debugInformationGenerated>
+          <wasmDebugInfoLocation>EMBEDDED</wasmDebugInfoLocation>
+          <sourceMapsGenerated>true</sourceMapsGenerated>
+          <sourceFilesCopied>true</sourceFilesCopied>
+          <minHeapSize>1</minHeapSize>
+          <maxHeapSize>4</maxHeapSize>
+          <strict>true</strict>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

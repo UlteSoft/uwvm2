@@ -743,14 +743,14 @@ case static_cast<wasm_byte>(0xd6u):
             // loop register transform still needs its handler; all other edges jump directly.
             bool const loop_transform{stacktop_enabled && target_frame.type == block_type::loop &&
                 stacktop_regtransform_cf_entry && stacktop_cache_count != 0uz};
-            if(thunks.size() == thunk_start && !loop_transform) { branch_label_id = target_label_id; }
+            if(thunks.size() == thunk_start && !loop_transform) { branch_label_id = control_end_branch_target(target_label_id); }
             else if(loop_transform) { emit_br_to_with_stacktop_transform(thunks, target_label_id, true); }
             else { emit_br_to(thunks, target_label_id, true); }
             if constexpr(stacktop_enabled)
             {
                 if constexpr(!strict_cf_entry_like_call)
                 {
-                    if(target_label_id == target_frame.end_label_id)
+                    if(target_label_id == target_frame.end_label_id && !target_frame.stacktop_has_end_state)
                     {
                         target_frame.stacktop_has_end_state = true;
                         target_frame.stacktop_currpos_at_end = curr_stacktop;

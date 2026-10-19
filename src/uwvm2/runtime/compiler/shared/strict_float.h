@@ -7,6 +7,7 @@
 #pragma once
 
 #include <bit>
+#include <cmath>
 #include <cstdint>
 #include <type_traits>
 #include <fast_io_freestanding.h>
@@ -455,9 +456,13 @@ namespace uwvm2::runtime::compiler::shared::strict_float
     template <typename Float>
     [[nodiscard]] inline Float square_root(Float value) noexcept
     {
-        Float result;
-        if(try_nearest_fast<operation::sqrt>(value, Float{}, result)) { return canonicalize_native_nan(result); }
-        return slow_operation<operation::sqrt>(value);
+        if constexpr(needs_extended_rounding)
+        {
+            Float result;
+            if(try_nearest_fast<operation::sqrt>(value, Float{}, result)) { return canonicalize_native_nan(result); }
+            return slow_operation<operation::sqrt>(value);
+        }
+        else { return canonicalize_native_nan(::std::sqrt(value)); }
     }
 
     enum class comparison { eq, ne, lt, gt, le, ge };

@@ -1,0 +1,6 @@
+{
+  "name": "uwvm-high-level-assemblyscript",
+  "private": true,
+  "version": "1.0.0",
+  "devDependencies": {"assemblyscript": "0.28.20"}
+}

@@ -59,6 +59,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         console_launch_action action{console_launch_action::run};
         ::fast_io::string program_name{}; // Owned host display label, never guest/launch authority.
         ::std::vector<breakpoint> breakpoints{}; // Cold settings, revalidated in the new instance.
+        console_print_preferences source_print{}; // HOST presentation preferences survive a fresh guest launch.
     };
     struct console_io
     {
@@ -140,12 +141,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             if(io.interactive && !drawn && (action == console_editing::action::changed ||
                 action == console_editing::action::redraw || action == console_editing::action::candidates))
             {
-                if(action == console_editing::action::redraw) { io.write(io.context, "\x1b[2J\x1b[H"); }
+                if(action == console_editing::action::redraw) { io.write(io.context, ::fast_io::string_view{"\x1b[2J\x1b[H"}); }
                 if(action == console_editing::action::candidates && !handled_candidates)
                 {
-                    io.write(io.context, "\n");
+                    io.write(io.context, ::fast_io::string_view{"\n"});
                     editor.display_candidates([&](::fast_io::string_view name)
-                    { io.write(io.context, name); io.write(io.context, "\n"); });
+                    { io.write(io.context, name); io.write(io.context, ::fast_io::string_view{"\n"}); });
                 }
                 auto const rendered{console_tui::command_line(editor, console_tui::terminal_dimensions().columns)};
                 io.write(io.context, ::fast_io::string_view{rendered.data(), rendered.size()});
@@ -164,7 +165,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                     // [owned editor bytes][size <= max_input_command_bytes] end
                     // [safe                              ] copied into equal fixed extent.
                     for(::std::size_t index{}; index != line.size; ++index) { line.bytes[index] = editor.line().bytes[index]; }
-                    if(io.interactive && !drawn) { io.write(io.context, "\n"); }
+                    if(io.interactive && !drawn) { io.write(io.context, ::fast_io::string_view{"\n"}); }
                     return line;
                 case console_editing::action::end: line.status = line_status::end; return line;
                 case console_editing::action::interrupted: line.status = line_status::interrupted; return line;
@@ -1125,6 +1126,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             }
             return text;
         }
+
+        // Authenticated private transports dispatch HOST printer preferences
+        // and bounded module metadata here. Neither is a Runtime operation;
+        // the parsed opcode deliberately stays zero. All other commands keep
+        // the existing controller validation and machine-readable formatter.
+        [[nodiscard]] inline ::std::string execute_control_command(controller& control, console_command const& command)
+        {
+            if(command.kind == console_command_kind::source_print_options || command.kind == console_command_kind::source_printer_config)
+            { return control.configure_transport_source_print(command); }
+            if(command.kind == console_command_kind::module_list)
+            {
+                auto const text{console_module_help::format(control.source_module_page(command.module_help_page), false, 80u)};
+                return ::std::string{text.data(), text.size()};
+            }
+            // Preserve the existing execution and machine-readable formatter
+            // for every other command admitted by the platform server.
+            auto effective{command}; control.apply_transport_source_print(effective);
+            return format_reply(control.execute(effective), effective);
+        }
     }
     namespace details
     {
@@ -1277,6 +1297,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         controller& control_;
         console_io io_;
         console_tui::screen& screen_;
+        console_print_preferences const& source_print_;
         console_completion::candidates candidates_{};
         ::std::uint64_t painted_stop_{};
         execution_status painted_execution_{execution_status::closed};
@@ -1284,11 +1305,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         ::std::chrono::steady_clock::time_point mouse_batch_start_{};
         ::std::size_t mouse_batch_count_{};
         [[nodiscard]] controller_reply query(::fast_io::string_view input)
-        { return control_.execute(parse_console_command(input)); }
+        { auto command{parse_console_command(input)}; source_print_.apply(command); return control_.execute(command); }
         void panel_reply(console_tui::layout which, ::fast_io::string const& input) { panel_reply(which,input.subview(0u)); }
         void panel_reply(console_tui::layout which, ::fast_io::string_view input)
         {
-            auto const command{parse_console_command(input)};
+            auto command{parse_console_command(input)}; source_print_.apply(command);
             auto const reply{control_.execute(command)};
             auto const text{details::format_reply(reply,command)};
             if(which==console_tui::layout::memory && reply.status==::uwvm2::utils::control::error::none)
@@ -1457,7 +1478,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             else if(level.word=="asm" && !part.word.empty() && part.tail.empty())
             { request=::fast_io::concat_fast_io("info registers ",thread.identifier," ",actual.stop_identifier); }
             else { return ::fast_io::concat_fast_io("error: inspect src EXPR | inspect wasm local|stack INDEX | inspect asm REGISTER\n"); }
-            auto command{parse_console_command(request.subview(0u))};auto reply{control_.execute(command)};
+            auto command{parse_console_command(request.subview(0u))};source_print_.apply(command);auto reply{control_.execute(command)};
             if(reply.status!=::uwvm2::utils::control::error::none)
             { return line(level.tail,{},"unavailable at this stop",false); }
             if(level.word=="src")
@@ -1466,11 +1487,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 if(reply.source_object_value_available && !reply.source_object_type.empty() && reply.source_object_type.size()<=1024u)
                 {
                     ::fast_io::string text{};unsigned shown{};
-                    for(auto const& node:reply.source_object_type)
+                    for(::std::size_t index{};index!=reply.source_object_type.size();++index)
                     {
+                        auto const& node{reply.source_object_type[index]};
+                        if(!console_messages::pretty_visible(reply.source_object_type,index)) { continue; }
                         if(node.depth>1u) { continue; }if(shown==8u) { text.append("…\n");break; }++shown;
-                        ::fast_io::string value{};bool available{node.value_available || node.display_text_available};
-                        if(node.display_text_available) { value=::fast_io::concat_fast_io("\"",::std::string_view{node.display_text},node.display_text_truncated ? ::fast_io::string_view{"…\""} : ::fast_io::string_view{"\""}); }
+                        ::fast_io::string value{};bool available{node.value_available || node.display_text_available || node.pretty_available};
+                        if(node.pretty_available) { value=::fast_io::concat_fast_io(source_dwarf::readable_metadata_text{node.pretty_summary}); }
+                        else if(node.display_text_available) { value=::fast_io::concat_fast_io("\"",::std::string_view{node.display_text},node.display_text_truncated ? ::fast_io::string_view{"…\""} : ::fast_io::string_view{"\""}); }
                         else if(node.reason!=source_dwarf::object_unavailable_reason::none) { value=::fast_io::concat_fast_io("unavailable");available=false; }
                         else if(node.value_available && node.kind==source_dwarf::type_kind::pointer) { value=::fast_io::concat_fast_io(::fast_io::mnp::hex0x(node.bits)); }
                         else if(node.value_available) { value=scalar_text(node.scalar_kind,node.bits,node.scalar_bytes);available=value.subview(0u)!="unavailable"; }
@@ -1509,8 +1533,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             return value.available ? line(part.word,value.type.subview(0u),value.value.subview(0u)) : line(part.word,{},"unavailable",false);
         }
     public:
-        console_visual_session(controller& control, console_io io, console_tui::screen& screen)
-            : control_{control}, io_{io}, screen_{screen} {}
+        console_visual_session(controller& control, console_io io, console_tui::screen& screen, console_print_preferences const& source_print)
+            : control_{control}, io_{io}, screen_{screen}, source_print_{source_print} {}
         void output(::fast_io::string_view text)
         {
             if(io_.interactive && text.starts_with("error:"))
@@ -1560,7 +1584,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             auto const query{screen_.take_query()}; if(query.empty()) { return; }
             refresh_needed_=true;
             // Mouse and typed `info wasip1 fd` use exactly the same authenticated query.
-            auto const command{parse_console_command(query.subview(0u))};
+            auto command{parse_console_command(query.subview(0u))}; source_print_.apply(command);
             auto const reply{control_.execute(command)}; auto const text{details::format_reply(reply,command)};
             if(command.operation==::uwvm2::utils::control::operation::read_memory)
             { if(reply.status==::uwvm2::utils::control::error::none) { ::std::uint64_t module{},offset{};::std::uint32_t memory{},reserved{};::uwvm2::utils::control::input_buffer fields{command.payload};
@@ -1658,7 +1682,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         {
             candidates_={};
             auto const request{console_completion::context(editor.line().view(),editor.cursor())};
-            if(request.type == console_completion::kind::pane)
+            if(request.type==console_completion::kind::printer)
+            {
+                if(request.root != "delete") { static_cast<void>(candidates_.add("builtin",request.prefix)); }
+                if(source_print_.source_printers)
+                { for(auto const& profile : source_print_.source_printers->profiles)
+                  { static_cast<void>(candidates_.add(::fast_io::string_view{profile.name.data(),profile.name.size()},request.prefix)); } }
+            }
+            else if(request.type == console_completion::kind::pane)
             { if(request.root=="direction")
               { for(auto name:{::fast_io::string_view{"left"},::fast_io::string_view{"right"},::fast_io::string_view{"above"},::fast_io::string_view{"below"}}) { static_cast<void>(candidates_.add(name,request.prefix)); } }
               else { for(auto name : console_tui::layout_names) { if(name!="split") { static_cast<void>(candidates_.add(name,request.prefix)); } }
@@ -1804,7 +1835,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 {
                     // execute(wait) already serviced the REAL delivered host
                     // event. Only acknowledge keyboard input, never a VM stop.
-                    io.write(io.context, "^C\n");
+                    io.write(io.context, ::fast_io::string_view{"^C\n"});
                     if(io.consume_interrupt != nullptr) { static_cast<void>(io.consume_interrupt(io.context)); }
                     interrupt_acknowledged = true;
                 }
@@ -1838,15 +1869,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
     {
         if(io.read_byte == nullptr || io.write == nullptr) { return console_exit::input_failure; }
         if(shutdown != nullptr && !shutdown->matches_controller(control))
-        { io.write(io.context, "error: managed shutdown belongs to a different host controller\n"); return console_exit::input_failure; }
+        { io.write(io.context, ::fast_io::string_view{"error: managed shutdown belongs to a different host controller\n"}); return console_exit::input_failure; }
         struct paste_terminal_scope
         {
             console_io io;
-            ~paste_terminal_scope() { if(io.interactive) { io.write(io.context, "\x1b[?2004l"); } }
+            ~paste_terminal_scope() { if(io.interactive) { io.write(io.context, ::fast_io::string_view{"\x1b[?2004l"}); } }
         } const paste_scope{io};
-        if(io.interactive) { io.write(io.context, "\x1b[?2004h"); }
+        if(io.interactive) { io.write(io.context, ::fast_io::string_view{"\x1b[?2004h"}); }
         if(restart == nullptr || !restart->resume_new_launch)
-        { io.write(io.context, "UWVM debugger. Type \"help\" for command classes, \"help run\" to begin.\n"); }
+        { io.write(io.context, ::fast_io::string_view{"UWVM debugger. Type \"help\" for command classes, \"help run\" to begin.\n"}); }
         // The bounded history/kill/undo buffers outlive each command. Keep
         // their owner off the management thread stack: at -O0 the editor plus
         // execute() exceeded the ordinary 1 MiB Windows thread stack.
@@ -1857,7 +1888,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         if(!editor_owner) { editor_owner=::std::make_unique<console_editing::editor>(); }
         if(!screen_owner) { screen_owner=::std::make_unique<console_tui::screen>(io.context,io.write,io.interactive); }
         auto& editor{*editor_owner};
-        console_visual_session visual{control,io,*screen_owner};
+        console_print_preferences local_print{};
+        auto& source_print{restart == nullptr ? local_print : restart->source_print};
+        console_visual_session visual{control,io,*screen_owner,source_print};
         struct display_state { console_tui::screen& screen; console_editing::editor& editor; } display{*screen_owner,editor};
         io.display_context=::std::addressof(display);
         io.display_poll=+[](void* context)
@@ -1963,9 +1996,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
             for(auto const& entry : displays.records())
             {
                 if(entry.identifier == 0u || !entry.enabled || (!fresh && only != 0u && only != entry.identifier)) { continue; }
-                auto const query{parse_console_command(::fast_io::concat_fast_io("print ",
+                auto query{parse_console_command(::fast_io::concat_fast_io("print ",
                     ::fast_io::mnp::dec(actual.threads.front().identifier)," ",::fast_io::mnp::dec(actual.stop_identifier),
                     " 0 ",entry.expression).subview(0u))};
+                source_print.apply(query);
                 // execute rechecks this explicit stop/thread/frame on every
                 // read. Text and a prior observed reply grant no read authority.
                 auto const copied{control.execute(query)};
@@ -2009,7 +2043,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         for(;;)
         {
             retire_start_hit();
-            if(!visual.enabled() && !io.interactive) { io.write(io.context,"(uwvm-debug) "); }
+            if(!visual.enabled() && !io.interactive) { io.write(io.context,::fast_io::string_view{"(uwvm-debug) "}); }
             auto const line{read_console_line(io, editor,visual.hooks())};
             if(line.status == line_status::failure) { return console_exit::input_failure; }
             if(line.status == line_status::end)
@@ -2097,6 +2131,62 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 auto const help{console_help::format(menu->topic, io.interactive, io.interactive ? size.columns : 80u,
                     io.interactive && size.rows < 23u ? (size.rows > 5u ? size.rows - 5u : 4u) : 18u)};
                 output(help.subview(0u));  continue;
+            }
+            if(auto const printing{documentation.valid ? parse_console_command(documentation.view()) : console_command{}};
+               printing.kind == console_command_kind::source_print_options || printing.kind == console_command_kind::source_printer_config)
+            {
+                editor.forget_repeat();
+                if(printing.kind == console_command_kind::source_printer_config)
+                {
+                    auto const& request{printing.source_printer_request};
+                    auto const result{source_print.configure(request)};
+                    if(result != source_pretty_registry::error::none)
+                    { output(::fast_io::concat_fast_io("error: ",source_pretty_registry::error_text(result),"\n").subview(0u)); }
+                    else if(request.operation == source_pretty_registry::action::list)
+                    {
+                        auto const listing{source_pretty_registry::describe(source_print.source_printers.get())};
+                        output(::fast_io::string_view{listing.data(),listing.size()});
+                    }
+                    else
+                    {
+                        auto const acknowledgement{source_pretty_registry::acknowledge(request)};
+                        output(::fast_io::string_view{acknowledgement.data(),acknowledgement.size()});
+                    }
+                    continue;
+                }
+                source_print.update(printing);
+                switch(printing.source_print_policy)
+                {
+                    case source_print_action::set_pretty: case source_print_action::show_pretty:
+                        output(source_print.pretty ? ::fast_io::string_view{"Pretty printing of source values is on.\n"} :
+                            ::fast_io::string_view{"Pretty printing of source values is off.\n"}); break;
+                    case source_print_action::set_elements: case source_print_action::show_elements:
+                        output(::fast_io::concat_fast_io("Source pretty-printer element limit is ",::fast_io::mnp::dec(source_print.elements),
+                            source_print.elements == 0u ? ::fast_io::string_view{" (summary only).\n"} : ::fast_io::string_view{".\n"}).subview(0u)); break;
+                    case source_print_action::list_printers:
+                        output(source_print.pretty && (!source_print.source_printers || source_print.source_printers->builtins_enabled) ? ::fast_io::string_view{"Built-in source pretty-printers: enabled\n"} :
+                            ::fast_io::string_view{"Built-in source pretty-printers: disabled\n"});
+                        output("Profiles (each requires a validated emitted DWARF layout):\n"
+                            "  libstdc++ / libc++ vector, packed vector<bool>, deque, bitset\n"
+                            "  libstdc++ / libc++ list, forward_list, ordered/hash set and map nodes\n"
+                            "  C++ string, string_view, dynamic/static span, array, pair and tuple\n"
+                            "  C++ optional, active variant alternatives and expected value/error\n"
+                            "  C++ unique_ptr and typed shared_ptr/weak_ptr ownership counts\n"
+                            "  C++ stack, queue and priority_queue typed underlying containers\n"
+                            "  C++ chrono duration ticks and time_point representation\n"
+                            "  Rust Vec and String\n"
+                            "  Coroutine handle and recognized compiler frame\n"
+                            "  Custom sequence, string, pointer and optional field profiles\n"
+                            "Weak pointers never copy pointees. Unsupported layouts retain raw fields.\n"
+                            "Use print /r EXPR to inspect raw fields; pretty-printer list shows custom profiles.\n"
+                            "Coroutine state requires a recognized compiler layout; unknown state remains unavailable.\n");
+                        {
+                            auto const listing{source_pretty_registry::describe(source_print.source_printers.get())};
+                            output(::fast_io::string_view{listing.data(),listing.size()});
+                        }
+                        break;
+                }
+                continue;
             }
             if(visual.command(trimmed)) {  continue; }
             if(documentation.valid && documentation.view() == "quit force")
@@ -2191,6 +2281,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                 continue;
             }
             auto command{parsed.command};
+            source_print.apply(command);
             if(command.launch_action == console_launch_action::kill)
             {
 
@@ -2251,6 +2342,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
                         io.interactive, io.interactive ? size.columns : 80u).subview(0u));
                     continue;
                 }
+                case console_command_kind::source_print_options:
+                case console_command_kind::source_printer_config: continue; // consumed by HOST preferences above
                 case console_command_kind::empty: continue;
                 case console_command_kind::help:
                 {

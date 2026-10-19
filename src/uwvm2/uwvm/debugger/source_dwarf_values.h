@@ -40,7 +40,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
         inline_query_limits inline_limits{};
         ::std::size_t max_types{65536u}, max_variables{65536u}, max_locations{65536u};
         ::std::size_t max_captured_locals{256u}, max_results{1024u};
-        ::std::size_t max_metadata_string_bytes{1024u * 1024u}, max_result_string_bytes{16384u};
+        // Count every owned scope/type/variable string use, including repeated
+        // declarations in a real standard-library CU. Keep the parser's finite
+        // 8 MiB envelope; this does not increase result or memory-read limits.
+        ::std::size_t max_metadata_string_bytes{8u * 1024u * 1024u}, max_result_string_bytes{16384u};
     };
     [[nodiscard]] inline constexpr ::std::string_view numeric_reason_text(numeric_unavailable_reason reason) noexcept
     {
@@ -190,27 +193,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
             out.byte_count = type.byte_count; out.bits = bits & numeric_mask(type.byte_count);
         }
     }
-    // Finite metadata + copied-scalar query only. The caller must FIRST bind a
-    // real paused participant/source/code owner/generation. This API never loads
-    // a frame, executes guest DWARF, reads memory/registers or opens source files.
-    // Failure clears out; no partial variable list is published.
-    [[nodiscard]] inline inline_query_error query_numeric_variables(::std::span<scope_record const> scopes,
-        ::std::span<type_record const> types, ::std::span<variable_record const> variables, ::std::uint64_t pc,
-        ::std::span<copied_numeric_local const> locals, ::std::size_t total_count,
-        ::std::vector<numeric_variable>& out, numeric_query_limits const& cap = {}) noexcept
+    namespace value_details
     {
-        out.clear();
-#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
-        try
+        [[nodiscard]] inline inline_query_error validate_numeric_metadata(
+            ::std::span<scope_record const> scopes, ::std::span<type_record const> types,
+            ::std::span<variable_record const> variables, numeric_query_limits const& cap,
+            ::std::size_t& strings, ::std::size_t& locations) noexcept
         {
-#endif
-            if(types.size() > cap.max_types || variables.size() > cap.max_variables ||
-               locals.size() > cap.max_captured_locals) { return inline_query_error::limit_exceeded; }
-            if(locals.size() > total_count) { return inline_query_error::malformed; }
-            ::std::vector<inline_frame> chain{};
-            auto const proven{query_inline_frames(scopes, pc, chain, cap.inline_limits)};
-            if(proven != inline_query_error::none) { return proven; }
-            ::std::size_t strings{}, locations{};
+            strings=0u;locations=0u;
             for(auto const& scope : scopes)
             { if(!budget::charge(scope.name.size(), cap.max_metadata_string_bytes, strings) ||
                  !budget::charge(scope.call_file.size(), cap.max_metadata_string_bytes, strings)) { return inline_query_error::limit_exceeded; } }
@@ -231,6 +221,72 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
                     else if(location.range->begin > location.range->end) { return inline_query_error::malformed; }
                 }
             }
+            return inline_query_error::none;
+        }
+    }
+    class index;
+    // This proof owns no value, PC, stop, local copy or read authority. Only an
+    // index can create it after finalizing its immutable metadata and optional
+    // scope owner. Foreign spans or smaller metadata caps use the full check.
+    class owned_numeric_validation final
+    {
+        friend class index;
+        ::std::span<scope_record const> scopes_;
+        ::std::span<type_record const> types_;
+        ::std::span<variable_record const> variables_;
+        ::std::size_t strings_{}, locations_{};
+        bool valid_{};
+        owned_numeric_validation(::std::span<scope_record const> scopes,
+            ::std::span<type_record const> types, ::std::span<variable_record const> variables) noexcept
+            : scopes_{scopes}, types_{types}, variables_{variables}
+        {
+            numeric_query_limits cap{};
+            valid_=types.size()<=cap.max_types && variables.size()<=cap.max_variables &&
+                value_details::validate_numeric_metadata(scopes,types,variables,cap,strings_,locations_)==inline_query_error::none;
+        }
+    public:
+        owned_numeric_validation(owned_numeric_validation const&)=delete;
+        owned_numeric_validation& operator=(owned_numeric_validation const&)=delete;
+        owned_numeric_validation(owned_numeric_validation&&)=delete;
+        owned_numeric_validation& operator=(owned_numeric_validation&&)=delete;
+        [[nodiscard]] bool accepts(::std::span<scope_record const> scopes,
+            ::std::span<type_record const> types, ::std::span<variable_record const> variables,
+            numeric_query_limits const& cap) const noexcept
+        {
+            return valid_ && scopes.data()==scopes_.data() && scopes.size()==scopes_.size() &&
+                types.data()==types_.data() && types.size()==types_.size() &&
+                variables.data()==variables_.data() && variables.size()==variables_.size() &&
+                strings_<=cap.max_metadata_string_bytes && locations_<=cap.max_locations;
+        }
+    };
+    // Finite metadata + copied-scalar query only. The caller must FIRST bind a
+    // real paused participant/source/code owner/generation. This API never loads
+    // a frame, executes guest DWARF, reads memory/registers or opens source files.
+    // Failure clears out; no partial variable list is published.
+    [[nodiscard]] inline inline_query_error query_numeric_variables(::std::span<scope_record const> scopes,
+        ::std::span<type_record const> types, ::std::span<variable_record const> variables, ::std::uint64_t pc,
+        ::std::span<copied_numeric_local const> locals, ::std::size_t total_count,
+        ::std::vector<numeric_variable>& out, numeric_query_limits const& cap = {}, owned_scope_paths const* scope_owner = nullptr,
+        owned_numeric_validation const* schema_owner = nullptr) noexcept
+    {
+        out.clear();
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+        try
+        {
+#endif
+            if(types.size() > cap.max_types || variables.size() > cap.max_variables ||
+               locals.size() > cap.max_captured_locals) { return inline_query_error::limit_exceeded; }
+            if(locals.size() > total_count) { return inline_query_error::malformed; }
+            ::std::vector<inline_frame> chain{};
+            ::std::size_t physical{no_record};
+            auto const proven{query_inline_frames(scopes, pc, chain, cap.inline_limits, scope_owner, &physical)};
+            if(proven != inline_query_error::none) { return proven; }
+            if(schema_owner==nullptr || !schema_owner->accepts(scopes,types,variables,cap))
+            {
+                ::std::size_t strings{},locations{};
+                auto const schema{value_details::validate_numeric_metadata(scopes,types,variables,cap,strings,locations)};
+                if(schema!=inline_query_error::none) { return schema; }
+            }
             auto const contains{[&](::std::size_t i) noexcept
             {
                 // [immutable scopes] end; i is a previously checked record index.
@@ -239,9 +295,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
                 { if(range.begin <= pc && pc < range.end) { return true; } }
                 return false;
             }};
-            ::std::size_t physical{no_record};
-            for(::std::size_t i{}; i != scopes.size(); ++i)
-            { if(scopes[i].kind == scope_kind::subprogram && scopes[i].concrete && contains(i)) { physical = i; break; } }
             if(physical == no_record) { return inline_query_error::unavailable; }
             auto const active{[&](::std::size_t i) noexcept
             {

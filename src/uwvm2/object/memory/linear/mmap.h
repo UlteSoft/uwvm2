@@ -46,6 +46,7 @@
 # include <uwvm2/object/memory/wasm_page/impl.h>
 # include <uwvm2/object/memory/platform_page/impl.h>
 # include <uwvm2/object/memory/signal/impl.h>
+# include "threaded_grow_types.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -1034,6 +1035,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             this->memory_length_p->store(grow_final_memory_length, this->sequentially_consistent_size ? ::std::memory_order_seq_cst : ::std::memory_order_release);
             return true;
         }
+
+# include "threaded_grow_member.h"
 
         inline constexpr ::std::size_t get_page_size() const noexcept
         {

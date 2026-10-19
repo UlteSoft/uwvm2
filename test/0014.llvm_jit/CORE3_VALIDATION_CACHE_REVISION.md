@@ -1,3 +1,37 @@
+# Current v7 Core 3 validation identity fixture
+
+The current source uses the actual raw builder/parser, canonical context encoder,
+metadata comparator and path digest in memory. Old/current ABI contexts differ
+only by the canonical `wasm-core3-validation=fused-rich-call-reference-v1` field.
+Both inert DATA roundtrips must succeed and the old context must be rejected by
+the independent current DATA comparison. Computed paths must differ. No cache
+object is published, loaded by the production loader or executed in this test.
+
+The public fixture seed, raw Ed25519 signature and any synthetic image digest are
+DATA, not kernel-origin authentication. Signed DATA coverage requires the actual
+signing provider; unsigned DATA coverage is reported separately. Calls to the
+real persistent sync/async/load APIs clear the weak origin and must refuse without
+publishing anything. They do not mint a Runtime ticket or alter dumpability.
+
+Expected current marker contains `CORE3_VALIDATION_CACHE codec_data_only=1
+standalone_persistent_refused=1 native_cache_replay=0 previous_context_rejected=1
+fresh_roundtrip=1 signed=0` (or `signed=1` for raw fixture signing). A successful
+codec result cannot qualify persistent replay. Actual production CLI cold/store,
+authenticated warm/hit, same-version different executable SHA separation and
+corruption recovery are independent mandatory qualification gates.
+
+All actual imports, compilation, generation and execution must occur on SSH Linux
+inside the existing 64GiB/swap0 cgroup. This current Source migration has not been
+compiled or run. Module/header, actual CLI, DBG, checkpoint, cross-architecture and
+performance results remain pending until separately recorded.
+
+The historical v5 notes below remain exact evidence of the old authored test,
+not the current store/loader contract or a reclassified old successful receipt.
+
+---
+
+## Historical v5 authored fixture description (retained verbatim)
+
 # Core 3 call-reference validation cache revision
 
 This fixture checks the actual binary metadata and cache store/loader after the

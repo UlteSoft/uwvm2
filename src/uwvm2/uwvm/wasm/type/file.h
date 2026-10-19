@@ -36,6 +36,7 @@
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/control/owned_file_image.h>
+# include <uwvm2/utils/security/wsea.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
 # include <uwvm2/parser/wasm_custom/customs/impl.h>
@@ -48,6 +49,18 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type { struct wasm_file_t; }
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
+{
+    // Global C++ linkage keeps this single friend declaration shared by the
+    // separate type and loader named modules.
+    extern "C++" {
+    enum class load_wasm_file_rtl;
+    inline constexpr load_wasm_file_rtl load_wasm_file(::uwvm2::uwvm::wasm::type::wasm_file_t&,
+        ::uwvm2::utils::container::u8cstring_view, ::uwvm2::utils::container::u8string_view,
+        ::uwvm2::uwvm::wasm::type::wasm_parameter_t, ::uwvm2::utils::control::owned_file_image::owner) noexcept;
+    }
+}
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 {
     struct wasm_file_t
@@ -84,6 +97,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         // Memory-mapped or memory-copy (for platforms that don't support memory mapping) open wasm files
         ::fast_io::native_file_loader wasm_file{};
     private:
+        friend constexpr auto ::uwvm2::uwvm::wasm::loader::load_wasm_file(::uwvm2::uwvm::wasm::type::wasm_file_t&,
+            ::uwvm2::utils::container::u8cstring_view, ::uwvm2::utils::container::u8string_view,
+            ::uwvm2::uwvm::wasm::type::wasm_parameter_t, ::uwvm2::utils::control::owned_file_image::owner) noexcept
+            -> ::uwvm2::uwvm::wasm::loader::load_wasm_file_rtl;
+        bool secure_required_{};
+        ::std::shared_ptr<::uwvm2::utils::security::wsea::verified_module const> execution_authorization_{};
         // Exclusive stable source bytes, adopted only before parsing. No mutable
         // view escapes; retaining this actual file retains every parsed borrow.
         ::uwvm2::utils::control::owned_file_image::owner source_image_{};
@@ -94,6 +113,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             source_image_ = ::std::move(image); return true;
         }
         [[nodiscard]] bool has_owned_source_image() const noexcept { return source_image_ != nullptr; }
+        [[nodiscard]] bool requires_verified_execution_authorization() const noexcept { return secure_required_; }
+        [[nodiscard]] bool has_verified_execution_authorization() const noexcept
+        {
+            return source_image_ && execution_authorization_ && binfmt_ver == 1u &&
+                execution_authorization_->matches(reinterpret_cast<::std::byte const*>(source_cbegin()), source_size());
+        }
+        [[nodiscard]] ::std::uint64_t authorized_capabilities() const noexcept
+        { return execution_authorization_ ? execution_authorization_->capabilities() : 0u; }
         [[nodiscard]] char const* source_cbegin() const noexcept
         { return source_image_ ? source_image_->cbegin() : wasm_file.cbegin(); }
         [[nodiscard]] char const* source_cend() const noexcept
@@ -132,7 +159,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
         inline constexpr wasm_file_t(wasm_file_t&& other) noexcept :
             file_name{::std::move(other.file_name)}, module_name{::std::move(other.module_name)}, binfmt_ver{::std::move(other.binfmt_ver)},
-            wasm_file{::std::move(other.wasm_file)}, source_image_{::std::move(other.source_image_)}, wasm_parameter{::std::move(other.wasm_parameter)}, wasm_custom_name{::std::move(other.wasm_custom_name)}
+            wasm_file{::std::move(other.wasm_file)}, secure_required_{other.secure_required_}, execution_authorization_{::std::move(other.execution_authorization_)}, source_image_{::std::move(other.source_image_)}, wasm_parameter{::std::move(other.wasm_parameter)}, wasm_custom_name{::std::move(other.wasm_custom_name)}
         {
             switch(this->binfmt_ver)
             {
@@ -176,6 +203,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             this->module_name = ::std::move(other.module_name);
             this->binfmt_ver = ::std::move(other.binfmt_ver);
             this->wasm_file = ::std::move(other.wasm_file);
+            this->secure_required_ = other.secure_required_;
+            this->execution_authorization_ = ::std::move(other.execution_authorization_);
             this->source_image_ = ::std::move(other.source_image_);
             this->wasm_parameter = ::std::move(other.wasm_parameter);
             this->wasm_custom_name = ::std::move(other.wasm_custom_name);

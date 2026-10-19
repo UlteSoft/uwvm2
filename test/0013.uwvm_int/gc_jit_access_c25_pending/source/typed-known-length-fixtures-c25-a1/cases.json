@@ -1,0 +1,186 @@
+{
+  "cases": [
+    {
+      "name": "i8-old-ssa-after-local-set",
+      "detail": "Older reference is already on operand stack when the same local is overwritten with another length. Facts must follow the complete reference SSA, not the current local.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i8-old-ssa-after-local-set.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i8-old-ssa-after-local-set.wasm",
+      "wat_sha": "370e4e73f946c988fca2939969664220fe4bf6524d46a68db57bc1c304dc91cc",
+      "wasm_sha": "666bae1797ce0b56241e89f38206862f1b34659c32502d0b6765a8fb131f7179",
+      "trap": null
+    },
+    {
+      "name": "i8-branch-different-lengths",
+      "detail": "Unknown PHI/if result must retain actual authenticated header bounds; no inferred constructor length may cross the join.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i8-branch-different-lengths.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i8-branch-different-lengths.wasm",
+      "wat_sha": "231770c62d717837cc27c65a9170cdc0852e06b24e0c9f523b4a2febd635adb9",
+      "wasm_sha": "ac3f16a7c6fab27c01a3d7b3b3f9aeb372085faef3b5b3bd855545083854c0dc",
+      "trap": null
+    },
+    {
+      "name": "i8-unknown-call-result",
+      "detail": "The caller must not borrow a length fact from the callee code generator.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i8-unknown-call-result.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i8-unknown-call-result.wasm",
+      "wat_sha": "ae5ae3dd7cd9f17ecdbce7a84c477ac6e4a588e29dafac9fa25ff84e127e05a7",
+      "wasm_sha": "779b8c98baf1bc791366cd46091e0eca33362632b5391da3a5d53135f0967f10",
+      "trap": null
+    },
+    {
+      "name": "i8-alias-null-replacement",
+      "detail": "Aliased old reference remains valid when another local is cleared and assigned a new different-length array.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i8-alias-null-replacement.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i8-alias-null-replacement.wasm",
+      "wat_sha": "7c5b2b4bd3fff0709dd9f711daa176d324bb374f81ef42f8ca37c8ab2863008c",
+      "wasm_sha": "44674e7212e0a2c00d5448ffbd36bcf6a0128d6ce1e00ed9fe0bb40517b1ba2f",
+      "trap": null
+    },
+    {
+      "name": "i8-changing-runtime-constructor-length",
+      "detail": "Known logical length is a changing runtime i32 value, not just a constant; index is computed from the same loop induction value.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i8-changing-runtime-constructor-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i8-changing-runtime-constructor-length.wasm",
+      "wat_sha": "1d743aca6571e1b8e36b4cfa416694fcc926230c7abd75586d6ef75fdb12c5d1",
+      "wasm_sha": "8ccfc63a343f5b9355b0fa3a9996b8593ea5a3da6ff7e85fbac9640ef0ec8d98",
+      "trap": null
+    },
+    {
+      "name": "i16-old-ssa-after-local-set",
+      "detail": "Older reference is already on operand stack when the same local is overwritten with another length. Facts must follow the complete reference SSA, not the current local.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i16-old-ssa-after-local-set.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i16-old-ssa-after-local-set.wasm",
+      "wat_sha": "5c3eb4e29fff319b50f996247a54cfb3819e1f10b240d6603d1f4d2513e51892",
+      "wasm_sha": "f0593c45aeb5f7c6391e42589f1485543a5f72547a5193e4c8473e3578f1494d",
+      "trap": null
+    },
+    {
+      "name": "i16-branch-different-lengths",
+      "detail": "Unknown PHI/if result must retain actual authenticated header bounds; no inferred constructor length may cross the join.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i16-branch-different-lengths.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i16-branch-different-lengths.wasm",
+      "wat_sha": "a3ee25ce7dbc8c4935ce613c096c3f82a6abbac758264e86e4f6392ebe1d8e6e",
+      "wasm_sha": "1847418e58e870aad9f5cc94cd11ef1e6a096578d6e75063ef20473ec1a179f7",
+      "trap": null
+    },
+    {
+      "name": "i16-unknown-call-result",
+      "detail": "The caller must not borrow a length fact from the callee code generator.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i16-unknown-call-result.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i16-unknown-call-result.wasm",
+      "wat_sha": "ffdba41f3abc6639ffef478929eaf7e2bc2af6750481b6201280a891b57b2aa6",
+      "wasm_sha": "7a5bfd9471e4879edb62000d1e96dd0a6e0e8c448dc8a92699bcdc915e4fb55d",
+      "trap": null
+    },
+    {
+      "name": "i16-alias-null-replacement",
+      "detail": "Aliased old reference remains valid when another local is cleared and assigned a new different-length array.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i16-alias-null-replacement.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i16-alias-null-replacement.wasm",
+      "wat_sha": "2944c34717f93a12f8455317dbc76663faff17c1221dec58ec6efd779bb8611a",
+      "wasm_sha": "5c6cb8347f801993114093185627080c07ad45f70b2a90f575158078d42c5657",
+      "trap": null
+    },
+    {
+      "name": "i16-changing-runtime-constructor-length",
+      "detail": "Known logical length is a changing runtime i32 value, not just a constant; index is computed from the same loop induction value.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i16-changing-runtime-constructor-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i16-changing-runtime-constructor-length.wasm",
+      "wat_sha": "0414e53dccbac95a1a0c3b8362bcb74d0e33e663060827acd5fa12b96733265e",
+      "wasm_sha": "5437be8307aee317885868c179450c3d022bfb287dab3484a6f695cc0e0d90f2",
+      "trap": null
+    },
+    {
+      "name": "i32-old-ssa-after-local-set",
+      "detail": "Older reference is already on operand stack when the same local is overwritten with another length. Facts must follow the complete reference SSA, not the current local.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i32-old-ssa-after-local-set.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i32-old-ssa-after-local-set.wasm",
+      "wat_sha": "f75df10ebaceedea862611927408650fb6bcb392a8bee177aedbbd9ede95cff7",
+      "wasm_sha": "fd5f6c335b174a662bd9835cc7e62f97e87f9e6f1ca270d91e0cedd28e6696b8",
+      "trap": null
+    },
+    {
+      "name": "i32-branch-different-lengths",
+      "detail": "Unknown PHI/if result must retain actual authenticated header bounds; no inferred constructor length may cross the join.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i32-branch-different-lengths.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i32-branch-different-lengths.wasm",
+      "wat_sha": "081b9220d6c1ed03dcc79c6d8c45045716275d1d25c859ad1baca3c798a5125f",
+      "wasm_sha": "e6b5af14f921a92a62b0cce5e43b537394e82604893646e901667c600878271b",
+      "trap": null
+    },
+    {
+      "name": "i32-unknown-call-result",
+      "detail": "The caller must not borrow a length fact from the callee code generator.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i32-unknown-call-result.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i32-unknown-call-result.wasm",
+      "wat_sha": "2e77b0cd2074369084cd0f78e21e32ee90d25598ac07d589d526a8f49ac56b84",
+      "wasm_sha": "0d8f482847e6459f7bee583a3e77592d26e6892ae864a149a9fd90b0c7e4e24a",
+      "trap": null
+    },
+    {
+      "name": "i32-alias-null-replacement",
+      "detail": "Aliased old reference remains valid when another local is cleared and assigned a new different-length array.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i32-alias-null-replacement.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i32-alias-null-replacement.wasm",
+      "wat_sha": "99a247db5020d309859c46c900e1b4e9ad505fb822c03ddf19dfad3783ca70ad",
+      "wasm_sha": "e8cb09e48cf0759e6281bb1d2f9e3c556dc1a73e528d968221a9b704392bb328",
+      "trap": null
+    },
+    {
+      "name": "i32-changing-runtime-constructor-length",
+      "detail": "Known logical length is a changing runtime i32 value, not just a constant; index is computed from the same loop induction value.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i32-changing-runtime-constructor-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/i32-changing-runtime-constructor-length.wasm",
+      "wat_sha": "8f55ba1db57428af47d4fbd14e83c1aa165a4074f649f3672f605416538c19fb",
+      "wasm_sha": "9de63f1c02d619753262a2774ec63b9ec8eb3ed255675ea314994c11f3690c60",
+      "trap": null
+    },
+    {
+      "name": "f32-old-ssa-after-local-set",
+      "detail": "Older reference is already on operand stack when the same local is overwritten with another length. Facts must follow the complete reference SSA, not the current local.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/f32-old-ssa-after-local-set.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/f32-old-ssa-after-local-set.wasm",
+      "wat_sha": "c752f5c2e66be845a2660190539fd07c044f0262ea7301c251d0ef542eead0dd",
+      "wasm_sha": "1a64a07fa3b0f0e079afdcffb90e27357ad848b1c691ed32cd212bed40e6250e",
+      "trap": null
+    },
+    {
+      "name": "f32-branch-different-lengths",
+      "detail": "Unknown PHI/if result must retain actual authenticated header bounds; no inferred constructor length may cross the join.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/f32-branch-different-lengths.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/f32-branch-different-lengths.wasm",
+      "wat_sha": "702073299a9492dfea29cae5d32ab1f7f6df80e5a8a86afb03f0764e59702615",
+      "wasm_sha": "b1bfcab10121cdfcb0bcf396e2f2872ec14bcfc8cc8b284376cfecd39fe22383",
+      "trap": null
+    },
+    {
+      "name": "f32-unknown-call-result",
+      "detail": "The caller must not borrow a length fact from the callee code generator.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/f32-unknown-call-result.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/f32-unknown-call-result.wasm",
+      "wat_sha": "19c9e39dd85a3bb94e17928b03302567e19d26faecba9aa4477e827d4640a50b",
+      "wasm_sha": "e0ab76cb49a29082657352cc9fb657c80792fb33d5e3dd8417c6d224f2024876",
+      "trap": null
+    },
+    {
+      "name": "f32-alias-null-replacement",
+      "detail": "Aliased old reference remains valid when another local is cleared and assigned a new different-length array.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/f32-alias-null-replacement.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/f32-alias-null-replacement.wasm",
+      "wat_sha": "53e112c6a28bdfcdea82e9df3f6435f33cc98a0486e96fea29307655dbfcb6c1",
+      "wasm_sha": "e09962c602efc364c87d064151dd12d643d02caead348064b2bd008f7679172a",
+      "trap": null
+    },
+    {
+      "name": "f32-changing-runtime-constructor-length",
+      "detail": "Known logical length is a changing runtime i32 value, not just a constant; index is computed from the same loop induction value.",
+      "wat": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/f32-changing-runtime-constructor-length.wat",
+      "wasm": "/tmp/uwvm-gc-perf-20261011-r74/source/typed-known-length-fixtures-c25-a1/f32-changing-runtime-constructor-length.wasm",
+      "wat_sha": "189da2c06474ad13017445e4a734c3e378902311a6a0eb4554e6b207188573a5",
+      "wasm_sha": "4750fab6b467c07a23cffededb8d1f46b62e4baf1cd0862a7d619f2ef1494285",
+      "trap": null
+    }
+  ],
+  "generator_sha": "b6ad5425567e49ee769d554e767a73f0165cd9365665b4dc5139894413cb6e70",
+  "scope": "20 independent Wasm correctness fixtures for i8/i16/i32/f32 length facts, stale reference SSA, PHI, calls, null replacement, local aliasing, changing dynamic constructor length. This index is not a candidate pass claim."
+}

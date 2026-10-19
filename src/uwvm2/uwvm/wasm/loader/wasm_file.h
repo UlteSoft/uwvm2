@@ -28,6 +28,9 @@
 # include <climits>
 # include <type_traits>
 # include <utility>
+# include <string>
+# include <string_view>
+# include <uwvm2/utils/security/wsea.h>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
@@ -76,6 +79,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         }
     }
 
+    extern "C++" {
     enum class load_wasm_file_rtl
     {
         ok,
@@ -92,6 +96,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         // Never reload a parsed immutable image through mutable native file
         // borrows. Its actual owner must retire after all source users drain.
         if(wf.has_owned_source_image()) { return load_wasm_file_rtl::load_error; }
+        wf.secure_required_ = ::uwvm2::utils::security::wsea::module_selected(
+            ::std::string_view{reinterpret_cast<char const*>(load_file_name.cbegin()), load_file_name.size()});
+        if(wf.secure_required_)
+        {
+            // A selected module's verification and every parser/compiler borrow
+            // use the same private immutable snapshot, never a reopened path.
+            if(!image)
+            {
+                auto snapshot{::uwvm2::utils::control::owned_file_image::read(
+                    ::std::u8string{load_file_name.cbegin(), load_file_name.size()})};
+                if(!snapshot)
+                {
+                    ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                        u8"uwvm: [SIG_001] DENIED: unable to retain immutable secure WASM input.");
+                    return load_wasm_file_rtl::load_error;
+                }
+                image = ::std::move(snapshot.image);
+            }
+            auto authorization{::uwvm2::utils::security::wsea::verify_module(
+                ::std::string_view{reinterpret_cast<char const*>(load_file_name.cbegin()), load_file_name.size()},
+                reinterpret_cast<::std::byte const*>(image->cbegin()), image->size())};
+            if(!authorization || !authorization.authorization)
+            {
+                ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                    u8"uwvm: [", ::fast_io::mnp::code_cvt(::fast_io::mnp::os_c_str(authorization.code ? authorization.code : "SIG_003")),
+                    u8"] DENIED: ", ::fast_io::mnp::code_cvt(::fast_io::mnp::os_c_str(authorization.message ? authorization.message : "missing execution authorization")));
+                return load_wasm_file_rtl::load_error;
+            }
+            wf.execution_authorization_ = ::std::move(authorization.authorization);
+        }
         if(image && !wf.adopt_unparsed_source_image(::std::move(image)))
         { return load_wasm_file_rtl::load_error; }
 
@@ -1034,6 +1068,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         return load_wasm_file_rtl::ok;
     }
 
+    } // global C++ linkage: shared with the type module's private friend
 }  // namespace uwvm2::uwvm::wasm::loader
 
 #ifndef UWVM_MODULE

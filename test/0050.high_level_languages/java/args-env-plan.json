@@ -1,0 +1,99 @@
+{
+  "status": "optional-adapter-verified-jvm-wasmtime-and-three-native-budget-products",
+  "scope": "Original upstream producer environment stub is retained; optional private producer adapter separately verified",
+  "optional_adapter": {
+    "compiler_flag": "--wasi-environ",
+    "compiler_jar_sha256": "12801a92b5d1fd66cddab8a41b68e93fbeb353cbcc79b669424e6e586c6cdb12",
+    "wasm": "/tmp/high-level-20261017/java/target/args-env-adapted-v3/java-args-env.wasm",
+    "wasm_sha256": "78b83d7e22d2fad87af236deab9fb82bb5c16c9e1725f0ba15369374fb1b3847",
+    "oracle": "/tmp/high-level-20261017/java/args-env-build-v3/receipt.json",
+    "jvm_wasmtime_four_cases_strict_passed": true,
+    "uwvm_executed": true,
+    "uwvm_ordinary_adapted_cases_passed": 12,
+    "uwvm_original_stub_expected_negatives_passed": 3,
+    "uwvm_wasm_debug_unicode_cases_passed": 3,
+    "uwvm_receipt": "evidence/2026-10-17/args-env/args-env-uwvm-native-budget-v2/receipt.json",
+    "uwvm_summary": "evidence/args-env-uwvm-summary.json"
+  },
+  "main_class": "uwvm.hll.ArgsEnv",
+  "compiler": "TeaVM 0.13.1 original pinned Maven repository; no new compiler patch",
+  "target": "WEBASSEMBLY_WASI",
+  "proposed_output": "target/args-env/java-args-env.wasm",
+  "runtime_language_flag": null,
+  "argv_cases": [
+    {
+      "name": "no-extra-args",
+      "args": [],
+      "expected_main_argc": 0,
+      "expected_wasi_argc": 1
+    },
+    {
+      "name": "empty-utf8-equals",
+      "args": [
+        "",
+        "雪=🙂",
+        "a=b=c",
+        "="
+      ],
+      "expected_main_argc": 4,
+      "expected_wasi_argc": 5
+    }
+  ],
+  "environment_cases": [
+    {
+      "name": "all-test-keys-unset",
+      "environment": {},
+      "unset": [
+        "UWVM_HLL_EMPTY",
+        "UWVM_HLL_UTF8",
+        "UWVM_HLL_EQUALS",
+        "UWVM_HLL_MISSING"
+      ]
+    },
+    {
+      "name": "present-empty-utf8-equals",
+      "environment": {
+        "UWVM_HLL_EMPTY": "",
+        "UWVM_HLL_UTF8": "雪=🙂",
+        "UWVM_HLL_EQUALS": "a=b=c"
+      },
+      "unset": [
+        "UWVM_HLL_MISSING"
+      ]
+    }
+  ],
+  "expected_main_stdout": {
+    "no-extra-args": [
+      "java args/env: argc=0"
+    ],
+    "empty-utf8-equals": [
+      "java args/env: argc=4",
+      "arg[0]=len:0,utf16:",
+      "arg[1]=len:4,utf16:38634,61,55357,56898",
+      "arg[2]=len:5,utf16:97,61,98,61,99",
+      "arg[3]=len:1,utf16:61"
+    ]
+  },
+  "expected_environment_stdout": {
+    "jvm-all-test-keys-unset": [
+      "env[UWVM_HLL_EMPTY]=NULL",
+      "env[UWVM_HLL_UTF8]=NULL",
+      "env[UWVM_HLL_EQUALS]=NULL",
+      "env[UWVM_HLL_MISSING]=NULL"
+    ],
+    "jvm-present-empty-utf8-equals": [
+      "env[UWVM_HLL_EMPTY]=len:0,utf16:",
+      "env[UWVM_HLL_UTF8]=len:4,utf16:38634,61,55357,56898",
+      "env[UWVM_HLL_EQUALS]=len:5,utf16:97,61,98,61,99",
+      "env[UWVM_HLL_MISSING]=NULL"
+    ],
+    "teavm-wasi-both-environment-cases": [
+      "env[UWVM_HLL_EMPTY]=NULL",
+      "env[UWVM_HLL_UTF8]=NULL",
+      "env[UWVM_HLL_EQUALS]=NULL",
+      "env[UWVM_HLL_MISSING]=NULL"
+    ]
+  },
+  "qualification": "Exact complete ordinary stdout and zero exit match the strict JVM/Wasmtime reference for each of four argv/environment cases on all three pinned UWVM products. The original stub remains an expected negative for present environment values. Unicode args/environment WasmDBG entry/step/state/breakpoint/restart/output/shutdown passes once per product; this is not source-level typed-local or performance evidence.",
+  "pending_checks": []
+}

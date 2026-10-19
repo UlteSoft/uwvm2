@@ -88,14 +88,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         }
 
         auto const argv_vec_size{env.argv.size()};
-        if(argv_vec_size > ::std::numeric_limits<::std::size_t>::max() / sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t) - 1uz) [[unlikely]]
+        if(argv_vec_size > ::std::numeric_limits<::std::size_t>::max() / sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t)) [[unlikely]]
         {
             // This is an error specific to env itself, which triggers a direct trap.
             ::fast_io::fast_terminate();
         }
 
-        // An additional null pointer check is required.
-        auto const argv_vec_size_bytes{(argv_vec_size + 1uz) * sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t)};
+        // WASI authorizes exactly the count reported by the matching sizes_get call.
+        auto const argv_vec_size_bytes{argv_vec_size * sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t)};
         ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32(memory, argv_ptrsz, argv_vec_size_bytes);
 
         // Check only once to avoid excessive locking overhead.
@@ -133,12 +133,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             argv_buff_curr_size += sizeof(char8_t);
             static_assert(sizeof(char8_t) == 1uz);
         }
-
-        // write end nullptr
-        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked<::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t>(
-            memory,
-            argv_curr_size,
-            ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t{});
 
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
     }

@@ -33,9 +33,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     // Native administration/flags/preload mutations are externally serialized.
     [[nodiscard]] inline int prepare_owned_full_cli_source(bool retain_immutable_image = false, bool restart_after_retirement = false) noexcept
     {
-#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS)
+#if (defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)) && \
+    defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS)
         namespace mode = ::uwvm2::uwvm::runtime::runtime_mode;
-        if(mode::global_runtime_compiler != mode::runtime_compiler_t::llvm_jit_only ||
+        bool supported_full_backend{};
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+        supported_full_backend = supported_full_backend ||
+            mode::global_runtime_compiler == mode::runtime_compiler_t::uwvm_interpreter_only;
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+        supported_full_backend = supported_full_backend ||
+            mode::global_runtime_compiler == mode::runtime_compiler_t::llvm_jit_only;
+# endif
+        if(!supported_full_backend ||
            mode::global_runtime_mode != mode::runtime_mode_t::full_compile ||
            !::uwvm2::uwvm::cmdline::wasm_file_ppos ||
            ::uwvm2::uwvm::wasm::storage::preloaded_wasm.size() > 4095u)
@@ -52,11 +62,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             ::std::u8string path, rename;
             ::uwvm2::utils::control::owned_file_image::owner image{};
             ::std::vector<::uwvm2::uwvm::runtime::full::full_preload_input> preloads{};
+# if defined(UWVM_RUNTIME_LLVM_JIT)
             mode::runtime_llvm_jit_exception_dispatch_t dispatch{mode::global_runtime_llvm_jit_exception_dispatch};
+# endif
             bool restart{};
+            bool ordinary_cache_input{}; // Derived below from actual CLI setup, never supplied as a certificate.
             int result{static_cast<int>(retval::parameter_error)};
         } state{};
         state.restart = restart_after_retirement;
+# if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(UWVM_MODULE)
+        state.ordinary_cache_input = !retain_immutable_image && !restart_after_retirement &&
+            ::uwvm2::uwvm::wasm::storage::execute_wasm_mode == ::uwvm2::uwvm::wasm::base::mode::run &&
+            mode::global_runtime_mode == mode::runtime_mode_t::full_compile &&
+            mode::global_runtime_compiler == mode::runtime_compiler_t::llvm_jit_only &&
+            ::uwvm2::uwvm::wasm::storage::preloaded_wasm.empty();
+# endif
         try
         {
             auto const path{::uwvm2::uwvm::cmdline::wasm_file_ppos->str};
@@ -159,8 +179,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     // valid module just to rerun ordinary loader/initializer.
                     // This frozen cold request supplies no authority. The original
                     // real validator/factory still decides numeric eligibility.
-                    if(ctx.dispatch != mode::runtime_llvm_jit_exception_dispatch_t::native_unwind)
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+                    // INT uses its actual complete validator publication below;
+                    // selecting INT never requests a private LLVM numeric ABI.
+                    if(mode::global_runtime_compiler == mode::runtime_compiler_t::llvm_jit_only &&
+                       ctx.dispatch != mode::runtime_llvm_jit_exception_dispatch_t::native_unwind)
                     { candidate->request_numeric_full_after_actual_initializer(); }
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(UWVM_MODULE)
+                    if(ctx.ordinary_cache_input)
+                    { candidate->cache_cli_origin_ = ::uwvm2::uwvm::runtime::full::full_source_instance::cache_cli_origin::ordinary_full_cli; }
+# endif
                     ctx.result = static_cast<int>(retval::ok);
                     return true;
                 }

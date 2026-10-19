@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -33,6 +33,7 @@
 # include "debug_test.h"
 
 // wasm
+# include "security.h"
 # include "wasm_set_main_module_name.h"
 # include "wasm_set_start_func.h"
 # include "wasm_preload_library.h"
@@ -52,6 +53,7 @@
 # include "runtime_custom_compiler.h"
 # include "runtime_compiler_log.h"
 # include "runtime_compile_threads.h"
+# include "wasi_threads.h"
 # include "runtime_scheduling_policy.h"
 # include "runtime_llvm_jit_policy.h"
 # include "runtime_llvm_jit_lazy_policy.h"
@@ -62,6 +64,7 @@
 # include "runtime_llvm_jit_cache_no_sign.h"
 # include "runtime_llvm_jit_cache_no_verify.h"
 # include "runtime_llvm_jit_cache_path.h"
+# include "runtime_llvm_jit_cache_seal_process.h"
 # include "runtime_debug_int.h"
 # include "runtime_int.h"
 # include "runtime_jit.h"

@@ -62,6 +62,10 @@
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+#if defined(__linux__) && (defined(__GNUC__) || defined(__clang__))
+# pragma GCC visibility push(hidden)
+#endif
+
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 {
     namespace details
@@ -121,9 +125,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         cache_context derived_context{};
         bool has_derived_context{};
 
-        [[nodiscard]] inline constexpr cache_context make_module_context(::llvm::Module const& module) UWVM_THROWS
+        [[nodiscard]] inline cache_context make_module_context(::llvm::Module const& module) UWVM_THROWS
         {
             auto ctx{base_context};
+            auto const& layout{module.getDataLayoutStr()};
+            ctx.data_layout.clear();
+            ::fast_io::io::print(::uwvm2::utils::container::u8string_ref_uwvm{::std::addressof(ctx.data_layout)},
+                                ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t const*>(layout.data()), layout.size()});
             // Some callers already provide a fully qualified cache key, so avoid expensive bitcode hashing in that path.
             if(ctx.cache_key_is_complete) { return ctx; }
 
@@ -162,7 +170,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"LLVM JIT cache object has no identity signature; rejected because signature verification is enabled. ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                u8"Use --runtime-llvm-jit-cache-no-verify only when unsigned cache objects are trusted.",
+                                u8"Legacy no-sign/no-verify options disable persistent caching; origin authentication cannot be bypassed.",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8" (runtime)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
@@ -191,12 +199,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         // context replaces it. This is compiler-input DATA, not cache adoption.
         // The actual materializer keeps this owner alive through finalizeObject,
         // symbol resolution, and synchronous receipt copy; the borrow never
-        // escapes into the publication. No copy/hash occurs for ordinary use.
-        [[nodiscard]] inline constexpr cache_context const& actual_materializer_base_context() const noexcept
-        { return base_context; }
-        inline constexpr llvm_jit_object_cache() noexcept = default;
+        // escapes into the publication. This metadata copy explicitly strips the weak origin.
+        [[nodiscard]] inline cache_context actual_materializer_base_context() const noexcept
+        { auto data{base_context}; data.origin.reset(); return data; }
+        inline llvm_jit_object_cache() noexcept = default;
 
-        inline explicit constexpr llvm_jit_object_cache(cache_context ctx, cache_policy pol = default_cache_policy()) noexcept :
+        inline explicit llvm_jit_object_cache(cache_context ctx, cache_policy pol = default_cache_policy()) noexcept :
             base_context{::std::move(ctx)}, policy{pol}
         {
         }
@@ -298,6 +306,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         }
     };
 }  // namespace uwvm2::runtime::llvm_jit_cache
+#endif
+
+#if defined(__linux__) && (defined(__GNUC__) || defined(__clang__))
+# pragma GCC visibility pop
 #endif
 
 #ifndef UWVM_MODULE

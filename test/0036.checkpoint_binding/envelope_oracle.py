@@ -154,19 +154,32 @@ def semantic_hashes(document):
     wire = b'UW CPEV02'.replace(b' ', b'') + document[24:40] + struct.pack('<QQ', struct.unpack_from('<Q', document, 64)[0], len(events))
     return hashes, digest(wire + b''.join(events))
 
+
+def component_isa():
+    return (pair("target", "component-target") + pair("cpu", "component-cpu")
+            + pair("features", "component-feature") + pair("layout", "component-layout"))
+
+def component_context(key, product):
+    # Explicit independent v7 DATA preimage. The image and seed are fixtures,
+    # not proof of the executing image, a keyring origin or Runtime admission.
+    return (pair("product", "uwvm2" if product == "uwvm2" else "uwvm2ros")
+            + pair("origin-auth", "kernel-user-keyring-hmac-sha256-ed25519-v1")
+            + pair("self-executable-sha256", bytes((0x42,)) + bytes(31))
+            + pair("key", key) + pair("llvm", "component-provider")
+            + pair("uwvm_abi", "component-abi") + pair("codegen", "component-policy"))
+
 def identity_wire(wa,wb,oa,ob,blobs,body,product):
     flavor=1 if product=='uwvm2' else 2
     key=pair('format','uwvm-ljc-key-v1')+pair('domain','actual-checkpoint-binding-component')+pair('wasm','fixture-A')
     keys=[key+pair('module-ordinal','0')+pair('partition-count','2')+pair('partition-ordinal',str(i)) for i in range(2)]
     keys.append(key+pair('module-ordinal','1'))
-    isa=pair('target','component-target')+pair('cpu','component-cpu')+pair('features','component-feature')
-    contexts=[pair('product','uwvm2' if flavor==1 else 'uwvm2ros')+pair('key',k)+pair('llvm','component-provider')+
-              pair('uwvm_abi','component-abi')+pair('codegen','component-policy') for k in keys]
+    isa=component_isa()
+    contexts=[component_context(k,product) for k in keys]
     payloads=[oa,ob,ob]
     for blob,ctx,obj in zip(blobs,contexts,payloads):
         magic,version,header,compression,signature,size,payload,isa_size,ctx_size,sig_size=struct.unpack_from('<8sIIIIQQQQQ',blob)
         assert magic==(b'UWVMLJC\x01' if flavor==1 else b'UWVMROS\x01')
-        assert (version,header,compression,signature,sig_size)==(5,64,0,1,64)
+        assert (version,header,compression,signature,sig_size)==(7,64,0,1,64)
         assert size==payload==len(obj) and len(blob)==64+isa_size+ctx_size+sig_size+payload
         assert blob[64:64+isa_size]==isa and blob[64+isa_size:64+isa_size+ctx_size]==ctx and blob[-payload:]==obj
     wire=bytearray(b'UWCPID02')+struct.pack('<IIIII4I',2,4,6,1,flavor,2,0,4,0)
@@ -181,7 +194,7 @@ def identity_wire(wa,wb,oa,ob,blobs,body,product):
         wire += struct.pack('<QQQI',ordinal,len(wasm),len(name),role)+digest(wasm)+label(name)+semantic_hashes(body)[0][ordinal]
     for i,(blob,obj,k,ctx) in enumerate(zip(blobs,payloads,keys,contexts)):
         module,ordinal,count,role=(0,i,2,2) if i<2 else (1,0,1,1)
-        wire += struct.pack('<5QII',module,ordinal,count,len(blob),len(obj),role,5)
+        wire += struct.pack('<5QII',module,ordinal,count,len(blob),len(obj),role,7)
         for h in (digest(k),digest(isa),digest(ctx),digest(blob),digest(obj),label('actual component provider/emitter')):wire+=h
     assert len(wire)==484+2*124+3*240
     return bytes(wire)
@@ -206,6 +219,6 @@ def main():
     out=pathlib.Path(sys.argv[12]).read_text()
     assert 'negatives=40' in out and 'bytes='+str(len(a)) in out and 'truncations='+str(len(a)) in out
     assert 'file_sha='+digest(a).hex() in out and 'two_distinct_saved_bodies_one_target=1' in out
-    assert 'canonical_data_only=1 loaded_build_cache_issuer=0 whole_restore=0' in out
+    assert 'canonical_data_only=1 fixture_codec_only=1 origin_authenticated=0 legacy_cache_versions_rejected=2 loaded_build_cache_issuer=0 whole_restore=0' in out
     print('CHECKPOINT_ENVELOPE_ORACLE PASS',product,len(a),digest(a).hex(),'DATA-only; no loaded/build/restore authority')
 if __name__=='__main__':main()
