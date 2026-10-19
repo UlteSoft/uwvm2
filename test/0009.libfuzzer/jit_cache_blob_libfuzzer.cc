@@ -278,6 +278,11 @@ namespace
         bad_magic_header.magic[control0 % 8u] ^= ::std::byte{0x80u};
         expect_parse_status(make_blob(bad_magic_header, isa_metadata, context_metadata, signature, payload), cache_status::invalid_magic);
 
+        // Fixed legacy DATA vectors: never upgraded into current v7.
+        for(auto old_version : {5u,6u})
+        { auto legacy{header};legacy.version=old_version;
+          expect_parse_status(make_blob(legacy,isa_metadata,context_metadata,signature,payload),cache_status::unsupported_version); }
+
         auto bad_version_header{header};
         bad_version_header.version += 1u + static_cast<::std::uint_least32_t>(control0);
         expect_parse_status(make_blob(bad_version_header, isa_metadata, context_metadata, signature, payload),

@@ -1,4 +1,8 @@
 module;
+#include <array>
+#include <memory>
+#include <mutex>
+#include <new>
 #include <cstddef>
 #include <cstdint>
 #include <span>

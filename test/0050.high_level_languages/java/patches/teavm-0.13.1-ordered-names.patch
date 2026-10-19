@@ -1,0 +1,18 @@
+--- a/org/teavm/backend/wasm/render/WasmBinaryRenderer.java
++++ b/org/teavm/backend/wasm/render/WasmBinaryRenderer.java
+@@ -536,6 +536,7 @@
+         WasmBinaryWriter functionsSubsection = new WasmBinaryWriter();
+         var functions = module.functions.stream()
+                 .filter(f -> f.getName() != null)
++                .sorted(java.util.Comparator.comparingInt(module.functions::indexOf))
+                 .collect(Collectors.toList());
+         functionsSubsection.writeLEB(functions.size());
+ 
+@@ -551,6 +552,7 @@
+ 
+         var functionsWithLocalNames = module.functions.stream()
+                 .filter(fn -> fn.getLocalVariables().stream().anyMatch(v -> v.getName() != null))
++                .sorted(java.util.Comparator.comparingInt(module.functions::indexOf))
+                 .collect(Collectors.toList());
+         if (!functionsWithLocalNames.isEmpty()) {
+             var subsection = new WasmBinaryWriter();

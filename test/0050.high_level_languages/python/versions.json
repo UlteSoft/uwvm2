@@ -1,0 +1,21 @@
+{
+  "cpython": {
+    "version": "3.14.8",
+    "tag": "v3.14.8",
+    "source_url": "https://www.python.org/ftp/python/3.14.8/Python-3.14.8.tar.xz",
+    "source_sha256": "c2215904f02b175596dc49351585104f4bc20341e1c47378b26a2c274360ce73",
+    "release_page": "https://www.python.org/downloads/release/python-3148/",
+    "wasi_build_helper": "Tools/wasm/wasi",
+    "target": "wasm32-wasip1"
+  },
+  "wasi_sdk": {
+    "version": "24.0",
+    "release_tag": "wasi-sdk-24",
+    "release_api": "https://api.github.com/repos/WebAssembly/wasi-sdk/releases/tags/wasi-sdk-24",
+    "asset": "wasi-sdk-24.0-x86_64-linux.tar.gz",
+    "asset_url": "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz",
+    "selection_basis": "CPython v3.14.8 Tools/wasm/wasi/__main__.py WASI_SDK_VERSION=24; archive identity must be recorded after Linux acquisition"
+  },
+  "reference_wasmtime": "42.0.1",
+  "status": "prepared; no download/build/execution performed"
+}

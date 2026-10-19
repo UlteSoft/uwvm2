@@ -44,10 +44,10 @@ int main()
           "exact source step does not expand into native step");
     editor.begin(); type(editor, "set ");
     check(editor.feed(9) == editing::action::candidates && editor.line().view() == "set ", "source and Wasm settings share no prefix");
-    check(editor.feed(9) == editing::action::candidates, "next Tab lists the two choices");
-    std::size_t count{}; bool wasm{}, wasip1{}, source{};
-    editor.display_candidates([&](view name) { ++count; wasm = wasm || name == "set wasm"; wasip1 = wasip1 || name == "set wasip1"; source=source || name=="set source"; });
-    check(count == 3u && wasm && wasip1 && source, "set candidates show only the next level");
+    check(editor.feed(9) == editing::action::candidates, "next Tab lists the setting categories");
+    std::size_t count{}; bool wasm{}, wasip1{}, source{}, printing{};
+    editor.display_candidates([&](view name) { ++count; wasm = wasm || name == "set wasm"; wasip1 = wasip1 || name == "set wasip1"; source=source || name=="set source"; printing=printing || name=="set print"; });
+    check(count == 4u && wasm && wasip1 && source && printing, "set candidates show only the next level");
     editor.begin(); type(editor, "i wasi "); count = 0u;
     check(editor.feed(9) == editing::action::candidates, "scoped abbreviated inspection candidates");
     editor.display_candidates([&](view name) { ++count; check(name.starts_with("i wasi ") && name.subview(7u).find(" ") == fast_io::containers::npos,

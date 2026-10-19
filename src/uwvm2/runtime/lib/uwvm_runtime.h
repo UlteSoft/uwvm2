@@ -37,6 +37,7 @@
 // import
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/thread/impl.h>
+# include "uwvm_runtime_threaded_profile_api.h"
 # include <uwvm2/runtime/exception/impl.h>
 # include <uwvm2/runtime/gc/impl.h>
 # include <uwvm2/runtime/checkpoint/materialization.h>

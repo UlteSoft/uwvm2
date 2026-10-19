@@ -1,1 +1,7 @@
 __pycache__
+# CI execution output.
+gc-eh-perf-*.json
+gc-eh-perf-*.txt
+*.log
+*.stdout
+*.stderr

@@ -1,0 +1,48 @@
+--- a/org/teavm/backend/wasm/runtime/WasiSupport.java
++++ b/org/teavm/backend/wasm/runtime/WasiSupport.java
+@@ -75,6 +75,26 @@
+     @Unmanaged
+     @Import(module = "wasi_snapshot_preview1", name = "proc_exit")
+     private static native void monotonicClockFailure(int status);
++
++    // Profile fixture's System.in.read(): a real, blocking, one-byte WASI read.
++    @Unmanaged
++    public static int readStdinByte() {
++        Address buffer = WasiBuffer.getBuffer();
++        IOVec vector = buffer.toStructure();
++        SizeResult result = Address.align(buffer.add(Structure.sizeOf(IOVec.class)), 16).toStructure();
++        Address value = buffer.add(128);
++        vector.buffer = value;
++        vector.bufferLength = 1;
++        result.value = 0;
++        if (Wasi.fdRead(0, vector, 1, result) != ERRNO_SUCCESS || (result.value != 0 && result.value != 1)) {
++            stdinFailure(74);
++        }
++        return result.value == 0 ? -1 : value.getByte() & 255;
++    }
++
++    @Unmanaged
++    @Import(module = "wasi_snapshot_preview1", name = "proc_exit")
++    private static native void stdinFailure(int status);
+ 
+     @Unmanaged
+     public static void printString(String s) {
+--- a/org/teavm/backend/wasm/transformation/WasiSupportClassTransformer.java
++++ b/org/teavm/backend/wasm/transformation/WasiSupportClassTransformer.java
+@@ -34,6 +34,16 @@
+ public class WasiSupportClassTransformer implements ClassHolderTransformer {
+     @Override
+     public void transformClass(ClassHolder cls, ClassHolderTransformerContext context) {
++        if (cls.getName().equals("java.lang.ConsoleInputStream")
++                || cls.getName().equals("java.lang.TConsoleInputStream")
++                || cls.getName().equals("org.teavm.classlib.java.lang.TConsoleInputStream")) {
++            var method = cls.getMethod(new MethodDescriptor("read", ValueType.INTEGER));
++            var source = context.getHierarchy().getClassSource().get(WasiSupport.class.getName())
++                    .getMethod(new MethodDescriptor("readStdinByte", ValueType.INTEGER));
++            var pe = ProgramEmitter.create(method, context.getHierarchy());
++            pe.invoke(source.getReference(), new ValueEmitter[0]).returnValue();
++            return;
++        }
+         if (cls.getName().equals(WasmSupport.class.getName())) {
+             transformWasm(cls, context.getHierarchy());
+         } else if (cls.getName().equals("java.lang.System")

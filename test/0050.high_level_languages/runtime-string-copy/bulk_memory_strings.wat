@@ -1,0 +1,17 @@
+(module
+  ;; Non-overlapping and overlapping byte moves, plus fill, preserve string data.
+  (memory 1)
+  (data (i32.const 16) "abcdef")
+  (func $require (param $ok i32)
+    (if (i32.eqz (local.get $ok)) (then unreachable)))
+  (func (export "_start")
+    (memory.copy (i32.const 64) (i32.const 16) (i32.const 6))
+    (call $require (i32.eq (i32.load8_u (i32.const 64)) (i32.const 97)))
+    (call $require (i32.eq (i32.load8_u (i32.const 69)) (i32.const 102)))
+    (memory.copy (i32.const 65) (i32.const 64) (i32.const 5))
+    (call $require (i32.eq (i32.load8_u (i32.const 66)) (i32.const 98)))
+    (call $require (i32.eq (i32.load8_u (i32.const 69)) (i32.const 101)))
+    (memory.fill (i32.const 96) (i32.const 165) (i32.const 3))
+    (call $require (i32.eq (i32.load8_u (i32.const 98)) (i32.const 165)))
+    (memory.copy (i32.const 65536) (i32.const 65536) (i32.const 0))
+    (memory.fill (i32.const 65536) (i32.const 0) (i32.const 0))))

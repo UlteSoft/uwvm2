@@ -21,7 +21,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_completion
 {
     using view = ::fast_io::string_view;
-    enum class kind { none, path, symbol, function, module, pane };
+    enum class kind { none, path, symbol, function, module, pane, printer };
     struct request
     {
         kind type{};
@@ -45,6 +45,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_completion
         auto const normalized{console_aliases::normalize(command)};
         if(normalized.ambiguous) { return {}; }
         if(normalized.valid && !normalized.view().empty()) { command = normalized.view(); }
+        if(command=="pretty-printer")
+        {
+            auto const verb{word()};
+            if(verb!="enable" && verb!="disable" && verb!="delete") { return {}; }
+            auto begin{p}; while(begin<line.size() && ::fast_io::char_category::c_space::char_is(line[begin])) { ++begin; }
+            auto end{begin}; while(end<line.size() && !::fast_io::char_category::c_space::char_is(line[end])) { ++end; }
+            if(cursor>=begin && cursor<=end) { return {kind::printer,begin,end,cursor,line.subview(begin,cursor-begin),verb}; }
+            return {};
+        }
         if(command=="window") { if(word()!="resize") { return {}; } command="focus"; }
         if(command=="scroll") { command="focus"; }
         if(command=="info")
@@ -186,6 +195,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_completion
         if(!display && !explicit_frame && command != "print" && command != "p" && command != "ptype" && command != "source-value" && command != "source-type")
         { return {}; }
         auto expression{p}; while(expression < cursor && ::fast_io::char_category::c_space::char_is(line[expression])) { ++expression; }
+        if(command == "print" || command == "p" || command == "source-value" || command == "print-frame")
+        {
+            auto option_end{expression};
+            while(option_end < line.size() && !::fast_io::char_category::c_space::char_is(line[option_end])) { ++option_end; }
+            auto const option{line.subview(expression, option_end - expression)};
+            if(option == "/r" || option == "/p" || option == "--raw" || option == "--pretty" || option == "--")
+            { expression = option_end; while(expression < line.size() && ::fast_io::char_category::c_space::char_is(line[expression])) { ++expression; } }
+        }
         // Preserve explicit THREAD STOP [FRAME] selectors in the actual query.
         auto const selector_begin{expression}; unsigned numeric{};
         while(!display && numeric < 3u)

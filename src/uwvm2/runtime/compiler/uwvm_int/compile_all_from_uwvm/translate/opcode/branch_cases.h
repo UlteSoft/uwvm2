@@ -1265,7 +1265,7 @@ case wasm1_code::br:
             // If this unconditional branch targets the end label of its frame, record the current
             // stack-top state so the `end` handler can restore it when the fallthrough path becomes
             // unreachable (polymorphic) before reaching `end`.
-            if(codegen_reachable && !is_polymorphic && target_label_id == target_frame.end_label_id)
+            if(codegen_reachable && !is_polymorphic && target_label_id == target_frame.end_label_id && !target_frame.stacktop_has_end_state)
             {
                 target_frame.stacktop_has_end_state = true;
                 target_frame.stacktop_currpos_at_end = curr_stacktop;
@@ -3131,13 +3131,14 @@ case wasm1_code::br_if:
                         }
 #endif
 
+                        brif_target_label_id = control_end_branch_target(brif_target_label_id);
                         // Emit using the pre-pop stacktop cursor (the br_if op reads the condition before the pop).
                         auto const saved_post_pop_stacktop{curr_stacktop};
                         curr_stacktop = brif_stacktop_currpos_at_site;
                         emit_br_if_jump_any(brif_target_label_id);
                         curr_stacktop = saved_post_pop_stacktop;
 
-                        if(codegen_reachable && target_label_id == target_frame.end_label_id)
+                        if(codegen_reachable && target_label_id == target_frame.end_label_id && !target_frame_mut.stacktop_has_end_state)
                         {
                             target_frame_mut.stacktop_has_end_state = true;
                             target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
@@ -3258,7 +3259,7 @@ case wasm1_code::br_if:
                             }
                         }
 
-                        if(codegen_reachable && target_label_id == target_frame.end_label_id)
+                        if(codegen_reachable && target_label_id == target_frame.end_label_id && !target_frame_mut.stacktop_has_end_state)
                         {
                             target_frame_mut.stacktop_has_end_state = true;
                             target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
@@ -3306,6 +3307,7 @@ case wasm1_code::br_if:
                 }
             }
 #endif
+            brif_target_label_id = control_end_branch_target(brif_target_label_id);
             emit_br_if_jump_any(brif_target_label_id);
 
             if constexpr(stacktop_enabled)
@@ -3320,7 +3322,7 @@ case wasm1_code::br_if:
                     // the operand stack (e.g. `local.get; i32.eqz; br_if` fused to a local-based `br_if`),
                     // because in that case the taken path still reaches the end label even though no stack pop
                     // triggers the thunk-based snapshot logic above.
-                    if(codegen_reachable && !is_polymorphic && target_label_id == target_frame.end_label_id)
+                    if(codegen_reachable && !is_polymorphic && target_label_id == target_frame.end_label_id && !target_frame_mut.stacktop_has_end_state)
                     {
                         target_frame_mut.stacktop_has_end_state = true;
                         target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
@@ -3393,7 +3395,7 @@ case wasm1_code::br_if:
                     // Same rationale as the `!need_repair` path: ensure `end` has a reachable snapshot even
                     // when the taken path is lowered via a repair thunk and the condition is not popped from
                     // the operand stack.
-                    if(codegen_reachable && !is_polymorphic && target_label_id == target_frame.end_label_id)
+                    if(codegen_reachable && !is_polymorphic && target_label_id == target_frame.end_label_id && !target_frame_mut.stacktop_has_end_state)
                     {
                         target_frame_mut.stacktop_has_end_state = true;
                         target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
@@ -3824,7 +3826,7 @@ case wasm1_code::br_table:
                     {
                         // Record reachable end-label state for constructs that are reached via this `br_table`
                         // when their fallthrough becomes unreachable before `end`.
-                        if(codegen_reachable && !is_polymorphic && target_label_id == target_frame.end_label_id)
+                        if(codegen_reachable && !is_polymorphic && target_label_id == target_frame.end_label_id && !target_frame_mut.stacktop_has_end_state)
                         {
                             target_frame_mut.stacktop_has_end_state = true;
                             target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
@@ -3851,6 +3853,7 @@ case wasm1_code::br_table:
                     }
                 }
 #endif
+                br_table_target_label_id = control_end_branch_target(br_table_target_label_id);
                 emit_ptr_label_placeholder(br_table_target_label_id, false);
                 continue;
             }
@@ -3909,7 +3912,7 @@ case wasm1_code::br_table:
                 if constexpr(strict_cf_entry_like_call) { /* snapshots not needed */ }
                 else
                 {
-                    if(codegen_reachable && !is_polymorphic && target_label_id == target_frame.end_label_id)
+                    if(codegen_reachable && !is_polymorphic && target_label_id == target_frame.end_label_id && !target_frame_mut.stacktop_has_end_state)
                     {
                         target_frame_mut.stacktop_has_end_state = true;
                         target_frame_mut.stacktop_currpos_at_end = curr_stacktop;

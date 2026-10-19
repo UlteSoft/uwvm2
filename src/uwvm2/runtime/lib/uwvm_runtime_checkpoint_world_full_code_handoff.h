@@ -20,7 +20,7 @@ bool full_code_handoff_complete_{};
         auto const* publication=record.llvm_jit_full_publication.get();
         auto const count=bound.actual->local_defined_function_vec_storage.size();
         auto const imported=bound.actual->imported_function_vec_storage.size();
-        if(!staged.owner_.matches_unpublished_file() || staged.owner_.module()!=bound.actual ||
+        if(!staged.security_allows_original_code() || !staged.owner_.matches_unpublished_file() || staged.owner_.module()!=bound.actual ||
            staged.owner_.file()!=bound.file || staged.module_id_!=dense || bound.new_actual_id!=dense ||
            record.runtime_module!=bound.actual || record.module_name!=bound.file->module_name ||
            !publication || !publication->engine || !publication->context || publication->engine->hasError() ||
@@ -136,6 +136,8 @@ bool full_code_handoff_complete_{};
     // ALL owners/observers qualify before the first private ownership move.
     for(auto const& staged:engines_)
     {
+        if(!staged || !staged->security_allows_original_code())
+        { return fail(preparation_status::source_mismatch); }
         if(!staged->ranges_ || !staged->ranges_->can_handoff_private_owner(*staged->engine_) ||
            !staged->debug_cfi_manager_ || staged->debug_cfi_manager_->has_finalization_failure())
         { return fail(preparation_status::source_mismatch); }

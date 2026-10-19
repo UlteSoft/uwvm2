@@ -42,6 +42,10 @@ def exported(path):
     if kind==0 and name==b"_start":return idx
   p=end
  raise ValueError("no guest entry")
+def guest_finished(reply):
+ return any(line.startswith(b'guest exited: ') or line==b'Program exited normally.' or line.startswith(b'Program exited with code ') for line in reply.splitlines())
+def guest_succeeded(reply):
+ return any(line in (b'guest exited: 0', b'Program exited normally.') for line in reply.splitlines())
 class Console:
  def __init__(self,case,policy):
   self.name=case["name"]+"-"+policy;self.log=bytearray();self.pending=bytearray();self.commands=[]
@@ -62,7 +66,7 @@ class Console:
   while True:
    r=self.send("status")
    if b"stopped:" in r:return r
-   assert b"guest exited" not in r,r
+   assert not guest_finished(r),r
    assert time.monotonic()<limit,r
    time.sleep(.02)
  def saveclose(self,success):
@@ -100,15 +104,15 @@ for case in cases:
     answer=c.send(cmd);record["queries"].append(query_evidence(cmd,answer,participant=thread,stop=stop))
    assert b"breakpoint deleted" in c.send("delete 1")
    for _ in range(3):
-    r=c.send("step wasm "+str(thread));assert b"selected participant step" in r or b"guest exited: 0" in r,r
-    if b"guest exited: 0" in r:break
+    r=c.send("step wasm "+str(thread));assert b"selected participant step" in r or guest_succeeded(r),r
+    if guest_succeeded(r):break
    else:
     c.send("continue")
    limit=time.monotonic()+a.stop_timeout
    while True:
     r=c.send("status")
-    if b"guest exited:" in r:
-     assert b"guest exited: 0" in r,r;break
+    if guest_finished(r):
+     assert guest_succeeded(r),r;break
     assert time.monotonic()<limit,r;time.sleep(.02)
    trace=c.send("trace wasm read 0 128");assert b"error:" not in trace,trace
    assert b"wasm-event sequence=" in trace and b"opcode=unavailable" not in trace,trace

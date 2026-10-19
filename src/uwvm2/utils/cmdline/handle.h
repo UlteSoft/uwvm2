@@ -101,6 +101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::cmdline
 #if defined(UWVM_IMPORT_WASI)
         wasi,
 #endif
+        secure,
     };
 
     /// @brief Execution charset EBCDIC not supported

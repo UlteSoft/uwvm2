@@ -1,0 +1,123 @@
+--- a/src/uwvm2/runtime/lib/uwvm_runtime.default.cpp
++++ b/src/uwvm2/runtime/lib/uwvm_runtime.default.cpp
+@@ -13096,4 +13096,5 @@
+         {
+             // Shared cancellation flag: any worker failure makes the main materializer fall back to single-object MCJIT.
+             ::std::atomic_bool failed{};
++            ::std::mutex native_policy_log_mutex{};
+         };
+@@ -13120,6 +13121,10 @@
+             ::uwvm2::utils::container::u8string const& host_tune_cpu_name,
+             ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& host_target_attribute_storage,
+             ::llvm::CodeGenOptLevel codegen_opt_level,
++            bool debug_session_native_budget,
++            ::std::size_t native_ir_instruction_budget,
++            ::uwvm2::utils::container::u8string_view module_name,
++            ::std::size_t partition_index,
+             bool verify_llvm_jit_ir,
+             ::uwvm2::utils::container::u8string& object_output,
+             runtime_llvm_jit_parallel_object_emit_failure_state& failure_state) noexcept
+@@ -13216,13 +13221,42 @@
+                     co_return;
+                 }
+ 
+-                auto target_machine{make_runtime_llvm_jit_materialize_target_machine(host_cpu_name, host_target_attribute_storage, codegen_opt_level)};
++                // The shared module has already completed its resolved IR pipeline.
++                // This budget changes native backend work only, never the optimized IR,
++                // safepoints, typed packets, source-step deadlines or explicit policies.
++                ::std::size_t maximum_function_ir_instructions{};
++                ::std::size_t partition_ir_instructions{};
++                for(auto const& function: *module)
++                {
++                    ::std::size_t function_ir_instructions{};
++                    for(auto const& block: function) { function_ir_instructions += block.size(); }
++                    maximum_function_ir_instructions = (::std::max)(maximum_function_ir_instructions, function_ir_instructions);
++                    partition_ir_instructions += function_ir_instructions;
++                }
++                auto const native_budget_applied{debug_session_native_budget && maximum_function_ir_instructions > native_ir_instruction_budget};
++                auto const effective_codegen_opt_level{native_budget_applied ? ::llvm::CodeGenOptLevel::None : codegen_opt_level};
++                if(::uwvm2::uwvm::io::enable_runtime_log)
++                {
++                    ::std::lock_guard lock{failure_state.native_policy_log_mutex};
++                    ::fast_io::io::perrln(::uwvm2::uwvm::io::u8runtime_log_output,
++                        u8"[llvm-jit-full] object-partition-native-policy module=\"", module_name,
++                        u8"\" partition=", partition_index,
++                        u8" debug-session-budget=", ::fast_io::mnp::cond(debug_session_native_budget, u8"yes", u8"no"),
++                        u8" budget-revision=partition-max-optimized-ir-v1 threshold=", native_ir_instruction_budget,
++                        u8" maximum-function-ir-instructions=", maximum_function_ir_instructions,
++                        u8" partition-ir-instructions=", partition_ir_instructions,
++                        u8" base-codegen=", get_runtime_llvm_jit_codegen_opt_level_name(codegen_opt_level),
++                        u8" effective-codegen=", get_runtime_llvm_jit_codegen_opt_level_name(effective_codegen_opt_level),
++                        u8" fast-isel=", ::fast_io::mnp::cond(effective_codegen_opt_level == ::llvm::CodeGenOptLevel::None, u8"yes", u8"no"),
++                        u8" native-budget-applied=", ::fast_io::mnp::cond(native_budget_applied, u8"yes", u8"no"));
++                }
++                auto target_machine{make_runtime_llvm_jit_materialize_target_machine(host_cpu_name, host_target_attribute_storage, effective_codegen_opt_level)};
+                 if(target_machine == nullptr) [[unlikely]]
+                 {
+                     failure_state.failed.store(true, ::std::memory_order_release);
+                     co_return;
+                 }
+-                if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
++                if(effective_codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
+ 
+                 set_llvm_module_target_triple_from_machine(*module, *target_machine);
+                 module->setDataLayout(target_machine->createDataLayout());
+@@ -13262,6 +13296,9 @@
+                                                    ::uwvm2::utils::container::u8string const& host_tune_cpu_name,
+                                                    ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> const& host_target_attribute_storage,
+                                                    ::llvm::CodeGenOptLevel codegen_opt_level,
++                                                   bool debug_session_native_budget,
++                                                   ::std::size_t native_ir_instruction_budget,
++                                                   ::uwvm2::utils::container::u8string_view module_name,
+                                                    bool verify_llvm_jit_ir,
+                                                    ::std::size_t extra_compile_threads,
+                                                    ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string>& object_outputs,
+@@ -13308,6 +13345,10 @@
+                                                                           host_tune_cpu_name,
+                                                                           host_target_attribute_storage,
+                                                                           codegen_opt_level,
++                                                                          debug_session_native_budget,
++                                                                          native_ir_instruction_budget,
++                                                                          module_name,
++                                                                          task_index,
+                                                                           verify_llvm_jit_ir,
+                                                                           object_outputs.index_unchecked(task_index),
+                                                                           failure_state)};
+@@ -13736,6 +13777,11 @@
+ 
+             auto const full_materialize_strategy{resolve_runtime_llvm_jit_full_materialize_strategy(default_codegen_opt_level, merged_module.get())};
+             auto const codegen_opt_level{full_materialize_strategy.codegen_opt_level};
++            // Eligibility comes from the final resolved policy. Explicit full/general
++            // overrides remain authoritative even inside an enabled debug session.
++            auto const debug_session_native_budget{full_materialize_strategy.policy_name ==
++                ::uwvm2::utils::container::u8string_view{u8"session:debug", 13uz}};
++            constexpr ::std::size_t native_ir_instruction_budget{100000uz};
+             // Full materialization keeps optimization policy and codegen level together because some policies intentionally select a
+             // lighter codegen level to reduce compile latency.
+ 
+@@ -13785,6 +13831,18 @@
+                                                                               u8"codegen-opt-level",
+                                                                               get_runtime_llvm_jit_codegen_opt_level_name(codegen_opt_level));
+             ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_codegen_policy, u8"policy", full_materialize_strategy.policy_name);
++            // Parallel contexts inherit this policy before lookup. The effective
++            // per-partition level is deterministic from exact IR, the resolved
++            // pipeline, partition count/index, and this explicitly versioned rule.
++            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
++                llvm_jit_cache_codegen_policy, u8"parallel-debug-native-budget-enabled",
++                debug_session_native_budget
++                    ? ::uwvm2::utils::container::u8string_view{u8"yes", 3uz}
++                    : ::uwvm2::utils::container::u8string_view{u8"no", 2uz});
++            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(
++                llvm_jit_cache_codegen_policy, u8"parallel-debug-native-budget-revision", u8"partition-max-optimized-ir-v1");
++            ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value_u64(
++                llvm_jit_cache_codegen_policy, u8"parallel-debug-native-budget-threshold", native_ir_instruction_budget);
+             ::uwvm2::runtime::llvm_jit_cache::details::append_cache_key_value(llvm_jit_cache_codegen_policy,
+                                                                               u8"call-stack",
+                                                                               get_runtime_llvm_jit_call_stack_mode_name());
+@@ -14081,3 +14139,6 @@
+                                                            host_tune_cpu_name,
+                                                            host_target_attribute_storage,
+                                                            codegen_opt_level,
++                                                           debug_session_native_budget,
++                                                           native_ir_instruction_budget,
++                                                           ::uwvm2::utils::container::u8string_view{rec.module_name.data(), rec.module_name.size()},

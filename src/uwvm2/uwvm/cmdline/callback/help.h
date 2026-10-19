@@ -187,6 +187,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"--help wasm",
                                 ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                 u8"\" to display the wasm arguments." u8"\n\n",
+                                // secure
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_CYAN),
+                                u8"  ",
+                                ::fast_io::mnp::left(u8"<secure>", ::uwvm2::uwvm::cmdline::parameter_max_principal_name_size),
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
+                                u8"  -----  ",
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
+                                u8"Use \"",
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_YELLOW),
+                                u8"--help secure",
+                                ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
+                                u8"\" to display the secure arguments.\n\n",
                                 // runtime
                                 ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_LT_CYAN),
                                 u8"  ",
@@ -255,6 +267,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }};
             output_category_hint(u8"<debug>", u8"debug");
             output_category_hint(u8"<wasm>", u8"wasm");
+            output_category_hint(u8"<secure>", u8"secure");
             output_category_hint(u8"<runtime>", u8"runtime");
             output_category_hint(u8"<log>", u8"log");
 #if defined(UWVM_IMPORT_WASI)
@@ -308,6 +321,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             help_output_singal_cate(u8log_output_ul, ::uwvm2::utils::cmdline::categorization::debug);
             // help_output_singal_cate comes with UWVM_COLOR_U8_RST_ALL
             ::fast_io::io::perrln(u8log_output_ul);
+        }
+        else if(currp1_str == u8"secure")
+        {
+            ::fast_io::io::perrln(u8log_output_ul, u8"Secure execution arguments:");
+            help_output_singal_cate(u8log_output_ul, ::uwvm2::utils::cmdline::categorization::secure);
+            ::fast_io::io::perrln(u8log_output_ul,
+                u8"  --secure module <wasm-path> <protected-policy-path> (repeatable)\n"
+                u8"  --secure named-module <wasm-path> <protected-policy-path> <expected-id> (shared policies)\n"
+                u8"  --secure help\n  --secure status\n"
+                u8"Only explicitly selected modules require signatures; other modules retain ordinary behavior.");
         }
         else if(currp1_str == u8"wasm")
         {

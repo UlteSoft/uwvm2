@@ -7,7 +7,37 @@ can construct DATA; matching two manifests does not mint a stop, build/provider
 certificate, immutable source owner, cache-entry owner or restore permission.
 A real private producer and the coherent manager must supply these authorities.
 
-## Exact current source evidence
+## Current cache dependency: v7 successor
+
+This source successor targets cache format7. It must be composed with the exact
+reviewed v7 cache core before building; applying it alone to the public v5 core
+intentionally leaves the cache dependency equality assertion unsatisfied.
+`binding::cache_format_revision` is7, and
+`checkpoint_binding_dependency_contract.h` still compares it with the actual
+`llvm_jit_cache::cache_format_version` in both header and module builds.
+The real CLI includes/imports that contract through its debugger implementation.
+
+Every required-cache object row must have format7. Formats5 and6 are rejected
+as `unsupported_cache_version`; changing an old row's number does not authenticate
+its object, create its owner or upgrade an old envelope. Identity revision2,
+envelope4 and state schema6 remain separate wire contracts. Their layouts,
+continuation ABI and profile policy are not changed by this cache dependency.
+
+An accepted runtime cache row must come from genuine v7 origin admission and the
+actual engine/cache-entry owner. The real loaded executable identity and all
+applicable Source, generation, target/provider and codegen checks remain required.
+Nominal version/git/build strings, a public context, a deterministic seed or a
+successful detached signature check cannot supply this origin. The binding DATA
+codec does not implement that producer, enable disk cache for an ineligible
+engine or relax the debug-process binding refusal.
+
+This dependency-only successor supplies no new cache builder, signer, Runtime
+ticket or CLI option. Component codecs/oracles, standalone persistence refusal
+and authenticated production cold/warm execution need their own exact source
+successors and Linux receipts. The v5 source observations and migration notes
+below are retained historical evidence, not the current v7 contract or v7 tests.
+
+## Historical v5 source evidence (before this successor)
 
 The ordinary and ROS `runtime/llvm_jit_cache/format.h` use cache format5 and
 reader-owned product metadata (`uwvm2` / `uwvm2ros`), also included in namespaced
@@ -152,7 +182,7 @@ engine`; it may require explicit OFF selection, never silently claim cached stat
 
 Cache ON binds one actual accepted full object or the COMPLETE ordered partition
 set per module. Every row records actual module/partition ordinal/count, cache
-format5, exact stored blob length/SHA, decompressed native object length/SHA,
+format7, exact stored blob length/SHA, decompressed native object length/SHA,
 complete canonical key SHA, ISA and context metadata SHAs, and provider/emitter
 identity. The precise accepted context and source/ABI/profile key must be pinned
 by the owning engine publication. Writer success or predicted lookup key is not
@@ -195,7 +225,11 @@ No native PC/SP/GPR jump, mapped file after-truncate assumption, caller epoch or
 private-producer test mock is allowed. Resource-input diagnostics and format4
 roundtrip tests still do not qualify any of these operations.
 
-## Evidence plan and negative cases
+## Retained component plan and pending v7 qualification
+
+The following predecessor component plan is retained as unexecuted history. Its
+v5 codec/signature inputs and independent oracles need separate exact v7
+reconciliation; this dependency-only successor does not supply that work.
 
 Component tests use real owned-file reads and actual cache-format writer output
 for two distinct modern Wasm inputs and two distinct object payloads. They verify
@@ -226,6 +260,8 @@ above is an UWVM design proposal, not a WebAssembly standard snapshot format.
 
 The precise revision2 function/event preimages and pending corruption regressions
 are specified in `test/0036.checkpoint_binding/README.state-identity.md`.
+
+## Historical schema6 migration notes (v5 cache baseline)
 
 State schema6 retains the empty table descriptor and revises the canonical state wire
 markers (`UWCPST6\0`, `UWCPSTE6`). Binding identity revision2, envelope4,

@@ -1,0 +1,73 @@
+--- a/org/teavm/backend/wasm/render/WasmBinaryRenderer.java
++++ b/org/teavm/backend/wasm/render/WasmBinaryRenderer.java
+@@ -257,7 +257,7 @@
+         }
+ 
+         var section = new WasmBinaryWriter();
+-        var visitor = new WasmBinaryRenderingVisitor(section, module, null, null, 0);
++        var visitor = new WasmBinaryRenderingVisitor(section, module, null, null, 0, 0);
+         section.writeLEB(globals.size());
+         for (var global : globals) {
+             section.writeType(global.getType(), module);
+@@ -446,7 +446,7 @@
+         }
+ 
+         var visitor = new WasmBinaryRenderingVisitor(code, module, dwarfGenerator,
+-                function.getJavaMethod() != null ? debugLines : null, offset + sectionOffset);
++                function.getJavaMethod() != null ? debugLines : null, offset + sectionOffset, offset);
+         for (var part : function.getBody()) {
+             visitor.preprocess(part);
+         }
+@@ -464,6 +464,12 @@
+             visitor.popLocation();
+         }
+         visitor.endLocation();
++        // DWARF addresses are relative to the Code section payload. Close a
++        // sequence even when endLocation has no new instruction to flush.
++        // DwarfLinesGenerator ignores this call if the sequence is closed.
++        if (dwarfGenerator != null) {
++            dwarfGenerator.endLineNumberSequence(code.getPosition() + offset);
++        }
+ 
+         if (dwarfSubprogram != null) {
+             dwarfSubprogram.endOffset = code.getPosition() + offset;
+--- a/org/teavm/backend/wasm/render/WasmBinaryRenderingVisitor.java
++++ b/org/teavm/backend/wasm/render/WasmBinaryRenderingVisitor.java
+@@ -100,6 +100,7 @@
+     private DwarfGenerator dwarfGenerator;
+     private DebugLines debugLines;
+     private int addressOffset;
++    private int dwarfAddressOffset;
+     private int depth;
+     private Map<WasmBlock, Integer> blockDepths = new HashMap<>();
+     private List<InliningInfo> methodStack = new ArrayList<>();
+@@ -112,11 +113,12 @@
+     private Set<WasmBlock> blocksToPreserve = new HashSet<>();
+ 
+     WasmBinaryRenderingVisitor(WasmBinaryWriter writer, WasmModule module,
+-            DwarfGenerator dwarfGenerator, DebugLines debugLines, int addressOffset) {
++            DwarfGenerator dwarfGenerator, DebugLines debugLines, int addressOffset, int dwarfAddressOffset) {
+         this.writer = writer;
+         this.module = module;
+         this.dwarfGenerator = dwarfGenerator;
+         this.addressOffset = addressOffset;
++        this.dwarfAddressOffset = dwarfAddressOffset;
+         this.debugLines = debugLines;
+     }
+ 
+@@ -1466,10 +1468,13 @@
+     private void doEmitLocation() {
+         var address = positionToEmit + addressOffset;
+         if (dwarfGenerator != null) {
++            // Keep TeaVM's private debug format separate from standard Wasm
++            // DWARF, whose addresses use the Code section payload origin.
++            var dwarfAddress = positionToEmit + dwarfAddressOffset;
+             if (textLocationToEmit == null || textLocationToEmit.getFileName() == null) {
+-                dwarfGenerator.endLineNumberSequence(address);
++                dwarfGenerator.endLineNumberSequence(dwarfAddress);
+             } else {
+-                dwarfGenerator.lineNumber(address, textLocationToEmit.getFileName(), textLocationToEmit.getLine());
++                dwarfGenerator.lineNumber(dwarfAddress, textLocationToEmit.getFileName(), textLocationToEmit.getLine());
+             }
+         }
+         if (debugLines != null) {

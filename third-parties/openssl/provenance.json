@@ -1,0 +1,15 @@
+{
+  "release": "3.5.9",
+  "release_date": "2026-09-29",
+  "source_url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+  "official_release_page": "https://www.openssl-library.org/source/",
+  "source_sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a",
+  "signing_subkey_fingerprint": "C46ED3F2CBEFDA1FDAADA44264ED7B1DCCE71CB2",
+  "official_primary_fingerprint": "B146647E45A7B33947AB226B2A2C87D161692D40",
+  "key_source_url": "https://www.openssl-library.org/source/pubkeys.asc",
+  "verification": "Detached OpenPGP VALIDSIG, primary fingerprint compared with official HTTPS release page; archive SHA256 equals official checksum. Isolated GnuPG home, no system trust store changes.",
+  "upstream_modifications": [],
+  "upstream_file_entries": 5779,
+  "source_manifest_sha256": "ecf889968127e9cac6cda5fe572beb69e2a3e20e276ab7bb4a1e730b1b72b30b",
+  "license": "Apache-2.0 (upstream/LICENSE.txt)"
+}

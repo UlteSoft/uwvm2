@@ -93,6 +93,10 @@
     return true;
 }
 
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_USE_THREAD_LOCAL) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE) && defined(__linux__) && !defined(UWVM_MODULE)
+#include "threaded_exception_emit.h"
+#endif
+
 #ifdef UWVM_CPP_EXCEPTIONS
 // Emit one no-throw cold copy while the typed C++ catch still owns its exception.
 // Reference payloads and catch_ref use complete native Wasm reference carriers, never a
@@ -197,6 +201,15 @@
 {
     if(!state.valid || state.ir_builder == nullptr || type == nullptr || callee == nullptr) { return nullptr; }
     auto& builder{*state.ir_builder};
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_USE_THREAD_LOCAL) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE) && defined(__linux__) && !defined(UWVM_MODULE)
+    if(threaded_host_emission_scope::selected())
+    {
+        auto const call{builder.CreateCall(type,callee,arguments)};
+        call->setDoesNotThrow();
+        if(!emit_threaded_exception_route(state,include_lexical_handlers))return nullptr;
+        return call;
+    }
+#endif
 #ifdef UWVM_CPP_EXCEPTIONS
     if(state.native_guest_exceptions)
     {
@@ -316,6 +329,9 @@
 [[nodiscard]] inline bool try_emit_runtime_local_func_llvm_jit_throw_tuple(runtime_local_func_llvm_jit_emit_state_t& state,
     ::std::size_t tag_index, runtime_block_result_type params) noexcept
 {
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_USE_THREAD_LOCAL) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE) && defined(__linux__) && !defined(UWVM_MODULE)
+    if(threaded_host_emission_scope::selected())return emit_threaded_throw_tuple(state,tag_index,params);
+#endif
 #ifdef UWVM_CPP_EXCEPTIONS
     if(!state.valid || !state.native_guest_exceptions || state.ir_builder == nullptr || state.control_stack.empty()) { return false; }
     if(!state.control_stack.back().is_reachable) { return true; }
@@ -396,6 +412,9 @@
 [[nodiscard]] inline bool try_emit_runtime_local_func_llvm_jit_throw_ref(
     runtime_local_func_llvm_jit_emit_state_t& state) noexcept
 {
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_USE_THREAD_LOCAL) && defined(UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD) && defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE) && defined(__linux__) && !defined(UWVM_MODULE)
+    if(threaded_host_emission_scope::selected())return emit_threaded_throw_reference(state);
+#endif
 #ifdef UWVM_CPP_EXCEPTIONS
     if(!state.valid || !state.native_guest_exceptions || state.ir_builder == nullptr || state.control_stack.empty() ||
        state.local_func_storage_ptr == nullptr) { return false; }

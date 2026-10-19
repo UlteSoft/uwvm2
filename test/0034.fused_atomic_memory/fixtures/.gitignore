@@ -1,0 +1,7 @@
+# Raw malformed WebAssembly fixtures are source test inputs.
+!/atomic_alignment_over.wasm
+!/atomic_alignment_under.wasm
+!/atomic_bad_memory_index.wasm
+!/atomic_fence_reserved.wasm
+!/atomic_u64_offset_overflow.wasm
+!/atomic_unknown_subopcode.wasm

@@ -62,6 +62,13 @@ namespace uwvm2::runtime::lib
     extern "C++" { class runtime_checkpoint_world_transaction; }
 }
 
+#if !defined(UWVM_MODULE)
+namespace uwvm2::uwvm::run
+{
+    extern "C++" { inline int prepare_owned_full_cli_source(bool, bool) noexcept; }
+}
+#endif
+
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full
 {
 
@@ -93,10 +100,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full
         ::uwvm2::utils::control::owned_file_image::owner image{};
     };
 
+    class full_source_instance;
+    // Native lifetime observation only. The real canonical factory captures
+    // this record in its shared_ptr deleter. A zero strong count/expired weak
+    // owner is NOT proof that Source/registry/NativeMemory destruction finished.
+    class full_source_destruction_completion final
+    {
+        friend class full_source_instance;
+        ::std::atomic<bool> complete_{};
+        full_source_destruction_completion() noexcept = default;
+    public:
+        using owner = ::std::shared_ptr<full_source_destruction_completion const>;
+        [[nodiscard]] bool completed() const noexcept
+        { return complete_.load(::std::memory_order_acquire); }
+    };
+
     class full_source_instance final
     {
+#if !defined(UWVM_MODULE)
+        friend int ::uwvm2::uwvm::run::prepare_owned_full_cli_source(bool, bool) noexcept;
+#endif
+        enum class cache_cli_origin { unknown, ordinary_full_cli };
+        cache_cli_origin cache_cli_origin_{cache_cli_origin::unknown};
+
         friend class ::uwvm2::uwvm::runtime::initializer::restoration_context;
         friend class ::uwvm2::runtime::lib::runtime_checkpoint_world_transaction;
+        ::std::shared_ptr<full_source_destruction_completion> destruction_completion_;
+        struct delete_and_publish_completion
+        {
+            ::std::shared_ptr<full_source_destruction_completion> actual;
+            void operator()(full_source_instance* instance) const noexcept
+            {
+                delete instance; // ALL members, including registry/mmap owners, finish here.
+                actual->complete_.store(true, ::std::memory_order_release);
+            }
+        };
         ::std::u8string file_name_storage_;
         ::std::u8string rename_storage_;
         ::uwvm2::uwvm::wasm::type::wasm_file_t file_{};
@@ -143,8 +181,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full
         mutable ::std::weak_ptr<numeric_plan_lifetime const> numeric_plan_{};
 
         explicit full_source_instance(::std::u8string file_name, ::std::u8string rename,
-            ::std::vector<full_preload_input> inputs)
-            : file_name_storage_{::std::move(file_name)}, rename_storage_{::std::move(rename)}, preload_inputs_{::std::move(inputs)}
+            ::std::vector<full_preload_input> inputs, ::std::shared_ptr<full_source_destruction_completion> completion)
+            : destruction_completion_{::std::move(completion)}, file_name_storage_{::std::move(file_name)},
+              rename_storage_{::std::move(rename)}, preload_inputs_{::std::move(inputs)}
         {
             // [this nonmoving owner: terminated filename and rename buffers]
             // [safe] file_ borrows these final object buffers before parsing.
@@ -176,10 +215,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full
         {
             // Real nonconst allocation, including both file/map objects. Bind the
             // weak control-block identity before any const owner is published.
-            mutable_owner result{new full_source_instance{::std::move(file_name), ::std::move(rename), ::std::move(inputs)}};
+            auto completion{::std::shared_ptr<full_source_destruction_completion>{new full_source_destruction_completion{}}};
+            mutable_owner result{new full_source_instance{::std::move(file_name), ::std::move(rename), ::std::move(inputs), completion},
+                delete_and_publish_completion{completion}};
             result->canonical_owner_ = result;
             return result;
         }
+
+        [[nodiscard]] full_source_destruction_completion::owner destruction_completion() const noexcept
+        { return destruction_completion_; }
 
         [[nodiscard]] ::uwvm2::utils::container::u8cstring_view owned_file_name() const noexcept
         {
@@ -349,6 +393,51 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full
             for(auto const& binding : preload_bindings_)
             { if(binding.module == actual_module && binding.id == actual_id) { return binding.validation_epoch == actual_epoch ? file : nullptr; } }
             return nullptr;
+        }
+        // This private provenance is written only after the real owning CLI
+        // parser + original initializer succeeded. It is NOT a body-validation
+        // epoch, an embedding registration or a serialized restore property.
+        [[nodiscard]] bool has_actual_ordinary_cli_cache_origin() const noexcept
+        {
+#if !defined(UWVM_MODULE)
+            return cache_cli_origin_ == cache_cli_origin::ordinary_full_cli && initialized_from_actual_state();
+#else
+            return false;
+#endif
+        }
+        enum class cache_native_provider_census { unsafe, no_native, builtin_wasip1 };
+        // Initializer-sealed provider identity only. Unlike the debugger's method
+        // below this does NOT claim a code-validation epoch: the first ordinary
+        // materializer may perform its cache query before that publication.
+        [[nodiscard]] cache_native_provider_census actual_cache_native_provider_census() const noexcept
+        {
+            if(!has_actual_ordinary_cli_cache_origin()) { return cache_native_provider_census::unsafe; }
+#if defined(UWVM_SUPPORT_PRELOAD_DL)
+            // Previously delivered C ABI tables/descriptors cannot be revoked
+            // by the current exposure flag or an empty counted host gate.
+            if(!::uwvm2::uwvm::wasm::storage::preloaded_dl.empty()) { return cache_native_provider_census::unsafe; }
+#endif
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+            if(!::uwvm2::uwvm::wasm::storage::weak_symbol.empty()) { return cache_native_provider_census::unsafe; }
+#endif
+            auto const& providers{::uwvm2::uwvm::wasm::storage::preload_local_imported};
+            if(!builtin_wasip1_identity_) { return providers.empty() ? cache_native_provider_census::no_native : cache_native_provider_census::unsafe; }
+            if(!builtin_wasip1_loader_identity::canonical(builtin_wasip1_identity_)) { return cache_native_provider_census::unsafe; }
+            auto const& selected{builtin_wasip1_loader_identity::selected_};
+            if(!selected || selected.get()!=builtin_wasip1_identity_.get() ||
+               selected.owner_before(builtin_wasip1_identity_) || builtin_wasip1_identity_.owner_before(selected) ||
+               providers.size()!=builtin_wasip1_vector_extent_ || providers.cbegin()!=builtin_wasip1_vector_begin_ ||
+               builtin_wasip1_identity_->current_member()!=builtin_wasip1_member_) { return cache_native_provider_census::unsafe; }
+            for(::std::size_t i{};i!=providers.size();++i)
+            {
+                // [actual unchanged FINAL native vector][i<count] end
+                // [safe] compare its OWN member address, not a name/count or
+                // caller pointer. Only the original factory-certified builtin
+                // wrapper is exempt; actual host-import cache still refuses
+                // its byte operations without an independent real adapter.
+                if(::std::addressof(providers.index_unchecked(i))!=builtin_wasip1_member_) { return cache_native_provider_census::unsafe; }
+            }
+            return cache_native_provider_census::builtin_wasip1;
         }
         // Cold debug-byte exclusivity qualification ONLY. This authenticates
         // the actual finalized native provider census for this current source;

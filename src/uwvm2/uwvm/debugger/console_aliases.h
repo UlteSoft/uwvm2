@@ -114,12 +114,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_aliases
         else if(name == "where" || name == "backtrace") { name = "bt"; }
         else
         {
-            constexpr ::fast_io::array<::fast_io::string_view, 56u> names{{
+            constexpr ::fast_io::array<::fast_io::string_view, 58u> names{{
                 "jump", "advance", "apropos", "until", "breakwasm", "breakasm", "breaksource", "breakpoint", "bt", "catch", "continue", "delete", "disable", "disassemble",
                 "disassemble-range", "down", "enable", "finish", "frame", "frames", "globals", "help", "info", "input", "locals",
                 "members", "memory", "next", "nexti", "operands", "path", "pause", "print", "process", "ptype", "quit", "register",
                 "replace", "run", "saved", "server", "set", "si", "source-type", "source-value", "status", "step", "table",
-                "thread", "trace", "unset", "up", "start", "startw", "starti", "kill"}};
+                "thread", "trace", "unset", "up", "start", "startw", "starti", "kill", "show", "pretty-printer"}};
             // Exact product commands outside the compatibility vocabulary keep
             // their existing grammar, including bounded scripts and checkpoints.
             bool exact_extra{name == "wait" || name == "wasm-script" || name == "wasm-path" || name == "wasm-set" ||
@@ -143,9 +143,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_aliases
             else if(sub == "b") { sub = "breakpoints"; }
             else
             {
-                constexpr ::fast_io::array<::fast_io::string_view, 16u> names{{"all-registers", "breakpoints", "globals", "locals", "modules",
+                constexpr ::fast_io::array<::fast_io::string_view, 17u> names{{"all-registers", "breakpoints", "globals", "locals", "modules",
                     "operands", "registers", "saved", "table", "threads", "wasm-events", "wasip1", "controls", "handlers",
-                    "control-params", "control-results"}};
+                    "control-params", "control-results", "pretty-printer"}};
                 sub = resolve(sub, names, result.ambiguous, ::std::addressof(result.candidates), "info");
                 if(sub.empty())
                 {

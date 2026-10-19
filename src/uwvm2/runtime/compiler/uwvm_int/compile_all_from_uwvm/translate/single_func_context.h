@@ -167,6 +167,8 @@ struct label_info_t
 {
     ::std::size_t offset{SIZE_MAX};
     bool in_thunk{};
+    // Compiler-only link to a live control frame; never serialized or executed.
+    ::std::size_t end_frame_index{SIZE_MAX};
 };
 
 struct ptr_fixup_t

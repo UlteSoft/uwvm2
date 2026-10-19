@@ -1,0 +1,61 @@
+--- a/org/teavm/backend/wasm/runtime/WasiSupport.java
++++ b/org/teavm/backend/wasm/runtime/WasiSupport.java
+@@ -24,6 +24,7 @@
+ import org.teavm.backend.wasm.wasi.SizeResult;
+ import org.teavm.backend.wasm.wasi.Wasi;
+ import org.teavm.interop.Address;
++import org.teavm.interop.Import;
+ import org.teavm.interop.Structure;
+ import org.teavm.interop.Unmanaged;
+ 
+@@ -60,6 +61,20 @@
+         Wasi.clockTimeGet(Wasi.CLOCKID_REALTIME, 10, result);
+         return result.value / 1000000;
+     }
++
++    // WASI clockid 1 is CLOCKID_MONOTONIC; timestamps are already nanoseconds.
++    @Unmanaged
++    public static long nanoTime() {
++        LongResult result = WasiBuffer.getBuffer().toStructure();
++        if (Wasi.clockTimeGet(1, 1, result) != ERRNO_SUCCESS) {
++            monotonicClockFailure(70);
++        }
++        return result.value;
++    }
++
++    @Unmanaged
++    @Import(module = "wasi_snapshot_preview1", name = "proc_exit")
++    private static native void monotonicClockFailure(int status);
+ 
+     @Unmanaged
+     public static void printString(String s) {
+--- a/org/teavm/backend/wasm/transformation/WasiSupportClassTransformer.java
++++ b/org/teavm/backend/wasm/transformation/WasiSupportClassTransformer.java
+@@ -25,6 +25,7 @@
+ import org.teavm.model.ClassReader;
+ import org.teavm.model.ElementModifier;
+ import org.teavm.model.MethodHolder;
++import org.teavm.model.MethodDescriptor;
+ import org.teavm.model.MethodReader;
+ import org.teavm.model.ValueType;
+ import org.teavm.model.emit.ProgramEmitter;
+@@ -35,6 +36,19 @@
+     public void transformClass(ClassHolder cls, ClassHolderTransformerContext context) {
+         if (cls.getName().equals(WasmSupport.class.getName())) {
+             transformWasm(cls, context.getHierarchy());
++        } else if (cls.getName().equals("java.lang.System")
++                || cls.getName().equals("org.teavm.classlib.java.lang.TSystem")) {
++            // This transformer is installed only for the legacy WASI target.
++            // Other backends retain their existing System.nanoTime contract.
++            var method = cls.getMethod(new MethodDescriptor("nanoTime", ValueType.LONG));
++            if (method != null) {
++                var source = context.getHierarchy().getClassSource().get(WasiSupport.class.getName())
++                        .getMethod(method.getDescriptor());
++                method.getModifiers().remove(ElementModifier.NATIVE);
++                method.getAnnotations().remove(Import.class.getName());
++                var pe = ProgramEmitter.create(method, context.getHierarchy());
++                pe.invoke(source.getReference(), new ValueEmitter[0]).returnValue();
++            }
+         }
+     }
+ 

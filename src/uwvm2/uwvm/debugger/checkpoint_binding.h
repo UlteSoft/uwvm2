@@ -1,5 +1,5 @@
 // PRIVATE PROPOSAL: typed identity DATA, never a stop/restore capability.
-// No current runtime, database or format4 codec selects this header.
+// The CLI debugger includes this DATA contract; it grants no runtime authority.
 #pragma once
 #ifndef UWVM_MODULE
 # include <array>
@@ -34,7 +34,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::checkpoint::binding
         quota_exceeded
     };
     inline constexpr ::std::uint32_t identity_revision{2u}, envelope_version{4u}, state_version{6u};
-    inline constexpr ::std::uint32_t cache_format_revision{5u};
+    inline constexpr ::std::uint32_t cache_format_revision{7u};
     inline constexpr ::std::uint32_t canonical_byte_order{1u}; // canonical LE on LE AND BE native hosts
     struct build
     {

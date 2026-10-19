@@ -62,7 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter help{.name{u8"--help"},
                                                              .describe{u8"Show help information."},
-                                                             .usage{u8"([all|global|debug|wasm|log|runtime"
+                                                             .usage{u8"([all|global|debug|wasm|secure|log|runtime"
 #if defined(UWVM_IMPORT_WASI)
                                                                     u8"|wasi"
 #endif

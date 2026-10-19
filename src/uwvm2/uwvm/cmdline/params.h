@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -62,6 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 #endif
 
             // wasm
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::secure),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_main_module_name),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_start_func),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_preload_library),
@@ -137,6 +138,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 # endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compiler_log),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compile_threads),
+# if defined(UWVM2_HAS_THREADED_PROFILE_HOST_API) && UWVM2_HAS_THREADED_PROFILE_HOST_API
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasi_threads),
+# endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_scheduling_policy),
 # if defined(UWVM_RUNTIME_LLVM_JIT)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_policy),
@@ -144,6 +148,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_exception_dispatch),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_call_stack),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_cache_path),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_cache_seal_process),
 # endif
 #endif
 

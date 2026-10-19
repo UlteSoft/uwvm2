@@ -953,7 +953,15 @@ Group* dummy_groups()
    * insertion as the container's capacity is precisely zero.
    */
 
+#if defined(__arm__) && (!defined(__ARM_ARCH) || __ARM_ARCH < 7)
+  /* A pre-ARMv7 64-bit atomic load can use compare-and-swap (including
+   * the ARM Linux kuser helper). Even an unchanged value then needs writable
+   * storage. In particular, ARMv5 must not place this sentinel in .rodata.
+   */
+  static typename Group::dummy_group_type
+#else
   static constexpr typename Group::dummy_group_type
+#endif
   storage[Size]={typename Group::dummy_group_type(),};
 
   return reinterpret_cast<Group*>(

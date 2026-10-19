@@ -29,6 +29,8 @@
 # include <memory>
 # include <bit>
 # include <utility>
+# include <string_view>
+# include <uwvm2/utils/security/wsea.h>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
@@ -345,6 +347,94 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             }
 
             // Here, guard will perform destructors.
+        }
+
+        // Register all explicitly selected secure modules before ANY preload
+        // callback. Unselected modules retain their ordinary loading behavior.
+        bool secure_status_requested{};
+        bool secure_help_requested{};
+        for(auto current{pr.begin() + 1u}; current != end_pos; ++current)
+        {
+            if(current->para != ::std::addressof(::uwvm2::uwvm::cmdline::params::secure)) { continue; }
+            auto subcommand{current + 1u};
+            using kind = ::uwvm2::utils::cmdline::parameter_parsing_results_type;
+            if(subcommand == end_pos || subcommand->type != kind::arg)
+            {
+                ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                    u8"uwvm: --secure requires a subcommand; use --secure help.");
+                return parsing_return_val::returnm1;
+            }
+            subcommand->type = kind::occupied_arg;
+            if(subcommand->str == u8"help") { secure_help_requested = true; continue; }
+            if(subcommand->str == u8"status") { secure_status_requested = true; continue; }
+            bool const named_module{subcommand->str == u8"named-module"};
+            if(subcommand->str != u8"module" && !named_module)
+            {
+                ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                    u8"uwvm: unknown --secure subcommand; use --secure help.");
+                return parsing_return_val::returnm1;
+            }
+            auto module{subcommand + 1u};
+            if(module == end_pos || module->type != kind::arg || module->str.empty())
+            {
+                ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                    u8"uwvm: --secure module requires <wasm-path> <protected-policy-path>.");
+                return parsing_return_val::returnm1;
+            }
+            auto policy{module + 1u};
+            if(policy == end_pos || policy->type != kind::arg || policy->str.empty())
+            {
+                ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                    u8"uwvm: --secure module requires <wasm-path> <protected-policy-path>.");
+                return parsing_return_val::returnm1;
+            }
+            ::std::string_view expected_identity{};
+            if(named_module)
+            {
+                auto identity{policy + 1u};
+                if(identity == end_pos || identity->type != kind::arg || identity->str.empty())
+                {
+                    ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                        u8"uwvm: --secure named-module requires <wasm-path> <protected-policy-path> <expected-id>.");
+                    return parsing_return_val::returnm1;
+                }
+                identity->type = kind::occupied_arg;
+                expected_identity = ::std::string_view{reinterpret_cast<char const*>(identity->str.cbegin()), identity->str.size()};
+            }
+            module->type = kind::occupied_arg;
+            policy->type = kind::occupied_arg;
+            auto selected{::uwvm2::utils::security::wsea::select_module(
+                ::std::string_view{reinterpret_cast<char const*>(module->str.cbegin()), module->str.size()},
+                ::std::string_view{reinterpret_cast<char const*>(policy->str.cbegin()), policy->str.size()}, expected_identity)};
+            if(!selected)
+            {
+                ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                    u8"uwvm: [", ::fast_io::mnp::code_cvt(::fast_io::mnp::os_c_str(selected.code)), u8"] DENIED: ",
+                    ::fast_io::mnp::code_cvt(::fast_io::mnp::os_c_str(selected.message)));
+                return parsing_return_val::returnm1;
+            }
+        }
+        if(secure_help_requested)
+        {
+            ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                u8"--secure module <wasm-path> <protected-policy-path>\n"
+                u8"  Bind this path to the only module identity authorized by a single-rule policy. Repeat for more modules.\n"
+                u8"--secure named-module <wasm-path> <protected-policy-path> <expected-id>\n"
+                u8"  Bind this path to an explicit module identity when sharing a policy between publishers/modules.\n"
+                u8"  Relative paths are normalized against the current directory. Selected modules fail closed.\n"
+                u8"--secure status\n  Print the configured secure-module status and exit.\n"
+                u8"--secure help\n  Print this help and exit.\n"
+                u8"Unselected WASM modules retain ordinary loading behavior.");
+            return parsing_return_val::return0;
+        }
+        if(secure_status_requested)
+        {
+            ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                ::fast_io::mnp::code_cvt(::fast_io::mnp::os_c_str(::uwvm2::utils::security::wsea::status_message())));
+            auto const details{::uwvm2::utils::security::wsea::status_details()};
+            ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                ::fast_io::mnp::code_cvt(::fast_io::mnp::os_c_str(details.c_str())));
+            return parsing_return_val::return0;
         }
 
         // Call the function corresponding to each parameter

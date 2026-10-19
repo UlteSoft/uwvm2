@@ -90,6 +90,11 @@ int main()
     constexpr wasi_void_ptr_wasm64_t argv_ptr{256u};
     constexpr wasi_void_ptr_wasm64_t argv_buf_ptr{1024u};
 
+    // The pointer table contains exactly count entries; the next word is caller-owned.
+    constexpr auto vector_canary{static_cast<wasi_void_ptr_wasm64_t>(0x13579bdfu)};
+    auto const vector_guard{static_cast<wasi_void_ptr_wasm64_t>(argv_ptr + args.size() * sizeof(wasi_void_ptr_wasm64_t))};
+    ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64<wasi_void_ptr_wasm64_t>(memory, vector_guard, vector_canary);
+
     auto const ret{::uwvm2::imported::wasi::wasip1::func::args_get_wasm64(env, argv_ptr, argv_buf_ptr)};
     if(ret != errno_wasm64_t::esuccess) { ::fast_io::fast_terminate(); }
 
@@ -125,6 +130,53 @@ int main()
         ::fast_io::io::perrln(::fast_io::u8err(), u8"args_get_wasm64: argv[1] mismatch");
         ::fast_io::fast_terminate();
     }
+    if(::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<wasi_void_ptr_wasm64_t>(memory, vector_guard) != vector_canary)
+    { ::fast_io::fast_terminate(); }
+
+    // Cover zero, one and multiple entries, then a table ending exactly at the
+    // one-page memory boundary. Zero count also accepts the one-past-end pointer.
+    for(::std::size_t count{}; count <= args.size(); ++count)
+    {
+        env.argv.clear();
+        for(::std::size_t i{}; i != count; ++i) { env.argv.push_back(args.index_unchecked(i)); }
+        for(unsigned layout{}; layout != 2u; ++layout)
+        {
+            auto const table{static_cast<wasi_void_ptr_wasm64_t>(layout == 0u ? 256uz : 65536uz - count * sizeof(wasi_void_ptr_wasm64_t))};
+            auto const guard{static_cast<wasi_void_ptr_wasm64_t>(table + count * sizeof(wasi_void_ptr_wasm64_t))};
+            if(layout == 0u)
+            { ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64<wasi_void_ptr_wasm64_t>(memory, guard, vector_canary); }
+            ::std::size_t string_bytes{};
+            for(auto const item: env.argv) { string_bytes += item.size() + 1uz; }
+            auto const tail{static_cast<wasi_void_ptr_wasm64_t>(argv_buf_ptr + string_bytes)};
+            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64<unsigned char>(memory, tail, 0xa5u);
+            if(::uwvm2::imported::wasi::wasip1::func::args_get_wasm64(env, table, argv_buf_ptr) != errno_wasm64_t::esuccess)
+            { ::fast_io::fast_terminate(); }
+            if(layout == 0u && ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<wasi_void_ptr_wasm64_t>(memory, guard) != vector_canary)
+            { ::fast_io::fast_terminate(); }
+            auto cursor{argv_buf_ptr};
+            for(::std::size_t i{}; i != count; ++i)
+            {
+                auto const actual{::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<wasi_void_ptr_wasm64_t>(
+                    memory, static_cast<wasi_void_ptr_wasm64_t>(table + i * sizeof(wasi_void_ptr_wasm64_t)))};
+                if(actual != cursor) { ::fast_io::fast_terminate(); }
+                auto const expected{args.index_unchecked(i)};
+                for(::std::size_t byte{}; byte != expected.size(); ++byte)
+                {
+                    if(::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<unsigned char>(
+                        memory, static_cast<wasi_void_ptr_wasm64_t>(actual + byte)) != static_cast<unsigned char>(expected.data()[byte]))
+                    { ::fast_io::fast_terminate(); }
+                }
+                cursor = static_cast<wasi_void_ptr_wasm64_t>(actual + expected.size());
+                if(::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<unsigned char>(memory, cursor) != 0u)
+                { ::fast_io::fast_terminate(); }
+                ++cursor;
+            }
+            if(::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<unsigned char>(memory, tail) != 0xa5u)
+            { ::fast_io::fast_terminate(); }
+        }
+    }
+    ::fast_io::io::println(::fast_io::u8out(), u8"args_get_wasm64 exact-count vector contract: PASS");
+
 }
 
 #else

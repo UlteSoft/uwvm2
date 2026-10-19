@@ -1,0 +1,201 @@
+--- a/org/teavm/backend/wasm/runtime/WasiSupport.java
++++ b/org/teavm/backend/wasm/runtime/WasiSupport.java
+@@ -17,6 +17,11 @@
+ 
+ import static org.teavm.backend.wasm.wasi.Wasi.ERRNO_SUCCESS;
+ import java.nio.charset.StandardCharsets;
++import java.util.AbstractMap;
++import java.util.Collections;
++import java.util.HashMap;
++import java.util.Map;
++import java.util.Set;
+ import org.teavm.backend.wasm.runtime.math.WasmPow;
+ import org.teavm.backend.wasm.wasi.IOVec;
+ import org.teavm.backend.wasm.wasi.IntResult;
+@@ -24,12 +29,14 @@
+ import org.teavm.backend.wasm.wasi.SizeResult;
+ import org.teavm.backend.wasm.wasi.Wasi;
+ import org.teavm.interop.Address;
++import org.teavm.interop.Import;
+ import org.teavm.interop.Structure;
+ import org.teavm.interop.Unmanaged;
+ 
+ public class WasiSupport {
+     private static long nextRandom;
+     private static boolean randomInitialized;
++    private static Map<String, String> environment;
+ 
+     private WasiSupport() {
+     }
+@@ -101,6 +108,131 @@
+         printString("Out of memory");
+     }
+ 
++    public static String getenv(String name) {
++        if (name == null) {
++            throw new NullPointerException("environment variable name");
++        }
++        return getenv().get(name);
++    }
++
++    public static Map<String, String> getenv() {
++        if (environment == null) {
++            environment = loadEnvironment();
++        }
++        return environment;
++    }
++
++    private static Map<String, String> loadEnvironment() {
++        Address scratch = WasiBuffer.getBuffer();
++        IntResult countResult = scratch.toStructure();
++        IntResult sizeResult = Address.align(scratch.add(Structure.sizeOf(IntResult.class)), 16).toStructure();
++        if (environmentSizesGet(countResult, sizeResult) != ERRNO_SUCCESS) {
++            throw new IllegalStateException("environ_sizes_get failed");
++        }
++        int count = countResult.value;
++        int size = sizeResult.value;
++        if (count < 0 || size < 0) {
++            throw new IllegalStateException("environment exceeds Java array sizes");
++        }
++        // WASI provides exactly count pointers, not an extra NULL pointer slot.
++        int[] offsets = new int[count];
++        byte[] bytes = new byte[size];
++        if (environmentGet(Address.ofData(offsets), Address.ofData(bytes)) != ERRNO_SUCCESS) {
++            throw new IllegalStateException("environ_get failed");
++        }
++        Map<String, String> result = new HashMap<>();
++        for (int i = 0; i < count; ++i) {
++            int base = Address.ofData(bytes).toInt();
++            int offset = offsets[i] - base;
++            if (offset < 0 || offset >= size) {
++                throw new IllegalStateException("invalid environment entry offset");
++            }
++            int end = offset;
++            while (end < size && bytes[end] != 0) {
++                ++end;
++            }
++            if (end == size) {
++                throw new IllegalStateException("unterminated environment entry");
++            }
++            String entry = new String(bytes, offset, end - offset, StandardCharsets.UTF_8);
++            int equals = entry.indexOf('=');
++            if (equals > 0) {
++                result.put(entry.substring(0, equals), entry.substring(equals + 1));
++            }
++        }
++        return new EnvironmentMap(result);
++    }
++
++    private static class EnvironmentMap extends AbstractMap<String, String> {
++        private final Map<String, String> values;
++        private final Set<Map.Entry<String, String>> entries;
++
++        EnvironmentMap(Map<String, String> values) {
++            this.values = values;
++            this.entries = Collections.unmodifiableMap(values).entrySet();
++        }
++
++        @Override
++        public Set<Map.Entry<String, String>> entrySet() {
++            return entries;
++        }
++
++        @Override
++        public String put(String key, String value) {
++            throw new UnsupportedOperationException();
++        }
++
++        @Override
++        public void putAll(Map<? extends String, ? extends String> map) {
++            throw new UnsupportedOperationException();
++        }
++
++        @Override
++        public String remove(Object key) {
++            throw new UnsupportedOperationException();
++        }
++
++        @Override
++        public void clear() {
++            throw new UnsupportedOperationException();
++        }
++
++        private static void checkQuery(Object value) {
++            if (value == null) {
++                throw new NullPointerException("environment query");
++            }
++            if (!(value instanceof String)) {
++                throw new ClassCastException("environment query requires String");
++            }
++        }
++
++        @Override
++        public String get(Object name) {
++            checkQuery(name);
++            return values.get(name);
++        }
++
++        @Override
++        public boolean containsKey(Object name) {
++            checkQuery(name);
++            return values.containsKey(name);
++        }
++
++        @Override
++        public boolean containsValue(Object value) {
++            checkQuery(value);
++            return values.containsValue(value);
++        }
++    }
++
++    @Unmanaged
++    @Import(module = "wasi_snapshot_preview1", name = "environ_sizes_get")
++    private static native short environmentSizesGet(IntResult count, IntResult size);
++
++    @Unmanaged
++    @Import(module = "wasi_snapshot_preview1", name = "environ_get")
++    private static native short environmentGet(Address entries, Address buffer);
++
+     public static String[] getArgs() {
+         Address buffer = WasiBuffer.getBuffer();
+         IntResult sizesReceiver = buffer.toStructure();
+--- a/org/teavm/backend/wasm/transformation/WasiSupportClassTransformer.java
++++ b/org/teavm/backend/wasm/transformation/WasiSupportClassTransformer.java
+@@ -33,9 +33,37 @@
+ public class WasiSupportClassTransformer implements ClassHolderTransformer {
+     @Override
+     public void transformClass(ClassHolder cls, ClassHolderTransformerContext context) {
++        if (cls.getName().equals("java.lang.System")
++                || cls.getName().equals("org.teavm.classlib.java.lang.TSystem")) {
++            replaceEnvironmentMethod(cls, context.getHierarchy(),
++                    new org.teavm.model.MethodDescriptor("getenv", ValueType.object("java.lang.String"),
++                            ValueType.object("java.lang.String")));
++            replaceEnvironmentMethod(cls, context.getHierarchy(),
++                    new org.teavm.model.MethodDescriptor("getenv", ValueType.object("java.util.Map")));
++        }
+         if (cls.getName().equals(WasmSupport.class.getName())) {
+             transformWasm(cls, context.getHierarchy());
+         }
++    }
++
++    private void replaceEnvironmentMethod(ClassHolder cls, ClassHierarchy hierarchy,
++            org.teavm.model.MethodDescriptor descriptor) {
++        MethodHolder method = cls.getMethod(descriptor);
++        if (method == null) {
++            method = new MethodHolder(descriptor);
++            method.setLevel(org.teavm.model.AccessLevel.PUBLIC);
++            method.getModifiers().add(ElementModifier.STATIC);
++            cls.addMethod(method);
++        }
++        method.getModifiers().remove(ElementModifier.NATIVE);
++        method.getAnnotations().remove(Import.class.getName());
++        MethodReader source = hierarchy.getClassSource().get(WasiSupport.class.getName()).getMethod(descriptor);
++        ProgramEmitter pe = ProgramEmitter.create(method, hierarchy);
++        ValueEmitter[] arguments = new ValueEmitter[method.parameterCount()];
++        for (int i = 0; i < arguments.length; ++i) {
++            arguments[i] = pe.var(i + 1, method.parameterType(i));
++        }
++        pe.invoke(source.getReference(), arguments).returnValue();
+     }
+ 
+     private void transformWasm(ClassHolder cls, ClassHierarchy classHierarchy) {

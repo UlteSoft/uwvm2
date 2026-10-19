@@ -1,0 +1,42 @@
+[
+  {
+    "name": "java-teavm-perf-profile-2000000000",
+    "language": "java",
+    "target": "teavm-wasi",
+    "mode": "release",
+    "purpose": "hardware-gated",
+    "rounds": 2000000000,
+    "iterations": 2000000000,
+    "expected_checksum": 2861092023649889434,
+    "clock_kind": "monotonic-ns",
+    "wasm": "/home/macromodel/Documents/uwvm-hll-20261017/java/target/perf-profile-gated/java-perf-profile.wasm",
+    "wasm_sha256": "390f6195be3fc3443b7daa76f9568124b1583fc381881f7ae2ce38962e688933",
+    "args": [
+      "2000000000"
+    ],
+    "checks": [
+      "java perf timed: iterations=2000000000",
+      "checksum=2861092023649889434"
+    ],
+    "kernel_time": "ns",
+    "kernel_clock": "monotonic",
+    "clock_line_prefix": "Kernel ns: ",
+    "checksum_line": "checksum=2861092023649889434",
+    "generated_source": "/home/macromodel/Documents/uwvm-hll-20261017/java/src/main/java/uwvm/hll/PerfProfile.java",
+    "generated_source_sha256": "5eebe5d0e2efc91e626d437f28791c1394a502cea74ed96dffe14c8b6eca0bbd",
+    "oracle": "/home/macromodel/Documents/uwvm-hll-20261017/java/perf-profile-gated-build-v1/receipt.json",
+    "compiler_jar_sha256": "04f3dc950c662aa6fc1318c458a1791b2c09911f234fa9711cb2ffdd76c6ff82",
+    "classlib_jar_sha256": "a250f7baf877767af72634cd3f19d30f2a6b8a3fb16bd3931b99fde1b17cd12d",
+    "toolchain_receipt": "/home/macromodel/Documents/uwvm-hll-20261017/java/dwarf-clock-stdin-toolchain-v3/receipt.json",
+    "toolchain_receipt_sha256": "ab1af498679ec511283e11001c3e543c4392e346526602866f92bdede3ea57c8",
+    "gate_stream": "stderr",
+    "gate_ready": "UWVM_PROFILE_READY",
+    "gate_done": "UWVM_PROFILE_DONE",
+    "gate_release": "G",
+    "gate_finish": "D",
+    "gate_ready_timeout": 900,
+    "kernel_timeout": 28,
+    "warmup_iterations": 65536,
+    "warmup_runs": 2
+  }
+]

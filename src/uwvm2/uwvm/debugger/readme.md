@@ -20,7 +20,7 @@ fail closed before resuming the guest.
 `controller::create` requires an explicit, qualified host launch
 grant; it opens no endpoint. The runtime must be configured with its domain and
 owning observer before publication, using instruction safe-point granularity.
-`-m debug-jit` calls `arm_initial_pause` after `prepare_debug_host_api` and before
+`-m debug` calls `arm_initial_pause` after `prepare_debug_host_api` and before
 starting its guest worker. This prepared state has no fabricated PC or stack.
 
 Launch with `uwvm -Rdbg --run app.wasm` (`--runtime-debug` is the long

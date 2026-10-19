@@ -51,6 +51,11 @@
 # include <uwvm2/uwvm/wasm/impl.h>
 # include <uwvm2/uwvm/imported/wasi/wasip1/impl.h>
 # include <uwvm2/uwvm/runtime/storage/builtin_wasip1_loader.h>
+# include <uwvm2/runtime/lib/uwvm_runtime_threaded_profile_api.h>
+# if UWVM2_HAS_THREADED_PROFILE_HOST_API
+#  include <uwvm2/uwvm/runtime/storage/threaded_builtin_loader.h>
+#  include <uwvm2/uwvm/imported/wasi/threads/local_imported.h>
+# endif
 # include "retval.h"
 # include "weak_symbol.h"
 #endif
@@ -196,6 +201,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
     inline constexpr int load_local_modules() noexcept
     {
+#if UWVM2_HAS_THREADED_PROFILE_HOST_API
+        // An atomic host policy snapshot chooses namespace construction only.
+        // Actual Group/ChildLease/source checks still decide every spawn.
+        bool const threaded_requested{::uwvm2::runtime::lib::runtime_threaded_profile_builtin_requested_host_api()};
+        if(threaded_requested && !::uwvm2::uwvm::runtime::full::threaded_builtin_loader::append(
+            ::uwvm2::uwvm::imported::wasi::threads::local_imported_module))
+        { return static_cast<int>(::uwvm2::uwvm::run::retval::load_local_modules_error); }
+#endif
         // preload abi
 
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1

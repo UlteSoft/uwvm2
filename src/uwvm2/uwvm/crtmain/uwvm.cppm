@@ -28,8 +28,13 @@ module;
 #include <cstddef>
 #include <limits>
 #include <utility>
+#include <cerrno>
+#if defined(__linux__)
+# include <sys/prctl.h>
+#endif
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/runtime/macro/push_macros.h>
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 
 export module uwvm2.uwvm.crtmain:uwvm;
@@ -41,6 +46,7 @@ import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.cmdline;
 import uwvm2.uwvm.run;
+import uwvm2.uwvm.runtime.runtime_mode;
 import uwvm2.uwvm.crtmain.global;
 // callback
 import uwvm2.uwvm.cmdline.callback;

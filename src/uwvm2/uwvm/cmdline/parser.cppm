@@ -21,6 +21,8 @@
  ****************************************/
 
 module;
+#include <string_view>
+#include <uwvm2/utils/security/wsea.h>
 
 // std
 #include <cstdint>

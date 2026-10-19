@@ -88,6 +88,22 @@ extern "C++"
                 body - base < size && expression - base < size && end - base <= size;
         }
 
+        // Source membership precedes file access. Repeat this check at code
+        // handoff so a policy/evidence change cannot publish a stale receipt.
+        [[nodiscard]] bool security_allows_original_code() const noexcept
+        {
+            if(!owner_.matches_unpublished_file()) { return false; }
+            auto const& file{*owner_.file()};
+            auto const selected{file.requires_verified_execution_authorization() ||
+                ::uwvm2::utils::security::wsea::module_selected(::std::string_view{
+                    reinterpret_cast<char const*>(file.file_name.cbegin()), file.file_name.size()})};
+            if(!selected) { return true; }
+            if(!file.has_verified_execution_authorization()) { return false; }
+            for(auto generation : generations_) { if(generation != 1u) { return false; } }
+            for(auto const& body : effective_bodies_) { if(body) { return false; } }
+            return true;
+        }
+
         [[nodiscard]] static preparation_result prepare(module_owner const& actual_owner,
             ::std::size_t actual_module_id, profile_owner actual_profile,
             ::std::vector<effective_function_body> const& effective,
@@ -105,6 +121,21 @@ extern "C++"
                 (granularity != compile::llvm_jit_debug_safe_point_granularity::entry_loop &&
                  granularity != compile::llvm_jit_debug_safe_point_granularity::instruction))
             { return {}; }
+            auto const& verified_file{*actual_owner.file()};
+            auto const secure_source{verified_file.requires_verified_execution_authorization() ||
+                ::uwvm2::utils::security::wsea::module_selected(::std::string_view{
+                    reinterpret_cast<char const*>(verified_file.file_name.cbegin()), verified_file.file_name.size()})};
+            if(secure_source && !verified_file.has_verified_execution_authorization()) { return {}; }
+            if(secure_source)
+            {
+                for(auto const& body : effective)
+                {
+                    // A base module signature does not authenticate a saved
+                    // hot-replacement body from an earlier insecure checkpoint.
+                    if(body.generation != 1u || !body.body.empty())
+                    { return {{}, preparation_status::invalid_body}; }
+                }
+            }
             if(stack_policy == call_stack_policy::unwind && !runtime_llvm_jit_unwind_can_replace_instruction_frames())
             { return {{}, preparation_status::unsupported_native}; }
             try
@@ -186,6 +217,7 @@ extern "C++"
                     data->locals_[index] = ::std::move(local);
                 }
 
+                if(!data->security_allows_original_code()) { return {}; }
                 if(!ensure_llvm_jit_native_target_initialized())
                 { return {{}, preparation_status::unsupported_native}; }
                 auto const cpu{get_llvm_jit_host_cpu_name_storage()};

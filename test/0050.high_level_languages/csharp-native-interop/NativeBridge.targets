@@ -1,0 +1,21 @@
+<Project>
+  <!-- Private v8.0.15 hook. NativeFileReference's automatic link item is
+       commented out upstream; register AND link the same already-built .o. -->
+  <Target Name="HllInjectNativeBridge"
+          AfterTargets="_GetNativeFilesForLinking"
+          BeforeTargets="_GenerateManagedToNative"
+          Condition="'$(RuntimeIdentifier)' == 'wasi-wasm'">
+    <Error Condition="'$(HllNativeBridgeObject)' == '' or !Exists('$(HllNativeBridgeObject)')"
+           Text="Build hll_native_bridge.o first and supply HllNativeBridgeObject." />
+    <Error Condition="'$(HllInteropEvidenceDir)' == ''"
+           Text="Supply a private HllInteropEvidenceDir." />
+    <ItemGroup>
+      <_WasmNativeFileForLinking Include="$(HllNativeBridgeObject)" ScanForPInvokes="true" />
+    </ItemGroup>
+    <MakeDir Directories="$(HllInteropEvidenceDir)" />
+    <WriteLinesToFile File="$(HllInteropEvidenceDir)/injected-native-items.txt"
+                      Lines="@(_WasmNativeFileForLinking->'%(Identity)|%(FileName)|%(ScanForPInvokes)')"
+                      Overwrite="true" />
+    <Message Importance="High" Text="HLL native bridge object=$(HllNativeBridgeObject); PInvoke module=hll_native_bridge" />
+  </Target>
+</Project>

@@ -26,18 +26,32 @@ def pair(key, value):
     value = value.encode("ascii") if isinstance(value, str) else value
     return uleb(len(key)) + key + uleb(len(value)) + value
 
+
+def component_isa():
+    return (pair("target", "component-target") + pair("cpu", "component-cpu")
+            + pair("features", "component-feature") + pair("layout", "component-layout"))
+
+def component_context(key, product):
+    # Explicit independent v7 DATA preimage. The image and seed are fixtures,
+    # not proof of the executing image, a keyring origin or Runtime admission.
+    return (pair("product", "uwvm2" if product == "uwvm2" else "uwvm2ros")
+            + pair("origin-auth", "kernel-user-keyring-hmac-sha256-ed25519-v1")
+            + pair("self-executable-sha256", bytes((0x42,)) + bytes(31))
+            + pair("key", key) + pair("llvm", "component-provider")
+            + pair("uwvm_abi", "component-abi") + pair("codegen", "component-policy"))
+
 def identity(wasm, obj, blob, product):
     assert product in ("uwvm2", "uwvm2-ros")
     fmt = "<8sIIIIQQQQQ"
     magic, version, header, compression, signature, size, payload, isa_size, ctx_size, sig_size = struct.unpack_from(fmt, blob)
     expected_magic = b"UWVMLJC\x01" if product == "uwvm2" else b"UWVMROS\x01"
-    assert magic == expected_magic and version == 5 and header == 64
+    assert magic == expected_magic and version == 7 and header == 64
     assert compression == 0 and signature == 1 and sig_size == 64 and size == len(obj)
     assert len(blob) == 64 + isa_size + ctx_size + sig_size + payload and payload == len(obj)
     key = pair("format", "uwvm-ljc-key-v1") + pair("domain", "actual-checkpoint-binding-component") + pair("wasm", "fixture-A")
-    isa = pair("target", "component-target") + pair("cpu", "component-cpu") + pair("features", "component-feature")
+    isa = component_isa()
     cache_product = "uwvm2" if product == "uwvm2" else "uwvm2ros"
-    context = pair("product", cache_product) + pair("key", key) + pair("llvm", "component-provider") + pair("uwvm_abi", "component-abi") + pair("codegen", "component-policy")
+    context = component_context(key, product)
     assert blob[64:64+isa_size] == isa
     assert blob[64+isa_size:64+isa_size+ctx_size] == context
     assert blob[-payload:] == obj
@@ -54,7 +68,7 @@ def identity(wasm, obj, blob, product):
     wire += struct.pack("<IIQQ", 1, 0, 1, 1)
     wire += struct.pack("<QQQI", 0, len(wasm), 4, 1)
     wire += digest(wasm) + label("main") + label("actual component gen1 bodies")
-    wire += struct.pack("<5QII", 0, 0, 1, len(blob), len(obj), 1, 5)
+    wire += struct.pack("<5QII", 0, 0, 1, len(blob), len(obj), 1, 7)
     for h in (digest(key), digest(isa), digest(context), digest(blob), digest(obj), label("actual component provider/emitter")):
         wire += h
     return digest(wire).hex()
@@ -62,16 +76,16 @@ def identity(wasm, obj, blob, product):
 def bundle_identity(wasm_a, wasm_b, object_a, object_b, blobs, product):
     """Independent ordered two-module / 2-partition + full object reference."""
     base_key = pair("format", "uwvm-ljc-key-v1") + pair("domain", "actual-checkpoint-binding-component") + pair("wasm", "fixture-A")
-    isa = pair("target", "component-target") + pair("cpu", "component-cpu") + pair("features", "component-feature")
+    isa = component_isa()
     keys = [base_key + pair("module-ordinal", "0") + pair("partition-count", "2") + pair("partition-ordinal", str(i)) for i in range(2)]
     keys.append(base_key + pair("module-ordinal", "1"))
     cache_product = "uwvm2" if product == "uwvm2" else "uwvm2ros"
-    contexts = [pair("product", cache_product) + pair("key", key) + pair("llvm", "component-provider") + pair("uwvm_abi", "component-abi") + pair("codegen", "component-policy") for key in keys]
+    contexts = [component_context(key, product) for key in keys]
     payloads = [object_a, object_b, object_b]
     for blob, context, payload in zip(blobs, contexts, payloads):
         magic, version, header, compression, signature, size, encoded_payload, isa_size, context_size, signature_size = struct.unpack_from("<8sIIIIQQQQQ", blob)
         assert magic == (b"UWVMLJC\x01" if product == "uwvm2" else b"UWVMROS\x01")
-        assert (version, header, compression, signature, signature_size) == (5, 64, 0, 1, 64)
+        assert (version, header, compression, signature, signature_size) == (7, 64, 0, 1, 64)
         assert size == encoded_payload == len(payload)
         assert len(blob) == 64 + isa_size + context_size + signature_size + encoded_payload
         assert blob[64:64 + isa_size] == isa
@@ -93,7 +107,7 @@ def bundle_identity(wasm_a, wasm_b, object_a, object_b, blobs, product):
         wire += digest(wasm) + label(name) + label(generation)
     for i, (blob, payload, key, context) in enumerate(zip(blobs, payloads, keys, contexts)):
         module, partition, count, role = (0, i, 2, 2) if i < 2 else (1, 0, 1, 1)
-        wire += struct.pack("<5QII", module, partition, count, len(blob), len(payload), role, 5)
+        wire += struct.pack("<5QII", module, partition, count, len(blob), len(payload), role, 7)
         for h in (digest(key), digest(isa), digest(context), digest(blob), digest(payload), label("actual component provider/emitter")):
             wire += h
     return digest(wire).hex()
@@ -110,7 +124,7 @@ def main():
     actual = pathlib.Path(sys.argv[11]).read_text().strip()
     assert "digest=" + expected in actual and "bundle_digest=" + expected_bundle in actual, (expected, expected_bundle, actual)
     assert "negatives=45" in actual and "complete_modules=2 complete_objects=3" in actual
-    assert "canonical_data_only=1 loaded_build_cache_issuer=0 whole_restore=0" in actual
+    assert "canonical_data_only=1 fixture_codec_only=1 origin_authenticated=0 legacy_cache_versions_rejected=2 loaded_build_cache_issuer=0 whole_restore=0" in actual
     print("CHECKPOINT_BINDING_ORACLE PASS", product, expected, expected_bundle, "DATA-only; no VM qualification")
 
 if __name__ == "__main__":

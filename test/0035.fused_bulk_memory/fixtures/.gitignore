@@ -1,0 +1,6 @@
+# Raw malformed WebAssembly fixtures are source test inputs.
+!/bulk_copy_bad_destination.wasm
+!/bulk_copy_bad_source.wasm
+!/bulk_copy_missing_source.wasm
+!/bulk_fill_missing_memidx.wasm
+!/bulk_fill_u32_overflow.wasm

@@ -46,6 +46,10 @@
 #endif
 #endif
 
+#ifndef UWVM_MODULE
+# include <uwvm2/uwvm/runtime/initializer/threaded_allocation.h>
+#endif
+
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
@@ -61,7 +65,7 @@ namespace uwvm2::runtime::lib
 // remains attached to the global module by its existing C++ linkage block;
 // full_source_instance remains attached to this storage module. Exporting only
 // these incomplete names neither defines a constructor nor grants native setup.
-UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer { extern "C++" { class restoration_context; } }
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer { extern "C++" { class restoration_context; class ThreadedChildWorld; } }
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full { class full_source_instance; }
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
@@ -279,6 +283,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         friend class ::uwvm2::runtime::lib::runtime_checkpoint_gc_state_borrow;
         friend class checkpoint_gc_staging;
         friend class ::uwvm2::uwvm::runtime::initializer::restoration_context;
+        friend class ::uwvm2::uwvm::runtime::initializer::ThreadedChildWorld;
+#ifndef UWVM_MODULE
+        template<typename> friend class ::uwvm2::uwvm::runtime::initializer::threaded_std_allocator;
+#endif
         friend class managed_numeric_entry_page;
 #if defined(UWVM_EXPERIMENTAL_SEALED_COMPACT_CURSOR) && UWVM_EXPERIMENTAL_SEALED_COMPACT_CURSOR == 1
         friend class sealed_compact_entry;
@@ -511,6 +519,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
             ::std::byte* original_array_slot{};
         };
 
+        // Use the standard-layout tail view in this offset reference. Its size
+        // and alignment versus the former unique_ptr carrier are checked above;
+        // offsetof on unique_ptr itself is not a portable layout contract.
         struct object_layout_before_sweep
         {
             gc_object_store const* owner{};
@@ -520,7 +531,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
             object* next{};
             object* hash_next{};
             ::std::atomic_flag mutation_lock = ATOMIC_FLAG_INIT;
-            ::std::unique_ptr<gc_object_value[]> values{};
+            object_values_view values{};
             ::std::size_t length{};
             ::std::uint_least32_t type_index{};
             gc_type::composite_kind kind{};
@@ -530,6 +541,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
             // module may unload before an exported object holding its values.
             gc_lease_owner value_leases{};
         };
+
+        static_assert(::std::is_standard_layout_v<object_layout_before_sweep>);
 
         // Keep the exact object size, alignment and every existing field offset
         // on each target. If the mark byte cannot fit into existing padding,
@@ -940,6 +953,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // Cold staging-only source lineage. Ordinary constructors leave this empty;
         // no local/foreign object access or allocator hot field gains a new load.
         ::std::weak_ptr<::uwvm2::uwvm::runtime::full::full_source_instance const> checkpoint_source_binding_{};
+        // Child-only callback lineage; ordinary guest accesses never inspect it.
+        ::std::weak_ptr<::uwvm2::uwvm::runtime::initializer::ThreadedChildWorld const> threaded_world_binding_{};
 
         struct slab_guard
         {
@@ -2981,6 +2996,53 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
             }
 #endif
         }
+#ifndef UWVM_MODULE
+        // A new arena/lease/callback with a bounded, privately copied immutable
+        // FUNCTION-ONLY schema. No aggregate bucket, canonical-registry insertion
+        // or nested field allocation can happen on this construction path.
+        struct threaded_function_schema_tag {};
+        explicit gc_object_store(gc_object_store const& source,
+            ::std::shared_ptr<gc_lease_owner> const& leases,
+            gc_function_type_match_callback callback,
+            threaded_function_schema_tag,
+            ::uwvm2::uwvm::runtime::initializer::threaded_allocation_account& account) noexcept
+            : lease_owner_{leases}, function_type_match_{callback}
+        {
+            if(!source.valid_) { return; }
+            auto const count{source.layout_count_};
+            if(count != 0uz && (!source.layouts_ || !source.canonical_ids_)) { return; }
+            if(count > ((::std::numeric_limits<::std::size_t>::max)() - 64uz) / sizeof(type_layout) ||
+                count > ((::std::numeric_limits<::std::size_t>::max)() - 64uz) / sizeof(::std::size_t)) { return; }
+            for(::std::size_t i{}; i != count; ++i)
+            {
+                auto const& layout{source.layouts_[i]};
+                if(layout.kind != gc_type::composite_kind::function || layout.field_count != 0uz ||
+                    layout.fields || layout.has_reference_fields || layout.has_packed_fields ||
+                    layout.has_nonnullable_reference_fields) { return; }
+            }
+            if(count != 0uz)
+            {
+                using request = ::uwvm2::uwvm::runtime::initializer::threaded_nothrow_array;
+                layouts_.reset(new(request{::std::addressof(account)}) type_layout[count]{});
+                if(!layouts_) { return; }
+                canonical_ids_.reset(new(request{::std::addressof(account)}) ::std::size_t[count]{});
+                if(!canonical_ids_) { return; }
+                for(::std::size_t i{}; i != count; ++i)
+                {
+                    layouts_[i].kind = gc_type::composite_kind::function;
+                    layouts_[i].parent = source.layouts_[i].parent;
+                    canonical_ids_[i] = source.canonical_ids_[i];
+#if defined(UWVM_EXPERIMENTAL_PRECISE_GC_TRACE_METADATA) && UWVM_EXPERIMENTAL_PRECISE_GC_TRACE_METADATA == 1
+                    // Function schema has zero fields, so build performs no allocation.
+                    if(layouts_[i].trace.build(gc_type::composite_kind::function, nullptr, 0uz) != gc_trace_metadata_status::ok) { return; }
+#endif
+                }
+            }
+            layout_count_ = count;
+            valid_ = true;
+            register_cohort_member(); // intrusive links only; no allocation.
+        }
+#endif
     public:
         explicit gc_object_store(gc_type::recursive_type_section const& section,
             ::std::shared_ptr<gc_lease_owner> const& lease_owner = {},

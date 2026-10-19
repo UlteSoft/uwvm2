@@ -4,6 +4,7 @@
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
 #pragma once
+#include "language_debug_features.h"
 #ifndef UWVM_MODULE
 # include "source_dwarf_expression.h"
 # include <bit>
@@ -44,6 +45,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_scalar_expression
     // callbacks while refusing ambiguous unclassified eight-bit carriers.
     enum class value_category { unspecified, integer, boolean };
     enum class language_semantics { shared_numeric, c, cpp, c23, rust, go, zig };
+    inline constexpr bool language_enabled(language_semantics language) noexcept
+    {
+        switch(language)
+        {
+            case language_semantics::shared_numeric: return true;
+            case language_semantics::c: case language_semantics::c23: return UWVM_DEBUG_LANGUAGE_C;
+            case language_semantics::cpp: return UWVM_DEBUG_LANGUAGE_CPP;
+            case language_semantics::rust: return UWVM_DEBUG_LANGUAGE_RUST;
+            case language_semantics::go: return UWVM_DEBUG_LANGUAGE_GO_FAMILY;
+            case language_semantics::zig: return UWVM_DEBUG_LANGUAGE_ZIG;
+        }
+        return false;
+    }
     struct program
     {
         ::std::vector<node> nodes{}; ::std::size_t root{};
@@ -55,7 +69,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_scalar_expression
     inline constexpr language_semantics language_from_dwarf(::std::uint64_t language, bool tinygo, bool zig = false) noexcept
     {
         if(tinygo && zig) { return language_semantics::shared_numeric; }
-        if(tinygo) { return language_semantics::go; }
+        if(tinygo) { return UWVM_DEBUG_LANGUAGE_TINYGO ? language_semantics::go : language_semantics::shared_numeric; }
         if(zig) { return language == 0x0cu ? language_semantics::zig : language_semantics::shared_numeric; }
         switch(language)
         {
@@ -1922,6 +1936,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_scalar_expression
     }
     inline error parse(::std::string_view text, program& out, language_semantics language = language_semantics::shared_numeric) noexcept
     {
+        if(!language_enabled(language)) { out = {}; return error::unsupported; }
         out = {}; if(text.empty()) { return error::malformed; } if(text.size() > 4096u) { return error::limit_exceeded; }
 #if defined(__cpp_exceptions) || defined(_CPPUNWIND)
         try {
@@ -1940,12 +1955,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_scalar_expression
     {
         auto const status{parse(text,out,language_semantics::cpp)};
         if(status == error::none || status == error::limit_exceeded || status == error::allocation_failure) { return status; }
-        return parse(text,out,language_semantics::rust);
+        auto const rust_status{parse(text,out,language_semantics::rust)};
+        if(rust_status == error::none || rust_status == error::limit_exceeded || rust_status == error::allocation_failure) { return rust_status; }
+        return parse(text,out,language_semantics::shared_numeric);
     }
     template<typename Resolver, typename TypeResolver = details::no_type_resolver>
     inline error evaluate(program const& code, Resolver&& resolve, integer& out, unsigned guest_address_bits = 32u,
         TypeResolver&& resolve_type = {}, language_semantics language = language_semantics::shared_numeric) noexcept
     {
+        if(!language_enabled(language)) { out = {}; return error::unsupported; }
         out = {}; if(code.nodes.empty() || code.nodes.size() > 128u) { return error::limit_exceeded; }
 #if defined(__cpp_exceptions) || defined(_CPPUNWIND)
         try {

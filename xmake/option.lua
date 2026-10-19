@@ -314,14 +314,70 @@ option("llvm-jit-env", function()
     end)
 end)
 
+option("enable-wsea", function()
+    set_default(true)
+    set_showmenu(true)
+    set_description("Build the opt-in --secure per-module offline verifier (OpenSSL 3, supported POSIX hosts). Disabling this makes --secure module fail closed.")
+end)
+
+option("openssl-provider", function()
+    set_default("bundled")
+    set_values("bundled", "package")
+    set_showmenu(true)
+    set_description("OpenSSL dependency provider: complete pinned bundled 3.5.9 source (default), or explicit xmake package >=3.0. openssl-root overrides this option.")
+end)
+
 option("openssl-root", function()
     set_default("default")
     set_showmenu(true)
     set_description(
-        "Use a prebuilt OpenSSL root instead of the xmake openssl package.",
-        [[    default: use xmake package resolution.]],
-        [[    path: use headers from path/include and libraries from path or path/lib.]]
+        "Use an explicit prebuilt OpenSSL >=3 root, overriding bundled/package selection.",
+        [[    default: use openssl-provider (bundled by default).]],
+        [[    path: use target headers from path/include and libraries from path or path/lib. Cross builds require target libraries.]]
     )
+end)
+
+option("openssl-provider-receipt", function()
+    set_default("none")
+    set_showmenu(true)
+    set_description("Pinned target SDK/runtime JSON receipt; its SHA256 and runtime hashes participate in bundled OpenSSL reuse identity.")
+end)
+
+option("openssl-build-jobs", function()
+    set_default("1")
+    set_showmenu(true)
+    set_description("Maximum parallel make jobs for the bundled OpenSSL dependency (default 1).")
+end)
+
+option("openssl-configure-target", function()
+    set_default("auto")
+    set_showmenu(true)
+    set_description("OpenSSL Configure target (auto maps platform/arch; target compiler ELF/ABI is independently verified).")
+end)
+
+option("openssl-cflags", function()
+    set_default("")
+    set_showmenu(true)
+    set_description("Extra target C/ABI flags for bundled OpenSSL; native and cross outputs remain isolated.")
+end)
+
+option("openssl-ldflags", function()
+    set_default("")
+    set_showmenu(true)
+    set_description("Extra target linker flags for bundled OpenSSL; never adds host OpenSSL search paths.")
+end)
+
+option("openssl-float-abi", function()
+    set_default("auto")
+    set_values("auto", "soft", "hard")
+    set_showmenu(true)
+    set_description("ARM bundled OpenSSL PCS: auto expects arm=soft, armhf/armeb=hard; override explicitly for a distinct ARM BE soft profile.")
+end)
+
+option("openssl-no-asm", function()
+    set_default(false)
+    set_showmenu(true)
+    set_description("Explicit portable no-asm OpenSSL build, intended for target bring-up/debugging; cryptographic algorithms remain enabled.")
 end)
 
 option("enable-uwvm-int-combine-ops", function()

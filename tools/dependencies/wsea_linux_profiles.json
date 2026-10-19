@@ -1,0 +1,16 @@
+{
+  "schema": "uwvm-wsea-linux-target-profiles-v1",
+  "qualification": "Profiles are intended inputs, not execution results. Every final ELF and actual target identity must be checked.",
+  "targets": {
+    "x86_64": {"triple": "x86_64-linux-gnu", "qemu": "x86_64", "machine": 62, "bits": 64, "endian": "little", "flags": []},
+    "i686": {"triple": "i686-linux-gnu", "qemu": "i386", "machine": 3, "bits": 32, "endian": "little", "flags": ["-msse2"]},
+    "aarch64": {"triple": "aarch64-linux-gnu", "qemu": "aarch64", "machine": 183, "bits": 64, "endian": "little", "flags": []},
+    "arm": {"triple": "arm-linux-gnueabi", "qemu": "arm", "machine": 40, "bits": 32, "endian": "little", "float_abi": "soft", "flags": ["-mcpu=arm926ej-s", "-mfloat-abi=soft"]},
+    "armhf": {"triple": "arm-linux-gnueabihf", "qemu": "arm", "machine": 40, "bits": 32, "endian": "little", "float_abi": "hard", "flags": ["-mcpu=cortex-a15", "-mfpu=neon-vfpv4", "-mfloat-abi=hard"]},
+    "armeb": {"triple": "armeb-linux-gnueabihf", "qemu": "armeb", "machine": 40, "bits": 32, "endian": "big", "float_abi": "hard", "flags": ["-mcpu=cortex-a15", "-mfpu=neon-vfpv4", "-mfloat-abi=hard", "-mbig-endian"]},
+    "aarch64_be": {"triple": "aarch64_be-linux-gnu", "qemu": "aarch64_be", "machine": 183, "bits": 64, "endian": "big", "flags": ["-mbig-endian"]},
+    "ppc64": {"triple": "powerpc64-linux-gnu", "qemu": "ppc64", "machine": 21, "bits": 64, "endian": "big", "abi": "ELFv1", "flags": ["-mcpu=power8", "-mabi=elfv1"]},
+    "mips64": {"triple": "mips64-linux-gnuabi64", "qemu": "mips64", "machine": 8, "bits": 64, "endian": "big", "abi": "n64", "flags": ["-march=mips64r2", "-mabi=64"]},
+    "loongarch64": {"triple": "loongarch64-linux-gnu", "qemu": "loongarch64", "machine": 258, "bits": 64, "endian": "little", "abi": "LP64D", "flags": ["-march=la464", "-mabi=lp64d"]}
+  }
+}

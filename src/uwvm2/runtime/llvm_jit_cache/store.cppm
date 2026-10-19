@@ -34,8 +34,10 @@ module;
 #include <deque>
 #include <limits>
 #include <memory>
+#include "runtime_origin.h"
 #include <mutex>
 #include <thread>
+#include <string_view>
 #include <uwvm2/runtime/lib/uwvm_runtime_posix_abi.h>
 #include <utility>
 // macro
@@ -58,6 +60,7 @@ import uwvm2.utils.thread;
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
 import :format;
+import :self_executable;
 import :compress;
 
 #ifndef UWVM_MODULE

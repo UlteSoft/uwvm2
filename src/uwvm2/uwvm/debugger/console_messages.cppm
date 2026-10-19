@@ -5,12 +5,14 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string_view>
 export module uwvm2.uwvm.debugger:console_messages;
 import fast_io;
 import uwvm2.utils.control;
 import :command;
 import :controller;
+import :source_dwarf_objects;
 import :console_help;
 import :console_tui;
 import :console_aliases;

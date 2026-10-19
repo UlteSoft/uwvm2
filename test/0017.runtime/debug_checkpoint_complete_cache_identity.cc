@@ -49,9 +49,9 @@ static cache::cache_context context(containers::u8string const& tuple)
 }
 int main()
 {
-    // The on-disk cache format stays5. Actual native resume ABI2 and state
-    // schema6 change canonical context/path material, isolating old keys.
-    static_assert(cache::cache_format_version == 5u);
+    // Explicit v7 cache dependency; this fixture remains metadata/key DATA.
+    // State schema6 and native resume ABI2 remain independent compatibility inputs.
+    static_assert(cache::cache_format_version == 7u);
     auto const profile{cp::compilation_profile::create_for_trusted_manager()};
     require(bool(profile), "actual profile factory");
     auto const tuple{profile->cache_identity()};

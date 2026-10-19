@@ -60,7 +60,7 @@ static void unit()
     check(help::format("i lo") == help::format("info locals"), "scoped command prefix help");
     check(help::format("thread step-ov") == help::format("next"), "LLDB command prefix help");
     check(help::format("wasm set memo") == help::format("wasm set memory"), "hierarchical category prefix help");
-    check(help::format("language v pr full 2", false, 80u, 4u) == help::format("print full 2", false, 80u, 4u), "prefix help retains full/page suffixes");
+    check(help::format("language v pri full 2", false, 80u, 4u) == help::format("print full 2", false, 80u, 4u), "prefix help retains full/page suffixes");
     check(help::format("st") == help::format("start") && help::format("stw") == help::format("startw") &&
           help::format("sti") == help::format("starti"), "explicit launch aliases have exact help");
     auto ambiguous{help::format("sta")};

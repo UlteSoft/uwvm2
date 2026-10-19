@@ -30,6 +30,7 @@
 # include <cstdint>
 # include <cstring>
 # include <memory>
+# include <type_traits>
 # include <uwvm2/runtime/compiler/shared/strict_float.h>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
@@ -51,6 +52,8 @@
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/uwvm/runtime/runtime_mode/impl.h>
 # include "format.h"
+# include "self_executable.h"
+# include "kernel_origin.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -58,6 +61,10 @@
 #endif
 
 #include "source_provenance_policy.h"
+
+#if defined(__linux__) && (defined(__GNUC__) || defined(__clang__))
+# pragma GCC visibility push(hidden)
+#endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 {
@@ -748,7 +755,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         cache_context const& ctx) noexcept
     {
         ::fast_io::sha256_context sha{};
-        // Separate the deterministic integrity domains as well as disk paths.
+        // Public context domain separation only; mandatory kernel-origin HMAC is added at final persistent I/O.
         // This is not a secret-key boundary against a same-account attacker.
         details::seed_sha256_update_literal(sha, u8"uwvm2ros-llvm-jit-cache-ed25519-seed-v2");
 #if defined(__unix__) || defined(__APPLE__) || defined(__linux__) || defined(__linux)
@@ -757,7 +764,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         details::seed_sha256_update_literal(sha, u8"posix-user");
         details::seed_sha256_update_le(sha, static_cast<::std::uint_least64_t>(details::posix::libc_getuid()));
 #elif defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__)
-        // The Windows user name is the available per-user identity for the deterministic cache signature seed.
+        // Legacy public context data only; this implementation disables persistent I/O on Windows.
         details::seed_sha256_update_literal(sha, u8"win32-user");
 # ifndef _WIN32_WINDOWS
         details::seed_sha256_update(sha, details::win32_environment_variable(u"USERNAME"));
@@ -767,7 +774,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #else
         details::seed_sha256_update_literal(sha, u8"unknown-user");
 #endif
-        // The seed includes the same compatibility inputs as the object key so signatures cannot be replayed across contexts.
+        // This public seed covers selected compatibility inputs; the signed message binds the full header, ISA/context metadata and object payload.
         details::seed_sha256_update_literal(sha, u8"target");
         details::seed_sha256_update(sha, ctx.target_triple);
         details::seed_sha256_update_literal(sha, u8"cpu");
@@ -776,6 +783,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         details::seed_sha256_update(sha, ctx.cpu_features);
         details::seed_sha256_update_literal(sha, u8"codegen");
         details::seed_sha256_update(sha, ctx.codegen_policy);
+        details::seed_sha256_update_literal(sha, u8"self-executable-sha256");
+        sha.update(ctx.self_executable_sha256.cbegin(), ctx.self_executable_sha256.cend());
         sha.do_final();
 
         ::uwvm2::utils::container::array<::std::byte, cache_ed25519_seed_size> out{};
@@ -783,45 +792,48 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         return out;
     }
 
+    // Low-level embedders constructing their own context must also bind the
+    // genuine process executable; a public key/seed alone never authorizes I/O.
+    [[nodiscard]] inline bool bind_self_executable_identity(cache_context& ctx) noexcept
+    {
+        self_executable::digest_type digest{};
+        if(!self_executable::current_digest(digest)) { return false; }
+        for(::std::size_t i{}; i != digest.size(); ++i) { ctx.self_executable_sha256.index_unchecked(i) = digest[i]; }
+        ctx.has_self_executable_sha256 = true;
+        return true;
+    }
+
     [[nodiscard]] inline constexpr cache_policy default_cache_policy() noexcept
     {
         cache_policy policy{};
+        policy.enable = false;
+        if consteval { return policy; }
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         // Native object caching may be disabled, but an enabled cache always requires the reduced runtime's
-        // deterministic context-integrity signature. This must not be presented as a same-user secret-key boundary.
+        // mandatory origin signature. The public context seed below is not its private key.
         policy.enable = ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_cache_path_mode !=
                         ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_cache_path_mode_t::disabled;
         policy.generate_signature = true;
         policy.verify_signature = true;
 #endif
-        constexpr source_provenance_policy_inputs provenance_policy{
-#if defined(UWVM_GIT_COMMIT_ID)
-            .has_git_commit = true,
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+        // Actual explicit-bootstrap failure is a one-way process latch. A later
+        // cache-path mode cannot erase it; it is not a Source authorization.
+        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_cache_seal_process_failed)
+        { policy.enable = false; policy.disabled_reason = cache_disable_reason::process_not_sealed; }
 #endif
-#if defined(UWVM2_BUILD_SOURCE_ID)
-            .has_verified_build_source_id = true,
-#endif
-#if defined(UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS)
-            .git_worktree_is_dirty = true,
-#endif
-#if defined(UWVM2_ALLOW_UNSAFE_DIRTY_LLVM_JIT_CACHE)
-            .allow_unsafe_dirty_cache = true,
-#endif
-#if defined(UWVM2_ALLOW_UNSAFE_UNPROVENANCED_LLVM_JIT_CACHE)
-            .allow_unsafe_unprovenanced_cache = true,
-#endif
-        };
-        // The generated module hash does not cover host bridge/runtime/unwind semantics. Likewise, a deterministic
-        // signature provides integrity and context binding, not source provenance. Therefore dirty or unidentified
-        // source builds cannot publish or reuse persistent native objects unless their distinct developer-only
-        // escape hatch was explicitly selected at build time.
-        if(!source_provenance_allows_persistent_cache(provenance_policy)) { policy.enable = false; }
+        if(policy.enable && !kernel_origin::dumping_disabled())
+        { policy.enable = false; policy.disabled_reason = cache_disable_reason::process_not_sealed; }
+        // Persistent identity is the real executable, not a manually maintained
+        // git/version/source string. Dirty-build escape macros cannot bypass it.
+        self_executable::digest_type digest{};
+        if(policy.enable && !self_executable::current_digest(digest)) { policy.enable = false; }
         // If signing support is missing, disabling the whole cache is safer than silently accepting unsigned native code.
         if(policy.enable && !cache_ed25519_identity_signature_available) { policy.enable = false; }
         return policy;
     }
 
-    [[nodiscard]] inline constexpr cache_context default_cache_context(::uwvm2::utils::container::u8string_view cache_key,
+    [[nodiscard]] inline cache_context default_cache_context(::uwvm2::utils::container::u8string_view cache_key,
                                                                        ::uwvm2::utils::container::u8string_view codegen_policy = {}) noexcept
     {
         cache_context ctx{};
@@ -840,6 +852,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             ::uwvm2::utils::container::u8string_ref_uwvm codegen_policy_ref{::std::addressof(ctx.codegen_policy)};
             ::fast_io::io::print(codegen_policy_ref, codegen_policy);
         }
+        if(default_cache_policy().enable) { (void)bind_self_executable_identity(ctx); }
+        ctx.origin = runtime_origin::capture();
         ctx.signature_seed = collect_signature_seed(ctx);
         // A generated seed is marked explicitly so store/load code can fail closed if future constructors omit it.
         ctx.has_signature_seed = true;
@@ -847,7 +861,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     }
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-    [[nodiscard]] inline constexpr cache_context default_cache_context(::uwvm2::utils::container::u8string_view cache_key,
+    [[nodiscard]] inline cache_context default_cache_context(::uwvm2::utils::container::u8string_view cache_key,
                                                                        ::uwvm2::utils::container::u8string_view codegen_policy,
                                                                        ::llvm::TargetMachine const& target_machine) noexcept
     {
@@ -859,6 +873,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
         ctx.target_triple = collect_target_triple(target_machine);
         ctx.cpu_name = collect_cpu_name(target_machine);
         ctx.cpu_features = collect_cpu_features(target_machine);
+        auto const layout{target_machine.createDataLayout().getStringRepresentation()};
+        ::fast_io::io::print(::uwvm2::utils::container::u8string_ref_uwvm{::std::addressof(ctx.data_layout)},
+                            ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t const*>(layout.data()), layout.size()});
         ctx.llvm_version = details::llvm_version_string();
         ctx.uwvm_abi = uwvm_runtime_abi_fingerprint();
         if(codegen_policy.empty()) { ctx.codegen_policy = default_codegen_policy_name(); }
@@ -867,6 +884,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
             ::uwvm2::utils::container::u8string_ref_uwvm codegen_policy_ref{::std::addressof(ctx.codegen_policy)};
             ::fast_io::io::print(codegen_policy_ref, codegen_policy);
         }
+        if(default_cache_policy().enable) { (void)bind_self_executable_identity(ctx); }
+        ctx.origin = runtime_origin::capture();
         ctx.signature_seed = collect_signature_seed(ctx);
         // The signature seed is recomputed after TargetMachine fields so cross-target JITs do not share identities.
         ctx.has_signature_seed = true;
@@ -874,6 +893,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
     }
 #endif
 }  // namespace uwvm2::runtime::llvm_jit_cache
+
+#if defined(__linux__) && (defined(__GNUC__) || defined(__clang__))
+# pragma GCC visibility pop
+#endif
 
 #ifndef UWVM_MODULE
 // macro

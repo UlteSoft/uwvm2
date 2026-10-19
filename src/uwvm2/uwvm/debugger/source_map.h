@@ -65,6 +65,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         ::std::size_t max_files{65536u};
         ::std::size_t max_path_bytes{4096u};
         ::std::size_t max_total_path_bytes{8u * 1024u * 1024u};
+        // Runtime may keep uniquely mapped intervals of a module containing
+        // folded code. Conflicting addresses remain unmapped; no CU wins.
+        bool isolate_ambiguous_ranges{};
     };
 
     enum class source_map_error
@@ -458,6 +461,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         ::std::uint64_t module_{}, code_size_{};
         ::std::vector<::std::string> files_{};
         ::std::vector<range> ranges_{};
+        ::std::size_t ambiguous_interval_count_{};
 
         [[nodiscard]] static source_map_error parse_unit(
             source_map& result, source_map_details::reader& unit,
@@ -475,6 +479,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         [[nodiscard]] ::std::optional<source_location> lookup(::std::uint64_t module,
             ::std::uint64_t code_section_content_offset) const noexcept;
         [[nodiscard]] ::std::size_t range_count() const noexcept { return ranges_.size(); }
+        [[nodiscard]] ::std::size_t ambiguous_interval_count() const noexcept { return ambiguous_interval_count_; }
         [[nodiscard]] ::std::uint64_t module() const noexcept { return module_; }
     };
 
@@ -946,10 +951,49 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger
         if(directory_index != sections.compilation_directories.size()) { return source_map_error::malformed; }
         ::std::sort(result.ranges_.begin(), result.ranges_.end(),
             [](range const& a, range const& b) { return a.begin < b.begin; });
+        bool overlapping{};
         for(::std::size_t i{1u}; i < result.ranges_.size(); ++i)
         {
             if(result.ranges_[i].begin < result.ranges_[i - 1u].end)
-            { return source_map_error::ambiguous_ranges; }
+            { overlapping=true;break; }
+        }
+        if(overlapping)
+        {
+            if(!limits.isolate_ambiguous_ranges) { return source_map_error::ambiguous_ranges; }
+            // Each accepted row contributes two bounded endpoints. Sweep equal
+            // endpoints together, so adjacent exclusive ranges never conflict.
+            // Count+xor retains the sole active row without an attacker-sized
+            // ordered set or a quadratic scan through overlapping CUs.
+            struct endpoint { ::std::uint64_t address{};::std::size_t encoded{}; };
+            ::std::vector<endpoint> endpoints{};endpoints.reserve(result.ranges_.size()*2u);
+            for(::std::size_t i{};i<result.ranges_.size();++i)
+            {
+                endpoints.push_back({result.ranges_[i].begin,i*2u+1u});
+                endpoints.push_back({result.ranges_[i].end,i*2u});
+            }
+            ::std::sort(endpoints.begin(),endpoints.end(),
+                [](endpoint const& a,endpoint const& b) {return a.address<b.address;});
+            ::std::vector<range> unique{};unique.reserve(result.ranges_.size());
+            ::std::size_t active{},sole{},i{};
+            while(i<endpoints.size())
+            {
+                auto const address{endpoints[i].address};
+                do
+                {
+                    auto const code{endpoints[i].encoded};sole^=code/2u;
+                    if(code&1u) {++active;}else {if(!active) {return source_map_error::malformed;}--active;}
+                    ++i;
+                }while(i<endpoints.size()&&endpoints[i].address==address);
+                if(i==endpoints.size()) {break;}
+                if(active==1u)
+                {
+                    if(sole>=result.ranges_.size()||unique.size()>=limits.max_rows*2u) {return source_map_error::limit_exceeded;}
+                    auto copy{result.ranges_[sole]};copy.begin=address;copy.end=endpoints[i].address;unique.push_back(copy);
+                }
+                else if(active>1u) {++result.ambiguous_interval_count_;}
+            }
+            if(active) {return source_map_error::malformed;}
+            result.ranges_=::std::move(unique);
         }
         output = ::std::move(result);
         return source_map_error::none;

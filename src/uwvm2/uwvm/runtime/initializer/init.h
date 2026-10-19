@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -31,6 +31,7 @@
 // std
 # include <atomic>
 # include <cstddef>
+# include <cstdlib>
 # include <cstdint>
 # include <cstring>
 # include <concepts>
@@ -70,6 +71,7 @@
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 # include <uwvm2/runtime/lib/uwvm_runtime_generated_wasm_bridge.h>
 # include "init_limit.h"
+# include "threaded_registry_view.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -78,7 +80,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 {
-    extern "C++" { class restoration_context; }
+    extern "C++" { class restoration_context; class ThreadedChildWorld; }
 }
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
@@ -227,7 +229,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose>
-        [[noreturn]] inline constexpr void fatal_wasm1p1_initializer_feature_required_in_context(initialization_context<Purpose>& world, 
+        [[noreturn]] inline constexpr void fatal_wasm1p1_initializer_feature_required_in_context(initialization_context<Purpose>& world,
             ::uwvm2::parser::wasm::base::wasm1p1_feature_kind feature,
             ::uwvm2::utils::container::u8string_view subject,
             ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 value) noexcept
@@ -286,7 +288,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose>
-        [[noreturn]] inline constexpr void fatal_wasm2_initializer_feature_required_in_context(initialization_context<Purpose>& world, 
+        [[noreturn]] inline constexpr void fatal_wasm2_initializer_feature_required_in_context(initialization_context<Purpose>& world,
             ::uwvm2::parser::wasm::base::wasm2_feature_kind feature,
             ::uwvm2::utils::container::u8string_view subject,
             ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 value) noexcept
@@ -347,7 +349,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-        inline constexpr void check_wasm1p1_initializer_value_type_in_context(initialization_context<Purpose>& world, 
+        inline constexpr void check_wasm1p1_initializer_value_type_in_context(initialization_context<Purpose>& world,
             ::uwvm2::parser::wasm::standard::wasm1p1::type::value_type value_type,
             ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
             ::uwvm2::utils::container::u8string_view subject) noexcept
@@ -359,16 +361,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             {
                 auto const& policy{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
                 if(policy.disable_exceptions) [[unlikely]]
-                { fatal_wasm1p1_initializer_feature_required_in_context(world, 
+                { fatal_wasm1p1_initializer_feature_required_in_context(world,
                     ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::exceptions, subject, 0x69u); }
                 if(policy.disable_reference_types) [[unlikely]]
-                { fatal_wasm1p1_initializer_feature_required_in_context(world, 
+                { fatal_wasm1p1_initializer_feature_required_in_context(world,
                     ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types, subject, 0x69u); }
                 return;
             }
             if(!::uwvm2::parser::wasm::standard::wasm1p1::features::value_type_enabled(value_type, fs_para)) [[unlikely]]
             {
-                fatal_wasm1p1_initializer_feature_required_in_context(world, 
+                fatal_wasm1p1_initializer_feature_required_in_context(world,
                     wasm1p1_initializer_feature_for_value_type(value_type),
                     subject,
                     static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
@@ -387,14 +389,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-        inline constexpr void check_wasm1p1_initializer_reference_type_in_context(initialization_context<Purpose>& world, 
+        inline constexpr void check_wasm1p1_initializer_reference_type_in_context(initialization_context<Purpose>& world,
             ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type reference_type,
             ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
             ::uwvm2::utils::container::u8string_view subject) noexcept
         {
             if(!::uwvm2::parser::wasm::standard::wasm1p1::features::reference_type_enabled(reference_type, fs_para)) [[unlikely]]
             {
-                fatal_wasm1p1_initializer_feature_required_in_context(world, 
+                fatal_wasm1p1_initializer_feature_required_in_context(world,
                     ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
                     subject,
                     static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
@@ -413,7 +415,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-        inline constexpr void check_wasm1p1_initializer_table_reference_type_in_context(initialization_context<Purpose>& world, 
+        inline constexpr void check_wasm1p1_initializer_table_reference_type_in_context(initialization_context<Purpose>& world,
             ::uwvm2::parser::wasm::standard::wasm1p1::type::reference_type reference_type,
             ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
             ::uwvm2::utils::container::u8string_view subject) noexcept
@@ -423,7 +425,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 auto const& para{::uwvm2::parser::wasm::standard::wasm1p1::features::get_wasm1p1_parameter(fs_para)};
                 if(para.disable_table_instructions) [[unlikely]]
                 {
-                    fatal_wasm2_initializer_feature_required_in_context(world, 
+                    fatal_wasm2_initializer_feature_required_in_context(world,
                         ::uwvm2::parser::wasm::base::wasm2_feature_kind::table_instructions,
                         subject,
                         static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
@@ -432,10 +434,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 if(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(reference_type) == 0x69u &&
                    para.disable_exceptions) [[unlikely]]
                 {
-                    fatal_wasm1p1_initializer_feature_required_in_context(world, 
+                    fatal_wasm1p1_initializer_feature_required_in_context(world,
                         ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::exceptions, subject, 0x69u);
                 }
-                fatal_wasm1p1_initializer_feature_required_in_context(world, 
+                fatal_wasm1p1_initializer_feature_required_in_context(world,
                     ::uwvm2::parser::wasm::base::wasm1p1_feature_kind::reference_types,
                     subject,
                     static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
@@ -454,7 +456,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-        inline constexpr void check_wasm1p1_initializer_const_expr_in_context(initialization_context<Purpose>& world, 
+        inline constexpr void check_wasm1p1_initializer_const_expr_in_context(initialization_context<Purpose>& world,
             ::uwvm2::parser::wasm::standard::wasm1::features::final_wasm_const_expr<Fs...> const& expr,
             ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
             ::uwvm2::utils::container::u8string_view subject,
@@ -535,7 +537,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-        inline constexpr void enforce_wasm1p1_initializer_feature_parameters_in_context(initialization_context<Purpose>& world, 
+        inline constexpr void enforce_wasm1p1_initializer_feature_parameters_in_context(initialization_context<Purpose>& world,
             ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
             ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) noexcept
         {
@@ -2276,7 +2278,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         // Evaluate only parser-validated Core 3.0 constant expressions, after imports have been linked.
         // Host/global values remain typed; arithmetic never touches guest pointers or native call frames.
         template <initialization_purpose Purpose>
-        [[nodiscard]] inline constexpr ::uwvm2::object::global::wasm_global_storage_t evaluate_wasm3_constant_expression_in_context(initialization_context<Purpose>& world, 
+        [[nodiscard]] inline constexpr ::uwvm2::object::global::wasm_global_storage_t evaluate_wasm3_constant_expression_in_context(initialization_context<Purpose>& world,
             ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_const_expr_t const& expr,
             ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& curr_rt) noexcept
         {
@@ -2455,7 +2457,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         {
                             // [imported globals ... idx ... count) is a checked live vector.
                             //                       ^^ addressof selects a record, without pointer arithmetic.
-                            try_resolve_wasm1_imported_global_value_in_context(world, 
+                            try_resolve_wasm1_imported_global_value_in_context(world,
                                 ::std::addressof(curr_rt.imported_global_vec_storage.index_unchecked(idx)), resolved, scratch);
                             // Resolver either produces a live record/scratch address or fails; check before dereference.
                             if(resolved == nullptr || resolved->is_mutable) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -3384,7 +3386,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             ::std::size_t index{};
         };
         template <initialization_purpose Purpose>
-        [[nodiscard]] inline linked_function_type_location locate_linked_function_type_in_context(initialization_context<Purpose>& world, 
+        [[nodiscard]] inline linked_function_type_location locate_linked_function_type_in_context(initialization_context<Purpose>& world,
             ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* pointer,
             ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const* owner = nullptr) noexcept
         {
@@ -3519,7 +3521,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         // matching), independently of the exact ABI identity used by tags and
         // replacement. Do not reduce a recursive declaration to carrier bytes.
         template <initialization_purpose Purpose>
-        [[nodiscard]] inline bool wasm1_function_type_matches_in_context(initialization_context<Purpose>& world, 
+        [[nodiscard]] inline bool wasm1_function_type_matches_in_context(initialization_context<Purpose>& world,
             ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* expected,
             ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* actual) noexcept
         {
@@ -3642,7 +3644,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose>
-        [[nodiscard]] inline linked_function_record_location locate_linked_imported_function_in_context(initialization_context<Purpose>& world, 
+        [[nodiscard]] inline linked_function_record_location locate_linked_imported_function_in_context(initialization_context<Purpose>& world,
             ::uwvm2::uwvm::runtime::storage::imported_function_storage_t const* candidate) noexcept
         {
             for(auto const& [name, module]: world.modules())
@@ -3667,7 +3669,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose>
-        [[nodiscard]] inline linked_function_record_location locate_linked_defined_function_in_context(initialization_context<Purpose>& world, 
+        [[nodiscard]] inline linked_function_record_location locate_linked_defined_function_in_context(initialization_context<Purpose>& world,
             ::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t const* candidate) noexcept
         {
             for(auto const& [name, module]: world.modules())
@@ -3703,7 +3705,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         // admission and constexpr reference evaluation. Pending/unresolved chains
         // never supply an actual type. Keep this usable without compiled registries.
         template <initialization_purpose Purpose>
-        [[nodiscard]] inline linked_imported_function_leaf resolve_linked_imported_function_leaf_in_context(initialization_context<Purpose>& world, 
+        [[nodiscard]] inline linked_imported_function_leaf resolve_linked_imported_function_leaf_in_context(initialization_context<Purpose>& world,
             ::uwvm2::uwvm::runtime::storage::imported_function_storage_t const* candidate) noexcept
         {
             using link_kind = ::uwvm2::uwvm::runtime::storage::imported_function_link_kind;
@@ -3851,7 +3853,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         // Shared by GC casts/tests and typed aggregate-field admission, including
         // constant expressions evaluated before any compiler dispatch cache exists.
         template <initialization_purpose Purpose>
-        [[nodiscard]] inline bool linked_gc_function_reference_type_matches_in_context(initialization_context<Purpose>& world, 
+        [[nodiscard]] inline bool linked_gc_function_reference_type_matches_in_context(initialization_context<Purpose>& world,
             ::uwvm2::uwvm::runtime::storage::gc_reference reference,
             ::uwvm2::uwvm::runtime::storage::gc_object_store const* expected_store,
             ::std::uint_least32_t expected_index) noexcept
@@ -5443,7 +5445,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose>
-        inline constexpr void try_eval_wasm3_memory_const_expr_offset_after_linking_in_context(initialization_context<Purpose>& world, 
+        inline constexpr void try_eval_wasm3_memory_const_expr_offset_after_linking_in_context(initialization_context<Purpose>& world,
             ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_const_expr_t const& expr,
             ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& module,
             ::std::uint_least64_t& out, bool address64) noexcept
@@ -5492,7 +5494,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose>
-        inline constexpr void try_eval_wasm3_table_const_expr_offset_after_linking_in_context(initialization_context<Purpose>& world, 
+        inline constexpr void try_eval_wasm3_table_const_expr_offset_after_linking_in_context(initialization_context<Purpose>& world,
             ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_const_expr_t const& expr,
             ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& module,
             ::std::uint_least64_t& out, bool address64) noexcept
@@ -5518,7 +5520,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-        inline constexpr void initialize_from_binfmt_ver1_module_storage_in_context(initialization_context<Purpose>& world, 
+        inline constexpr void initialize_from_binfmt_ver1_module_storage_in_context(initialization_context<Purpose>& world,
             ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
             ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para,
             ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& out) noexcept(Purpose == initialization_purpose::ordinary)
@@ -5576,7 +5578,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             // Only aggregate declarations allocate the GC membership index; the
             // GC opcode feature gate remains independent of this host-owned store.
             {
-                out.gc_lease_roots = ::std::make_shared<::uwvm2::uwvm::runtime::storage::gc_lease_owner>();
+                if constexpr(Purpose == initialization_purpose::threaded_child)
+                { out.gc_lease_roots = world.make_lease_owner(); }
+                else { out.gc_lease_roots = ::std::make_shared<::uwvm2::uwvm::runtime::storage::gc_lease_owner>(); }
                 if(!out.gc_lease_roots) [[unlikely]] { ::fast_io::fast_terminate(); }
                 out.gc_store = world.make_store(typesec.core3_recursive_types, out.gc_lease_roots,
                     linked_gc_function_reference_type_matches);
@@ -5628,7 +5632,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 // each separately initialized local tag gets a distinct owning token. Exception
                 // values retain only the token, so parser/module retirement cannot dangle identity.
                 out.local_defined_tag_vec_storage.push_back({::std::addressof(type), index,
-                    ::std::make_shared<::uwvm2::uwvm::runtime::storage::tag_instance_identity const>()});
+                    [&] {
+                        if constexpr(Purpose == initialization_purpose::threaded_child) { return world.make_tag_identity(); }
+                        else { return ::std::make_shared<::uwvm2::uwvm::runtime::storage::tag_instance_identity const>(); }
+                    }()});
             }
 
 
@@ -6377,7 +6384,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             u8"uwvm: [fatal] initializer: table minimum exceeds the host allocation limit.\n\n");
                         ::fast_io::fast_terminate();
                     }
-                    if constexpr(Purpose == initialization_purpose::ordinary)
+                    if constexpr(Purpose == initialization_purpose::threaded_child) { world.prepare_table(rec, table_idx); }
+                    if constexpr(Purpose != initialization_purpose::unpublished_restore)
                     { rec.elems.resize(static_cast<::std::size_t>(table_type.limits.min)); }
                     // Restored extent is installed once from the checked saved state;
                     // empty private metadata is never a published non-null table filler.
@@ -6429,7 +6437,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                     ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_WHITE),
                                     u8"). ");
             }
-            out.llvm_jit_call_indirect_table_views.resize(out.imported_table_vec_storage.size() + out.local_defined_table_vec_storage.size());
+            if constexpr(Purpose != initialization_purpose::threaded_child)
+            { out.llvm_jit_call_indirect_table_views.resize(out.imported_table_vec_storage.size() + out.local_defined_table_vec_storage.size()); }
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
             {
                 verbose_module_info_in_context(world, u8"Init: resize LLVM AOT call_indirect table views done (views=",
@@ -6514,7 +6523,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     emit_local_memory_init_verbose_in_context(world, u8"init_by_page_count begin", memory_idx, memory_type.limits, rec.effective_limits, runtime_page_size_bytes);
                     // Memory ownership includes imported memories. Native mmap instances use this
                     // index for fault diagnostics; 32-bit reservations also honor the effective maximum.
-                    if constexpr(Purpose == initialization_purpose::ordinary)
+                    if constexpr(Purpose != initialization_purpose::unpublished_restore)
                     {
                     initialize_native_memory(rec.memory, rec.effective_limits, out.imported_memory_vec_storage.size() + memory_idx,
                                              wasm_memory_is_shared(memory_type), wasm_memory_is_address64(memory_type));
@@ -6730,11 +6739,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
                     rec.element.kind = elem_segment.active ? ::uwvm2::uwvm::runtime::storage::wasm_element_segment_kind::active
                                                            : ::uwvm2::uwvm::runtime::storage::wasm_element_segment_kind::passive;
-                    if constexpr(Purpose == initialization_purpose::ordinary)
+                    if constexpr(Purpose != initialization_purpose::unpublished_restore)
                     {
                         if(elem_segment.declarative) { ::uwvm2::uwvm::runtime::storage::drop_wasm_element_segment_payload(rec.element); }
                     }
-                    if(elem_segment.active && Purpose == initialization_purpose::ordinary)
+                    if(elem_segment.active && Purpose != initialization_purpose::unpublished_restore)
                     {
                         try_eval_wasm3_table_const_expr_offset(elem_segment.expr, rec.element.offset,
                             runtime_table_is_address64(out, safe_u32_to_size_t(rec.element.table_idx)));
@@ -6759,7 +6768,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     rec.data.memory_idx = data_segment.memory_idx;
                     rec.data.byte_begin = reinterpret_cast<::std::byte const*>(data_segment.byte.begin);
                     rec.data.byte_end = reinterpret_cast<::std::byte const*>(data_segment.byte.end);
-                    if(data_segment.active && Purpose == initialization_purpose::ordinary)
+                    if(data_segment.active && Purpose != initialization_purpose::unpublished_restore)
                     {
                         try_eval_wasm3_memory_const_expr_offset(data_segment.expr, rec.data.offset,
                             runtime_memory_is_address64(out, safe_u32_to_size_t(rec.data.memory_idx)));
@@ -7327,7 +7336,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose>
-        inline constexpr void apply_wasm1_active_element_and_data_segments_for_module_in_context(initialization_context<Purpose>& world, 
+        inline constexpr void apply_wasm1_active_element_and_data_segments_for_module_in_context(initialization_context<Purpose>& world,
             ::uwvm2::utils::container::u8string_view curr_module_name,
             ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& curr_rt) noexcept
         {
@@ -7605,7 +7614,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             {
                                 target_table->elems.index_unchecked(offset + i) = funcref_begin[i];
                             }
-                            refresh_active_element_call_indirect_view(target_table, offset, element_count);
+                            if constexpr(Purpose != initialization_purpose::threaded_child)
+                            { refresh_active_element_call_indirect_view(target_table, offset, element_count); }
                             ::uwvm2::uwvm::runtime::storage::drop_wasm_element_segment_payload(elem);
                             continue;
                         }
@@ -7663,7 +7673,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
 
                     // Instantiation applies an active segment and then implicitly drops its payload.
-                    refresh_active_element_call_indirect_view(target_table, offset, element_count);
+                    if constexpr(Purpose != initialization_purpose::threaded_child)
+                            { refresh_active_element_call_indirect_view(target_table, offset, element_count); }
                     ::uwvm2::uwvm::runtime::storage::drop_wasm_element_segment_payload(elem);
                 }
 
@@ -7974,13 +7985,91 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <initialization_purpose Purpose>
+        [[nodiscard]] inline constexpr ::std::uint64_t wsea_import_capabilities(
+            initialization_context<Purpose>& world, ::uwvm2::utils::container::u8string_view module,
+            ::uwvm2::utils::container::u8string_view name) noexcept
+        {
+            if(module == u8"wasi_snapshot_preview1" || module == u8"wasi_unstable")
+            {
+                if(name.starts_with(u8"fd_") || name.starts_with(u8"path_") || name == u8"poll_oneoff") { return 3u; }
+                if(name.starts_with(u8"sock_")) { return 5u; }
+                if(name == u8"args_get" || name == u8"args_sizes_get" || name == u8"environ_get" ||
+                   name == u8"environ_sizes_get" || name == u8"clock_res_get" || name == u8"clock_time_get" ||
+                   name == u8"random_get" || name == u8"proc_exit" || name == u8"proc_raise" || name == u8"sched_yield")
+                { return 1u; }
+                return 33u; // Unknown WASI functions need explicit arbitrary-host authority too.
+            }
+            if(module.starts_with(u8"uwvm_ros1_")) { return 8u; }
+            if(module.starts_with(u8"uwvm_ros2_")) { return 16u; }
+            auto const provider{world.declarations().find(module)};
+            if(provider != world.declarations().end())
+            {
+                using kind = ::uwvm2::uwvm::wasm::type::module_type_t;
+                if((provider->second.type == kind::exec_wasm || provider->second.type == kind::preloaded_wasm) &&
+                   provider->second.module_storage_ptr.wf != nullptr)
+                {
+                    // Every provider reaches its own initializer gate before
+                    // execution. Classifying a WASM edge grants no host capability.
+                    return 0u;
+                }
+            }
+            return 32u;
+        }
+
+        template <initialization_purpose Purpose, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        inline constexpr void wsea_require_import_capabilities(initialization_context<Purpose>& world,
+            ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& parsed,
+            ::std::uint64_t allowed) noexcept
+        {
+            auto const& imports{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Fs...>>(parsed.sections)};
+            auto const rules{world.find_import_reset(world.current_module())};
+            for(auto const& imported : imports.imports)
+            {
+                auto required{wsea_import_capabilities(world, imported.module_name, imported.extern_name)};
+                // Import-reset CLI rules cannot turn a signed low-privilege
+                // import into a stronger host binding without authorization.
+                if(rules != nullptr)
+                {
+                    for(auto const& rule : *rules)
+                    {
+                        if(imported.module_name == rule.import_module_name && imported.extern_name == rule.import_extern_name)
+                        {
+                            required |= wsea_import_capabilities(world,
+                                ::uwvm2::utils::container::u8string_view{rule.new_import_module_name.data(), rule.new_import_module_name.size()},
+                                ::uwvm2::utils::container::u8string_view{rule.new_import_extern_name.data(), rule.new_import_extern_name.size()});
+                            break;
+                        }
+                    }
+                }
+                if((required & allowed) != required)
+                {
+                    ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                        u8"uwvm: [POL_003] DENIED: signed module capabilities do not authorize import ",
+                        imported.module_name, u8".", imported.extern_name);
+                    ::std::_Exit(127);
+                }
+            }
+        }
+
+        template <initialization_purpose Purpose>
         inline constexpr void initialize_from_wasm_file_in_context(initialization_context<Purpose>& world, ::uwvm2::uwvm::wasm::type::wasm_file_t const& wf,
                                                         ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& out) noexcept(Purpose == initialization_purpose::ordinary)
         {
+            // Embedding, threaded worlds and restored source graphs must hold
+            // the same genuine authorization as the ordinary CLI loader.
+            if(wf.requires_verified_execution_authorization() && !wf.has_verified_execution_authorization())
+            {
+                ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                    u8"uwvm: [VM_003] DENIED: missing or stale immutable module authorization.");
+                ::std::_Exit(127);
+            }
             switch(wf.binfmt_ver)
             {
                 case 1u:
                 {
+                    if(wf.requires_verified_execution_authorization())
+                    { wsea_require_import_capabilities(world, wf.wasm_module_storage.wasm_binfmt_ver1_storage, wf.authorized_capabilities()); }
                     initialize_from_binfmt_ver1_module_storage_in_context(world, wf.wasm_module_storage.wasm_binfmt_ver1_storage, wf.wasm_parameter.binfmt1_para, out);
                     break;
                 }

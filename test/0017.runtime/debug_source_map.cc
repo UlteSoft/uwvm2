@@ -272,6 +272,24 @@ static void check_synthetic()
     bytes overlap{old}; append(overlap, old);
     check(source_map::parse(8u, {view(overlap), {}, {}, 40u}, map) ==
         source_map_error::ambiguous_ranges, "overlapping compilation units rejected");
+    // Runtime-only isolation never invents a winning CU for folded code.
+    source_map isolated{};source_map_limits isolation{};isolation.isolate_ambiguous_ranges=true;
+    check(source_map::parse(8u, {view(overlap), {}, {}, 40u}, isolated,isolation)==source_map_error::none&&
+          isolated.range_count()==0&&isolated.ambiguous_interval_count()!=0&&!isolated.lookup(8u,12u),
+        "all duplicate intervals remain unmapped");
+    bytes partial{old};append(partial,dwarf4(17u));
+    check(source_map::parse(8u,{view(partial),{},{},40u},isolated,isolation)==source_map_error::none,
+        "partial overlap keeps independent address intervals");
+    check(isolated.lookup(8u,10u)&&isolated.lookup(8u,16u)&&!isolated.lookup(8u,17u)&&!isolated.lookup(8u,19u)&&
+          isolated.lookup(8u,20u)&&isolated.lookup(8u,20u)->line==1u&&isolated.lookup(8u,26u)&&!isolated.lookup(8u,27u),
+        "exact conflicting interval quarantined with unique nested tail restored");
+    bytes touching{old};append(touching,dwarf4(20u));
+    check(source_map::parse(8u,{view(touching),{},{},40u},isolated,isolation)==source_map_error::none&&
+          isolated.ambiguous_interval_count()==0&&isolated.lookup(8u,20u)&&isolated.lookup(8u,29u),
+        "adjacent exclusive boundaries never overlap");
+    auto short_overlap{partial};short_overlap.pop_back();
+    check(source_map::parse(8u,{view(short_overlap),{},{},40u},isolated,isolation)==source_map_error::malformed&&
+          isolated.lookup(8u,29u),"isolation preserves malformed-input failure atomicity");
     bytes bad_path{str}; bad_path[0] = std::byte{0x1b};
     check(source_map::parse(7u, {view(modern), view(bad_path), {}, 50u}, map) ==
         source_map_error::malformed, "control byte in source path rejected");

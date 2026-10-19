@@ -25,6 +25,7 @@ module;
 #include <concepts>
 #include <atomic>
 #include <cstddef>
+#include <cstdlib>
 #include <cstdint>
 #include <cstring>
 #include <limits>

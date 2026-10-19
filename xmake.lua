@@ -16,6 +16,7 @@ set_allowedplats("windows", "mingw", "cygwin", "linux", "djgpp", "unix", "bsd", 
 	"wasm-wasi-threads", "wasm-wasip1-threads", "wasm-wasip2-threads", "wasm-wasip3-threads", "wasm-emscripten",
 	"serenity", "sun", "cross", "none")
 
+includes("xmake/language_debug.lua")
 includes("xmake/impl.lua")
 includes("xmake/mach_exc_protected.lua")
 includes("xmake/platform/impl.lua")
@@ -52,6 +53,12 @@ end
 
 function def_build(opt)
 	opt = opt or {}
+	uwvm_apply_language_debug_options()
+	-- Build support only: verification is explicitly selected per module.
+	if get_config("enable-wsea") and is_plat("linux", "macosx", "unix", "bsd", "freebsd", "dragonflybsd", "netbsd", "openbsd", "sun") then
+		add_defines("UWVM_WSEA_OPENSSL")
+		uwvm_add_llvm_jit_cache_openssl()
+	end
 	if is_mode("debug") then
 		add_rules("debug")
 	elseif is_mode("release") then
@@ -63,6 +70,10 @@ function def_build(opt)
 	end
 
 	set_languages("c23", "cxx26")
+	if get_config("use-llvm-compiler") and is_arch("armeb", "aarch64_be", "aarch64be", "arm64be") then
+		-- Endian conversion adds constexpr work to the command-line alias table.
+		add_cxxflags("-fconstexpr-steps=8388608", {force = true})
+	end
 
 	set_encodings("utf-8")
 	set_warnings("all", "extra", "pedantic", "error")
@@ -543,42 +554,29 @@ local function uwvm_add_frontend_module_files(is_public)
 	else
 		add_files("src/uwvm2/uwvm/**.cppm", { public = is_public })
 	end
+	if not uwvm_language_debug_enabled("cpp") then
+		remove_files("src/uwvm2/uwvm/debugger/source_pretty_coroutine.cppm")
+	end
 end
 
-if uwvm_uses_llvm_jit and get_config("openssl-root") == "default" then
-	add_requires("openssl", {configs = {shared = false}})
+if (uwvm_uses_llvm_jit or (get_config("enable-wsea") and
+	is_plat("linux", "macosx", "unix", "bsd", "freebsd", "dragonflybsd", "netbsd", "openbsd", "sun"))) and get_config("openssl-root") == "default" and get_config("openssl-provider") == "package" then
+	add_requires("openssl >=3.0.0", {configs = {shared = false}})
 end
 
 function uwvm_add_llvm_jit_cache_openssl()
 	add_defines("UWVM_RUNTIME_LLVM_JIT_CACHE_USE_OPENSSL_ED25519")
 	local openssl_root = get_config("openssl-root")
 	if openssl_root and openssl_root ~= "default" then
-		local openssl_libdir = path.join(openssl_root, "lib")
-		if not os.isdir(openssl_libdir) then
-			openssl_libdir = openssl_root
-		end
-		add_includedirs(path.join(openssl_root, "include"))
-		local static_mode = get_config("static")
-		if static_mode == "non-system" or static_mode == "compiler" then
-			local ssl_archive = path.join(openssl_libdir, "libssl.a")
-			local crypto_archive = path.join(openssl_libdir, "libcrypto.a")
-			if os.isfile(ssl_archive) and os.isfile(crypto_archive) then
-				add_ldflags(ssl_archive, crypto_archive, { force = true })
-				if is_plat("windows", "mingw") then
-					add_ldflags("-lcrypt32", "-lgdi32", "-ladvapi32", "-luser32", "-lws2_32", { force = true })
-				end
-			else
-				add_linkdirs(openssl_libdir)
-				add_links("ssl", "crypto")
-			end
-		else
-			add_linkdirs(openssl_libdir)
-			add_links("ssl", "crypto")
-		end
-	else
+		add_rules("uwvm.prebuilt-openssl")
+	elseif get_config("openssl-provider") == "package" then
 		add_packages("openssl")
+	else
+		add_rules("uwvm.bundled-openssl")
 	end
 end
+
+includes("xmake/openssl.lua")
 
 target("uwvm")
 	set_kind("binary")

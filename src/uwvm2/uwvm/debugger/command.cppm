@@ -2,8 +2,12 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
+#include <string_view>
+#include <utility>
 export module uwvm2.uwvm.debugger:command;
 import fast_io;
+import uwvm2.uwvm.debugger.source_pretty_registry;
 import :console_help_catalog;
 import uwvm2.utils.control;
 import :wasm_events;

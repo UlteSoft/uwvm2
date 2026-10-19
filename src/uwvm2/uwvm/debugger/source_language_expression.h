@@ -6,9 +6,11 @@
 #pragma once
 #ifndef UWVM_MODULE
 # include "source_dwarf_expression.h"
+# include "source_pretty_printer.h"
 # include <cstddef>
 # include <cstdint>
 # include <limits>
+# include <memory>
 # include <span>
 # include <utility>
 # include <vector>
@@ -24,9 +26,42 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
     // policy. Production invokes it only inside the actual runtime canonical
     // capture/source-binding/cohort/publication/memory transaction. Each read
     // returns another owned complete object; no raw pointer/span is retained.
-    struct limits { ::std::size_t maximum_reads{32u}; };
+    struct limits
+    {
+        ::std::size_t maximum_reads{32u}; bool raw{}; ::std::size_t maximum_elements{200u};
+        source_pretty_registry::registry const* registry{};
+    };
     namespace details
     {
+        [[nodiscard]] inline bool fixed_array_storage(::std::span<dwarf::type_record const> types,
+            ::std::size_t root, ::std::string_view& storage) noexcept
+        {
+            if(root >= types.size() || !source_pretty_printer::details::family(types[root],"array") ||
+               types[root].template_types.empty()) { return false; }
+            bool found{};
+            for(auto name : {::std::string_view{"_M_elems"},::std::string_view{"__elems_"}})
+            {
+                source_pretty_printer::details::field value{};
+                if(!source_pretty_printer::details::path(types,root,name,value)) { continue; }
+                if(found || value.type >= types.size()) { return false; }
+                auto const& array{types[value.type]};
+                if(array.kind != dwarf::type_kind::array || array.referenced_type != types[root].template_types[0u] ||
+                   !array.size_known || !array.contiguous_array || !array.row_major_array || array.dimensions.size() != 1u ||
+                   !array.dimensions[0u].lower_bound_known || array.dimensions[0u].lower_bound != 0 ||
+                   !array.dimensions[0u].count_known) { return false; }
+                bool count_known{};
+                for(auto const& parameter : types[root].template_values)
+                {
+                    if(parameter.position != 1u) { continue; }
+                    if(count_known || !parameter.available || (parameter.signed_value && parameter.bits >> 63u) ||
+                       parameter.bits != array.dimensions[0u].count) { return false; }
+                    count_known = true;
+                }
+                if(!count_known) { return false; }
+                storage = name; found = true;
+            }
+            return found;
+        }
         [[nodiscard]] inline dwarf::inline_query_error validate_steps(::std::span<dwarf::source_expression_step const> steps) noexcept
         {
             if(steps.size() > 32u) { return dwarf::inline_query_error::limit_exceeded; }
@@ -66,9 +101,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
                pointee.kind == dwarf::type_kind::unavailable) { return false; }
             target = type.referenced_type; return true;
         }
+        // Resolve only the selected metadata type here. C++ references have
+        // transparent language semantics; ordinary pointers remain explicit.
+        [[nodiscard]] inline dwarf::inline_query_error cpp_reference_target(::std::span<dwarf::type_record const> types,
+            ::std::size_t root, ::std::span<dwarf::object_selector_step const> segment, ::std::uint8_t address_bytes,
+            bool& matched, ::std::size_t& target)
+        {
+            matched = false;
+            if(root >= types.size()) { return dwarf::inline_query_error::malformed; }
+            dwarf::object_node direct{}; ::std::vector<dwarf::object_node> selected{};
+            dwarf::object_node const* node{::std::addressof(direct)};
+            if(segment.empty())
+            {
+                if(!dwarf::object_details::cxx_reference_spelling(types[root])) { return dwarf::inline_query_error::none; }
+                direct.type = root; direct.kind = types[root].kind;
+            }
+            else
+            {
+                auto const status{dwarf::query_selected_object_type(types,root,segment,selected)};
+                if(status != dwarf::inline_query_error::none) { return status; }
+                if(selected.empty() || selected[0u].type >= types.size()) { return dwarf::inline_query_error::malformed; }
+                if(!dwarf::object_details::cxx_reference_spelling(types[selected[0u].type])) { return dwarf::inline_query_error::none; }
+                if(selected.size() != 1u) { return dwarf::inline_query_error::unavailable; }
+                node = ::std::addressof(selected[0u]);
+            }
+            if(!conventional_pointer(types,*node,address_bytes,target,true)) { return dwarf::inline_query_error::unavailable; }
+            matched = true; return dwarf::inline_query_error::none;
+        }
         [[nodiscard]] inline bool rust_sequence(::std::span<dwarf::type_record const> types, ::std::size_t root,
             ::std::span<dwarf::object_selector_step const> segment, ::std::uint8_t width, ::std::size_t& target, bool& string)
         {
+            if constexpr (!(UWVM_DEBUG_LANGUAGE_RUST)) { return false; }
+            else
+            {
             ::std::vector<dwarf::object_node> layout{};
             if(dwarf::query_selected_object_type(types,root,segment,layout) != dwarf::inline_query_error::none || layout.empty() || layout[0u].type >= types.size()) { return false; }
             auto const& type{types[layout[0u].type]}; ::std::string_view name{type.name};
@@ -89,9 +154,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
             if(!element.size_known || element.byte_size == 0u || element.byte_size > 65536u || element.kind == dwarf::type_kind::unavailable ||
                (string && (element.kind != dwarf::type_kind::scalar || element.byte_size != 1u))) { return false; }
             target = pt.referenced_type; return true;
+        
+            }
         }
         [[nodiscard]] inline bool go_language(dwarf::type_record const& type) noexcept
-        { return type.language == 0x16u || (type.language == 0x0cu && type.tinygo_producer); }
+        { return (UWVM_DEBUG_LANGUAGE_GO && type.language == 0x16u) ||
+            (UWVM_DEBUG_LANGUAGE_TINYGO && type.language == 0x0cu && type.tinygo_producer); }
         // TinyGo labels Go compilation units C99 with the exact TinyGo producer;
         // preserve that raw language and adapt only the owned producer metadata.
         [[nodiscard]] inline bool implicit_member(dwarf::type_record const& type) noexcept
@@ -319,9 +387,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
         try
         {
 #endif
-            ::std::vector<dwarf::object_selector_step> segment{};
+            ::std::vector<dwarf::object_selector_step> segment{}; ::std::size_t reference_hops{};
+            auto const normalize_references{[&]() -> dwarf::inline_query_error
+            {
+                for(;;)
+                {
+                    bool matched{}; ::std::size_t target{};
+                    auto const status{details::cpp_reference_target(types,root,segment,address_bytes,matched,target)};
+                    if(status != dwarf::inline_query_error::none || !matched) { return status; }
+                    if(reference_hops == 32u) { return dwarf::inline_query_error::limit_exceeded; }
+                    ++reference_hops; root = target; segment.clear();
+                }
+            }};
             for(auto const& step : steps)
             {
+                auto const normalized{normalize_references()};
+                if(normalized != dwarf::inline_query_error::none) { return normalized; }
                 if(step.kind == dwarf::source_expression_step_kind::go_length || step.kind == dwarf::source_expression_step_kind::go_capacity)
                 {
                     details::sequence_layout layout{}; bool const capacity{step.kind == dwarf::source_expression_step_kind::go_capacity};
@@ -337,6 +418,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
                 }
                 if(step.kind == dwarf::source_expression_step_kind::index)
                 {
+                    // For a type query only, an all-zero descriptor is DATA
+                    // used to select the proven element type. No location or
+                    // pointer bits are evaluated and the planner has no reader.
+                    ::std::vector<dwarf::object_node> candidate{};
+                    if(dwarf::query_selected_object_type(types,root,segment,candidate) == dwarf::inline_query_error::none &&
+                       !candidate.empty() && candidate[0u].type < types.size() && candidate[0u].byte_size <= 65536u)
+                    {
+                        ::std::string_view storage{};
+                        if(details::fixed_array_storage(types,candidate[0u].type,storage))
+                        {
+                            dwarf::source_expression_step member{}; member.kind = dwarf::source_expression_step_kind::member;
+                            member.member.assign(storage); details::add(segment,member); details::add(segment,step); continue;
+                        }
+                        ::std::size_t element{};::std::uint64_t bound{};bool bounded{};
+                        if(source_pretty_printer::details::index_element_type(types,candidate[0u].type,address_bytes,element,bound,bounded))
+                        {
+                            if(step.index<0 || (bounded && static_cast<::std::uint64_t>(step.index)>=bound)) { return dwarf::inline_query_error::unavailable; }
+                            root=element;segment.clear();continue;
+                        }
+                        ::std::vector<::std::byte> descriptor(static_cast<::std::size_t>(candidate[0u].byte_size));
+                        source_pretty_printer::details::indexed_sequence plan{};
+                        if(source_pretty_printer::details::index_plan(types,candidate[0u].type,descriptor,{}, {},address_bytes,plan))
+                        { if(step.index < 0) { return dwarf::inline_query_error::unavailable; } root = plan.element; segment.clear(); continue; }
+                    }
                     details::sequence_layout sequence{};
                     if(details::sequence(types,root,segment,address_bytes,sequence))
                     { if(step.index < 0) { return dwarf::inline_query_error::unavailable; } root = sequence.element; segment.clear(); continue; }
@@ -373,6 +478,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
                 root = target; segment.clear(); // checked scalar graph transition, not a native/guest pointer.
                 if(implicit) { details::add(segment,step); }
             }
+            auto const normalized{normalize_references()};
+            if(normalized != dwarf::inline_query_error::none) { return normalized; }
             return dwarf::query_selected_object_type(types, root, segment, out);
 #if defined(__cpp_exceptions) || defined(_CPPUNWIND)
         }
@@ -431,8 +538,40 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
                 }
             }
             auto const allowed{cap.maximum_reads < 32u ? cap.maximum_reads : 32u};
+            ::std::size_t reference_hops{};
+            auto const normalize_references{[&]() -> dwarf::inline_query_error
+            {
+                for(;;)
+                {
+                    bool matched{}; ::std::size_t target_type{};
+                    auto const selected{details::cpp_reference_target(types,root,segment,address_bytes,matched,target_type)};
+                    if(selected != dwarf::inline_query_error::none || !matched) { return selected; }
+                    if(reference_hops == 32u) { return dwarf::inline_query_error::limit_exceeded; }
+                    ++reference_hops;
+                    dwarf::copied_guest_pointer_plan plan{};
+                    auto const& qualified{pointer_known.empty() ? known_bits : pointer_known};
+                    auto const planned{qualified.empty() ? dwarf::plan_copied_guest_cpp_reference(types,root,segment,bytes,plan) :
+                        dwarf::plan_copied_guest_cpp_reference_with_known_bits(types,root,segment,bytes,qualified,plan)};
+                    if(planned != dwarf::inline_query_error::none) { return planned; }
+                    auto const maximum{address_bytes == 4u ? 0xffffffffull : ~::std::uint64_t{}};
+                    if(plan.type != target_type || plan.address_bytes != address_bytes || plan.extent == 0u || plan.extent > 65536u ||
+                       plan.extent != types[target_type].byte_size || plan.guest_offset == 0u || plan.guest_offset > maximum ||
+                       plan.extent-1u > maximum-plan.guest_offset ||
+                       plan.extent > static_cast<::std::uint64_t>((::std::numeric_limits<::std::size_t>::max)()))
+                    { return dwarf::inline_query_error::unavailable; }
+                    if(reads >= allowed) { return dwarf::inline_query_error::limit_exceeded; }
+                    ++reads; // Same transaction and allowance as explicit pointer/container reads.
+                    ::std::vector<::std::byte> copied{};
+                    if(!read(plan.guest_offset,static_cast<::std::size_t>(plan.extent),copied) || copied.size() != plan.extent)
+                    { return dwarf::inline_query_error::unavailable; }
+                    bytes = ::std::move(copied); known_bits.clear(); pointer_known.clear();
+                    root = plan.type; segment.clear();
+                }
+            }};
             for(auto const& step : steps)
             {
+                auto const normalized{normalize_references()};
+                if(normalized != dwarf::inline_query_error::none) { return normalized; }
                 if(step.kind == dwarf::source_expression_step_kind::go_length || step.kind == dwarf::source_expression_step_kind::go_capacity)
                 {
                     bool const capacity{step.kind == dwarf::source_expression_step_kind::go_capacity};
@@ -487,6 +626,52 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
                 }
                 if(step.kind == dwarf::source_expression_step_kind::index)
                 {
+                    ::std::vector<dwarf::object_node> selected_container{};
+                    if((known_bits.empty() ? dwarf::query_selected_object_value(types,root,segment,bytes,selected_container) :
+                        dwarf::query_selected_object_value_with_known_bits(types,root,segment,bytes,known_bits,selected_container)) == dwarf::inline_query_error::none &&
+                       !selected_container.empty() && !selected_container[0u].bit_field)
+                    {
+                        auto const& object{selected_container[0u]};
+                        ::std::string_view storage{};
+                        if(details::fixed_array_storage(types,object.type,storage))
+                        {
+                            dwarf::source_expression_step member{}; member.kind = dwarf::source_expression_step_kind::member;
+                            member.member.assign(storage); details::add(segment,member); details::add(segment,step); continue;
+                        }
+                        if(object.byte_offset <= bytes.size() && object.byte_size <= bytes.size()-object.byte_offset)
+                        {
+                            auto const first{static_cast<::std::size_t>(object.byte_offset)}; auto const count{static_cast<::std::size_t>(object.byte_size)};
+                            auto const available{known_bits.empty() ? ::std::span<::std::byte const>{} : ::std::span<::std::byte const>{known_bits}.subspan(first,count)};
+                            auto const& qualified{pointer_known.empty() ? known_bits : pointer_known};
+                            auto const eligible{qualified.empty() ? ::std::span<::std::byte const>{} : ::std::span<::std::byte const>{qualified}.subspan(first,count)};
+                            source_pretty_printer::details::indexed_sequence plan{};
+                            if(source_pretty_printer::details::index_plan(types,object.type,::std::span<::std::byte const>{bytes}.subspan(first,count),
+                                available,eligible,address_bytes,plan))
+                            {
+                                if(step.index < 0 || static_cast<::std::uint64_t>(step.index) >= plan.count) { return dwarf::inline_query_error::unavailable; }
+                                auto const extent{types[plan.element].byte_size};
+                                if(plan.copied_storage)
+                                {
+                                    auto const offset{plan.copied_offset+static_cast<::std::uint64_t>(step.index)*extent};
+                                    if(offset>count || extent>count-offset) { return dwarf::inline_query_error::unavailable; }
+                                    auto const at{first+static_cast<::std::size_t>(offset)};auto const size{static_cast<::std::size_t>(extent)};
+                                    for(::std::size_t i{};i!=size;++i)
+                                    { if(!known_bits.empty() && known_bits[at+i]!=::std::byte{0xffu}) { return dwarf::inline_query_error::unavailable; } }
+                                    ::std::vector<::std::byte> copied(bytes.begin()+at,bytes.begin()+at+size);
+                                    ::std::vector<::std::byte> copied_known{},copied_pointer{};
+                                    if(!known_bits.empty()) { copied_known.assign(known_bits.begin()+at,known_bits.begin()+at+size); }
+                                    if(!pointer_known.empty()) { copied_pointer.assign(pointer_known.begin()+at,pointer_known.begin()+at+size); }
+                                    bytes=::std::move(copied);known_bits=::std::move(copied_known);pointer_known=::std::move(copied_pointer);
+                                    root=plan.element;segment.clear();continue;
+                                }
+                                auto const address{plan.address+static_cast<::std::uint64_t>(step.index)*extent};
+                                if(reads >= allowed) { return dwarf::inline_query_error::limit_exceeded; } ++reads;
+                                ::std::vector<::std::byte> copied{};
+                                if(!read(address,static_cast<::std::size_t>(extent),copied) || copied.size() != extent) { return dwarf::inline_query_error::unavailable; }
+                                bytes = ::std::move(copied); root = plan.element; segment.clear(); known_bits.clear(); pointer_known.clear(); continue;
+                            }
+                        }
+                    }
                     details::sequence_layout sequence{};
                     if(details::sequence(types,root,segment,address_bytes,sequence))
                     {
@@ -551,6 +736,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
                 // Complete returned owned bytes replace the old image. No stale
                 // validity mask, backend pointer or independently borrowed span.
             }
+            auto const normalized{normalize_references()};
+            if(normalized != dwarf::inline_query_error::none) { return normalized; }
             auto const status{known_bits.empty() ? dwarf::query_selected_object_value(types, root, segment, bytes, out) :
                 dwarf::query_selected_object_value_with_known_bits(types, root, segment, bytes, known_bits, out)};
             details::sequence_layout sequence{};
@@ -596,6 +783,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
                         if(complete || !text.empty())
                         { out[0u].display_text = ::std::move(text); out[0u].display_text_available = true; out[0u].display_text_truncated = !complete; }
                     }
+                }
+            }
+            if(status == dwarf::inline_query_error::none && !cap.raw && !out.empty() && !out[0u].bit_field)
+            {
+                auto const offset{out[0u].byte_offset}; auto const extent{out[0u].byte_size};
+                if(offset <= bytes.size() && extent <= bytes.size()-offset)
+                {
+                    auto const first{static_cast<::std::size_t>(offset)}; auto const count{static_cast<::std::size_t>(extent)};
+                    auto const available{known_bits.empty() ? ::std::span<::std::byte const>{} : ::std::span<::std::byte const>{known_bits}.subspan(first,count)};
+                    auto const& qualified{pointer_known.empty() ? known_bits : pointer_known};
+                    auto const eligible{qualified.empty() ? ::std::span<::std::byte const>{} : ::std::span<::std::byte const>{qualified}.subspan(first,count)};
+                    (void)source_pretty_printer::format(types,out[0u].type,::std::span<::std::byte const>{bytes}.subspan(first,count),
+                        available,eligible,address_bytes,read,out,{allowed-reads,cap.maximum_elements,1024u,65536u,8u,cap.registry});
                 }
             }
             return status;

@@ -162,3 +162,33 @@ def cases():
                            checks=1, expected_trap='memory access out of bounds', argv=FLAGS,
                            minimum_guest_bytes=2 * PAGE))
     return result
+
+
+def cache_replay_cases():
+    """Explicit new DATA/procedure variants, never relabel historical Wasm bytes.
+
+    Existing cases() and every original negative _start body stay unchanged.
+    A last empty local function allows normal cold publication of the SAME full
+    module used by subsequent default-entry OOB traps. All bodies still undergo
+    actual full compilation; this is not skipped validation or a fake issuer.
+    """
+    output = []
+    for original in cases():
+        if original['expected_trap'] is None:
+            continue
+        wat = original['wat']
+        assert wat.rstrip().endswith(')') and '(import ' not in wat
+        # These exact authored cases have either $load + _start or only _start.
+        # Append after both, preserving all existing function indices/bodies.
+        count = 2 if '(func $load (export "load")' in wat else 1
+        assert wat.count('(func ') == count
+        item = dict(original)
+        item['original_wat'] = wat
+        item['wat'] = wat.rstrip()[:-1] + '\n  (func (export "__uwvm_cache_seed"))\n)'
+        item['cache_seed_entry'] = count
+        item['cache_seed_contract'] = 'appended-void-export-v1'
+        item['cold_phase_executes_original_trap'] = False
+        item['warm_phases_execute_original_start'] = True
+        output.append(item)
+    assert output
+    return output

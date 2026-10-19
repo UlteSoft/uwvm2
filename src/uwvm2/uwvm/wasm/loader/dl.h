@@ -26,6 +26,7 @@
 # include <cstddef>
 # include <cstdint>
 # include <type_traits>
+# include <uwvm2/utils/security/wsea.h>
 # include <atomic>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
@@ -178,6 +179,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                          ::uwvm2::utils::container::u8string_view rename_module_name,
                                          ::uwvm2::uwvm::wasm::type::wasm_parameter_t para) noexcept
     {
+        // Native constructors run during dlopen and could bypass the selected
+        // module's security boundary. Secure processes admit trusted built-ins only.
+        if(::uwvm2::utils::security::wsea::secure_enabled())
+        {
+            ::fast_io::io::perrln(::uwvm2::uwvm::io::u8log_output,
+                u8"uwvm: [POL_003] DENIED: native dynamic-library loading is unavailable with --secure.");
+            return load_dl_rtl::load_error;
+        }
         if(::uwvm2::uwvm::io::show_untrusted_dl_warning)
         {
             // We use atomic<bool>::exchange here instead of compare_exchange_xxx because this

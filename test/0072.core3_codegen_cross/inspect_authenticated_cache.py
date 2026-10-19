@@ -6,6 +6,85 @@ receipts supply execution evidence. Each selected symbol is decoded over its
 complete ELF function extent, including functions in separate lazy groups.
 Instruction counts describe generated code, not hardware throughput.
 """
+
+# Future Linux only. The keeper admits this direct entry/Python/stdlib before
+# startup; no running source can retroactively authenticate its interpreter.
+if '__cache_source_context__' not in globals():
+    import sys as _source_sys
+    if _source_sys.flags.optimize != 0:
+        raise RuntimeError('qualification requires unoptimized startup')
+    assert __name__ == '__main__' and _source_sys.platform == 'linux'
+    assert isinstance(globals().get('__uwvm_entry_captured_bytes__'), bytes), 'use the admitted captured-entry keeper literal'
+    assert globals().get('__uwvm_entry_keeper_identity__') == 'cae2c05f7df6e9a2a94a84f5333eeef5c1946d96ea8b54cfe59eee5e17d23d21'
+    assert _source_sys.flags.isolated and _source_sys.flags.no_site and _source_sys.flags.safe_path, 'start the admitted entry with -I -S'
+    import os as _source_os
+    import json as _source_json
+    import hashlib as _source_hashlib
+    import stat as _source_stat
+    import types as _source_types
+    import importlib.machinery as _source_machinery
+    from pathlib import Path as _SourcePath
+    def _source_read_once(path, cap):
+        assert path.is_absolute() and path.resolve(strict=True) == path
+        fd = _source_os.open(path, _source_os.O_RDONLY | _source_os.O_CLOEXEC | _source_os.O_NOFOLLOW)
+        try:
+            first = _source_os.fstat(fd)
+            assert _source_stat.S_ISREG(first.st_mode) and first.st_uid == _source_os.geteuid() and first.st_size <= cap
+            raw = bytearray()
+            while len(raw) <= cap:
+                part = _source_os.read(fd, min(65536, cap + 1 - len(raw)))
+                if not part:
+                    break
+                raw.extend(part)
+            last = _source_os.fstat(fd)
+            identity = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
+            assert identity(first) == identity(last) and len(raw) == first.st_size <= cap
+            return bytes(raw)
+        finally:
+            _source_os.close(fd)
+    _guard_path = _SourcePath(_source_os.environ['UWVM2_CACHE_EXECUTION_GUARD'])
+    _guard_bytes = _source_read_once(_guard_path, 1 << 20)
+    assert _source_hashlib.sha256(_guard_bytes).hexdigest() == _source_os.environ['UWVM2_CACHE_EXECUTION_GUARD_SHA256']
+    _guard = _source_json.loads(_guard_bytes)
+    _membership = _SourcePath('/proc/self/cgroup').read_text().strip()
+    assert _guard['release_note'].strip() and _membership == _guard['membership'] and _membership.startswith('0::/') and '\n' not in _membership
+    _cgroup = (_SourcePath('/sys/fs/cgroup') / _membership[3:].lstrip('/')).resolve(strict=True)
+    assert _cgroup.stat().st_ino == _guard['cgroup_inode']
+    assert _SourcePath('/proc/sys/kernel/random/boot_id').read_text().strip() == _guard['boot_id']
+    assert (_cgroup / 'memory.max').read_text().strip() == '68719476736'
+    assert (_cgroup / 'memory.swap.max').read_text().strip() == '0'
+    _repository = _SourcePath(__file__).resolve(strict=True).parents[2]
+    _helper_path = _repository / 'test/0014.llvm_jit/cache_cli_process.py'
+    _helper_bytes = _source_read_once(_helper_path, 2 << 20)
+    assert _source_hashlib.sha256(_helper_bytes).hexdigest() == '3475afc5e7f08f8cddb45d009d901412280532e88aca45bcbd6d963b395ef3d7'
+    _prefix = '_uwvm_cache_' + _source_os.urandom(16).hex()
+    _helper_name = _prefix + '.cache_cli_process'
+    assert _prefix not in _source_sys.modules and _helper_name not in _source_sys.modules
+    _package = _source_types.ModuleType(_prefix)
+    _package.__package__, _package.__path__ = _prefix, []
+    _package.__spec__ = _source_machinery.ModuleSpec(_prefix, loader=None, is_package=True)
+    _helper = _source_types.ModuleType(_helper_name)
+    _helper.__file__, _helper.__package__, _helper.__cached__ = str(_helper_path), _prefix, None
+    _helper.__spec__ = _source_machinery.ModuleSpec(_helper_name, loader=None, origin=str(_helper_path))
+    _helper.__spec__.has_location = True
+    _source_sys.modules[_prefix], _source_sys.modules[_helper_name] = _package, _helper
+    _package.cache_cli_process = _helper
+    try:
+        # Exactly the SAME captured bytes which passed the hard Source SHA.
+        exec(compile(_helper_bytes, str(_helper_path), 'exec', dont_inherit=True, optimize=0), _helper.__dict__, _helper.__dict__)
+        __cache_source_context__ = _helper.admit_source_context(_repository, _guard, _helper, _helper_bytes, _package)
+        __cache_source_context__.bind_entry(globals())
+    except BaseException:
+        if '__cache_source_context__' in globals():
+            __cache_source_context__.close(audit=False)
+        for _name, _owned in ((_helper_name, _helper), (_prefix, _package)):
+            if _source_sys.modules.get(_name) is _owned:
+                del _source_sys.modules[_name]
+        raise
+else:
+    __cache_source_context__.assert_loaded_scope(globals())
+
+
 import argparse
 import importlib.util
 import json
@@ -14,18 +93,36 @@ import re
 import subprocess
 import time
 
-from elf_function_extent import function_extent
-from inspect_jit import instruction_evidence
-from run_matrix import digest, save, verify
+_captured_local_module = __cache_source_context__.load('elf_function_extent')
+function_extent = _captured_local_module.function_extent
+_captured_local_module = __cache_source_context__.load('inspect_jit')
+instruction_evidence = _captured_local_module.instruction_evidence
+_captured_local_module = __cache_source_context__.load('run_matrix')
+digest = _captured_local_module.digest
+save = _captured_local_module.save
+verify = _captured_local_module.verify
 
 
 def main():
+    import hashlib
+    import sys
+    helper = Path(__file__).resolve().parents[1] / '0014.llvm_jit/cache_cli_process.py'
+    assert hashlib.sha256(helper.read_bytes()).hexdigest() == '3475afc5e7f08f8cddb45d009d901412280532e88aca45bcbd6d963b395ef3d7'
+    _captured_local_module = __cache_source_context__.load('cache_cli_process')
+    BoundedCli = _captured_local_module.BoundedCli
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('config', type=Path)
     args = parser.parse_args()
     config = json.loads(args.config.read_text())
-    subprocess.run(['/usr/bin/bash', config['cgroup_guard']], check=True)
+
     verify(config['pins'])
+    output = Path(config['output'])
+    output.mkdir(exist_ok=False)
+    runner = BoundedCli(config['execution_guard'], output, Path(__file__).resolve().parents[2])
+    guard_source = Path(config['cgroup_guard']).resolve(strict=True)
+    assert config['pins'].get(str(guard_source)) == digest(guard_source), 'pin actual cgroup guard Source before execution'
+    guard_run = runner.execute('cgroup-guard-entry', ['/usr/bin/bash', str(guard_source)], timeout=30)
+    assert guard_run.returncode == 0
     summary_path = Path(config['summary'])
     deadline = time.monotonic() + config.get('prerequisite_timeout', 3000)
     while not summary_path.is_file():
@@ -36,6 +133,7 @@ def main():
     summary_hash = digest(summary_path)
     summary = json.loads(summary_path.read_text())
     assert summary['passed'] and summary['completed'] == len(summary['rows'])
+    assert summary['cache_format_version'] == 7 and summary['origin_authenticated_replay_qualified'], 'legacy execution receipts remain historical'
     tiered = config.get('execution_kind') == 'tiered-numeric'
     if tiered:
         build_path = Path(config['build_qualification'])
@@ -68,13 +166,14 @@ def main():
         assert digest(config['execution_code']) == summary['code_sha256']
         available_profiles = [p['name'] for p in matrix['profiles']]
         available_cases = matrix['cases']
-    spec = importlib.util.spec_from_file_location('inspection_only_decoder', config['decoder'])
-    decoder = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(decoder)
-    output = Path(config['output'])
-    output.mkdir(exist_ok=False)
+    decoder_path = Path(config['decoder']).resolve(strict=True)
+    assert config['pins'].get(str(decoder_path)) == digest(decoder_path), 'pin the actual transitive v7 decoder Source'
+    decoder = __cache_source_context__.load_path(decoder_path, config['pins'][str(decoder_path)])
+    assert decoder.CACHE_FORMAT_VERSION == 7, 'legacy decoder cannot qualify v7 objects'
     profiles = config.get('profiles', available_profiles)
     cases = config['cases']
+    assert profiles and cases and summary['rows'], 'empty requested/current execution selection cannot qualify inspection'
+    assert len(set(profiles)) == len(profiles) and len(set(cases)) == len(cases)
     assert set(profiles) <= set(available_profiles)
     assert set(cases) <= set(available_cases)
     qualified = {}
@@ -120,8 +219,12 @@ def main():
                 assert len(found) == 1 and digest(found[0]) == expected, (key, found)
                 obj = work / (str(entry_index) + '-executed-cache-object.o')
                 obj.write_bytes(decoder.decode_object(found[0].read_bytes(), config['ros']))
-                symbols = subprocess.check_output([config['llvm_nm'], '--defined-only', str(obj)], text=True)
-                relocations = subprocess.check_output([config['llvm_readobj'], '--relocations', str(obj)], text=True)
+                tool = runner.execute(profile + '--' + case + '--llvm-symbols-' + str(entry_index), [config['llvm_nm'], '--defined-only', str(obj)], timeout=60)
+                assert tool.returncode == 0
+                symbols = tool.stdout.decode('utf-8', errors='strict')
+                tool = runner.execute(profile + '--' + case + '--llvm-relocations-' + str(entry_index), [config['llvm_readobj'], '--relocations', str(obj)], timeout=60)
+                assert tool.returncode == 0
+                relocations = tool.stdout.decode('utf-8', errors='strict')
                 reloc = work / (str(entry_index) + '-relocations.txt')
                 reloc.write_text(relocations)
                 objects.append(dict(path=str(obj), symbols=symbols,
@@ -129,6 +232,7 @@ def main():
                                     object_sha256=digest(obj), relocations_sha256=digest(reloc)))
             functions = []
             indices = config.get('function_indices', {}).get(case, [0, 1] if case.startswith('tail-') else [0])
+            assert indices and all(type(i) is int and i >= 0 for i in indices) and len(set(indices)) == len(indices), 'nonempty exact function selection required'
             selected_objects = objects
             if tiered:
                 # T1 and T2 deliberately reuse function symbol names in
@@ -152,7 +256,9 @@ def main():
                         '--stop-address=' + str(start + size)]
                 if config['arch'].startswith('riscv'):
                     argv += ['-M', 'no-aliases']
-                assembly = subprocess.check_output([*argv, obj['path']], text=True)
+                tool = runner.execute(profile + '--' + case + '--llvm-function-' + str(index), [*argv, obj['path']], timeout=60)
+                assert tool.returncode == 0
+                assembly = tool.stdout.decode('utf-8', errors='strict')
                 asm = work / ('function-' + str(index) + '.asm')
                 asm.write_text(assembly)
                 counts = instruction_evidence(assembly, config['arch'])
@@ -164,12 +270,13 @@ def main():
                                       object_sha256=obj['object_sha256'], assembly_sha256=digest(asm), **counts))
             for obj in objects:
                 assert digest(obj['cache_path']) == obj['cache_sha256']
+            assert objects and functions and all(f['instruction_lines'] > 0 for f in functions)
             rows.append(dict(profile=profile, fixture=case,
                              objects=[{k: v for k, v in obj.items() if k != 'symbols'} for obj in objects],
                              functions=functions, signed_execution_summary_sha256=summary_hash))
             save(output / 'checkpoint.json', dict(state='running', rows=rows))
             print('PASS actual authenticated cache assembly', config['arch'], profile, case, flush=True)
-    assert len(rows) == len(profiles) * len(cases)
+    assert rows and len(rows) == len(profiles) * len(cases)
     verify(config['pins'])
     verify(matrix['pins'])
     if tiered:
@@ -177,7 +284,8 @@ def main():
         assert digest(build_path) == product_qualification_hash
     verify(summary['actual_dependency_pins'])
     assert digest(summary_path) == summary_hash
-    subprocess.run(['/usr/bin/bash', config['cgroup_guard']], check=True)
+    guard_run = runner.execute('cgroup-guard-exit', ['/usr/bin/bash', str(guard_source)], timeout=30)
+    assert guard_run.returncode == 0
     save(output / 'summary.json', dict(passed=True, rows=rows, completed=len(rows),
          source_identities=summary['source_identities'], product_sha256=summary['product_sha256'],
          configuration_sha256=digest(args.config), code_sha256=digest(__file__),
@@ -187,4 +295,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    finally:
+        __cache_source_context__.close()

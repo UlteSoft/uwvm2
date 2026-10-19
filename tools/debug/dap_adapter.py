@@ -1019,12 +1019,24 @@ def _summarize_copied_variants(nodes):
             owner['value'], _ = summary(selection, [0, 0], 0)
 
 
+def _source_pretty_display(encoded):
+    """Remove one validated quoted-field layer for display only.
+
+    The complete structural packet and canonical metadata escapes were already
+    checked. Hex escapes stay visible, including controls and non-ASCII bytes.
+    This string never enters a path, expression, selector or broker command.
+    """
+    return re.sub(r'\\(["\\])', lambda match: match[1], encoded)
+
+
 def parse_source_object_display(text, expected_stop, expected_thread):
     """Parse a complete copied tree for presentation, never for queries.
 
     Labels and guest pointer spellings remain opaque. No selector, evaluateName,
     memoryReference or pointer-following permission is reconstructed from them.
-    Extended/omitted formatter packets keep their original unexpandable display.
+    Extended/omitted historical packets keep their original unexpandable display.
+    A pretty summary is separately validated opaque display; it does not discard
+    any already copied children or turn their offsets into read selectors.
     """
     validate_source_evaluation_reply(text, expected_stop, expected_thread)
     rows = text[:-1].split("\n")
@@ -1037,35 +1049,73 @@ def parse_source_object_display(text, expected_stop, expected_thread):
     if len(rows) - 2 > 1024:
         raise ValueError("source object exceeds its copied node budget")
     nodes, ancestry = [], []
-    pattern = re.compile(r"( *)(.+): type=(.+), offset=(0|[1-9][0-9]{0,19}), bytes=(0|[1-9][0-9]{0,19})(.*)")
+    pattern = re.compile(r"( *)(.+?): type=(.+?), offset=(0|[1-9][0-9]{0,19}), bytes=(0|[1-9][0-9]{0,19})(.*)")
+    pretty_pattern = re.compile(r', pretty="((?:[\x20-\x21\x23-\x5b\x5d-\x7e]|\\(?:["\\]|x[0-9a-f]{2}))*)"')
     for row in rows[1:-1]:
-        # Text follows the structural fields and may itself contain their
-        # delimiters. Keep its canonical formatter escapes as display DATA;
-        # never unescape it into a selector, path, address or terminal bytes.
-        structural, separator, copied_text = row.partition(", text=")
-        if separator:
-            if (copied_text.endswith(" (truncated)")
-                    or re.search(r", omitted-elements=[0-9]+$", copied_text)):
-                return None  # This grammar cannot prove a complete text value.
-            _validate_source_metadata_label(copied_text)
-        match = pattern.fullmatch(structural)
+        # Parse the structural header first, then consume only the two known
+        # prefix flags. A quoted summary may contain every historical delimiter
+        # (including ", text="); it must never be partitioned as structural DATA.
+        match = pattern.fullmatch(row)
         if match is None:
             return None
         spaces, name, kind, offset, size, suffix = match.groups()
+        structural = row[:match.start(6)]
         if (len(spaces) % 2 or len(spaces) > 64 or name != name.strip()
                 or structural.count(": type=") != 1 or structural.count(", offset=") != 1 or structural.count(", bytes=") != 1):
             raise ValueError("ambiguous source object row")
         _validate_source_metadata_label(name)
         _validate_source_metadata_label(kind)
+        detached = suffix.startswith(", copied-child")
+        if detached:
+            suffix = suffix.removeprefix(", copied-child")
+            if suffix and not suffix.startswith(", "):
+                raise ValueError("malformed copied-child source flag")
+        pretty = None
+        if suffix.startswith(", pretty="):
+            summary = pretty_pattern.match(suffix)
+            if summary is None:
+                raise ValueError("malformed quoted source pretty summary")
+            pretty = summary[1]
+            _validate_source_metadata_label(pretty)
+            suffix = suffix[summary.end():]
+            if suffix and not suffix.startswith(", "):
+                raise ValueError("malformed source pretty suffix")
+        if suffix.startswith((", copied-child", ", pretty")):
+            raise ValueError("duplicate or reordered source presentation flags")
+        # Historical text is unquoted. Its truncation/omission decorations do
+        # not revoke the independent copied tree when a valid pretty summary is
+        # present. They remain display DATA and can never mint a query selector.
+        suffix, separator, copied_text = suffix.partition(", text=")
+        if separator:
+            incomplete = (copied_text.endswith(" (truncated)")
+                          or re.search(r", omitted-elements=[0-9]+$", copied_text) is not None)
+            if incomplete and pretty is None:
+                return None
+            if incomplete:
+                omitted = re.search(r", omitted-elements=(0|[1-9][0-9]{0,19})$", copied_text)
+                if omitted is not None:
+                    if int(omitted[1]) >= 1 << 64:
+                        raise ValueError("source omitted-element count exceeds its bound")
+                    copied_text = copied_text[:omitted.start()]
+                copied_text = copied_text.removesuffix(" (truncated)")
+            _validate_source_metadata_label(copied_text)
+        elif pretty is not None:
+            omitted = re.search(r", omitted-elements=(0|[1-9][0-9]{0,19})$", suffix)
+            if omitted is not None:
+                if int(omitted[1]) >= 1 << 64:
+                    raise ValueError("source omitted-element count exceeds its bound")
+                suffix = suffix[:omitted.start()]
         depth, offset, size = len(spaces) // 2, int(offset), int(size)
         if offset >= 1 << 64 or size > 65536 or offset + size >= 1 << 64:
             raise ValueError("source object extent exceeds its bounded guest image")
         if (not nodes and depth != 0 or nodes and depth == 0 or depth > len(ancestry)):
             raise ValueError("source object tree has an invalid parent")
         parent = ancestry[depth - 1] if depth else None
+        if detached and parent is None:
+            raise ValueError("a copied-child requires an existing source parent")
         if parent is not None:
             owner = nodes[parent]
-            if offset < owner['offset'] or offset + size > owner['offset'] + owner['size']:
+            if not detached and (offset < owner['offset'] or offset + size > owner['offset'] + owner['size']):
                 raise ValueError("source object child exceeds its copied parent")
         variant = re.fullmatch(r", (variant-part|active-variant)(, default)?(?:, unavailable=(.+))?", suffix)
         role, reason = None, None
@@ -1149,6 +1199,7 @@ def parse_source_object_display(text, expected_stop, expected_thread):
         nodes.append(dict(name=name, type=kind, value=value, offset=offset, size=size,
                           children=[], variant_role=role, variant_reason=reason,
                           copied_value=suffix.startswith(", value=") or bool(separator),
+                          pretty=pretty, detached_copy=detached,
                           indexed=re.fullmatch(r"\[(?:0|[1-9][0-9]{0,19})\]", name) is not None))
         if parent is not None:
             nodes[parent]['children'].append(index)
@@ -2354,7 +2405,12 @@ class Adapter:
         # rejected or diagnostic-only batches. Do not infer child success or a
         # new pause/generation from its transcript or truncated display.
         scripted = bool(words and words[0] == "wasm-script")
-        if replacing or scripted or words and words[0] in ("continue", "c", "step", "s", "ni", "nexti", "finish", "fin", "quit", "q"):
+        # Printer policy can change copied values without advancing the actual
+        # guest stop. Retire before a possibly committed configuration; a fresh
+        # authoritative status/frame query must mint replacement opaque labels.
+        printer_configuration = (words[:2] == ["set", "print"] or
+                                 words[:1] == ["pretty-printer"] and words[1:2] != ["list"])
+        if replacing or scripted or printer_configuration or words and words[0] in ("continue", "c", "step", "s", "ni", "nexti", "finish", "fin", "quit", "q"):
             self.invalidate_stop()
         try:
             reply = self.broker.request(text)
@@ -2428,7 +2484,8 @@ class Adapter:
         references = [self.new_reference() if node['children'] else 0 for node in nodes]
         variables = []
         for index, node in enumerate(nodes):
-            variable = dict(name=node['name'], type=node['type'], value=node['value'],
+            variable = dict(name=node['name'], type=node['type'],
+                            value=_source_pretty_display(node['pretty']) if node.get('pretty') is not None else node['value'],
                             variablesReference=references[index], presentationHint={'attributes': ['readOnly']})
             if node['children']:
                 variable['namedVariables'] = sum(not nodes[child]['indexed'] for child in node['children'])

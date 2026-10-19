@@ -339,6 +339,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         // requires setting the FILE_SHARED_WRITE flag to enable this). At this point, .. cannot be trusted. Naturally, we maintain a directory stack.
         // We obtain the FD from the already-opened directories (reference counts) in the directory stack, and this FD is trustworthy.
 
+        // P1 buf_used < buf_len means EOF: copy the actual last-entry prefix,
+        // including a partial header, rather than report an unfilled short page.
+        auto const write_dirent_prefix{[&](::uwvm2::imported::wasi::wasip1::abi::dircookie_t next,
+                                            ::uwvm2::imported::wasi::wasip1::abi::inode_t ino,
+                                            ::uwvm2::imported::wasi::wasip1::abi::dirnamlen_t namlen,
+                                            ::uwvm2::imported::wasi::wasip1::abi::filetype_t type,
+                                            char8_t const* filename,
+                                            ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t write_size) noexcept
+        {
+            if(write_size == 0u) { return; }
+            ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32(memory, buf_ptrsz, byte_write_all_size + write_size);
+            // Explicit little-endian bytes also define the three padding bytes.
+            ::std::byte header[size_of_wasi_dirent_t]{};
+            for(::std::size_t i{}; i != 8uz; ++i)
+            {
+                header[i] = static_cast<::std::byte>(static_cast<::std::uint_least64_t>(next) >> (i * 8u));
+                header[8uz + i] = static_cast<::std::byte>(static_cast<::std::uint_least64_t>(ino) >> (i * 8u));
+            }
+            for(::std::size_t i{}; i != 4uz; ++i)
+            { header[16uz + i] = static_cast<::std::byte>(static_cast<::std::uint_least32_t>(namlen) >> (i * 8u)); }
+            header[20uz] = static_cast<::std::byte>(static_cast<::std::uint_least8_t>(type));
+            auto const header_bytes{write_size < size_of_wasi_dirent_t ? static_cast<::std::size_t>(write_size) : size_of_wasi_dirent_t};
+            ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked(
+                memory, buf_ptrsz + byte_write_all_size, header, header + header_bytes);
+            if(write_size > size_of_wasi_dirent_t)
+            {
+                auto const filename_bytes{static_cast<::std::size_t>(write_size - size_of_wasi_dirent_t)};
+                ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked(
+                    memory, buf_ptrsz + byte_write_all_size + size_of_wasi_dirent_t,
+                    reinterpret_cast<::std::byte const*>(filename), reinterpret_cast<::std::byte const*>(filename + filename_bytes));
+            }
+        }};
+
         // '.'
         {
             decltype(auto) d_filename{u8"."};
@@ -379,59 +412,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 if(curr_write_size > ::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max()) { goto privous; }
             }
             auto const curr_write_size_wasi{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(curr_write_size)};
-            auto const new_byte_write_all_size{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(byte_write_all_size + curr_write_size_wasi)};
-            if(new_byte_write_all_size < byte_write_all_size) { goto privous; }
-            if(buf_remaining_size < curr_write_size_wasi) { goto privous; }
-
-            ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32(memory, buf_ptrsz, new_byte_write_all_size);
-
-            if constexpr(is_default_wasi_dirent_data_layout())
-            {
-                wasi_dirent_t tmp_wasi_dirent;  // no initialize
-                tmp_wasi_dirent.d_next = d_next;
-                tmp_wasi_dirent.d_ino = d_ino;
-                tmp_wasi_dirent.d_namlen = d_namlen;
-                tmp_wasi_dirent.d_type = d_type;
-
-                ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked(
-                    memory,
-                    buf_ptrsz + byte_write_all_size,
-                    reinterpret_cast<::std::byte const*>(::std::addressof(tmp_wasi_dirent)),
-                    reinterpret_cast<::std::byte const*>(::std::addressof(tmp_wasi_dirent)) + sizeof(tmp_wasi_dirent));
-            }
-            else
-            {
-                ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                    memory,
-                    buf_ptrsz + byte_write_all_size,
-                    static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::dircookie_t>>(d_next));
-
-                ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                    memory,
-                    buf_ptrsz + byte_write_all_size + 8u,
-                    static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::inode_t>>(d_ino));
-
-                ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                    memory,
-                    buf_ptrsz + byte_write_all_size + 16u,
-                    static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::dirnamlen_t>>(d_namlen));
-
-                ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                    memory,
-                    buf_ptrsz + byte_write_all_size + 20u,
-                    static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::filetype_t>>(d_type));
-            }
-
-            ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked(
-                memory,
-                buf_ptrsz + byte_write_all_size + size_of_wasi_dirent_t,
-                reinterpret_cast<::std::byte const*>(d_filename),
-                reinterpret_cast<::std::byte const*>(d_filename + d_filename_cstrlen));
-
-            buf_remaining_size -= curr_write_size_wasi;
+            auto const write_size_wasi{buf_remaining_size < curr_write_size_wasi ? buf_remaining_size : curr_write_size_wasi};
+            auto const new_byte_write_all_size{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(byte_write_all_size + write_size_wasi)};
+            if(new_byte_write_all_size < byte_write_all_size) [[unlikely]] { goto readdir_done; }
+            write_dirent_prefix(d_next, d_ino, d_namlen, d_type, d_filename, write_size_wasi);
+            buf_remaining_size -= write_size_wasi;
             byte_write_all_size = new_byte_write_all_size;
-
             ++dircookie_counter;
+            if(write_size_wasi < curr_write_size_wasi) { goto readdir_done; }
         }
 
     privous:
@@ -507,59 +495,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 if(curr_write_size > ::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max()) { goto files; }
             }
             auto const curr_write_size_wasi{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(curr_write_size)};
-            auto const new_byte_write_all_size{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(byte_write_all_size + curr_write_size_wasi)};
-            if(new_byte_write_all_size < byte_write_all_size) { goto files; }
-            if(buf_remaining_size < curr_write_size_wasi) { goto files; }
-
-            ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32(memory, buf_ptrsz, new_byte_write_all_size);
-
-            if constexpr(is_default_wasi_dirent_data_layout())
-            {
-                wasi_dirent_t tmp_wasi_dirent;  // no initialize
-                tmp_wasi_dirent.d_next = d_next;
-                tmp_wasi_dirent.d_ino = d_ino;
-                tmp_wasi_dirent.d_namlen = d_namlen;
-                tmp_wasi_dirent.d_type = d_type;
-
-                ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked(
-                    memory,
-                    buf_ptrsz + byte_write_all_size,
-                    reinterpret_cast<::std::byte const*>(::std::addressof(tmp_wasi_dirent)),
-                    reinterpret_cast<::std::byte const*>(::std::addressof(tmp_wasi_dirent)) + sizeof(tmp_wasi_dirent));
-            }
-            else
-            {
-                ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                    memory,
-                    buf_ptrsz + byte_write_all_size,
-                    static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::dircookie_t>>(d_next));
-
-                ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                    memory,
-                    buf_ptrsz + byte_write_all_size + 8u,
-                    static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::inode_t>>(d_ino));
-
-                ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                    memory,
-                    buf_ptrsz + byte_write_all_size + 16u,
-                    static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::dirnamlen_t>>(d_namlen));
-
-                ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                    memory,
-                    buf_ptrsz + byte_write_all_size + 20u,
-                    static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::filetype_t>>(d_type));
-            }
-
-            ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked(
-                memory,
-                buf_ptrsz + byte_write_all_size + size_of_wasi_dirent_t,
-                reinterpret_cast<::std::byte const*>(d_filename),
-                reinterpret_cast<::std::byte const*>(d_filename + d_filename_cstrlen));
-
-            buf_remaining_size -= curr_write_size_wasi;
+            auto const write_size_wasi{buf_remaining_size < curr_write_size_wasi ? buf_remaining_size : curr_write_size_wasi};
+            auto const new_byte_write_all_size{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(byte_write_all_size + write_size_wasi)};
+            if(new_byte_write_all_size < byte_write_all_size) [[unlikely]] { goto readdir_done; }
+            write_dirent_prefix(d_next, d_ino, d_namlen, d_type, d_filename, write_size_wasi);
+            buf_remaining_size -= write_size_wasi;
             byte_write_all_size = new_byte_write_all_size;
-
             ++dircookie_counter;
+            if(write_size_wasi < curr_write_size_wasi) { goto readdir_done; }
         }
 
     files:
@@ -696,84 +639,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
 
                 auto const curr_write_size_wasi{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(curr_write_size)};
-                auto const header_write_size_wasi{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(size_of_wasi_dirent_t)};
-                auto write_size_wasi{curr_write_size_wasi};
-
-                if(buf_remaining_size < curr_write_size_wasi)
-                {
-                    // The remaining size of the buffer is less than the writable size.
-                    if(buf_remaining_size < header_write_size_wasi) [[unlikely]] { break; }
-
-                    write_size_wasi = buf_remaining_size;
-                }
-
+                auto const write_size_wasi{buf_remaining_size < curr_write_size_wasi ? buf_remaining_size : curr_write_size_wasi};
                 auto const new_byte_write_all_size{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(byte_write_all_size + write_size_wasi)};
-                if(new_byte_write_all_size < byte_write_all_size) [[unlikely]]
-                {
-                    // Overflow-induced wrap-around, though it returns correctly here.
-                    break;
-                }
-
-                // write to memory (Check all boundaries)
-                ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32(memory, buf_ptrsz, new_byte_write_all_size);
-
-                // After verification, `buf_ptrsz + byte_write_all_size + curr_write_size_wasi` will not overflow.
-
-                if constexpr(is_default_wasi_dirent_data_layout())
-                {
-                    // If the memory is identical, it is copied directly, which is the most efficient approach.
-                    wasi_dirent_t tmp_wasi_dirent;  // no initialize
-                    tmp_wasi_dirent.d_next = d_next;
-                    tmp_wasi_dirent.d_ino = d_ino;
-                    tmp_wasi_dirent.d_namlen = d_namlen;
-                    tmp_wasi_dirent.d_type = d_type;
-
-                    ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked(
-                        memory,
-                        buf_ptrsz + byte_write_all_size,
-                        reinterpret_cast<::std::byte const*>(::std::addressof(tmp_wasi_dirent)),
-                        reinterpret_cast<::std::byte const*>(::std::addressof(tmp_wasi_dirent)) + sizeof(tmp_wasi_dirent));
-                }
-                else
-                {
-                    // Ensure the structure meets the requirements for wasi memory.
-                    ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                        memory,
-                        buf_ptrsz + byte_write_all_size,
-                        static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::dircookie_t>>(d_next));
-
-                    ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                        memory,
-                        buf_ptrsz + byte_write_all_size + 8u,
-                        static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::inode_t>>(d_ino));
-
-                    ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                        memory,
-                        buf_ptrsz + byte_write_all_size + 16u,
-                        static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::dirnamlen_t>>(d_namlen));
-
-                    ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                        memory,
-                        buf_ptrsz + byte_write_all_size + 20u,
-                        static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::filetype_t>>(d_type));
-                }
-
-                if(write_size_wasi > header_write_size_wasi)
-                {
-                    auto const filename_write_size{static_cast<::std::size_t>(write_size_wasi - header_write_size_wasi)};
-
-                    ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked(
-                        memory,
-                        buf_ptrsz + byte_write_all_size + size_of_wasi_dirent_t,
-                        reinterpret_cast<::std::byte const*>(d_filename.cbegin()),
-                        reinterpret_cast<::std::byte const*>(d_filename.cbegin() + filename_write_size));
-                }
-
-                // Settlement upon completion of writing
+                if(new_byte_write_all_size < byte_write_all_size) [[unlikely]] { goto readdir_done; }
+                write_dirent_prefix(d_next, d_ino, d_namlen, d_type, d_filename.cbegin(), write_size_wasi);
                 buf_remaining_size -= write_size_wasi;
                 byte_write_all_size = new_byte_write_all_size;
-
                 ++dircookie_counter;
+                if(write_size_wasi < curr_write_size_wasi) { goto readdir_done; }
             }
         }
 # ifdef UWVM_CPP_EXCEPTIONS
@@ -785,6 +658,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
 
         // need check
+    readdir_done:
+
         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32(
             memory,
             buf_used_ptrsz,

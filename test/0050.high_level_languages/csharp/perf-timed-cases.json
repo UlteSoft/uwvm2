@@ -1,0 +1,50 @@
+[
+  {
+    "name": "csharp-mono-wasm-timed-1000000",
+    "language": "csharp",
+    "target": "mono-wasm",
+    "rounds": 1000000,
+    "wasm": "/tmp/high-level-20261017/csharp/target/build-timed/AppBundle/highlevel-csharp-timed.wasm",
+    "wasm_sha256": "6500f679c640016c21661b4e71498c4ee4ebbc84551a60b44c6ba241e70df598",
+    "expected_checksum": 592549767,
+    "clock_kind": "monotonic-ticks",
+    "mode": "release",
+    "purpose": "ordinary-long",
+    "checks": [
+      "csharp classes=42 arrays=55 strings=7 exceptions=3 iterations=1000000 checksum=592549767"
+    ],
+    "kernel_time": "ticks",
+    "kernel_clock": "monotonic",
+    "args": [
+      "1000000"
+    ],
+    "clock_line_prefix": "csharp kernel iterations=1000000 ticks=",
+    "checksum_line": "csharp classes=42 arrays=55 strings=7 exceptions=3 iterations=1000000 checksum=592549767",
+    "generated_source": "/tmp/high-level-20261017/csharp/src/ProgramTimed.cs",
+    "oracle": "/tmp/high-level-20261017/recovery/csharp/references/report.json"
+  },
+  {
+    "name": "csharp-mono-wasm-timed-20000",
+    "language": "csharp",
+    "target": "mono-wasm",
+    "rounds": 20000,
+    "wasm": "/tmp/high-level-20261017/csharp/target/build-timed/AppBundle/highlevel-csharp-timed.wasm",
+    "wasm_sha256": "6500f679c640016c21661b4e71498c4ee4ebbc84551a60b44c6ba241e70df598",
+    "expected_checksum": 2356050119,
+    "clock_kind": "monotonic-ticks",
+    "mode": "release",
+    "purpose": "debug-hardware-short",
+    "checks": [
+      "csharp classes=42 arrays=55 strings=7 exceptions=3 iterations=20000 checksum=2356050119"
+    ],
+    "kernel_time": "ticks",
+    "kernel_clock": "monotonic",
+    "args": [
+      "20000"
+    ],
+    "clock_line_prefix": "csharp kernel iterations=20000 ticks=",
+    "checksum_line": "csharp classes=42 arrays=55 strings=7 exceptions=3 iterations=20000 checksum=2356050119",
+    "generated_source": "/tmp/high-level-20261017/csharp/src/ProgramTimed.cs",
+    "oracle": "/tmp/high-level-20261017/recovery/csharp/references/report.json"
+  }
+]

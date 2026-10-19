@@ -5,6 +5,7 @@
 # include <algorithm>
 # include <bit>
 # include <memory>
+# include <span>
 # include <string_view>
 # include <uwvm2/utils/macro/push_macros.h>
 # include <fast_io.h>
@@ -288,6 +289,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_messages
             default: ::fast_io::io::print(stream, "<unavailable: unsupported scalar>"); break;
         }
     }
+    [[nodiscard]] inline bool pretty_visible(::std::span<source_dwarf::object_node const> nodes,::std::size_t index) noexcept
+    {
+        for(unsigned depth{};depth!=33u;++depth)
+        {
+            if(index >= nodes.size()) { return false; }
+            auto const parent{nodes[index].parent};
+            if(parent == source_dwarf::no_record) { return true; }
+            if(parent >= index || (nodes[parent].pretty_available && !nodes[index].detached_copy)) { return false; }
+            index = parent;
+        }
+        return false;
+    }
     [[nodiscard]] inline ::fast_io::string source_values(controller_reply const& reply, console_command const& command, view raw)
     {
         bool const expression{command.kind == console_command_kind::source_value || command.kind == console_command_kind::source_type};
@@ -305,6 +318,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_messages
             {
                 auto const& node{reply.source_object_type[i]};
                 if(node.depth > 32u || (node.parent != source_dwarf::no_record && node.parent >= i)) { return {}; }
+                if(command.kind == console_command_kind::source_value && !pretty_visible(reply.source_object_type,i)) { continue; }
                 ::fast_io::string row{}; ::fast_io::ostring_ref_fast_io stream{::std::addressof(row)};
                 for(::std::size_t depth{}; depth < node.depth; ++depth) { ::fast_io::io::print(stream, "  "); }
                 auto const type{node.type_name.empty() ? source_dwarf::object_type_kind_text(node.kind) : ::std::string_view{node.type_name}};
@@ -331,7 +345,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_messages
                     auto const name{i == 0u ? ::std::string_view{command.source_variable_name.data(), command.source_variable_name_size} :
                         node.name.empty() ? ::std::string_view{"<unnamed>"} : ::std::string_view{node.name}};
                     ::fast_io::io::print(stream, source_dwarf::escaped_metadata_text{name}, " = ");
-                    if(node.reason != source_dwarf::object_unavailable_reason::none)
+                    if(node.pretty_available)
+                    { ::fast_io::io::print(stream, source_dwarf::readable_metadata_text{node.pretty_summary}); }
+                    else if(node.reason != source_dwarf::object_unavailable_reason::none)
                     { ::fast_io::io::print(stream, "<unavailable: ", source_dwarf::object_reason_text(node.reason), ">"); }
                     else if(node.value_available)
                     {
@@ -343,8 +359,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::console_messages
                             node.kind == source_dwarf::type_kind::union_type || node.kind == source_dwarf::type_kind::array || node.variant_part || node.variant_case)
                     { ::fast_io::io::print(stream, "(", source_dwarf::escaped_metadata_text{type}, ")"); }
                     else { ::fast_io::io::print(stream, "<unavailable: value was not captured>"); }
-                    if(node.display_text_available)
+                    if(node.display_text_available && !node.pretty_available)
                     { ::fast_io::io::print(stream, " [text: ", source_dwarf::escaped_metadata_text{node.display_text}, node.display_text_truncated ? view{"; truncated]"} : view{"]"}); }
+                    if(node.pretty_available && node.pretty_truncated && node.pretty_omitted != 0u)
+                    { ::fast_io::io::print(stream, " [", ::fast_io::mnp::dec(node.pretty_omitted), " pretty-printer elements omitted]"); }
                     if(node.variant_case) { ::fast_io::io::print(stream, node.active_variant ? view{" [active variant]"} : view{" [variant]"}); }
                 }
                 if(node.omitted_children != 0u) { ::fast_io::io::print(stream, " [", ::fast_io::mnp::dec(node.omitted_children), " elements omitted]"); }

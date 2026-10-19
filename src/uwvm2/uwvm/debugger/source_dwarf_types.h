@@ -11,6 +11,7 @@
 # include <cstddef>
 # include <cstdint>
 # include <limits>
+# include <memory>
 # include <optional>
 # include <span>
 # include <string>
@@ -49,8 +50,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
         ::std::size_t max_sections{64u}, max_section_bytes{1024u * 1024u};
         ::std::size_t max_total_bytes{8u * 1024u * 1024u};
         ::std::size_t max_units{256u}, max_unit_bytes{256u * 1024u};
-        ::std::size_t max_dies{65536u}, max_depth{64u};
-        ::std::size_t max_string_bytes{4096u}, max_total_string_bytes{1024u * 1024u};
+        // Linked Rust/std metadata can exceed 65536 DIEs within these byte and
+        // unit bounds. This remains an actual parsed-entry cap, not a heap cap.
+        ::std::size_t max_dies{131072u}, max_depth{64u};
+        ::std::size_t max_string_bytes{4096u}, max_total_string_bytes{8u * 1024u * 1024u};
+        // All copied attribute uses count, including repeated declarations in
+        // standard-library CUs; their sum can exceed the raw .debug_str size.
         ::std::size_t max_reference_hops{16u}, max_attributes{1024u * 1024u};
         ::std::size_t max_ranges{65536u}, max_locations{65536u}, max_line_rows{65536u};
         ::std::size_t max_expression_bytes{256u}, max_total_expression_bytes{1024u * 1024u};
@@ -96,7 +101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
         // zeros are not an initialized value, address or read capability.
         bool available{};
     };
-    enum class plan_kind : unsigned { unavailable, wasm_local_value, constant_value, frame_relative_offset, wasm_local_frame_base, composite_value, absolute_guest_offset };
+    enum class plan_kind : unsigned { unavailable, wasm_local_value, constant_value, frame_relative_offset, wasm_local_frame_base, composite_value, absolute_guest_offset, frame_relative_indirect_offset, wasm_local_guest_offset };
     enum class unavailable_reason : unsigned
     {
         none, no_location, empty_location, unsupported_expression, unsupported_wasm_location,
@@ -120,6 +125,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
         unavailable_reason reason{unavailable_reason::no_location};
         ::std::uint64_t local_index{}, constant_bits{};
         ::std::int64_t displacement{};
+        ::std::uint64_t indirect_addend{}; // one described guest-pointer load, then bounded addition
         ::std::array<::std::byte, 16u> implicit_bytes{};
         ::std::uint8_t byte_count{}, address_bytes{};
         bool signed_constant{}, implicit_constant{};
@@ -357,12 +363,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
         else if(name == "unsigned long long" || name == "unsigned long long int" || name == "long long unsigned int") { kind = c_wide_builtin::unsigned_long_long; }
         return c_wide_extent(kind,bytes,address_bytes) && encoding == (c_wide_unsigned(kind) ? 0x07u : 0x05u) ? kind : c_wide_builtin::unknown;
     }
+    struct template_value_record
+    {
+        ::std::size_t position{}, type{no_record};
+        ::std::uint64_t bits{};
+        bool signed_value{}, available{};
+    };
+    struct static_constant_record
+    {
+        ::std::string name{};
+        ::std::size_t type{no_record};
+        ::std::uint64_t bits{};
+        bool signed_value{}, available{};
+    };
     struct type_record
     {
         die_key identity{};
         die_key declaration_identity{}; // final owned type DIE after cv/typedef wrappers
         ::std::string name{};
         type_kind kind{};
+        // Exact aggregate DIE name after cv/typedef wrappers. Keep the user's
+        // display alias separately; this is metadata, never an ABI name guess.
+        ::std::string aggregate_name{};
+        // Cold C++ library completion evidence. These are copied declaration
+        // labels, never code addresses, calls or source-memory capabilities.
+        ::std::string qualified_type_name{};
+        ::std::array<::std::string,3u> completion_anchors{};
         ::std::uint64_t encoding{};
         ::std::uint8_t byte_count{};
         // Object sizes and offsets are Wasm linear-memory quantities. They are
@@ -374,6 +400,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
         // None of these references is executable or a guest read capability.
         ::std::size_t containing_type{no_record};
         ::std::vector<::std::size_t> parameter_types{};
+        // Owned DW_TAG_template_type_parameter references for library ABI
+        // profiles. Template names alone do not establish an element layout.
+        ::std::vector<::std::size_t> template_types{};
+        ::std::vector<template_value_record> template_values{};
+        ::std::vector<static_constant_record> static_constants{};
         ::std::uint64_t calling_convention{};
         ::std::uint8_t method_qualifiers{};
         bool signature_complete{}, variadic{}, calling_convention_known{};
@@ -395,11 +426,228 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
         // by its alias name. This creates no source write/read authority.
         ::std::uint8_t display_qualifiers{}; // const=1, volatile=2, restrict=4, atomic=8.
         bool named_type_alias{};
+        // Owned C/C++ void semantics, kept distinct from an incomplete type.
+        // It never establishes a size or authorizes reading a pointee.
+        bool void_type{};
+        bool rust_unit_type{}; // own Rust DW_TAG_base_type (), zero-byte unique value; no memory access
+        // libc++ 18 default deque ABI proved by this class's own qualified
+        // namespace and version-tagged member declarations; not a size guess.
+        bool libcxx18_deque_blocks{};
+        bool libcxx23_abi2_small_deque_blocks{}; // own libc++ 23.1 ABI2 versioned methods
+        bool clang23_wasi32_coro_handle{}; // exact SDK34 compiler and libc++23 ABI2 methods
+        bool clang23_wasm32_coro_dwarf{}; // exact own-CU artificial header; offsets stay unchanged
+        bool clang18_wasi32_coro_handle{}; // owning compiler, namespace and libc++ method evidence
+        bool clang18_wasm32_coro_dwarf{}; // exact owning CU/compiler + artificial header evidence
+        ::std::uint64_t original_coro_destroy_offset{}; // preserved original DWARF; zero unless normalized
         cxx_narrow_builtin narrow_builtin{}; // final same-CU base, not the alias name
         bool atomic_scalar{}; // any atomic wrapper, including wrappers hidden by a named typedef
         c_wide_builtin wide_builtin{}; // validated standard rank on this CU's finite Wasm ABI
         bool zig_producer{}; // Direct owning CU producer metadata, never a file/type-name guess.
     };
+    [[nodiscard]] inline bool rust_unit(type_record const& type) noexcept
+    {
+        return type.rust_unit_type && type.language==0x1cu && type.kind==type_kind::scalar &&
+            type.size_known && type.byte_size==0u && type.byte_count==0u && type.encoding==7u &&
+            !type.atomic_scalar && !type.void_type && !type.reference_type && !type.rvalue_reference_type &&
+            type.referenced_type==no_record && type.members.empty() && type.dimensions.empty() &&
+            type.variant_parts.empty() && type.template_types.empty() && type.enumerators.empty();
+    }
+    // LLVM18 buildFrameDebugInfo uses OffsetCache[DestroyIndex]={8,8}
+    // even on Wasm32, while its actual frame has two packed target pointers.
+    // https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/lib/Transforms/Coroutines/CoroFrame.cpp
+    // Normalize only the already proved compiler record, retain the reported
+    // offset, and never alter the original embedded DWARF sections.
+    [[nodiscard]] inline bool normalize_clang18_wasm32_coroutine(::std::span<type_record> types,::std::size_t index) noexcept
+    {
+        if(index>=types.size()) { return false; }auto& frame{types[index]};
+        if(!frame.clang18_wasm32_coro_dwarf) { return false; }
+        frame.clang18_wasm32_coro_dwarf=false;
+        ::std::string_view spelling{frame.aggregate_name.empty() ? frame.name : frame.aggregate_name};
+        if(!cxx_language(frame.language) || frame.tinygo_producer || frame.zig_producer || frame.atomic_scalar ||
+           !frame.size_known || frame.byte_size<9u || frame.byte_size>65536u || frame.members.size()>1024u ||
+           (frame.kind!=type_kind::structure && frame.kind!=type_kind::class_type) || !spelling.ends_with(".coro_frame_ty") ||
+           frame.declaration_identity==die_key{}) { return false; }
+        member_record *resume{},*destroy{},*promise{},*state{};
+        for(auto& field:frame.members)
+        {
+            member_record** slot{};
+            if(field.name=="__resume_fn")slot=&resume;
+            else if(field.name=="__destroy_fn")slot=&destroy;
+            else if(field.name=="__promise")slot=&promise;
+            else if(field.name=="__coro_index")slot=&state;
+            else continue;
+            if(*slot || !field.offset_known || field.bit_field || field.inherited || field.type>=types.size()) { return false; }
+            auto const& value{types[field.type]};
+            if(!value.size_known || value.byte_size==0u || field.byte_offset>frame.byte_size ||
+               value.byte_size>frame.byte_size-field.byte_offset) { return false; }
+            *slot=::std::addressof(field);
+        }
+        if(!resume || !destroy || !promise || !state || resume->byte_offset!=0u || promise->byte_offset!=8u ||
+           (destroy->byte_offset!=8u && !(destroy->byte_offset==4u && frame.original_coro_destroy_offset==8u)) ||
+           resume->type!=destroy->type || state->byte_offset<8u) { return false; }
+        auto const& pointer{types[resume->type]};auto const& value{types[promise->type]};auto const& counter{types[state->type]};
+        if(pointer.kind!=type_kind::pointer || pointer.reference_type || pointer.rvalue_reference_type || pointer.atomic_scalar ||
+           pointer.byte_size!=4u || pointer.byte_count!=4u || !cxx_language(pointer.language) || pointer.tinygo_producer ||
+           pointer.zig_producer || (pointer.address_class_known && pointer.address_class!=0u)) { return false; }
+        if(pointer.referenced_type!=no_record)
+        {
+            if(pointer.referenced_type>=types.size()) { return false; }auto const& erased{types[pointer.referenced_type]};
+            if(!erased.void_type || erased.kind!=type_kind::unavailable || erased.size_known || erased.atomic_scalar ||
+               erased.reference_type || erased.rvalue_reference_type || erased.referenced_type!=no_record ||
+               erased.byte_size!=0u || erased.byte_count!=0u || erased.encoding!=0u || !cxx_language(erased.language) || erased.tinygo_producer || erased.zig_producer) { return false; }
+        }
+        if((value.kind!=type_kind::structure && value.kind!=type_kind::class_type) || value.atomic_scalar ||
+           !cxx_language(value.language) || value.tinygo_producer || value.zig_producer ||
+           value.declaration_identity.unit!=frame.declaration_identity.unit ||
+           counter.kind!=type_kind::scalar || counter.atomic_scalar || !cxx_language(counter.language) ||
+           (counter.encoding!=7u && counter.encoding!=8u) || counter.byte_size!=counter.byte_count ||
+           (counter.byte_size!=1u && counter.byte_size!=2u && counter.byte_size!=4u && counter.byte_size!=8u))
+        { return false; }
+        destroy->byte_offset=4u;frame.original_coro_destroy_offset=8u;frame.clang18_wasm32_coro_dwarf=true;return true;
+    }
+    // SDK34 Clang23 emits the correct target-width header. Validate the
+    // copied schema without applying the LLVM18 compatibility correction.
+    [[nodiscard]] inline bool validate_clang23_wasm32_coroutine(::std::span<type_record> types,::std::size_t index) noexcept
+    {
+        if(index>=types.size()) { return false; }auto& frame{types[index]};
+        if(!frame.clang23_wasm32_coro_dwarf) { return false; }
+        frame.clang23_wasm32_coro_dwarf=false;
+        ::std::string_view spelling{frame.aggregate_name.empty() ? frame.name : frame.aggregate_name};
+        if(!cxx_language(frame.language) || frame.tinygo_producer || frame.zig_producer || frame.atomic_scalar ||
+           !frame.size_known || frame.byte_size<9u || frame.byte_size>65536u || frame.members.size()>1024u ||
+           (frame.kind!=type_kind::structure && frame.kind!=type_kind::class_type) || !spelling.ends_with(".coro_frame_ty") ||
+           frame.declaration_identity==die_key{}) { return false; }
+        member_record *resume{},*destroy{},*promise{},*state{};
+        for(auto& field:frame.members)
+        {
+            member_record** slot{};
+            if(field.name=="__resume_fn")slot=&resume;
+            else if(field.name=="__destroy_fn")slot=&destroy;
+            else if(field.name=="__promise")slot=&promise;
+            else if(field.name=="__coro_index")slot=&state;
+            else continue;
+            if(*slot || !field.offset_known || field.bit_field || field.inherited || field.type>=types.size()) { return false; }
+            auto const& value{types[field.type]};
+            if(!value.size_known || value.byte_size==0u || field.byte_offset>frame.byte_size ||
+               value.byte_size>frame.byte_size-field.byte_offset) { return false; }
+            *slot=::std::addressof(field);
+        }
+        if(!resume || !destroy || !promise || !state || resume->byte_offset!=0u || promise->byte_offset!=8u ||
+           (destroy->byte_offset!=4u || frame.original_coro_destroy_offset!=0u) ||
+           resume->type!=destroy->type || state->byte_offset<8u) { return false; }
+        auto const& pointer{types[resume->type]};auto const& value{types[promise->type]};auto const& counter{types[state->type]};
+        if(pointer.kind!=type_kind::pointer || pointer.reference_type || pointer.rvalue_reference_type || pointer.atomic_scalar ||
+           pointer.byte_size!=4u || pointer.byte_count!=4u || !cxx_language(pointer.language) || pointer.tinygo_producer ||
+           pointer.zig_producer || (pointer.address_class_known && pointer.address_class!=0u)) { return false; }
+        if(pointer.referenced_type!=no_record)
+        {
+            if(pointer.referenced_type>=types.size()) { return false; }auto const& erased{types[pointer.referenced_type]};
+            if(!erased.void_type || erased.kind!=type_kind::unavailable || erased.size_known || erased.atomic_scalar ||
+               erased.reference_type || erased.rvalue_reference_type || erased.referenced_type!=no_record ||
+               erased.byte_size!=0u || erased.byte_count!=0u || erased.encoding!=0u || !cxx_language(erased.language) || erased.tinygo_producer || erased.zig_producer) { return false; }
+        }
+        if((value.kind!=type_kind::structure && value.kind!=type_kind::class_type) || value.atomic_scalar ||
+           !cxx_language(value.language) || value.tinygo_producer || value.zig_producer ||
+           value.declaration_identity.unit!=frame.declaration_identity.unit ||
+           counter.kind!=type_kind::scalar || counter.atomic_scalar || !cxx_language(counter.language) ||
+           (counter.encoding!=7u && counter.encoding!=8u) || counter.byte_size!=counter.byte_count ||
+           (counter.byte_size!=1u && counter.byte_size!=2u && counter.byte_size!=4u && counter.byte_size!=8u))
+        { return false; }
+        frame.clang23_wasm32_coro_dwarf=true;return true;
+    }
+    // A final owned DIE, never a spelling/sizeof match, identifies aliases.
+    [[nodiscard]] inline bool same_cpp_value_type(::std::span<type_record const> types,
+        ::std::size_t left,::std::size_t right) noexcept
+    {
+        if(left>=types.size() || right>=types.size()) { return false; }
+        auto const& a{types[left]};auto const& b{types[right]};
+        if(left!=right && (a.declaration_identity==die_key{} || a.declaration_identity!=b.declaration_identity)) { return false; }
+        return a.kind!=type_kind::unavailable && a.kind==b.kind && a.size_known && b.size_known &&
+            a.byte_size==b.byte_size && a.byte_count==b.byte_count && a.encoding==b.encoding &&
+            a.reference_type==b.reference_type && a.rvalue_reference_type==b.rvalue_reference_type &&
+            a.atomic_scalar==b.atomic_scalar && a.language==b.language && cxx_language(a.language) &&
+            !a.tinygo_producer && !b.tinygo_producer && !a.zig_producer && !b.zig_producer;
+    }
+    // libc++ deliberately exports two shared-count legacy inline methods.
+    // The exact third (use_count) linkage binds the same qualified class and
+    // full ABI tag. Only those two methods may omit that exact tag.
+    [[nodiscard]] inline bool shared_count_legacy_anchors(type_record const& a,type_record const& b) noexcept
+    {
+        if(a.qualified_type_name!=b.qualified_type_name) { return false; }
+        ::std::string_view owner{};
+        if(a.qualified_type_name=="std::__1::__shared_weak_count") { owner="St3__119__shared_weak_count"; }
+        else if(a.qualified_type_name=="std::__2::__shared_weak_count") { owner="St3__219__shared_weak_count"; }
+        else { return false; }
+        auto const suffix{[&](::std::string_view symbol,bool constant,::std::string_view method,::std::string_view& tail)
+        {
+            auto const prefix{constant ? ::std::string_view{"_ZNK"} : ::std::string_view{"_ZN"}};
+            if(symbol.empty() || symbol.size()>1024u || !symbol.starts_with(prefix) || !symbol.ends_with("Ev")) { return false; }
+            symbol.remove_prefix(prefix.size());
+            if(!symbol.starts_with(owner)) { return false; }symbol.remove_prefix(owner.size());
+            if(!symbol.starts_with(method)) { return false; }symbol.remove_prefix(method.size());symbol.remove_suffix(2u);
+            tail=symbol;return true;
+        }};
+        if(a.completion_anchors[2u]!=b.completion_anchors[2u]) { return false; }
+        ::std::string_view tag{};
+        if(!suffix(a.completion_anchors[2u],true,"9use_count",tag) || tag.empty()) { return false; }
+        auto rest{tag};
+        while(!rest.empty())
+        {
+            if(rest.front()!='B') { return false; }rest.remove_prefix(1u);
+            if(rest.empty() || rest.front()<'1' || rest.front()>'9') { return false; }
+            ::std::size_t count{};
+            while(!rest.empty() && rest.front()>='0' && rest.front()<='9')
+            {
+                if(count>1024u/10u) { return false; }
+                count=count*10u+static_cast<unsigned>(rest.front()-'0');rest.remove_prefix(1u);
+                if(count>1024u) { return false; }
+            }
+            if(count==0u || count>rest.size()) { return false; }
+            for(auto c:rest.substr(0u,count))
+            { if(!((c>='a' && c<='z') || (c>='A' && c<='Z') || (c>='0' && c<='9') || c=='_')) { return false; } }
+            rest.remove_prefix(count);
+        }
+        constexpr ::std::array<::std::string_view,2u> methods{"16__release_shared","10__add_weak"};
+        for(::std::size_t i{};i!=methods.size();++i)
+        {
+            ::std::string_view left{},right{};
+            if(!suffix(a.completion_anchors[i],false,methods[i],left) ||
+               !suffix(b.completion_anchors[i],false,methods[i],right) ||
+               (!left.empty() && left!=tag) || (!right.empty() && right!=tag)) { return false; }
+        }
+        return true;
+    }
+    // Match the owned qualified class and exact ABI declarations, allowing
+    // only the explicitly checked libc++ legacy-inline compatibility above. No spelling-only completion or external debug-file lookup.
+    // Ambiguous independent definitions remain unavailable.
+    [[nodiscard]] inline bool complete_cpp_class(::std::span<type_record const> types,
+        ::std::size_t original,::std::size_t& result) noexcept
+    {
+        result=no_record;
+        if(original>=types.size() || types.size()>65536u) { return false; }
+        auto const& declaration{types[original]};
+        if((declaration.kind!=type_kind::class_type && declaration.kind!=type_kind::structure) ||
+           !cxx_language(declaration.language) || declaration.tinygo_producer || declaration.zig_producer ||
+           declaration.atomic_scalar || declaration.reference_type || declaration.rvalue_reference_type)
+        { return false; }
+        if(declaration.size_known) { result=original;return true; }
+        if(declaration.qualified_type_name.empty() || declaration.qualified_type_name.size()>1024u) { return false; }
+        for(auto const& anchor:declaration.completion_anchors) { if(anchor.empty() || anchor.size()>1024u) { return false; } }
+        for(::std::size_t i{};i!=types.size();++i)
+        {
+            auto const& candidate{types[i]};
+            if(!candidate.size_known || candidate.byte_size==0u || candidate.kind!=declaration.kind ||
+               !cxx_language(candidate.language) || candidate.tinygo_producer || candidate.zig_producer ||
+               candidate.atomic_scalar || candidate.reference_type || candidate.rvalue_reference_type ||
+               candidate.qualified_type_name!=declaration.qualified_type_name ||
+               (candidate.completion_anchors!=declaration.completion_anchors &&
+                !shared_count_legacy_anchors(declaration,candidate))) { continue; }
+            if(result!=no_record && (candidate.declaration_identity==die_key{} ||
+               candidate.declaration_identity!=types[result].declaration_identity)) { result=no_record;return false; }
+            result=i;
+        }
+        return result!=no_record;
+    }
     struct variable_record
     {
         die_key identity{};
@@ -494,9 +742,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
     }
 
     // Recognize a finite set of metadata shapes. There is no expression stack,
-    // branching, host register lookup, dereference, function call or memory read.
+    // branching, host register lookup, function call or memory read. A finite
+    // one-load guest-offset recipe requires the existing authenticated reader.
     // In LLVM's Wasm emitter local-indirect also uses subopcode 0 but omits the
-    // terminal stack_value. Therefore a plain local is not admitted as a value.
+    // terminal stack_value. A plain local is an offset recipe, never a value.
     [[nodiscard]] inline location_plan decode_single_location_plan(::std::span<::std::byte const> bytes,
         ::std::uint8_t address_bytes, limits const& cap = {}, position_role role = position_role::variable) noexcept
     {
@@ -524,7 +773,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
             result.local_index = index;
             if(role == position_role::frame_base && input.cursor == bytes.size())
             { result.kind = plan_kind::wasm_local_frame_base; result.reason = unavailable_reason::none; return result; }
-            if(input.cursor == bytes.size()) { result.reason = unavailable_reason::indirect_or_ambiguous_local; return result; }
+            if(input.cursor == bytes.size())
+            {
+                // LLVM TI_LOCAL_INDIRECT encodes a memory location using the
+                // integer local as its guest offset. Keep this distinct from
+                // a stack_value; only the authenticated object reader may use it.
+                if(role == position_role::variable && result.storage == wasm_location_space::local)
+                { result.kind=plan_kind::wasm_local_guest_offset;result.reason=unavailable_reason::none;return result; }
+                result.reason=unavailable_reason::indirect_or_ambiguous_local;return result;
+            }
             while(input.cursor < bytes.size() && bytes[input.cursor] != ::std::byte{0x9fu})
             {
                 // No transform is a frame-base/guest-offset capability. Global
@@ -549,9 +806,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
         if(op == 0x91u) // DW_OP_fbreg; displacement metadata only.
         {
             if(!input.leb(result.displacement)) { result.reason = unavailable_reason::malformed_expression; return result; }
-            if(input.cursor != bytes.size()) { result.reason = unavailable_reason::unsupported_expression; return result; }
-            result.kind = plan_kind::frame_relative_offset; result.reason = unavailable_reason::none;
-            return result;
+            if(input.cursor == bytes.size())
+            { result.kind = plan_kind::frame_relative_offset; result.reason = unavailable_reason::none;return result; }
+            // DW_OP_fbreg SLEB; exactly one address-width guest load; optional
+            // DW_OP_plus_uconst ULEB. This is a finite metadata recipe only.
+            ::std::uint8_t indirect{};
+            if(role!=position_role::variable || !input.byte(indirect) || (indirect!=0x06u && indirect!=0x94u))
+            { result.reason = unavailable_reason::unsupported_expression;return result; }
+            if(indirect==0x94u)
+            {
+                ::std::uint8_t size{};
+                if(!input.byte(size)) { result.reason = unavailable_reason::malformed_expression;return result; }
+                if(size!=address_bytes) { result.reason = unavailable_reason::unsupported_expression;return result; }
+            }
+            if(input.cursor!=bytes.size())
+            {
+                ::std::uint8_t addition{};
+                if(!input.byte(addition) || addition!=0x23u)
+                { result.reason = unavailable_reason::unsupported_expression;return result; }
+                if(!input.leb(result.indirect_addend))
+                { result.reason = unavailable_reason::malformed_expression;return result; }
+            }
+            if(input.cursor!=bytes.size()) { result.reason = unavailable_reason::unsupported_expression;return result; }
+            result.kind=plan_kind::frame_relative_indirect_offset;result.reason=unavailable_reason::none;return result;
         }
         if(op == 0x03u) // DW_OP_addr: Wasm producer ABI guest offset only.
         {

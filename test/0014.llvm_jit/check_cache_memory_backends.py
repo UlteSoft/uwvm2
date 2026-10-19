@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Actual cache objects cannot cross mmap/moving/single-thread native-memory ABIs."""
+# v7 SOURCE successor; this is DATA ABI separation, not authenticated native cache replay.
+"""Fixture cache DATA metadata separates mmap/moving/single-thread native-memory ABIs."""
 import argparse,hashlib,json,subprocess
 from pathlib import Path
 p=argparse.ArgumentParser(description=__doc__)
@@ -13,6 +14,8 @@ def run(backend,*args):
  rows.append(dict(command=command,returncode=r.returncode,stdout=r.stdout,stderr=r.stderr))
  (a.out/'results.json').write_text(json.dumps(rows,indent=2)+'\n')
  assert r.returncode==0,rows[-1]
+ assert 'codec_data_only=1' in r.stdout and 'native_cache_replay=0' in r.stdout
+ if args:assert 'standalone_persistent_refused=1' in r.stdout
  return dict(line.split('=',1) for line in r.stdout.splitlines() if '=' in line)
 defaults={key:run(key) for key in binaries}
 assert len({v['product'] for v in defaults.values()})==1
@@ -20,12 +23,14 @@ assert len({v['abi-hex'] for v in defaults.values()})==3
 for backend,label in [('mmap','mmap'),('allocator','allocator-concurrent'),('single','allocator-single')]:
  abi=bytes.fromhex(defaults[backend]['abi-hex']);assert b'native-memory-backend' in abi and label.encode() in abi
 for mode in ['native-signed','native-unsigned']:
- own={key:Path(run(key,'write',a.out/mode/'shared',mode)['path']) for key in binaries}
+ models={key:run(key,'write',a.out/mode/'shared',mode) for key in binaries}
+ own={key:Path(model['path']) for key,model in models.items()}
+ assert all(not path.exists() for path in own.values())
  assert len(set(own.values()))==3
  for key in binaries:
   for foreign in binaries:
    if key==foreign:continue
-   result=run(key,'load-foreign',a.out/mode/key/foreign,mode,own[foreign],'none','context-mismatch')
+   result=run(key,'load-foreign',a.out/mode/key/foreign,mode,models[foreign]['blob-hex'],'none','context-mismatch')
    assert result['status']=='context-mismatch'
-(a.out/'summary.json').write_text(json.dumps(dict(passed=True,invocations=len(rows),product=next(iter(defaults.values()))['product'],binary_sha256={k:hashlib.file_digest(v.open('rb'),'sha256').hexdigest() for k,v in binaries.items()}),indent=2)+'\n')
-print('PASS 21 native memory cache ABI checks: three builds, signed/unsigned objects, all six replay directions')
+(a.out/'summary.json').write_text(json.dumps(dict(passed=True,codec_data_only=True,native_cache_replay=False,invocations=len(rows),product=next(iter(defaults.values()))['product'],binary_sha256={k:hashlib.file_digest(v.open('rb'),'sha256').hexdigest() for k,v in binaries.items()}),indent=2)+'\n')
+print('PASS 21 native memory ABI DATA checks: three builds, signed/unsigned DATA objects, all six DATA comparison directions')
