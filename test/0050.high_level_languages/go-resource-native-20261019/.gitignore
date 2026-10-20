@@ -1,0 +1,13 @@
+# Regenerate dated-run records, copied source/SDK inputs and toolchain caches.
+# Keep the reproduction scripts and documentation at this directory's root.
+/*/
+/native-image-contract
+/PERFORMANCE.md
+
+# Superseded run-script snapshots; retain the latest numbered revision.
+/build-driver-r2.py
+/build-driver-r3.py
+/build-driver-r4.py
+/build-driver-r5.py
+/matrix-driver-r2.py
+/matrix-driver-r3.py

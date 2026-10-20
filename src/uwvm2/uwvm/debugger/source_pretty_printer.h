@@ -290,7 +290,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_pretty_printer
         {
             ::std::size_t element{dwarf::no_record}; ::std::uint64_t address{}, count{};
             bool copied_storage{}; ::std::uint64_t copied_offset{};
+            ::std::uint64_t ring_capacity{}, ring_head{};
         };
+        [[nodiscard]] inline bool indexed_address(indexed_sequence const& plan,::std::uint64_t index,
+            ::std::uint64_t extent,unsigned width,::std::uint64_t& address) noexcept
+        {
+            address=0u;
+            if(plan.copied_storage || index>=plan.count || extent==0u || (width!=4u && width!=8u)) { return false; }
+            auto position{index};
+            if(plan.ring_capacity!=0u)
+            {
+                if(plan.count>plan.ring_capacity || plan.ring_head>=plan.ring_capacity) { return false; }
+                auto const tail{plan.ring_capacity-plan.ring_head};
+                position=index>=tail ? index-tail : plan.ring_head+index;
+            }
+            auto const maximum{width==4u ? 0xffffffffull : ~::std::uint64_t{}};
+            if(plan.address==0u || plan.address>maximum || extent-1u>maximum-plan.address ||
+               position>(maximum-plan.address-(extent-1u))/extent) { return false; }
+            address=plan.address+position*extent;return true;
+        }
         struct libcxx_string_field
         {
             field value{};
@@ -588,10 +606,93 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_pretty_printer
             return type.language==0x1cu && type.kind==dwarf::type_kind::scalar && type.size_known &&
                 type.byte_size==1u && type.byte_count==1u && type.encoding==7u && !type.atomic_scalar;
         }
-        [[nodiscard]] inline bool rust_vector_schema(::std::span<dwarf::type_record const> types,field owner,
+        struct rust_shared_layout
+        {
+            field data{},strong{},weak{},value{};
+            ::std::size_t inner{dwarf::no_record};
+            ::std::size_t header_bytes{};
+            bool atomic{},weak_owner{};
+        };
+        // Rc/Arc are structural profiles of the actual owned Rust DWARF.
+        // In particular, neither the compiler release nor the host ABI selects
+        // the allocation offsets. Unsized/fat-pointer layouts fail this proof.
+        [[nodiscard]] inline bool rust_shared_schema(::std::span<dwarf::type_record const> types,
+            ::std::size_t root,unsigned width,rust_shared_layout& out) noexcept
+        {
+            out={};
+            if(root>=types.size() || (width!=4u && width!=8u)) { return false; }
+            auto const& owner{types[root]};bool const weak_owner{rust_family(owner,"Weak")};
+            if((!weak_owner && !rust_family(owner,"Rc") && !rust_family(owner,"Arc")) ||
+               !owner.size_known || owner.atomic_scalar || owner.template_types.empty()) { return false; }
+            field carrier{},data{};
+            if(!path(types,root,"ptr",carrier) || !rust_family(types[carrier.type],"NonNull") ||
+               types[carrier.type].atomic_scalar || types[carrier.type].template_types.empty() ||
+               !path(types,root,"ptr.pointer",data) || !pointer(types,data,width) || types[data.type].atomic_scalar) { return false; }
+            auto const inner{types[data.type].referenced_type};auto const& allocation{types[inner]};
+            bool const atomic{rust_family(allocation,"ArcInner")};
+            if((!atomic && !rust_family(allocation,"RcInner")) ||
+               (!weak_owner && atomic!=rust_family(owner,"Arc")) || !allocation.size_known || allocation.atomic_scalar ||
+               allocation.template_types.empty() || !rust_same_type(types,inner,types[carrier.type].template_types[0u])) { return false; }
+            field strong{},weak{},value{};
+            if(!path(types,inner,atomic?"strong.v.value":"strong.value.value",strong) ||
+               !path(types,inner,atomic?"weak.v.value":"weak.value.value",weak) ||
+               !path(types,inner,atomic?"data":"value",value) ||
+               !rust_same_type(types,owner.template_types[0u],value.type) ||
+               !rust_same_type(types,allocation.template_types[0u],value.type)) { return false; }
+            auto const counter{[&](::std::string_view name,field terminal)
+            {
+                field wrapper{},cell{};
+                if(!path(types,inner,name,wrapper) || !rust_family(types[wrapper.type],atomic?"AtomicUsize":"Cell") ||
+                   types[wrapper.type].atomic_scalar || !member(types,wrapper,atomic?"v":"value",cell) ||
+                   !rust_family(types[cell.type],"UnsafeCell") || types[cell.type].atomic_scalar ||
+                   !integer(types,terminal,width)) { return false; }
+                auto const& scalar{types[terminal.type]};
+                return scalar.language==0x1cu && scalar.name=="usize" && scalar.encoding==7u && !scalar.atomic_scalar &&
+                    !types[cell.type].template_types.empty() &&
+                    rust_same_type(types,terminal.type,types[cell.type].template_types[0u]) &&
+                    (atomic || (!types[wrapper.type].template_types.empty() &&
+                        rust_same_type(types,terminal.type,types[wrapper.type].template_types[0u])));
+            }};
+            if(!counter("strong",strong) || !counter("weak",weak) ||
+               (strong.offset<weak.offset+width && weak.offset<strong.offset+width)) { return false; }
+            auto const& target{types[value.type]};
+            auto const header{(std::max)(strong.offset+width,weak.offset+width)};
+            // Read the control prefix first. An expired Weak must never copy
+            // the already-destroyed T, even when it happens to remain mapped.
+            if(target.kind==dwarf::type_kind::unavailable || target.atomic_scalar || !target.size_known ||
+               target.byte_size>65536u || header>65536u || value.offset<header ||
+               value.offset>allocation.byte_size || target.byte_size>allocation.byte_size-value.offset) { return false; }
+            out={data,strong,weak,value,inner,static_cast<::std::size_t>(header),atomic,weak_owner};return true;
+        }
+        [[nodiscard]] inline bool rust_shared_address(::std::span<dwarf::type_record const> types,
+            rust_shared_layout const& layout,::std::span<::std::byte const> bytes,::std::span<::std::byte const> known,
+            ::std::span<::std::byte const> eligible,unsigned width,::std::uint64_t& address,bool& empty) noexcept
+        {
+            empty=false;address=0u;
+            if(layout.inner>=types.size() || (width!=4u && width!=8u) ||
+               !bits(types,layout.data,bytes,known,address) || (!eligible.empty() && !bits(types,layout.data,bytes,eligible,address))) { return false; }
+            auto const maximum{width==4u?0xffffffffull:~::std::uint64_t{}};
+            if(layout.weak_owner && address==maximum) { empty=true;return true; } // Rust Weak::new's dangling sentinel.
+            auto const extent{types[layout.inner].byte_size};
+            return address!=0u && address<=maximum && extent!=0u && extent-1u<=maximum-address;
+        }
+        [[nodiscard]] inline bool rust_shared_counts(::std::span<dwarf::type_record const> types,
+            rust_shared_layout const& layout,::std::span<::std::byte const> header,unsigned width,
+            ::std::uint64_t& strong,::std::uint64_t& weak) noexcept
+        {
+            ::std::uint64_t stored{};
+            if((width!=4u && width!=8u) || !bits(types,layout.strong,header,{},strong) ||
+               !bits(types,layout.weak,header,{},stored) || stored==0u || (!layout.weak_owner && strong==0u) ||
+               (layout.atomic && stored==(width==4u?0xffffffffull:~::std::uint64_t{}))) { return false; }
+            // std's public weak_count excludes the implicit weak held by the
+            // live strong cohort; expired Weak::weak_count returns zero.
+            weak=strong!=0u?stored-1u:0u;return true;
+        }
+        [[nodiscard]] inline bool rust_buffer_schema(::std::span<dwarf::type_record const> types,field owner,
             unsigned width,rust_sequence_layout& out) noexcept
         {
-            if(owner.type>=types.size() || !rust_family(types[owner.type],"Vec")) { return false; }
+            if(owner.type>=types.size() || (!rust_family(types[owner.type],"Vec") &&
+               !rust_family(types[owner.type],"VecDeque"))) { return false; }
             auto const& vec{types[owner.type]};field data{},length{},capacity{};
             bool const erased{path(types,owner.type,"buf.inner.ptr.pointer.pointer",data)};
             if(!erased && !any_path(types,owner.type,{"buf.ptr.pointer.pointer","buf.ptr.pointer"},data)) { return false; }
@@ -620,6 +721,61 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_pretty_printer
                 fields[i].offset+=owner.offset;
             }
             out={fields[0],fields[1],fields[2],element,false,types[element].byte_size==0u};return true;
+        }
+        [[nodiscard]] inline bool rust_vector_schema(::std::span<dwarf::type_record const> types,field owner,
+            unsigned width,rust_sequence_layout& out) noexcept
+        {
+            return owner.type<types.size() && rust_family(types[owner.type],"Vec") &&
+                rust_buffer_schema(types,owner,width,out);
+        }
+        struct rust_deque_layout { rust_sequence_layout buffer{};field head{}; };
+        [[nodiscard]] inline bool rust_deque_schema(::std::span<dwarf::type_record const> types,::std::size_t root,
+            unsigned width,rust_deque_layout& out) noexcept
+        {
+            out={};
+            if(root>=types.size() || (width!=4u && width!=8u) || !rust_family(types[root],"VecDeque") ||
+               types[root].atomic_scalar) { return false; }
+            rust_sequence_layout buffer{};field head{};
+            if(!rust_buffer_schema(types,{root,0u},width,buffer) || !path(types,root,"head",head) ||
+               !integer(types,head,width) || types[buffer.data.type].atomic_scalar ||
+               types[buffer.element].atomic_scalar) { return false; }
+            field const fields[]{buffer.data,buffer.length,buffer.capacity,head};
+            for(unsigned i{};i!=4u;++i)
+            {
+                auto const& f{fields[i]};auto const& t{types[f.type]};
+                if(t.language!=0x1cu || t.atomic_scalar || (i!=0u && t.encoding!=7u && t.encoding!=8u) ||
+                   f.offset>types[root].byte_size || width>types[root].byte_size-f.offset) { return false; }
+                for(unsigned j{i+1u};j!=4u;++j)
+                { if(f.offset<fields[j].offset+width && fields[j].offset<f.offset+width) { return false; } }
+            }
+            out={buffer,head};return true;
+        }
+        struct rust_deque_extent
+        {
+            indexed_sequence sequence{};::std::uint64_t capacity{};bool zero_sized{};
+        };
+        [[nodiscard]] inline bool rust_deque_plan(::std::span<dwarf::type_record const> types,::std::size_t root,
+            ::std::span<::std::byte const> bytes,::std::span<::std::byte const> known,
+            ::std::span<::std::byte const> eligible,unsigned width,rust_deque_extent& out) noexcept
+        {
+            out={};rust_deque_layout layout{};
+            if(!rust_deque_schema(types,root,width,layout)) { return false; }
+            auto const& buffer{layout.buffer};::std::uint64_t address{},count{},capacity{},head{},discarded{};
+            if(!bits(types,buffer.data,bytes,known,address) ||
+               (!eligible.empty() && (!bits(types,buffer.data,bytes,eligible,discarded) || discarded!=address)) ||
+               !bits(types,buffer.length,bytes,known,count) || !bits(types,buffer.capacity,bytes,known,capacity) ||
+               !bits(types,layout.head,bytes,known,head)) { return false; }
+            auto const maximum{width==4u ? 0xffffffffull : ~::std::uint64_t{}};
+            if(buffer.zero_sized) { capacity=maximum; }
+            if(count>capacity || (capacity==0u ? head!=0u : head>=capacity)) { return false; }
+            auto const extent{types[buffer.element].byte_size};
+            // Validate the entire allocation, including the wrapped-away part,
+            // before issuing a single bounded read of the displayed prefix.
+            if(capacity!=0u && (address==0u || address>maximum || (!buffer.zero_sized &&
+               (extent-1u>maximum-address || capacity-1u>(maximum-address-(extent-1u))/extent)))) { return false; }
+            out.sequence={buffer.element,address,count,buffer.zero_sized,0u,
+                buffer.zero_sized ? 0u : capacity,buffer.zero_sized ? 0u : head};
+            out.capacity=capacity;out.zero_sized=buffer.zero_sized;return true;
         }
         [[nodiscard]] inline bool rust_sequence_schema(::std::span<dwarf::type_record const> types,::std::size_t root,
             unsigned width,rust_sequence_layout& out) noexcept
@@ -652,6 +808,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_pretty_printer
         {
             if(root>=types.size()) { return false; }field data{};
 #if UWVM_DEBUG_LANGUAGE_RUST
+            rust_deque_layout deque{};
+            if(rust_deque_schema(types,root,width,deque))
+            { element=deque.buffer.element;count=0u;bounded=false;return true; }
             rust_sequence_layout rust{};
             if(rust_sequence_schema(types,root,width,rust))
             { element=rust.element;count=0u;bounded=false;return true; }
@@ -675,6 +834,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_pretty_printer
             result = {}; if(root >= types.size() || (width != 4u && width != 8u)) { return false; }
             auto const& type{types[root]}; field first{},length{},end{},capacity{}; bool endpoints{},counted_vector{};
             ::std::size_t selected_element{dwarf::no_record};bool rust_zero_sized{};
+#if UWVM_DEBUG_LANGUAGE_RUST
+            if(rust_family(type,"VecDeque"))
+            {
+                rust_deque_extent deque{};
+                if(!rust_deque_plan(types,root,bytes,known,pointer_known,width,deque)) { return false; }
+                result=deque.sequence;return true;
+            }
+#endif
             ::std::size_t span_element{};::std::uint64_t span_count{};
             if(static_span_schema(types,root,width,first,span_element,span_count))
             {
@@ -1107,6 +1274,91 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_pretty_printer
                 summary(tree[0u],tree_order ? "libstdc++ ordered tree" : hash ? "libstdc++ hash chain" : "libstdc++ list",::std::move(text),count-emitted);
                 return outcome::formatted;
             }
+#if UWVM_DEBUG_LANGUAGE_RUST
+            [[nodiscard]] outcome rust_shared(::std::size_t root,::std::span<::std::byte const> bytes,
+                ::std::span<::std::byte const> known,::std::span<::std::byte const> eligible,
+                ::std::vector<dwarf::object_node>& tree,::std::size_t depth)
+            {
+                rust_shared_layout layout{};::std::uint64_t address{},strong{},weak{};bool empty{};
+                if(!rust_shared_schema(types,root,width,layout) ||
+                   !rust_shared_address(types,layout,bytes,known,eligible,width,address,empty)) { return outcome::unavailable; }
+                auto const profile{layout.atomic?(layout.weak_owner?"Rust Arc Weak":"Rust Arc"):(layout.weak_owner?"Rust Rc Weak":"Rust Rc")};
+                if(empty) { summary(tree[0u],profile,"empty strong=0 weak=0");return outcome::formatted; }
+                ::std::vector<::std::byte> header{};
+                if(!read(address,layout.header_bytes,header)) { return limited?outcome::limit_exceeded:outcome::unavailable; }
+                if(!rust_shared_counts(types,layout,header,width,strong,weak)) { return outcome::unavailable; }
+                ::std::string text{strong==0u?"expired strong=":"strong="};number(text,strong);text+=" weak=";number(text,weak);
+                auto const available{elements<cap.max_elements?cap.max_elements-elements:0u};::std::size_t shown{};
+                if(strong!=0u && available!=0u)
+                {
+                    auto const size{static_cast<::std::size_t>(types[layout.value.type].byte_size)};::std::vector<::std::byte> value{};
+                    if(size!=0u && !read(address+layout.value.offset,size,value))
+                    { return limited?outcome::limit_exceeded:outcome::unavailable; }
+                    auto const before{tree.size()};++elements;
+                    if(!append(tree,layout.value.type,value,"value",depth)) { return limited?outcome::limit_exceeded:outcome::unavailable; }
+                    ++shown;text+=" = ";scalar_text(tree[before],text);
+                }
+                // Counter children are detached values from that same owned
+                // prefix, never writes to the actual reference count.
+                for(unsigned i{};i!=2u && elements<cap.max_elements;++i)
+                {
+                    auto const counter{i==0u?layout.strong:layout.weak};auto const count{i==0u?strong:weak};
+                    ::std::vector<::std::byte> value(width);
+                    for(unsigned j{};j!=width;++j) { value[j]=static_cast<::std::byte>((count>>(8u*j))&255u); }
+                    ++elements;if(!append(tree,counter.type,value,i==0u?"strong":"weak",depth))
+                    { return limited?outcome::limit_exceeded:outcome::unavailable; }++shown;
+                }
+                auto const children{strong==0u?2u:3u};
+                summary(tree[0u],profile,::std::move(text),children-shown);return outcome::formatted;
+            }
+            [[nodiscard]] outcome rust_deque(::std::size_t root,::std::span<::std::byte const> bytes,
+                ::std::span<::std::byte const> known,::std::span<::std::byte const> eligible,
+                ::std::vector<dwarf::object_node>& tree,::std::size_t depth)
+            {
+                rust_deque_extent layout{};
+                if(!rust_deque_plan(types,root,bytes,known,eligible,width,layout)) { return outcome::unavailable; }
+                auto const& plan{layout.sequence};auto const extent{types[plan.element].byte_size};
+                auto const remaining{elements<=cap.max_elements ? cap.max_elements-elements : 0u};
+                auto shown{static_cast<::std::size_t>((std::min)(plan.count,static_cast<::std::uint64_t>(remaining)))};
+                if(!layout.zero_sized)
+                {
+                    auto const available{copied<=cap.max_bytes ? cap.max_bytes-copied : 0u};
+                    shown=(std::min)(shown,static_cast<::std::size_t>(available/extent));
+                }
+                ::std::vector<::std::byte> data{};
+                if(shown!=0u && !layout.zero_sized)
+                {
+                    auto const first{static_cast<::std::size_t>((std::min)(static_cast<::std::uint64_t>(shown),
+                        plan.ring_capacity-plan.ring_head))};
+                    auto const needed{first==shown ? 1u : 2u};
+                    if(reads>cap.maximum_reads || needed>cap.maximum_reads-reads)
+                    { limited=true;return outcome::limit_exceeded; }
+                    ::std::uint64_t address{};
+                    if(!indexed_address(plan,0u,extent,width,address)) { return outcome::unavailable; }
+                    if(!read(address,first*static_cast<::std::size_t>(extent),data))
+                    { return limited ? outcome::limit_exceeded : outcome::unavailable; }
+                    if(first!=shown)
+                    {
+                        ::std::vector<::std::byte> tail{};
+                        if(!read(plan.address,(shown-first)*static_cast<::std::size_t>(extent),tail))
+                        { return limited ? outcome::limit_exceeded : outcome::unavailable; }
+                        data.insert(data.end(),tail.begin(),tail.end());
+                    }
+                }
+                ::std::string text{"size="};number(text,plan.count);text+=" capacity=";number(text,layout.capacity);text+=" [";
+                ::std::size_t appended{};
+                for(;appended!=shown;++appended)
+                {
+                    ::std::string label{"["};number(label,appended);label+=']';auto const before{tree.size()};++elements;
+                    if(!append(tree,plan.element,layout.zero_sized ? ::std::span<::std::byte const>{} :
+                        ::std::span<::std::byte const>{data}.subspan(appended*extent,extent),::std::move(label),depth)) { break; }
+                    if(appended<8u && text.size()<3000u)
+                    { if(appended!=0u) { text+=", "; }scalar_text(tree[before],text); }
+                }
+                if(appended>8u || plan.count>appended) { if(appended!=0u) { text+=", "; }text+="..."; }text+=']';
+                summary(tree[0u],"Rust VecDeque",::std::move(text),plan.count-appended);return outcome::formatted;
+            }
+#endif
             [[nodiscard]] outcome format_owned(::std::size_t root, ::std::span<::std::byte const> bytes,
                 ::std::span<::std::byte const> known, ::std::span<::std::byte const> pointer_known,
                 ::std::vector<dwarf::object_node>& tree, ::std::size_t depth)
@@ -1261,6 +1513,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_pretty_printer
 #if UWVM_DEBUG_LANGUAGE_RUST
                 if(type.language==0x1cu)
                 {
+                    if(rust_family(type,"Rc") || rust_family(type,"Arc") || rust_family(type,"Weak"))
+                    { return rust_shared(root,bytes,known,pointer_known,tree,depth); }
+                    if(rust_family(type,"VecDeque")) { return rust_deque(root,bytes,known,pointer_known,tree,depth); }
                     rust_sequence_layout rust{};
                     if(rust_sequence_schema(types,root,width,rust))
                     {

@@ -421,17 +421,97 @@ def rust(client, frame, record):
     live.require([r['name'] for r in rows]==[f'[{i}]' for i in range(7)] and
                  all(r['type']=='()' for r in rows),'zero-sized Rust elements retain their unit type',rows)
 
+def rust_deque(client, frame, record):
+    for context in ('watch', 'hover', 'variables'):
+        body = evaluate(client, frame, '*values', context)
+        live.require(has_size(body['result'], 8) and 'capacity=8' in body['result'] and body['variablesReference'] > 0,
+                     'real wrapped Rust VecDeque logical count', body)
+        rows = members(client, body['variablesReference'], filter='indexed')
+        live.require([row['name'] for row in rows] == [f'[{i}]' for i in range(8)] and
+                     [numeric(row['value']) for row in rows] == list(range(6, 14)),
+                     'real wrapped Rust VecDeque logical order', rows)
+        live.require(members(client, body['variablesReference'], filter='indexed', start=1, count=3) == rows[1:4],
+                     'real VecDeque page crosses the physical allocation boundary')
+        record['values'].append(dict(expression='*values', context=context, response=body, indexed=rows))
+        for index in (0, 1, 2, 7):
+            selected = evaluate(client, frame, f'(*values)[{index}]', context)
+            live.require(numeric(selected['result']) == index + 6 and selected['variablesReference'] == 0,
+                         'real VecDeque expression crosses the ring boundary', selected)
+    body = evaluate(client, frame, '*words')
+    rows = members(client, body['variablesReference'], filter='indexed')
+    live.require(has_size(body['result'], 4) and len(rows) == 4, 'real VecDeque<String> count', (body, rows))
+    for row, length, text in zip(rows, (5, 6, 2, 4), ('first', 'second', r'\xce\xbb', 'last')):
+        live.require('string length=' + str(length) in row['value'] and text in row['value'],
+                     'real VecDeque<String> nested value in logical order', row)
+    record['values'].append(dict(expression='*words', context='watch', response=body, indexed=rows))
+    body = evaluate(client, frame, '*units')
+    rows = members(client, body['variablesReference'], filter='indexed')
+    live.require(has_size(body['result'], 7) and 'capacity=4294967295' in body['result'] and
+                 [row['name'] for row in rows] == [f'[{i}]' for i in range(7)] and all(row['type'] == '()' for row in rows),
+                 'real VecDeque ZST capacity and unit elements', (body, rows))
+    record['values'].append(dict(expression='*units', context='watch', response=body, indexed=rows))
+
+
+def rust_rc(client, frame, record):
+    for name, strong, weak, value in (('number',3,2,-17), ('atomic',2,1,42), ('unit',1,0,None), ('atomic_unit',1,0,None)):
+        for context in ('watch','hover','variables'):
+            body=evaluate(client,frame,'*'+name,context)
+            live.require(body['result'].startswith(f'strong={strong} weak={weak} = ') and body['variablesReference']>0,
+                         'actual Rust Rc/Arc count and payload summary',(name,body))
+            rows=members(client,body['variablesReference'],filter='named')
+            for field,expected in (('strong',strong),('weak',weak)):
+                found=[row for row in rows if row['name']==field]
+                live.require(len(found)==1 and numeric(found[0]['value'])==expected,'actual copied ownership counter',(name,rows))
+            payload=[row for row in rows if row['name']=='value']
+            live.require(len(payload)==1 and (payload[0]['type']=='()' if value is None else numeric(payload[0]['value'])==value),
+                         'actual Rc/Arc payload child',(name,rows))
+            live.require(members(client,body['variablesReference'],filter='named',start=1,count=2)==rows[1:3],
+                         'actual named ownership child pagination')
+            selected=evaluate(client,frame,'**'+name,context)
+            live.require(selected['result']=='()' if value is None else numeric(selected['result'])==value,
+                         'actual Rust Rc/Arc finite Deref expression',(name,selected))
+            record['values'].append(dict(expression='*'+name,context=context,response=body,children=rows,dereference=selected))
+    for name, strong, weak in (('weak',3,2),('atomic_weak',2,1)):
+        body=evaluate(client,frame,'*'+name)
+        live.require(body['result'].startswith(f'strong={strong} weak={weak} = '),'actual live Weak summary',body)
+        rows=members(client,body['variablesReference'],filter='named')
+        live.require(sum(row['name']=='value' for row in rows)==1,'live Weak has exactly one copied payload',rows)
+        record['values'].append(dict(expression='*'+name,context='watch',response=body,children=rows))
+    for name in ('expired','atomic_expired','empty','atomic_empty'):
+        body=evaluate(client,frame,'*'+name)
+        expected='empty' if 'empty' in name else 'expired'
+        live.require(body['result']==expected+' strong=0 weak=0','actual expired/empty Weak state',body)
+        rows=members(client,body['variablesReference'],filter='named')
+        live.require(not any(row['name']=='value' for row in rows),'expired/empty Weak never exposes a payload',rows)
+        record['values'].append(dict(expression='*'+name,context='watch',response=body,children=rows))
+    body=evaluate(client,frame,'*text')
+    rows=members(client,body['variablesReference'],filter='named')
+    payload=[row for row in rows if row['name']=='value']
+    live.require(len(payload)==1 and 'string length=5' in payload[0]['value'] and r'rc-\xce\xbb' in payload[0]['value'],
+                 'actual nested Rc<String> UTF8 payload',(body,rows))
+    record['values'].append(dict(expression='*text',context='watch',response=body,children=rows))
+    body=evaluate(client,frame,'*numbers')
+    rows=members(client,body['variablesReference'],filter='named')
+    payload=[row for row in rows if row['name']=='value']
+    live.require(len(payload)==1 and has_size(payload[0]['value'],2),'actual nested Arc<Vec> payload',(body,rows))
+    indexed=members(client,payload[0]['variablesReference'],filter='indexed')
+    live.require([numeric(row['value']) for row in indexed]==[4,9],'actual nested Arc<Vec> logical elements',indexed)
+    selected=evaluate(client,frame,'(**numbers)[1]')
+    live.require(numeric(selected['result'])==9,'actual Arc Deref followed by Vec logical index',selected)
+    record['values'].append(dict(expression='*numbers',context='watch',response=body,children=rows,indexed=indexed,selected=selected))
+
+
 def session(args, folder, root):
     folder.mkdir(mode=0o700)
     dap = base.load(root / 'tools/debug/dap_adapter.py', 'actual_pretty_producer_dap')
     mode = [] if args.ros or args.fixed_llvm_full else ['-Rcc', 'jit', '-Rcm', 'full']
-    vm = ['-m', 'debug' if args.case in ('coroutine','rust') else 'run', *mode, *(['--wasm-feature-enable-exceptions'] if args.wasm_exceptions else []), '-Rct', '0', '-Rllvm-call-stack', args.policy, '-Rllvm-cache-path', 'disable', '--run', str(args.wasm)]
+    vm = ['-m', 'debug' if args.case in ('coroutine','rust','rust-deque','rust-rc') else 'run', *mode, *(['--wasm-feature-enable-exceptions'] if args.wasm_exceptions else []), '-Rct', '0', '-Rllvm-call-stack', args.policy, '-Rllvm-cache-path', 'disable', '--run', str(args.wasm)]
     server = live.BrokerSession(args.uwvm, Path(__file__).resolve(), root / 'tools/debug/dap_adapter.py', vm, folder)
     record = dict(passed=False, case=args.case, compiler_id=args.compiler_id, policy=args.policy, values=[], markers=[], actual_dap_stdio=True)
     try:
         gate = dap.UnixBroker(str(server.directory))
         try:
-            first = gate.request('status' if args.case in ('coroutine','rust') else 'pause')
+            first = gate.request('status' if args.case in ('coroutine','rust','rust-deque','rust-rc') else 'pause')
             live.require('error:' not in first and 'guest exited:' not in first, 'actual queued first pause', first)
         finally:
             gate.close()
@@ -439,15 +519,15 @@ def session(args, folder, root):
         client = base.TypedClient(root / 'tools/debug/dap_adapter.py', server.directory, client_folder, 'source')
         server.clients.append(client)
         client.evaluate('set print elements 200')
-        names = (['pretty_rust_ready'] if args.case == 'rust' else ['pretty_coroutine_ready', 'pretty_coroutine_body_ready', 'pretty_coroutine_empty_ready'] if args.case == 'coroutine' else
+        names = (['pretty_rust_rc_ready'] if args.case == 'rust-rc' else ['pretty_rust_deque_ready'] if args.case == 'rust-deque' else ['pretty_rust_ready'] if args.case == 'rust' else ['pretty_coroutine_ready', 'pretty_coroutine_body_ready', 'pretty_coroutine_empty_ready'] if args.case == 'coroutine' else
                  ['pretty_stateful_ready'] if args.case == 'stateful' else ['pretty_sequences_ready'])
         functions = {name: function_identity(args.wasm, name) for name in names}
         points = []
-        if args.case == 'rust':
+        if args.case in ('rust','rust-deque','rust-rc'):
             # A source breakpoint is after the compiler's prologue. A raw Wasm
             # function-entry stop intentionally precedes argument stack stores.
             line = next(i for i, text in enumerate(args.source.read_text().splitlines(), 1)
-                        if 'std::hint::black_box((values.len()' in text)
+                        if ('std::hint::black_box((number,text' if args.case=='rust-rc' else 'std::hint::black_box((values.len()') in text)
             bps = client.request('setBreakpoints', {'source': {'path': str(args.source)},
                                  'breakpoints': [{'line': line}]})['body']['breakpoints']
             live.require(len(bps)==1 and bps[0]['verified'] and bps[0]['line']==line,
@@ -460,7 +540,7 @@ def session(args, folder, root):
                 live.require(match is not None and b'registered' in reply, 'actual compiler marker function breakpoint', (name, reply))
                 points.append(int(match[1]))
         record['function_identities'] = functions
-        if args.case in ('coroutine','rust'):
+        if args.case in ('coroutine','rust','rust-deque','rust-rc'):
             # The late run-mode endpoint may pause after the initial phase.
             # The explicit debug launch arms the existing controller before
             # starting Guest; this is a prepared state, without a fabricated PC.
@@ -469,7 +549,11 @@ def session(args, folder, root):
             record['prepared_first_pause'] = first
             client.evaluate('continue')
         else:
-            client.request('continue', {'threadId': live.actual_location(client)['thread']})
+            # The registered launch pause can precede every Wasm participant.
+            # Setup/introspection can retire cached stop authority.
+            # Refresh the actual stopped status before domain continuation.
+            client.request('threads')
+            client.request('continue', {'threadId': 0})
         if args.case == 'coroutine':
             expected = [('pretty_coroutine_ready', 0), ('pretty_coroutine_body_ready', None), ('pretty_coroutine_ready', 1),
                         ('pretty_coroutine_body_ready', None), ('pretty_coroutine_ready', 2), ('pretty_coroutine_ready', 3),
@@ -505,8 +589,8 @@ def session(args, folder, root):
             else:
                 raise AssertionError('actual sequence marker source frame unavailable')
             record['markers'].append(dict(position=position, frame=selected[0], stack=stack))
-            rust(client, selected[0], record) if args.case == 'rust' else sequences(client, selected[0], record, args.case == 'stateful')
-        if args.case == 'rust':
+            rust_rc(client, selected[0], record) if args.case == 'rust-rc' else rust_deque(client, selected[0], record) if args.case == 'rust-deque' else rust(client, selected[0], record) if args.case == 'rust' else sequences(client, selected[0], record, args.case == 'stateful')
+        if args.case in ('rust','rust-deque','rust-rc'):
             client.request('setBreakpoints', {'source': {'path': str(args.source)}, 'breakpoints': []})
         for point in points:
             client.evaluate(f'delete {point}')
@@ -551,7 +635,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('uwvm', 'wasm', 'source', 'out'):
         parser.add_argument('--' + name, type=Path, required=True)
-    parser.add_argument('--case', choices=('sequences', 'stateful', 'coroutine', 'rust'), required=True)
+    parser.add_argument('--case', choices=('sequences', 'stateful', 'coroutine', 'rust', 'rust-deque', 'rust-rc'), required=True)
     parser.add_argument('--compiler-id', required=True)
     parser.add_argument('--producer-receipt', type=Path)
     parser.add_argument('--require-typed-frame', action='store_true')
@@ -572,7 +656,7 @@ def main():
     root = Path(__file__).resolve().parents[2]
     for name in ('uwvm', 'wasm', 'source'):
         setattr(args, name, getattr(args, name).resolve(strict=True))
-    identity = {'sequences': 'uwvm-dbg-pretty-sequences-v3', 'stateful': 'uwvm-dbg-pretty-stateful-v2', 'coroutine': 'uwvm-dbg-pretty-coroutine-v1', 'rust': 'uwvm-dbg-pretty-rust-native-v2'}[args.case]
+    identity = {'sequences': 'uwvm-dbg-pretty-sequences-v3', 'stateful': 'uwvm-dbg-pretty-stateful-v2', 'coroutine': 'uwvm-dbg-pretty-coroutine-v1', 'rust': 'uwvm-dbg-pretty-rust-native-v2', 'rust-deque': 'Genuine Rust standard-library VecDeque producer; no synthetic DWARF.', 'rust-rc': 'Genuine Rust standard-library ownership producer, with live/empty/expired weak values.'}[args.case]
     live.require(identity in args.source.read_text(), 'actual versioned producer fixture source', identity)
     paths = [Path(__file__), Path(base.__file__), Path(live.__file__), args.uwvm, args.wasm, args.source,
              root / 'tools/debug/dap_adapter.py', root / 'tools/debug/secure_server.py',

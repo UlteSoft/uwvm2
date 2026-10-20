@@ -106,3 +106,53 @@ All task compilation, program execution, DBG and hardware profiling happens
 on SSH Linux in the original 64 GiB/swap-zero cgroup. The Go producer's twenty
 passing native/Wasmtime outcomes are correctness results. They do not establish
 current UWVM DBG, native timing parity, ROS delivery or SDK/API parity.
+
+
+The [TinyGo SDK continuation](../tinygo-sdk-resources-20261019/README.md)
+adds an actual0.40.1 SDK/compiler/ROS2 resource matrix and finite source-debug
+checks. ROS-specific SDK sources stay in the ROS checkout; these ordinary
+language examples keep their basic build/run contract. The new SDK tests
+separate supported checks from expected panic traps. No new native/VTune
+performance equivalence is claimed. Keep all15 debugger adapters enabled;
+disabling them does not prohibit legal TinyGo Wasm execution.
+
+## TinyGo complete-example matrix checkpoint (19 October 2026)
+
+The [source-bound example checkpoint](../tinygo-examples-matrix-20261019/README.md) independently verifies 121 of
+135 planned products and 34 closed release-interpreter observations. Remaining
+compiler/runtime/DBG and performance work is explicitly unqualified; the packet
+retains resource refusals, original logs and an executable Linux resume plan.
+
+## TinyGo qualified example, source DBG and codec matrix (19 October 2026)
+
+The [qualified finite TinyGo matrix](../tinygo-examples-complete-20261019/README.md) records 135 actual products,
+390 ordinary outcomes, 15 complete source-value workflows across three frozen
+LLVM products and five optimizations, and 28 native/LLVM/Wasmtime codec
+correctness cases. It completes the example rows pending in the earlier partial
+checkpoint. Full SDK, native ROS, hardware performance and platform acceptance
+remain separate open requirements.
+
+
+## MoonBit typed Image checkpoint, 2026-10-19
+
+The [finite Image SDK matrix](../moonbit-image-sdk-20261019/README.md) records360 actual model executions,60 application products,120 interpreter runs,12 pure engine checks,82 native Host-codec assertions and three source-map debugger workflows. MoonBit lexical object values, positive native ROS Image delivery, hardware performance and the complete original fifteen-language bundle remain unqualified. The ROS checkout contains the active SDK and detailed English Image guide; this packet is identical in all three repositories.
+
+
+## MoonBit same-source Image native/Wasm checkpoint, 2026-10-20
+
+The [native/Wasm checkpoint](../moonbit-image-native-wasm-20261020/README.md) records three real products and40 independently checked finite cases. Imported-GC memory pressure and a debug large-workload timeout remain failures. Five calibrations and two first-replicate observations do not qualify a performance comparison; raw-memory admission stopped the cohort before any VTune collection. The identical packet retains complete positive logs, failed predecessors, the report-path error disclosure and the detailed English build/run guide. Full SDK/client parity, managed-value debugging, native ROS Image delivery, hardware and platform acceptance remain open.
+
+
+## MoonBit actual native ROS2 Image checkpoint, 2026-10-20
+
+The [native Image checkpoint](../moonbit-native-image-20261020/README.md) independently verifies eight actual complete Image deliveries, eight enabled zero-grant scenes and48 naturally exited actors. It covers four new MoonBit products on both frozen interpreter modes, exact prior-String/Image policies, real error13/error22 decisions and native graph/GID/QoS/quiet retirement. The separate pure-codec performance retry again stopped at the raw60GiB guard with zero new VTune collections. Physical cameras, native Image subscription, ROS1/mixed/vendor coverage, full official client APIs, managed lexical debugging and platform/cache/hardware acceptance remain open.
+
+
+## MoonBit actual native ROS1 Image checkpoint, 2026-10-20
+
+The [native ROS1 Image checkpoint](../moonbit-native-ros1-image-20261020/README.md) independently verifies eight complete TCPROS deliveries, eight enabled zero-grant scenes and 49 naturally exited actors, including an isolated native Master. It covers four fresh MoonBit products on both frozen interpreter modes, exact Image/connection-header checks, Master graph identities, real error13/error22 decisions and quiet retirement. A separate five-engine codec performance retry stopped at the strict raw60GiB guard with zero new completed formal timings or VTune collections. Physical cameras, native Image subscription, mixed/vendor coverage, full official client APIs, managed lexical debugging and platform/cache/hardware acceptance remain open.
+
+
+## MoonBit native Image pipeline and codec timing checkpoint, 2026-10-20
+
+The [native input/processing/output checkpoint](../moonbit-image-pipeline-20261020/README.md) independently verifies eight full native ROS2 Image pipelines, 24 zero/partial permission scenes and 96 naturally exited actors. It also records 48 exact prior policies, 16 explicit split-topic profiles and 48 refusals. A separate unchanged codec kernel completed 15 fresh five-engine formal timings and one actual-sample-qualified Native VTune Hotspots profile. In that finite workload the three UWVM medians are below the selected Wasmtime median, while the roughly 3.8x gap to Native remains open. The following microarchitecture attempt stopped at the strict raw 60 GiB guard; the ten-profile hardware matrix, native ROS performance, sustained imported GC, full client APIs, lexical DBG and platform/cache acceptance remain incomplete.

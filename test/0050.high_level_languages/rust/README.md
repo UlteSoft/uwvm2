@@ -122,5 +122,10 @@ The [current query matrix evidence](../results/native-budget/language-rust-query
 records 24 actual native combinations and 48 compiler/run actors across the
 three repositories, Debug/Release, language all/none, and thread-local on/off.
 Independent raw-artifact verification checks each exact output, input header,
-native ELF hash and closed process record. Aggregate archive verification and
-complete Runtime source-value qualification retain their separate scopes.
+native ELF hash and closed process record. The [controlled Runtime and size result](../results/native-budget/language-rust-runtime-query-size-20261019/README.md)
+now independently verifies the complete archive, four full CLI products,
+40 ordinary outcomes, eight Wasm DBG workflows and four real source scalar
+workflows. Both locals and print change from 40 to 42 after stepping.
+The ROS all/none raw and strip-all sizes retain exact ELF identities.
+This controlled frozen-source result does not qualify every later worktree
+feature, Rust object formatting, ROS transport or performance.

@@ -40,6 +40,7 @@ PROFILES = {
 ROS_PROFILES = {'x86_64', 'i686', 'aarch64', 'arm', 'armhf'}
 DEBUG_LANGUAGES = ('C', 'CPP', 'RUST', 'GO', 'TINYGO', 'ZIG', 'JAVA', 'CSHARP', 'FSHARP', 'VB', 'ASSEMBLYSCRIPT', 'MOONBIT', 'KOTLIN')
 CASES = {
+    'source_tinygo_map_layout': 'test/0018.debugger/source_tinygo_map_layout.cc',
     'pretty_printer_text_display': 'test/0018.debugger/pretty_printer_text_display.cc',
     'pretty_printer_scope_paths': 'test/0018.debugger/pretty_printer_scope_paths.cc',
     'pretty_printer_bench': 'test/0018.debugger/pretty_printer_bench.cc',

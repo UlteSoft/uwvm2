@@ -14,7 +14,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     for name in ('uwvm', 'build-receipt', 'wasm', 'source', 'out'):
         ap.add_argument('--' + name, type=Path, required=True)
-    ap.add_argument('--ros', action='store_true')
+    ap.add_argument('--ros', action='store_true');ap.add_argument('--fixed-llvm-full', action='store_true', help='Executable is built with a fixed LLVM-full runtime')
     ap.add_argument('--policy', choices=('instruction', 'unwind'), default='instruction')
     ap.add_argument('--expect-unavailable', action='store_true')
     a = ap.parse_args()
@@ -36,7 +36,7 @@ def main():
     save()
     try:
         prefix = [str(a.uwvm), '-Rdbg']
-        if not a.ros:
+        if not a.ros and not a.fixed_llvm_full:
             prefix += ['-Rcc', 'jit', '-Rcm', 'full']
         prefix += ['-Rct', '0', '-Rllvm-call-stack', a.policy, '-Rllvm-cache-path', 'disable', '--run', str(a.wasm)]
         record['argv'] = prefix

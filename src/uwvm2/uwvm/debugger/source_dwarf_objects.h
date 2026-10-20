@@ -645,7 +645,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
 #endif
             if(name.empty() || name.size() > cap.max_result_string_bytes) { return inline_query_error::unavailable; }
             ::std::vector<numeric_variable> active{};
-            auto const status{query_numeric_variables(scopes, types, variables, pc, {}, 0u, active, cap, scope_owner, schema_owner)};
+            ::std::size_t actual_physical{no_record};
+            auto const status{query_numeric_variables(scopes, types, variables, pc, {}, 0u, active, cap, scope_owner, schema_owner,
+                &actual_physical)};
             if(status != inline_query_error::none) { return status; }
             ::std::size_t selected{no_record}, selected_depth{};
             bool ambiguous{};
@@ -682,14 +684,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
                 if(selected == no_record || depth > selected_depth) { selected = found; selected_depth = depth; ambiguous = false; }
                 else if(depth == selected_depth) { ambiguous = true; }
             }
-            ::std::size_t actual_physical{no_record};
-            for(::std::size_t i{}; i != scopes.size(); ++i)
-            {
-                if(scopes[i].kind != scope_kind::subprogram || !scopes[i].concrete) { continue; }
-                for(auto const& range : scopes[i].ranges)
-                { if(range.begin <= pc && pc < range.end) { actual_physical = i; break; } }
-                if(actual_physical != no_record) { break; }
-            }
+            // Reuse the same checked metadata selection; a second physical
+            // scope scan supplies no additional stop or source authority.
             if(actual_physical == no_record) { return inline_query_error::unavailable; }
             auto const compile_unit{[&](::std::size_t scope) noexcept
             {

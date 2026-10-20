@@ -2160,6 +2160,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // storage, and compile-thread resolution publishes the value consumed by full-translation runtime code.
         resolve_runtime_compile_threads();
         auto runtime_entry{resolve_runtime_entry_invocation(::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name)};
+        int execution_exit_code{static_cast<int>(retval::ok)};
 
         // Dispatch matrix:
         //
@@ -2468,13 +2469,78 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             ::uwvm2::uwvm::utils::ansies::diagnostic_color(UWVM_COLOR_U8_RST_ALL));
                         return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
                     }
-                    ::std::thread management{[controller, channel = ::std::move(debug_channel)]() noexcept
-                    { channel->serve(*controller); }};
+                    // A late channel needs the same real registered guest as
+                    // the console. Executing on this host thread lets WASI
+                    // proc_exit bypass notification and leave the RPC loop
+                    // alive after Linux exits only the calling thread.
+                    struct actual_late_guest_launch_state final
+                    {
+                        ::std::shared_ptr<debugger::controller> control;
+                        ::uwvm2::runtime::lib::full_compile_run_config config;
+                    };
                     ::uwvm2::runtime::lib::full_compile_run_config cfg{};
                     configure_runtime_entry_buffers(cfg, runtime_entry);
-                    run_full_module_graph(::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name, cfg);
-                    controller->notify_guest_exit(0);
-                    management.join();
+                    ::std::shared_ptr<actual_late_guest_launch_state> launch_state{};
+#ifdef UWVM_CPP_EXCEPTIONS
+                    try
+#endif
+                    { launch_state = ::std::make_shared<actual_late_guest_launch_state>(
+                        actual_late_guest_launch_state{controller, cfg}); }
+#ifdef UWVM_CPP_EXCEPTIONS
+                    catch(...) { return static_cast<int>(retval::parameter_error); }
+#endif
+                    auto launched{::uwvm2::runtime::lib::runtime_launch_llvm_jit_debug_guest_worker_host_api(
+                        controller->domain(), ::std::move(launch_state), +[](void* state) noexcept
+                        {
+                            auto& actual{*static_cast<actual_late_guest_launch_state*>(state)};
+                            run_full_module_graph(::uwvm2::uwvm::wasm::storage::active_execute_wasm().module_name, actual.config);
+                            actual.control->notify_guest_exit(
+                                ::uwvm2::runtime::lib::runtime_llvm_jit_debug_registered_worker_exit_code_host_api());
+                        })};
+                    if(launched.status != ::uwvm2::runtime::lib::llvm_jit_debug_guest_worker_launch_status::started ||
+                       !launched.worker) { return static_cast<int>(retval::parameter_error); }
+                    debugger::managed_cli_shutdown shutdown{controller, launched.worker};
+                    // Keep the original authenticated endpoint and controller
+                    // on the normal host management thread. Peer loss/quit
+                    // detaches and resumes; it does not cancel the guest.
+                    debug_channel->serve(*controller);
+                    auto finished{controller->inspect()};
+                    while(finished.execution != debugger::execution_status::exited &&
+                          finished.execution != debugger::execution_status::closed)
+                    {
+                        ::fast_io::this_thread::sleep_for(::std::chrono::milliseconds{20});
+                        finished = controller->inspect();
+                    }
+                    if(finished.execution == debugger::execution_status::exited)
+                    {
+#  if defined(_WIN32) && !defined(__CYGWIN__)
+                        execution_exit_code = static_cast<int>(static_cast<::std::uint32_t>(finished.guest_exit_code));
+#  else
+                        execution_exit_code = static_cast<int>(static_cast<::std::uint32_t>(finished.guest_exit_code) & 255u);
+#  endif
+                    }
+                    else { execution_exit_code = static_cast<int>(retval::parameter_error); }
+                    // An exit event is not an OS/TLS retirement receipt. Run
+                    // the existing native/execution/producer/guest join pipeline
+                    // before these owners leave scope or normal runtime reset.
+                    for(;;)
+                    {
+                        auto const retired{shutdown.attempt_until(
+                            ::std::chrono::steady_clock::now() + ::std::chrono::milliseconds{100})};
+                        using phase = debugger::managed_cli_shutdown_phase;
+                        if(retired.phase == phase::completed) { break; }
+                        switch(retired.phase)
+                        {
+                            case phase::pending_native: case phase::pending_execution:
+                            case phase::pending_producers: case phase::pending_guest_thread:
+                            case phase::pending_release: case phase::busy: continue;
+                            default:
+                                ::fast_io::io::perrln(::fast_io::err(),
+                                    "uwvm: [fatal] Late debugger retirement failed: ",
+                                    debugger::managed_cli_shutdown_phase_text(retired.phase));
+                                ::fast_io::fast_terminate(); // retain owners until process containment
+                        }
+                    }
                     break;
                 }
 # endif
@@ -2552,7 +2618,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // runtime module storage is destroyed.
         ::uwvm2::runtime::lib::reset_runtime_state_host_api();
 
-        return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
+        return execution_exit_code;
 #endif
     }
 }  // namespace uwvm2::uwvm::run

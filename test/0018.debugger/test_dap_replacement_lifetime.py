@@ -132,6 +132,7 @@ class ReplacementLifetimeTests(unittest.TestCase):
         for attribute in ("frames", "scopes", "native_frames", "native_code_refs",
                           "source_frames", "source_scope_stops", "inline_frames", "source_frame_ordinals", "wasip1_scope_stops"):
             self.assertFalse(getattr(self.adapter, attribute), attribute)
+        self.assertFalse(getattr(self.adapter, "ros_scope_stops", {}), "ROS scope references")
 
     def capture(self, native=False):
         self.broker.native = native
@@ -139,11 +140,12 @@ class ReplacementLifetimeTests(unittest.TestCase):
         response = self.send("stackTrace", threadId=3)
         self.assertTrue(response["success"], response)
         frames = response["body"]["stackFrames"]
-        scopes, source_references = [], []
+        scopes, source_references, ros_scopes = [], [], []
         for frame in frames:
             response = self.send("scopes", frameId=frame["id"])
             self.assertTrue(response["success"], response)
             scopes.extend(row["variablesReference"] for row in response["body"]["scopes"])
+            ros_scopes.extend(row for row in response["body"]["scopes"] if row["name"].startswith("ROS "))
             if "sourceReference" in frame.get("source", {}):
                 source_references.append(frame["source"]["sourceReference"])
         references = [frame["instructionPointerReference"] for frame in frames
@@ -153,7 +155,14 @@ class ReplacementLifetimeTests(unittest.TestCase):
             self.assertTrue(self.adapter.inline_frames)
             self.assertTrue(self.adapter.source_frames)
             self.assertTrue(self.adapter.source_scope_stops)
-            self.assertEqual(len(scopes), 6)
+            expected_ros = {"ROS capabilities (process-owned)": "capabilities",
+                            "ROS instances (backend sessions)": "instances",
+                            "ROS event queues (metadata only)": "events"} if hasattr(self.adapter, "ros_scope_stops") else {}
+            self.assertEqual({row["name"] for row in ros_scopes}, set(expected_ros))
+            self.assertEqual(len(scopes), 6 + len(expected_ros))
+            for row in ros_scopes:
+                self.assertEqual(self.adapter.ros_scope_stops[row["variablesReference"]],
+                                 (self.adapter.stop_key, expected_ros[row["name"]]))
         return frames, scopes, source_references, references
 
     def reject_old(self, old):

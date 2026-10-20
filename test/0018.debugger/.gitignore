@@ -14,3 +14,7 @@
 *-work/*.patch
 *-work/*.txt
 !*-work/README*.txt
+
+# Generated benchmark and execution qualification reports.
+/pretty_benchmark_comparison.md
+/pretty_current_qualification.md

@@ -40,3 +40,14 @@ The pinned compiler and actual commands follow the official
 All task qualification runs on SSH Linux in the original 64 GiB/swap-zero
 cgroup. This fixture is a basic non-ROS example and makes no SDK/API or native
 performance parity claim.
+
+## Resource SDK and finite debug follow-up
+
+The [dated Zig continuation](../zig-sdk-resources-20261019/README.md) adds
+32 actual ROS SDK producer builds,40 real ROS2 positives and four native
+wrong-value controls in the ROS checkout. Its small real SDK codec probe
+passes source breakpoints, repeated scalar reads, source stepping and stale
+stop refusal on the three LLVM products. Eight ordinary probe executions
+include the ROS no-adapter control. These do not certify full SDK/API parity,
+native-resource source debugging, VTune or other architectures. This directory
+remains the basic non-ROS compiler/use example.

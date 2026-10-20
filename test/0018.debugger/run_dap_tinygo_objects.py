@@ -42,7 +42,7 @@ class TypedClient(live.Client):
 def session(a, folder, root):
     folder.mkdir(mode=0o700)
     dap = load(root / 'tools/debug/dap_adapter.py', 'actual_tinygo_dap')
-    mode = [] if a.ros else ['-Rcc', 'jit', '-Rcm', 'full']
+    mode = [] if a.ros or a.fixed_llvm_full else ['-Rcc', 'jit', '-Rcm', 'full']
     vm = ['-m', 'run', *mode, '-Rct', '0', '-Rllvm-call-stack', a.policy,
           '-Rllvm-cache-path', 'disable', '--run', str(a.wasm)]
     server = live.BrokerSession(a.uwvm, Path(__file__).resolve(),
@@ -71,7 +71,11 @@ def session(a, folder, root):
                                                 'breakpoints': [{'line': line}]})['body']['breakpoints']
         live.require(len(point) == 1 and point[0]['verified'], 'real source breakpoint', point)
         record['breakpoint'] = point[0]
-        client.request('continue', {'threadId': live.actual_location(client)['thread']})
+        # The managed launch pause may precede any actual Wasm participant.
+        # Setup/introspection can retire cached stop authority.
+        # Refresh the actual stopped status before domain continuation.
+        client.request('threads')
+        client.request('continue', {'threadId': 0})
         for _ in range(64):
             stopped = client.evaluate('wait')
             if b'stopped: breakpoint' in stopped:
@@ -99,7 +103,7 @@ def session(a, folder, root):
         oracle = {}
         for name, expected in zip(names, (3, 2, 2, 4, 1, 3)):
             matches = [v for v in variables if v['name'] == name]
-            live.require(len(matches) == 1 and matches[0]['value'] == f'i32={expected}' and
+            live.require(len(matches) == 1 and matches[0]['value'] == (f'i32={expected}' if a.expect_numeric_scope or a.expect_display_packet else str(expected)) and
                          matches[0]['variablesReference'] == 0 and 'memoryReference' not in matches[0],
                          'actual compiler argument through DAP variables', (name, variables))
             oracle[name] = expected
@@ -215,7 +219,7 @@ def session(a, folder, root):
         live.require(fresh_object not in [item['aggregate']['variablesReference'] for item in record['objects']],
                      'copied object references are never reused')
         client.request('setBreakpoints', {'source': {'path': str(a.source)}, 'breakpoints': []})
-        queued = client.queue([('stepIn', {'threadId': position['thread'], 'granularity': 'instruction'}),
+        queued = client.queue([('stepIn', {'threadId': position['thread'], 'granularity': 'statement'}),
                                ('evaluate', {'expression': 'len(box.Numbers)', 'context': 'watch', 'frameId': fresh['id']}),
                                ('variables', {'variablesReference': fresh_ref}),
                                ('variables', {'variablesReference': fresh_object}),
@@ -288,7 +292,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     for name in ('uwvm', 'build-receipt', 'wasm', 'source', 'out'):
         ap.add_argument('--' + name, type=Path, required=True)
-    ap.add_argument('--ros', action='store_true')
+    ap.add_argument('--ros', action='store_true');ap.add_argument('--fixed-llvm-full', action='store_true', help='Executable is built with a fixed LLVM-full runtime')
     ap.add_argument('--expect-display-packet', action='store_true')
     ap.add_argument('--expect-numeric-scope', action='store_true', help='qualify the frozen R37 adapter as a separate before control')
     ap.add_argument('--policy', choices=('instruction', 'unwind'), default='instruction')

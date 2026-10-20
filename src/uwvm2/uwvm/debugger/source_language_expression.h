@@ -314,13 +314,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
             }
             else
             {
+                // TinyGo 0.40 has eight fields and no flags byte. Later
+                // layouts add flags, then explicit key/value slot widths. The
+                // complete owned layout selects an ABI; no version guess or
+                // omitted field grants a guest-memory read.
+                bool const legacy{object.members.size() == 8u};
                 bool const slots{object.members.size() == 11u}; unsigned const trailing{slots ? 7u : 5u};
-                if((!slots && object.members.size() != 9u) || object.byte_size != width*(trailing+5u) ||
+                if((!legacy && !slots && object.members.size() != 9u) || object.byte_size != width*(trailing+5u) ||
                    !field("buckets",0u,dwarf::type_kind::pointer,width) || !integer("seed",1u) ||
                    !integer("count",2u) || !integer("keySize",3u) || !integer("valueSize",4u) ||
                    (slots && (!integer("keySlotSize",5u) || !integer("valueSlotSize",6u))) ||
                    !field("bucketBits",width*trailing,dwarf::type_kind::scalar,1u,7u) ||
-                   !field("flags",width*trailing+1u,dwarf::type_kind::scalar,1u,7u) ||
+                   (!legacy && !field("flags",width*trailing+1u,dwarf::type_kind::scalar,1u,7u)) ||
                    !field("keyEqual",width*(trailing+1u),dwarf::type_kind::structure,width*2u) ||
                    !field("keyHash",width*(trailing+3u),dwarf::type_kind::structure,width*2u)) { return false; }
             }
@@ -446,6 +451,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
                     if(details::sequence(types,root,segment,address_bytes,sequence))
                     { if(step.index < 0) { return dwarf::inline_query_error::unavailable; } root = sequence.element; segment.clear(); continue; }
                 }
+#if UWVM_DEBUG_LANGUAGE_RUST
+                if(step.kind==dwarf::source_expression_step_kind::dereference)
+                {
+                    ::std::vector<dwarf::object_node> candidate{};source_pretty_printer::details::rust_shared_layout layout{};
+                    if(dwarf::query_selected_object_type(types,root,segment,candidate)==dwarf::inline_query_error::none &&
+                       !candidate.empty() && source_pretty_printer::details::rust_shared_schema(types,candidate[0u].type,address_bytes,layout) &&
+                       !layout.weak_owner)
+                    { root=layout.value.type;segment.clear();continue; }
+                }
+#endif
                 bool implicit{}, cpp_reference{};
                 if(step.kind == dwarf::source_expression_step_kind::member)
                 {
@@ -664,7 +679,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
                                     bytes=::std::move(copied);known_bits=::std::move(copied_known);pointer_known=::std::move(copied_pointer);
                                     root=plan.element;segment.clear();continue;
                                 }
-                                auto const address{plan.address+static_cast<::std::uint64_t>(step.index)*extent};
+                                ::std::uint64_t address{};
+                                if(!source_pretty_printer::details::indexed_address(plan,static_cast<::std::uint64_t>(step.index),
+                                    extent,address_bytes,address)) { return dwarf::inline_query_error::unavailable; }
                                 if(reads >= allowed) { return dwarf::inline_query_error::limit_exceeded; } ++reads;
                                 ::std::vector<::std::byte> copied{};
                                 if(!read(address,static_cast<::std::size_t>(extent),copied) || copied.size() != extent) { return dwarf::inline_query_error::unavailable; }
@@ -695,6 +712,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_language_expression
                         bytes = ::std::move(copied); root = target; segment.clear(); known_bits.clear(); pointer_known.clear(); continue;
                     }
                 }
+#if UWVM_DEBUG_LANGUAGE_RUST
+                if(step.kind==dwarf::source_expression_step_kind::dereference)
+                {
+                    ::std::vector<dwarf::object_node> candidate{};source_pretty_printer::details::rust_shared_layout layout{};
+                    auto const selected{known_bits.empty()?dwarf::query_selected_object_value(types,root,segment,bytes,candidate):
+                        dwarf::query_selected_object_value_with_known_bits(types,root,segment,bytes,known_bits,candidate)};
+                    if(selected==dwarf::inline_query_error::none && !candidate.empty() && !candidate[0u].bit_field &&
+                       source_pretty_printer::details::rust_shared_schema(types,candidate[0u].type,address_bytes,layout) && !layout.weak_owner)
+                    {
+                        auto const& object{candidate[0u]};
+                        if(object.byte_offset>bytes.size() || object.byte_size>bytes.size()-object.byte_offset) { return dwarf::inline_query_error::unavailable; }
+                        auto const first{static_cast<::std::size_t>(object.byte_offset)},count{static_cast<::std::size_t>(object.byte_size)};
+                        auto const known{known_bits.empty()?::std::span<::std::byte const>{} : ::std::span<::std::byte const>{known_bits}.subspan(first,count)};
+                        auto const& qualified{pointer_known.empty()?known_bits:pointer_known};
+                        auto const eligible{qualified.empty()?::std::span<::std::byte const>{} : ::std::span<::std::byte const>{qualified}.subspan(first,count)};
+                        ::std::uint64_t address{},strong{},weak{};bool empty{};
+                        if(!source_pretty_printer::details::rust_shared_address(types,layout,::std::span<::std::byte const>{bytes}.subspan(first,count),
+                            known,eligible,address_bytes,address,empty) || empty) { return dwarf::inline_query_error::unavailable; }
+                        auto const size{static_cast<::std::size_t>(types[layout.value.type].byte_size)};auto const needed{size==0u?1u:2u};
+                        if(reads>allowed || needed>allowed-reads) { return dwarf::inline_query_error::limit_exceeded; }
+                        ::std::vector<::std::byte> header{},value{};++reads;
+                        if(!read(address,layout.header_bytes,header) || header.size()!=layout.header_bytes ||
+                           !source_pretty_printer::details::rust_shared_counts(types,layout,header,address_bytes,strong,weak))
+                        { return dwarf::inline_query_error::unavailable; }
+                        if(size!=0u)
+                        {
+                            ++reads;if(!read(address+layout.value.offset,size,value) || value.size()!=size) { return dwarf::inline_query_error::unavailable; }
+                        }
+                        bytes=::std::move(value);known_bits.clear();pointer_known.clear();root=layout.value.type;segment.clear();continue;
+                    }
+                }
+#endif
                 bool implicit{}, cpp_reference{};
                 if(step.kind == dwarf::source_expression_step_kind::member)
                 {

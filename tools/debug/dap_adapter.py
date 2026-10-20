@@ -2684,8 +2684,10 @@ class Adapter:
                 # Keep IDs session-unique so an old request cannot alias a
                 # different frame after this snapshot is replaced.
                 if notify:
-                    self.event("stopped", {"reason": reason, "threadId": threads[0]["id"] if threads else 1,
-                                           "allThreadsStopped": True})
+                    event = {"reason": reason, "allThreadsStopped": True}
+                    if threads:
+                        event["threadId"] = threads[0]["id"]
+                    self.event("stopped", event)
                 return True
         elif state == "exited":
             self.invalidate_stop()
@@ -3480,19 +3482,33 @@ class Adapter:
             elif command == "threads":
                 self.observe(self.command("status"))
                 self.respond(request, {"threads": [{"id": t["id"], "name": f"Wasm thread {t['id']}"}
-                                                    for t in self.threads] or
-                                                   ([{"id": 1, "name": "Wasm thread 1"}] if self.state != "exited" else [])})
+                                                    for t in self.threads]})
             elif command == "pause":
                 reply = self.command("pause")
                 observation = self._decode_status(reply)
                 self.respond(request)
                 self._commit_status(observation)
             elif command == "continue":
-                thread = unsigned_id(args.get("threadId", 1), "Wasm threadId")
+                # DAP requires threadId. Zero is this adapter's explicit
+                # all-domain route before a Wasm participant exists; it never
+                # enters the real thread list or authorizes frame/value reads.
+                if args.get("singleThread", False) is not False:
+                    raise ValueError("single-thread continuation is unsupported")
+                requested = args.get("threadId")
+                if type(requested) is not int:
+                    raise ValueError("exact DAP continuation threadId required")
+                thread = None
+                if requested == 0 and (self.state != "stopped" or self.stop_key is None):
+                    raise ValueError("domain continuation requires a current stopped session")
+                if requested != 0:
+                    thread = unsigned_id(requested, "Wasm threadId")
+                    if not any(row["id"] == thread for row in self.threads):
+                        raise ValueError("unknown current Wasm participant")
                 reply = self.command("continue")
                 observation = self._decode_status(reply)
                 self.respond(request, {"allThreadsContinued": True})
-                self.event("continued", {"threadId": thread, "allThreadsContinued": True})
+                if thread is not None:
+                    self.event("continued", {"threadId": thread, "allThreadsContinued": True})
                 self._commit_status(observation)
             elif command in ("stepIn", "next", "stepOut"):
                 thread = unsigned_id(args.get("threadId"), "Wasm threadId")
