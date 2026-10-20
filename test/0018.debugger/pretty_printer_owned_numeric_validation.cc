@@ -5,13 +5,25 @@
 #include <iomanip>
 #include <iterator>
 #include <cstdlib>
+#include <cstring>
 #include <thread>
 #include <array>
 #include <uwvm2/uwvm/debugger/source_pretty_printer.h>
 namespace d=uwvm2::uwvm::debugger::source_dwarf;
 static void require(bool ok){if(!ok)std::abort();}
+// Runtime copied locals carry native scalar bytes even when the input Wasm
+// and its DWARF use little endian. Exercise the same carrier on BE hosts.
+static void copy_i32(std::span<d::copied_numeric_local> values,std::uint32_t bits){
+ for(auto&v:values){
+  v.wasm_type=0x7f;v.available=true;
+  for(std::size_t j{};j+sizeof(bits)<=v.bytes.size();j+=sizeof(bits))
+   std::memcpy(v.bytes.data()+j,&bits,sizeof(bits));
+ }
+}
 int main(int argc,char**argv){
- require(argc==2);std::ifstream f(argv[1],std::ios::binary);require(bool(f));
+ require(argc==1||argc==2);
+ auto path=argc==2?argv[1]:std::getenv("UWVM_DEBUG_METADATA_FIXTURE");
+ require(path&&*path);std::ifstream f(path,std::ios::binary);require(bool(f));
  std::vector<char> bytes{std::istreambuf_iterator<char>{f},{}};
  require(bytes.size()>=8u&&bytes.size()<=64u*1024u*1024u);
  std::size_t at=8u;
@@ -28,7 +40,7 @@ int main(int argc,char**argv){
  auto scopes=owner->scopes();auto variables=owner->variables();auto types=owner->types();
  require(owner->numeric_validation()!=nullptr && owner->numeric_validation()->accepts(scopes,types,variables,{}));
  std::array<d::copied_numeric_local,256> locals{};
- auto fill=[&](unsigned n){for(auto&v:locals){v.wasm_type=0x7f;v.available=true;for(unsigned j{};j!=v.bytes.size();++j)v.bytes[j]=static_cast<std::byte>((n>>((j%4)*8))&255u);}};
+ auto fill=[&](unsigned n){copy_i32(locals,n);};
  auto equal=[](auto const&a,auto const&b){
   if(a.size()!=b.size())return false;
   for(std::size_t i{};i!=a.size();++i)if(a[i].identity!=b[i].identity||a[i].name!=b[i].name||a[i].type_name!=b[i].type_name||a[i].parameter!=b[i].parameter||a[i].kind!=b[i].kind||a[i].reason!=b[i].reason||a[i].byte_count!=b[i].byte_count||a[i].bits!=b[i].bits)return false;
@@ -76,6 +88,46 @@ int main(int argc,char**argv){
   if(positions==64)break;
  }
  require(positions>0);path_check(~std::uint64_t{});
+ // Compare indexed candidates to the original complete-variable scan at both
+ // sides of real producer scope boundaries, including unavailable PCs. Keep
+ // the physical result empty on every failure and compare its independent
+ // original range-scan identity on success.
+ auto numeric_at=[&](std::uint64_t point,d::numeric_query_limits cap={}){
+  std::vector<d::numeric_variable> plain,indexed;
+  std::size_t physical=7;
+  auto a=d::query_numeric_variables(scopes,types,variables,point,locals,locals.size(),plain,cap,owner->scope_paths());
+  auto b=d::query_numeric_variables(scopes,types,variables,point,locals,locals.size(),indexed,cap,owner->scope_paths(),owner->numeric_validation(),&physical);
+  require(a==b&&equal(plain,indexed));
+  if(a==d::inline_query_error::none){
+   std::size_t reference=d::no_record;
+   for(std::size_t i{};i!=scopes.size();++i){
+    if(scopes[i].kind!=d::scope_kind::subprogram||!scopes[i].concrete)continue;
+    for(auto const&r:scopes[i].ranges)if(r.begin<=point&&point<r.end){reference=i;break;}
+    if(reference!=d::no_record)break;
+   }
+   require(reference!=d::no_record&&physical==reference);
+  }else require(physical==d::no_record);
+ };
+ numeric_at(pc);numeric_at(~std::uint64_t{});
+ unsigned numeric_positions{};
+ for(auto const&scope:scopes){
+  for(auto const&r:scope.ranges){
+   numeric_at(r.begin);numeric_at(r.end);
+   if(r.begin<r.end)numeric_at(r.end-1);
+   if(++numeric_positions==64u)break;
+  }
+  if(numeric_positions==64u)break;
+ }
+ require(numeric_positions>0u);
+ for(unsigned n{};n!=5u;++n){
+  d::numeric_query_limits cap{};
+  if(n==0u)cap.inline_limits.max_scopes=0u;
+  else if(n==1u)cap.inline_limits.max_ranges=0u;
+  else if(n==2u)cap.max_metadata_string_bytes=0u;
+  else if(n==3u)cap.max_results=0u;
+  else cap.max_variables=0u;
+  numeric_at(pc,cap);
+ }
  d::inline_query_limits no_scopes{};no_scopes.max_scopes=0;path_check(pc,no_scopes);
  d::inline_query_limits no_strings{};no_strings.max_string_bytes=0;path_check(pc,no_strings);
  auto malformed=std::vector<d::scope_record>(scopes.begin(),scopes.end());require(!malformed.empty());malformed[0].parent=malformed.size();
@@ -85,7 +137,7 @@ int main(int argc,char**argv){
 
  auto check=[&](d::index const& actual,unsigned n){
   std::array<d::copied_numeric_local,256> copied{};
-  for(auto&v:copied){v.wasm_type=0x7f;v.available=true;for(unsigned j{};j!=v.bytes.size();++j)v.bytes[j]=static_cast<std::byte>((n>>((j%4)*8))&255u);}
+  copy_i32(copied,n);
   auto s=actual.scopes();auto t=actual.types();auto vars=actual.variables();
   std::vector<d::numeric_variable> slow,fast;auto proof=actual.numeric_validation();require(proof);
   auto a=d::query_numeric_variables(s,t,vars,pc,copied,copied.size(),slow,{},actual.scope_paths());
@@ -146,5 +198,5 @@ int main(int argc,char**argv){
  std::array<std::thread,6> threads;
  for(unsigned i{};i!=threads.size();++i)threads[i]=std::thread([&,i]{for(unsigned n=1;n!=9;++n)check(i%2?*owner:*second,100u+i*16u+n);});
  for(auto&t:threads)t.join();
- std::cout<<"owned numeric metadata: fresh values, strict caps, foreign malformed spans, alternate owners and six concurrent readers passed\n";
+ std::cout<<"owned numeric metadata: scope-boundary candidate selection, fresh values, strict caps, foreign malformed spans, alternate owners and six concurrent readers passed\n";
 }

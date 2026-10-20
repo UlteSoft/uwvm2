@@ -112,6 +112,65 @@ class DapAdapterTests(unittest.TestCase):
         self.output.truncate()
         return result
 
+    def test_launch_stop_has_no_fabricated_thread(self):
+        for status in ("prepared; no Wasm instruction executed\nstop-id 17\n",
+                       "stopped: pause\nstop-id 18\n"):
+            with self.subTest(status=status):
+                fake = FakeBroker()
+                fake.status = status
+                self.adapter = dap.Adapter(self.output)
+                self.adapter.broker = fake
+                self.adapter.observe(status)
+                events = messages(self.output.getvalue())
+                stopped = next(row for row in events if row.get("event") == "stopped")
+                self.assertTrue(stopped["body"]["allThreadsStopped"])
+                self.assertNotIn("threadId", stopped["body"])
+                self.output.seek(0); self.output.truncate()
+                self.assertEqual(self.send("threads")[0]["body"]["threads"], [])
+                before = list(fake.commands)
+                rejected = self.send("continue", threadId=1)
+                self.assertFalse(rejected[0]["success"])
+                self.assertEqual(fake.commands, before)
+                for arguments in ({}, {"threadId": False}, {"threadId": 0, "singleThread": True}):
+                    before = list(fake.commands)
+                    self.assertFalse(self.send("continue", **arguments)[0]["success"])
+                    self.assertEqual(fake.commands, before)
+                # Refused control arguments retire cached stopped authority.
+                # Only a fresh authenticated status may re-establish it.
+                self.assertIsNone(self.adapter.stop_key)
+                refreshed = self.send("threads")
+                response = next(row for row in refreshed if row["type"] == "response")
+                self.assertTrue(response["success"], refreshed)
+                self.assertEqual(response["body"]["threads"], [])
+                fresh_stops = [row for row in refreshed if row.get("event") == "stopped"]
+                self.assertEqual(len(fresh_stops), 1)
+                self.assertNotIn("threadId", fresh_stops[0]["body"])
+                self.assertIsNotNone(self.adapter.stop_key)
+                resumed = self.send("continue", threadId=0, singleThread=False)
+                self.assertTrue(resumed[0]["success"], resumed)
+                self.assertTrue(resumed[0]["body"]["allThreadsContinued"])
+                self.assertFalse(any(row.get("event") == "continued" for row in resumed))
+                self.assertEqual(fake.commands[-1], "continue")
+                before = list(fake.commands)
+                self.assertFalse(self.send("continue", threadId=0)[0]["success"])
+                self.assertEqual(fake.commands, before)
+
+    def test_explicit_resume_uses_an_actual_participant(self):
+        fake = FakeBroker()
+        fake.status = "stopped: pause\nstop-id 19\nthread 7 module=0 function=1 byte-offset=3 generation=1\n"
+        self.adapter.broker = fake
+        self.adapter.observe(fake.status)
+        self.output.seek(0); self.output.truncate()
+        self.assertEqual(self.send("threads")[0]["body"]["threads"],
+                         [{"id": 7, "name": "Wasm thread 7"}])
+        before = list(fake.commands)
+        self.assertFalse(self.send("continue", threadId=99)[0]["success"])
+        self.assertEqual(fake.commands, before)
+        resumed = self.send("continue", threadId=7)
+        self.assertTrue(resumed[0]["success"], resumed)
+        continued = next(row for row in resumed if row.get("event") == "continued")
+        self.assertEqual(continued["body"]["threadId"], 7)
+
     def test_bounded_dap_framing(self):
         body = b'{"seq":1,"type":"request","command":"initialize"}'
         raw = (b"Content-Type: application/vscode-jsonrpc; charset=utf-8\r\n"

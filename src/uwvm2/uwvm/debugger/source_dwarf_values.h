@@ -8,10 +8,12 @@
 # include "source_dwarf_query.h"
 # include "source_type_declarators.h"
 # include "source_dwarf_pieces.h"
+# include <algorithm>
 # include <array>
 # include <bit>
 # include <cstring>
 # include <memory>
+# include <optional>
 # include <utility>
 #endif
 #ifndef UWVM_MODULE_EXPORT
@@ -230,12 +232,63 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
     // scope owner. Foreign spans or smaller metadata caps use the full check.
     class owned_numeric_validation final
     {
+    public:
+        struct scoped_variable
+        {
+            ::std::size_t physical{}, variable{};
+        };
+    private:
         friend class index;
         ::std::span<scope_record const> scopes_;
         ::std::span<type_record const> types_;
         ::std::span<variable_record const> variables_;
         ::std::size_t strings_{}, locations_{};
         bool valid_{};
+        ::std::vector<scoped_variable> candidates_{};
+        bool candidates_ready_{};
+        // Index immutable lexical ancestry only. Every actual PC/range, stop,
+        // location, scalar value and result budget is still checked per query.
+        // Optional allocation failure retains the original complete scan.
+        void build_scope_candidates() noexcept
+        {
+            if(!valid_ || scopes_.size() > 65536u) { return; }
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+            try
+            {
+#endif
+                ::std::vector<::std::size_t> physical(scopes_.size(), no_record);
+                ::std::vector<scoped_variable> pending{};
+                pending.reserve(variables_.size());
+                for(::std::size_t i{}; i != scopes_.size(); ++i)
+                {
+                    auto const& scope{scopes_[i]};
+                    if(scope.parent != no_record && scope.parent >= i) { return; }
+                    switch(scope.kind)
+                    {
+                        case scope_kind::subprogram: physical[i] = i; break;
+                        case scope_kind::inline_subprogram: case scope_kind::lexical_block:
+                            if(scope.parent != no_record) { physical[i] = physical[scope.parent]; }
+                            break;
+                        case scope_kind::compile_unit: break;
+                        default: return;
+                    }
+                }
+                for(::std::size_t i{}; i != variables_.size(); ++i)
+                {
+                    auto const& variable{variables_[i]};
+                    if(variable.global || variable.declaration) { continue; }
+                    // validate_numeric_metadata checked every variable's scope.
+                    auto const parent{physical[variable.scope]};
+                    if(parent != no_record) { pending.push_back({parent, i}); }
+                }
+                ::std::sort(pending.begin(), pending.end(), [](auto const& a, auto const& b) noexcept
+                { return a.physical < b.physical || (a.physical == b.physical && a.variable < b.variable); });
+                candidates_ = ::std::move(pending); candidates_ready_ = true;
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+            }
+            catch(...) { candidates_.clear(); candidates_ready_ = false; }
+#endif
+        }
         owned_numeric_validation(::std::span<scope_record const> scopes,
             ::std::span<type_record const> types, ::std::span<variable_record const> variables) noexcept
             : scopes_{scopes}, types_{types}, variables_{variables}
@@ -243,6 +296,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
             numeric_query_limits cap{};
             valid_=types.size()<=cap.max_types && variables.size()<=cap.max_variables &&
                 value_details::validate_numeric_metadata(scopes,types,variables,cap,strings_,locations_)==inline_query_error::none;
+            build_scope_candidates();
         }
     public:
         owned_numeric_validation(owned_numeric_validation const&)=delete;
@@ -258,6 +312,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
                 variables.data()==variables_.data() && variables.size()==variables_.size() &&
                 strings_<=cap.max_metadata_string_bytes && locations_<=cap.max_locations;
         }
+        [[nodiscard]] ::std::optional<::std::span<scoped_variable const>> candidates(
+            ::std::span<scope_record const> scopes, ::std::span<type_record const> types,
+            ::std::span<variable_record const> variables, numeric_query_limits const& cap,
+            ::std::size_t physical) const noexcept
+        {
+            if(!candidates_ready_ || !accepts(scopes, types, variables, cap) || physical >= scopes_.size())
+            { return ::std::nullopt; }
+            auto const first{::std::lower_bound(candidates_.begin(), candidates_.end(), physical,
+                [](scoped_variable const& item, ::std::size_t key) noexcept { return item.physical < key; })};
+            if(first == candidates_.end() || first->physical != physical)
+            { return ::std::span<scoped_variable const>{}; }
+            auto const last{::std::upper_bound(first, candidates_.end(), physical,
+                [](::std::size_t key, scoped_variable const& item) noexcept { return key < item.physical; })};
+            return ::std::span<scoped_variable const>{::std::addressof(*first), static_cast<::std::size_t>(last - first)};
+        }
     };
     // Finite metadata + copied-scalar query only. The caller must FIRST bind a
     // real paused participant/source/code owner/generation. This API never loads
@@ -267,9 +336,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
         ::std::span<type_record const> types, ::std::span<variable_record const> variables, ::std::uint64_t pc,
         ::std::span<copied_numeric_local const> locals, ::std::size_t total_count,
         ::std::vector<numeric_variable>& out, numeric_query_limits const& cap = {}, owned_scope_paths const* scope_owner = nullptr,
-        owned_numeric_validation const* schema_owner = nullptr) noexcept
+        owned_numeric_validation const* schema_owner = nullptr, ::std::size_t* selected_physical = nullptr) noexcept
     {
         out.clear();
+        if(selected_physical != nullptr) { *selected_physical = no_record; }
 #if defined(__cpp_exceptions) || defined(_CPPUNWIND)
         try
         {
@@ -314,8 +384,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
             }};
             ::std::vector<numeric_variable> pending{};
             ::std::size_t result_strings{};
-            for(auto const& variable : variables)
+            auto const candidates{schema_owner == nullptr ?
+                ::std::optional<::std::span<owned_numeric_validation::scoped_variable const>>{} :
+                schema_owner->candidates(scopes, types, variables, cap, physical)};
+            auto const count{candidates ? candidates->size() : variables.size()};
+            for(::std::size_t position{}; position != count; ++position)
             {
+                auto const i{candidates ? (*candidates)[position].variable : position};
+                auto const& variable{variables[i]}; // exact immutable owner, checked index built above.
                 if(variable.global || variable.declaration || !active(variable.scope)) { continue; }
                 if(pending.size() == cap.max_results ||
                    !budget::charge(variable.name.size(), cap.max_result_string_bytes, result_strings))
@@ -355,7 +431,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::debugger::source_dwarf
                 else if(!variable.locations.empty()) { saved.reason = numeric_unavailable_reason::inactive_location; }
                 pending.push_back(::std::move(saved));
             }
-            out = ::std::move(pending); return inline_query_error::none;
+            out = ::std::move(pending);
+            if(selected_physical != nullptr) { *selected_physical = physical; }
+            return inline_query_error::none;
 #if defined(__cpp_exceptions) || defined(_CPPUNWIND)
         }
         catch(...) { out.clear(); return inline_query_error::allocation_failure; }

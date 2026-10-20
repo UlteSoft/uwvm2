@@ -1,0 +1,26 @@
+# Regenerate dated-run records, copied source/SDK inputs and toolchain caches.
+# Keep the reproduction scripts and documentation at this directory's root.
+/*/
+/native-image-contract
+/PERFORMANCE.md
+
+# Superseded run-script snapshots; retain the latest numbered revision.
+/debug-r1.py
+/debug-r2.py
+/debug-r3.py
+/debug-r4.py
+/debug-r5.py
+/ordinary-partial-r1.py
+/ordinary-partial-r2.py
+/ordinary-partial-r3.py
+/ordinary-r1.py
+/ordinary-r2.py
+/ordinary-r3.py
+/ordinary-r4.py
+/ordinary-r5.py
+/producer-r1.py
+/producer-r2.py
+/producer-r3.py
+/producer-r4.py
+/readback-r1.py
+/readback-r2.py

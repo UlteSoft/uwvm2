@@ -36,7 +36,11 @@ def session(args, folder, root):
         line = next(i for i, text in enumerate(args.source.read_text().splitlines(), 1) if 'PRETTY_REFERENCES_STOP' in text)
         points = client.request('setBreakpoints', {'source': {'path': str(args.source)}, 'breakpoints': [{'line': line}]})['body']['breakpoints']
         live.require(len(points) == 1 and points[0]['verified'], 'actual reference parameter source breakpoint', points)
-        client.request('continue', {'threadId': live.actual_location(client)['thread']})
+        # The registered launch pause can precede every Wasm participant.
+        # Setup/introspection can retire cached stop authority.
+        # Refresh the actual stopped status before domain continuation.
+        client.request('threads')
+        client.request('continue', {'threadId': 0})
         for _ in range(64):
             stopped = client.evaluate('wait')
             if b'stopped: breakpoint' in stopped:

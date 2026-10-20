@@ -1,0 +1,5 @@
+# Regenerate dated-run records, copied source/SDK inputs and toolchain caches.
+# Keep the reproduction scripts and documentation at this directory's root.
+/*/
+/native-image-contract
+/PERFORMANCE.md

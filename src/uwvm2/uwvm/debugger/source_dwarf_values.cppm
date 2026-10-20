@@ -1,4 +1,5 @@
 module;
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cstring>
@@ -6,6 +7,7 @@ module;
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>

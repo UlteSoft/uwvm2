@@ -7,7 +7,7 @@ live=base.live
 sys.dont_write_bytecode=True
 def session(a,folder,root):
  folder.mkdir(mode=0o700);dap=base.load(root/'tools/debug/dap_adapter.py','real_array_dap')
- mode=[] if a.ros else ['-Rcc','jit','-Rcm','full']
+ mode=[] if a.ros or a.fixed_llvm_full else ['-Rcc','jit','-Rcm','full']
  vm=['-m','run',*mode,'-Rct','0','-Rllvm-call-stack',a.policy,'-Rllvm-cache-path','disable','--run',str(a.wasm)]
  server=live.BrokerSession(a.uwvm,Path(__file__).resolve(),root/'tools/debug/dap_adapter.py',vm,folder);record=dict(passed=False,policy=a.policy,objects=[])
  try:
@@ -20,7 +20,11 @@ def session(a,folder,root):
   line=next(i for i,s in enumerate(a.source.read_text().splitlines(),1) if 'GO_ARRAY_READY' in s)
   bp=client.request('setBreakpoints',{'source':{'path':str(a.source)},'breakpoints':[{'line':line}]})['body']['breakpoints']
   live.require(len(bp)==1 and bp[0]['verified'],'real array source breakpoint',bp);record['breakpoint']=bp[0]
-  client.request('continue',{'threadId':live.actual_location(client)['thread']})
+  # The managed launch pause may precede any actual Wasm participant.
+  # Setup/introspection can retire cached stop authority.
+  # Refresh the actual stopped status before domain continuation.
+  client.request('threads')
+  client.request('continue',{'threadId':0})
   for _ in range(64):
    stop=client.evaluate('wait')
    if b'stopped: breakpoint' in stop:break
@@ -37,7 +41,7 @@ def session(a,folder,root):
   oracle={'arrayLen':4,'outerLen':2,'innerLen':3,'zeroLen':0,'zeroSizedLen':6}
   for name,want in oracle.items():
    values=[v for v in variables if v['name']==name]
-   live.require(len(values)==1 and values[0]['value']==f'i32={want}' and values[0]['variablesReference']==0,'actual compiler argument',values)
+   live.require(len(values)==1 and values[0]['value']==str(want) and values[0]['variablesReference']==0,'actual compiler argument',values)
   record['compiler_oracles']=oracle
   def readonly(value):
    live.require(value['presentationHint']['attributes']==['readOnly'] and 'memoryReference' not in value and 'evaluateName' not in value,'copied display only',value)
@@ -117,7 +121,7 @@ def session(a,folder,root):
   text=client.request('evaluate',{'expression':'box.Message','context':'watch','frameId':fresh['id']})['body']['variablesReference']
   live.require(all(r>0 for r in (fresh_scope,lazy,matrix,inner,text)) and len({fresh_scope,lazy,matrix,inner,text})==5,'live distinct references before real step')
   client.request('setBreakpoints',{'source':{'path':str(a.source)},'breakpoints':[]})
-  queued=client.queue([('stepIn',{'threadId':position['thread'],'granularity':'instruction'}),
+  queued=client.queue([('stepIn',{'threadId':position['thread'],'granularity':'statement'}),
     ('evaluate',{'expression':'len(box.Array)','context':'watch','frameId':fresh['id']}),
     *[('variables',{'variablesReference':r}) for r in (fresh_scope,lazy,matrix,inner,text)],
     ('scopes',{'frameId':fresh['id']})])
@@ -148,7 +152,7 @@ def main():
  if len(sys.argv)>1 and sys.argv[1] in ('serve','__vm_gate'):return base.main()
  ap=argparse.ArgumentParser(description=__doc__)
  for name in ('uwvm','build-receipt','wasm','source','out'):ap.add_argument('--'+name,type=Path,required=True)
- ap.add_argument('--seconds',type=int,default=0);ap.add_argument('--ros',action='store_true');ap.add_argument('--policy',choices=('instruction','unwind'),default='instruction')
+ ap.add_argument('--seconds',type=int,default=0);ap.add_argument('--ros',action='store_true');ap.add_argument('--fixed-llvm-full', action='store_true', help='Executable is built with a fixed LLVM-full runtime');ap.add_argument('--policy',choices=('instruction','unwind'),default='instruction')
  a=ap.parse_args();live.require(sys.platform=='linux' and 0<=a.seconds<=900,'bounded Linux only')
  import subprocess
  subprocess.run(['bash',str(root/'tools/ci/require_wasm3_test_cgroup.sh')],check=True)

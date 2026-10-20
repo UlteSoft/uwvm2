@@ -217,7 +217,16 @@ class StepInlineTests(unittest.TestCase):
             self.assertNotIn("source", row); self.assertNotIn("instructionPointerReference", row)
             self.assertEqual(self.send("scopes", frameId=row["id"])["body"]["scopes"], [])
         scopes = self.send("scopes", frameId=frames[2]["id"])["body"]["scopes"]
-        self.assertEqual([row["name"] for row in scopes], ["Wasm locals", "Source variables", "WASIp1 arguments", "WASIp1 environment", "WASIp1 descriptors", "WASIp1 preopens"])
+        expected = ["Wasm locals", "Source variables", "WASIp1 arguments", "WASIp1 environment", "WASIp1 descriptors", "WASIp1 preopens"]
+        if hasattr(self.adapter, "ros_scope_stops"):
+            expected += ["ROS capabilities (process-owned)", "ROS instances (backend sessions)", "ROS event queues (metadata only)"]
+            selections = ("capabilities", "instances", "events")
+            for row, selection in zip(scopes[-3:], selections):
+                self.assertTrue(row["expensive"] and row["variablesReference"] > 0)
+                self.assertEqual(self.adapter.ros_scope_stops[row["variablesReference"]],
+                                 (self.adapter.stop_key, selection))
+            self.assertFalse(any(command.startswith(("info ros", "trace ros")) for command in self.broker.commands))
+        self.assertEqual([row["name"] for row in scopes], expected)
         self.assertEqual(self.send("variables", variablesReference=scopes[0]["variablesReference"])["body"]["variables"][0]["value"], "i32=5")
 
     def test_inline_labels_cannot_read_source_values_memory_or_restart(self):

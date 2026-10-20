@@ -46,7 +46,12 @@ int main()
         variable(4u, 2u, 3u), variable(5u, 3u), variable(6u, 0u), variable(7u, 1u), variable(8u, 0u), variable(9u, 2u)};
     ::std::vector<numeric_variable> values{};
     auto query{[&](::std::uint64_t pc = 15u, numeric_query_limits const& cap = {})
-    { return query_numeric_variables(scopes, types, variables, pc, locals, locals.size(), values, cap); }};
+    {
+        ::std::size_t physical{7u};
+        auto const status=query_numeric_variables(scopes, types, variables, pc, locals, locals.size(), values, cap, nullptr, nullptr, &physical);
+        check(physical==(status==inline_query_error::none?1u:no_record),"physical scope returned only after successful complete scalar query");
+        return status;
+    }};
     check(query() == inline_query_error::none && values.size() == 10u, "actual concrete inline chain and owned outputs");
     check(values[0].bits == 254u && numeric_signed_value(values[0]) == -2, "i8 from complete i32 carrier; portable BE low bits");
     check(values[1].bits == 0xcdfeu && numeric_signed_value(values[1]) == -12802, "i16 sign extension from i32");
@@ -143,6 +148,28 @@ int main()
                 "bounded unsigned conversion preserves logical low bits on actual target ABI");
             converted.integer_transforms[0].resolved=false;value={};value_details::copy_value(converted,unsigned_type,copied,1u,value);
             check(value.kind==numeric_kind::unavailable,"unresolved conversion cannot expose a value");
+        }
+    }
+    {
+        auto isolated{fixture()};auto second=isolated[1];second.identity={1u,99u};second.ranges={{40u,50u}};isolated.push_back(second);
+        ::std::vector<variable_record> declarations{variable(0u,0u,4u)};
+        ::std::unique_ptr<owned_scope_paths> owned{};check(owned_scope_paths::copy(isolated,owned),"independent scope copy");
+        for(bool cached:{false,true})for(unsigned repeat{};repeat!=3u;++repeat)
+        {
+            auto const records=cached?owned->scopes():std::span<scope_record const>{isolated};
+            auto const paths=cached?owned.get():nullptr;
+            for(auto point:{39u,40u,49u,50u,15u})
+            {
+                ::std::size_t physical{7u};std::vector<numeric_variable> selected;
+                auto const status=query_numeric_variables(records,types,declarations,point,locals,locals.size(),selected,{},paths,nullptr,&physical);
+                if(point==40u||point==49u)check(status==inline_query_error::none&&physical==4u&&selected.size()==1u&&selected[0].bits==254u,"separate physical function, native scalar and half-open endpoints");
+                else if(point==15u)check(status==inline_query_error::none&&physical==1u&&selected.empty(),"inactive foreign function cannot contribute a local");
+                else check(status==inline_query_error::unavailable&&physical==no_record&&selected.empty(),"unavailable source PC cannot retain physical result");
+            }
+            ::std::size_t physical{4u};std::vector<numeric_variable> selected;numeric_query_limits tight{};tight.max_results=0u;
+            check(query_numeric_variables(records,types,declarations,40u,locals,locals.size(),selected,tight,paths,nullptr,&physical)==inline_query_error::limit_exceeded&&physical==no_record&&selected.empty(),"failed result budget clears an already selected physical scope");
+            auto malformed=declarations;malformed[0].scope=records.size();physical=4u;
+            check(query_numeric_variables(records,types,malformed,40u,locals,locals.size(),selected,{},paths,nullptr,&physical)==inline_query_error::malformed&&physical==no_record&&selected.empty(),"malformed metadata cannot publish physical output");
         }
     }
     ::fast_io::io::println("debug_source_dwarf_values: PASS finite direct numeric copies, scope/location/type rejection and budgets");

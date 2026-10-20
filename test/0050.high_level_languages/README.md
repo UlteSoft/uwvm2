@@ -250,3 +250,103 @@ pass in each combination. The common DIE limit is now 131,072; the current
 checks 155 roles and full XZ integrity. These parser-only results give no
 actual Runtime source-value or performance credit; complete CLI rebuilds and
 Rust source requalification retain separate exact products.
+
+
+## TinyGo resource SDK continuation
+
+The [TinyGo resource packet](tinygo-sdk-resources-20261019/README.md) records
+30 compiled/validated ROS1/ROS2 artifacts,50 real ROS2 resource scenes,
+four wrong-value refusals and ten partial-factory rollbacks. Three LLVM
+products qualify a finite source/field/step workflow; broader local values
+and panic recovery retain their stated limits. Native/VTune performance has
+no new qualification because serialization/capacity admission did not pass.
+The original all-language requirement bundle remains incomplete.
+
+## TinyGo complete-example matrix checkpoint (19 October 2026)
+
+The [source-bound example checkpoint](tinygo-examples-matrix-20261019/README.md) independently verifies 121 of
+135 planned products and 34 closed release-interpreter observations. Remaining
+compiler/runtime/DBG and performance work is explicitly unqualified; the packet
+retains resource refusals, original logs and an executable Linux resume plan.
+
+## TinyGo qualified example, source DBG and codec matrix (19 October 2026)
+
+The [qualified finite TinyGo matrix](tinygo-examples-complete-20261019/README.md) records 135 actual products,
+390 ordinary outcomes, 15 complete source-value workflows across three frozen
+LLVM products and five optimizations, and 28 native/LLVM/Wasmtime codec
+correctness cases. It completes the example rows pending in the earlier partial
+checkpoint. Full SDK, native ROS, hardware performance and platform acceptance
+remain separate open requirements.
+
+
+## MoonBit typed Image checkpoint, 2026-10-19
+
+The [finite Image SDK matrix](moonbit-image-sdk-20261019/README.md) records360 actual model executions,60 application products,120 interpreter runs,12 pure engine checks,82 native Host-codec assertions and three source-map debugger workflows. MoonBit lexical object values, positive native ROS Image delivery, hardware performance and the complete original fifteen-language bundle remain unqualified. The ROS checkout contains the active SDK and detailed English Image guide; this packet is identical in all three repositories.
+
+
+## MoonBit same-source Image native/Wasm checkpoint, 2026-10-20
+
+The [native/Wasm checkpoint](moonbit-image-native-wasm-20261020/README.md) records three real products and40 independently checked finite cases. Imported-GC memory pressure and a debug large-workload timeout remain failures. Five calibrations and two first-replicate observations do not qualify a performance comparison; raw-memory admission stopped the cohort before any VTune collection. The identical packet retains complete positive logs, failed predecessors, the report-path error disclosure and the detailed English build/run guide. Full SDK/client parity, managed-value debugging, native ROS Image delivery, hardware and platform acceptance remain open.
+
+
+## MoonBit actual native ROS2 Image checkpoint, 2026-10-20
+
+The [native Image checkpoint](moonbit-native-image-20261020/README.md) independently verifies eight actual complete Image deliveries, eight enabled zero-grant scenes and48 naturally exited actors. It covers four new MoonBit products on both frozen interpreter modes, exact prior-String/Image policies, real error13/error22 decisions and native graph/GID/QoS/quiet retirement. The separate pure-codec performance retry again stopped at the raw60GiB guard with zero new VTune collections. Physical cameras, native Image subscription, ROS1/mixed/vendor coverage, full official client APIs, managed lexical debugging and platform/cache/hardware acceptance remain open.
+
+
+## MoonBit actual native ROS1 Image checkpoint, 2026-10-20
+
+The [native ROS1 Image checkpoint](moonbit-native-ros1-image-20261020/README.md) independently verifies eight complete TCPROS deliveries, eight enabled zero-grant scenes and 49 naturally exited actors, including an isolated native Master. It covers four fresh MoonBit products on both frozen interpreter modes, exact Image/connection-header checks, Master graph identities, real error13/error22 decisions and quiet retirement. A separate five-engine codec performance retry stopped at the strict raw60GiB guard with zero new completed formal timings or VTune collections. Physical cameras, native Image subscription, mixed/vendor coverage, full official client APIs, managed lexical debugging and platform/cache/hardware acceptance remain open.
+
+
+## MoonBit native Image pipeline and codec timing checkpoint, 2026-10-20
+
+The [native input/processing/output checkpoint](moonbit-image-pipeline-20261020/README.md) independently verifies eight full native ROS2 Image pipelines, 24 zero/partial permission scenes and 96 naturally exited actors. It also records 48 exact prior policies, 16 explicit split-topic profiles and 48 refusals. A separate unchanged codec kernel completed 15 fresh five-engine formal timings and one actual-sample-qualified Native VTune Hotspots profile. In that finite workload the three UWVM medians are below the selected Wasmtime median, while the roughly 3.8x gap to Native remains open. The following microarchitecture attempt stopped at the strict raw 60 GiB guard; the ten-profile hardware matrix, native ROS performance, sustained imported GC, full client APIs, lexical DBG and platform/cache acceptance remain incomplete.
+
+
+## MoonBit native ROS1 Image pipeline checkpoint, 2026-10-20
+
+The [native ROS1 input/processing/output checkpoint](moonbit-image-pipeline-ros1-20261020/README.md) independently verifies eight complete Noetic TCPROS Image pipelines, 24 zero/partial permission scenes and 97 naturally exited actors, including an isolated Master. Four fresh linear/GC × Debug/Release Wasms retain all 38 ROS1 imports. The initial native capacity stop, initial producer admission failure and a later refusal to start are retained. The English tutorial documents separate input/output grants, native connection identities, Master graphs and roscpp transport sequence assignment. No new debugger, hardware/performance, QEMU/cache or full official-client parity credit is claimed.
+
+
+## MoonBit Transform SDK and hardware checkpoint, 2026-10-20
+
+The [typed Transform checkpoint](moonbit-transform-sdk-20261020/README.md) independently verifies232 local models,16 application Wasms,704 C++ Host/Python codec cases,72 Runtime outcomes and three original-source-map breakpoint/step workflows. Lexical values and native TF delivery remain unqualified. A separate unchanged Image codec cohort adds three qualified hardware profiles, completing4/10 selected profiles with zero new formal timings. The packet retains two zero-child admission failures, the raw60GiB partial-profile stop and original producer/debug harness failures. The complete English TF reference, source-bound debug limits and actual raw samples are identical across all three checkouts; full fifteen-language/client/platform/cache acceptance remains incomplete.
+
+
+## MoonBit native TF pipeline checkpoint, 2026-10-20
+
+The [real ROS1/ROS2 TF checkpoint](moonbit-native-transform-20261020/README.md) independently verifies eight fresh Wasms, two fresh native witnesses and 64 scenes spanning linear/GC, Debug/Release, two interpreter Runtimes and four independent permission profiles. It qualifies 32 complete lookups, 32 broadcasts, 16 full processing scenes and 193 natural-zero actor exits. Complete values, native identities, permission refusals and endpoint retirement are checked. Failed policy and timeout-assumption attempts remain retained. The non-latched/volatile static-topic profile covers current peers; late joiners, empty-lookup timeout lifetime, new DBG, native TF performance, platforms/cache and full fifteen-language/client parity remain open. Active ROS SDK/tutorial sources reside in the ROS checkout; all three carry identical frozen evidence and guides.
+
+The [publication and owned-policy cleanup receipt](results/native-budget/moonbit-native-transform-publication-20261020.json) records all three verified payloads and removal of the 136 archived private policy/config files (779637 logical bytes). Original sources, Wasms, native witnesses, failed attempts and the protected shared debugger dependency remain retained.
+
+
+## Python typed TF SDK partial checkpoint, 2026-10-20
+
+The [partial Python TF checkpoint](python-transform-sdk-20261020/README.md) independently verifies 43 local contracts, six validated Wasm variants, four complete 704-vector corpus runs, four corrupted-golden controls and eleven Noetic native scenes. It adds complete TransformStamped codecs and one-call lookup/broadcast owners, with detailed English build/use/native tutorials. Five lookups, five broadcasts and two full processing paths complete; all 33 scene actors exit naturally. The isolated Master is administratively retired after admission blocks the next case. The full Runtime and native32 matrices, ROS2 native TF, new DBG/performance/platform/cache and official client parity remain incomplete. The displaced original storage is recovered as inert data with every recovery member and complete gzip EOF verified; no mount/loop changes or recovered controller execution occurs. All three repositories carry identical compact source/report/baseline capsules and SHA-bound references to the fully preserved raw data on Linux.
+
+[Final Python TF publication and cleanup receipt](results/native-budget/python-transform-publication-20261020.json): three identical 598-file capsules; the complete recovered Linux archive retains 8082 regular files and the matching toolchain. After ended-owner and live-descriptor checks, only 44 authenticated temporary policy files (217656 logical bytes) and 25 empty directories are retired. The full archive, five objects, protected Runtime inputs and original benchmark lock remain intact. This final data audit adds no Runtime, debugger, native, hardware, performance, QEMU or cache acceptance.
+
+
+## Python TF interpreter partial continuation, 2026-10-20
+
+The [interpreter continuation](python-transform-interpreter-20261020/README.md) byte-verifies four recovered ordinary/stable Runtime ELFs and adds an actual ordinary Release704-vector run plus an independently failing golden control. Eight unchanged earlier ROS interpreter outcomes are reused by SHA and original ownership/log identity:ten of forty selected interpreter cases are qualified,thirty remain incomplete. The guard-interrupted retained actor and both zero-actor bounded waits are retained. No new compile, native, DBG, hardware/performance, platform/cache or full client-library parity credit is added. Raw Runtime inputs and original reports are fully preserved in the verified owned Linux backup; all three repositories carry identical compact evidence and updated English guide snapshots.
+
+[Final interpreter publication and own-gzip retirement receipt](results/native-budget/python-transform-interpreter-publication-20261020.json): all three90-file capsules independently byte-hashed; ten qualified identities count each original execution once. The complete571330015-byte input/evidence backup is verified member-by-member and through gzip EOF. After ended-owner and live-descriptor checks, only four redundant owned gzip copies (46836424 logical bytes) are removed; all four recovered Runtime ELFs and full backup remain. No new target/debugger/native/performance/platform/cache acceptance is added by the final data audit.
+
+
+## Python TF complete corpus matrix, 2026-10-20
+
+The [complete corpus matrix](python-transform-corpus-matrix-20261020/README.md) completes all 24 pure-WASI identities across ordinary/stable/ROS Release/Debug interpreters: twelve complete704-case runs (8448 vector executions) and twelve independent failing golden controls. Fourteen outcomes are new and ten unchanged earlier outcomes count once. The original ROS interpreter ELFs are recovered read-only into owned storage and SHA-verified; sixteen default/argument cases still cannot start within the unchanged shared-memory admission limit. Missing-path, zero-actor and interrupted data-recovery evidence remain preserved. No new compile, native, DBG, hardware/performance, platform/cache or full client API parity is qualified.
+
+[Final complete-corpus publication and own-gzip retirement receipt](results/native-budget/python-transform-corpus-publication-20261020.json): three identical193-file capsules, all24 corpus/control identities independently verified, and all71 previous continuation values retained. After complete Linux backup verification and ended-owner/live-descriptor checks, only two redundant owned ROS gzip copies (25135381 logical bytes) are removed. Both recovered ROS Runtime ELFs and the full backup remain. The final data audit adds no business/native/debugger/performance/platform/cache execution.
+
+
+## Python native TF input recovery, 2026-10-20
+
+The [native input checkpoint](python-native-tf-inputs-20261020/README.md) restores both original witnesses and verifies all eight principal native pins. Fifteen inert-reader controls pass on SSH Linux; explicit-path DT_NEEDED graphs cover38 ROS1 and51 ROS2 images without unresolved names. Four old main-program RPATH strings remain a separate real-loader check. The revised Python native owner has syntax validation only. A bounded180-second attempt starts zero Guests, leaving the sixteen default/argument cases pending. No new native delivery, DBG, VTune/performance, QEMU, cache or full client API parity is qualified.
+
+
+## Python native loader and recovered inputs, 2026-10-20
+
+The [native loader checkpoint](python-native-loader-20261020/README.md) passes ten original-loader dependency-list diagnostics and retains one real PyYAML host-library fallback as failed. Read-only recovery supplies the selected SDK YAML library and system-Python package data. The current driver adds Master mapping checks; a fresh149-source/167-pin owner removes unused MoonBit execution dependencies. Guest R9 and both native attempts launch zero business actors at unchanged memory guards. Prior24 corpus identities remain unchanged; native32, sixteen Guest refusals, DBG, VTune, QEMU, cache and official client API parity are still pending.

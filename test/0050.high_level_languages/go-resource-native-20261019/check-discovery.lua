@@ -1,0 +1,1 @@
+function main(expected)\n local files=os.files("test/**.cc")\n table.sort(files)\n for _,file in ipairs(files) do print(file) end\n assert(#files==tonumber(expected),"unexpected test source discovery")\n print("PASS_ACTUAL_XMAKE_TEST_SOURCE_DISCOVERY count="..#files)\nend\n

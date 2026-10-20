@@ -222,3 +222,27 @@ checks against frozen current debugger inputs. It distinguishes fresh execution
 from byte-verified closed reuse and retains original harness/storage failures.
 Its complete independent archive readback does not substitute for full-VM,
 managed-language, ROS platform, QEMU or native/VTune qualification.
+
+The [controlled Rust Runtime and ROS footprint result](../../test/0050.high_level_languages/results/native-budget/language-rust-runtime-query-size-20261019/README.md)
+adds four complete CLI products, 40 ordinary outcomes, eight actual Wasm DBG
+workflows and four original-source locals/print checks at 40 then 42.
+The measured copied strip-all ROS ELF is 62,683,400 bytes with all adapters
+and 62,526,200 with none, a 157,200-byte difference. Native ROS imports are
+disabled in this manual LLVM profile. The None selection still runs legal
+Rust and generic DWARF scalar debugging. Retain the default full selection;
+these controlled source-bound correctness results add no native/VTune, real
+ROS SDK parity or persistent executable-cache security qualification.
+
+
+## MoonBit Transform source-map checkpoint, 20 October 2026
+
+The [Transform checkpoint](../../test/0050.high_level_languages/moonbit-transform-sdk-20261020/README.md)
+adds three original-file breakpoint/line/step sessions on the frozen ordinary,
+stable and ROS LLVM products. Same-stop local reads explicitly remain
+unavailable; the stale stop-id produces a distinct refusal. This establishes
+source positions and stepping, without lexical values or ROS callback debugging.
+Eight separate pure Wasm executions pass on the ROS product with all language
+adapters disabled. Legal Wasm execution remains independent of adapter selection.
+All fifteen options remain on by default; retaining the complete selection is
+recommended. These finite results do not complete the full language/debug or
+platform/cache matrix.
