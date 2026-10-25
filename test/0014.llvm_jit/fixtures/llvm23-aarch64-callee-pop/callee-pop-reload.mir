@@ -1,0 +1,84 @@
+# RUN: llc -mtriple=aarch64-linux-gnu -run-pass=prolog-epilog -verify-machineinstrs %s -o - | FileCheck %s
+# RUN: llc -mtriple=aarch64_be-linux-gnu -run-pass=prolog-epilog -verify-machineinstrs %s -o - | FileCheck %s
+#
+# @brief Preserve a spilled value across a callee-pop TailCC call.
+# @details Register allocation may place a frame-index reload between the call
+# and its call-frame destroy pseudo. The callee has already advanced SP by 16
+# bytes. A reserved-frame caller must restore SP before that reload, including
+# indirect calls. Ordinary caller-pop calls must not acquire an extra adjustment.
+--- |
+  declare tailcc void @callee(i64, i64, i64, i64, i64, i64, i64, i64, i64)
+  declare void @ordinary_callee()
+  define i64 @direct_reload() { ret i64 0 }
+  define i64 @indirect_reload(ptr %target) { ret i64 0 }
+  define i64 @ordinary_reload() { ret i64 0 }
+...
+---
+name: direct_reload
+tracksRegLiveness: true
+frameInfo:
+  adjustsStack: true
+  hasCalls: true
+  maxCallFrameSize: 16
+stack:
+  - { id: 0, type: spill-slot, size: 8, alignment: 8 }
+body: |
+  bb.0:
+    $x9 = MOVi64imm 42
+    STRXui killed $x9, %stack.0, 0 :: (store (s64) into %stack.0)
+    ADJCALLSTACKDOWN 16, 0, implicit-def dead $sp, implicit $sp
+    BL @callee, csr_aarch64_aapcs, implicit-def dead $lr, implicit $sp, implicit-def $sp
+    $x0 = LDRXui %stack.0, 0 :: (load (s64) from %stack.0)
+    ADJCALLSTACKUP 16, 16, implicit-def dead $sp, implicit $sp
+    RET_ReallyLR implicit $x0
+# CHECK-LABEL: name: direct_reload
+# CHECK: BL @callee
+# CHECK-NEXT: $sp = SUBXri $sp, 16, 0
+# CHECK-NEXT: $x0 = LDRXui $sp,
+...
+---
+name: indirect_reload
+tracksRegLiveness: true
+frameInfo:
+  adjustsStack: true
+  hasCalls: true
+  maxCallFrameSize: 16
+stack:
+  - { id: 0, type: spill-slot, size: 8, alignment: 8 }
+body: |
+  bb.0:
+    liveins: $x0
+    $x9 = MOVi64imm 43
+    STRXui killed $x9, %stack.0, 0 :: (store (s64) into %stack.0)
+    ADJCALLSTACKDOWN 16, 0, implicit-def dead $sp, implicit $sp
+    BLR killed $x0, csr_aarch64_aapcs, implicit-def dead $lr, implicit $sp, implicit-def $sp
+    $x0 = LDRXui %stack.0, 0 :: (load (s64) from %stack.0)
+    ADJCALLSTACKUP 16, 16, implicit-def dead $sp, implicit $sp
+    RET_ReallyLR implicit $x0
+# CHECK-LABEL: name: indirect_reload
+# CHECK: BLR
+# CHECK-NEXT: $sp = SUBXri $sp, 16, 0
+# CHECK-NEXT: $x0 = LDRXui $sp,
+...
+---
+name: ordinary_reload
+tracksRegLiveness: true
+frameInfo:
+  adjustsStack: true
+  hasCalls: true
+  maxCallFrameSize: 16
+stack:
+  - { id: 0, type: spill-slot, size: 8, alignment: 8 }
+body: |
+  bb.0:
+    $x9 = MOVi64imm 44
+    STRXui killed $x9, %stack.0, 0 :: (store (s64) into %stack.0)
+    ADJCALLSTACKDOWN 16, 0, implicit-def dead $sp, implicit $sp
+    BL @ordinary_callee, csr_aarch64_aapcs, implicit-def dead $lr, implicit $sp, implicit-def $sp
+    $x0 = LDRXui %stack.0, 0 :: (load (s64) from %stack.0)
+    ADJCALLSTACKUP 16, 0, implicit-def dead $sp, implicit $sp
+    RET_ReallyLR implicit $x0
+# CHECK-LABEL: name: ordinary_reload
+# CHECK: BL @ordinary_callee
+# CHECK-NEXT: $x0 = LDRXui $sp,
+...

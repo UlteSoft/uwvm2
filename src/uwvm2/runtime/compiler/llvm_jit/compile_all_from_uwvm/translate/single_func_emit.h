@@ -921,6 +921,15 @@ inline constexpr CallSite* apply_llvm_jit_raw_entry_calling_conv(CallSite* call_
     // ABI; the existing musttail guards reject unsupported tail materialization.
     // Qualify the exact target/provider through the toolchain ABI regressions.
     static_cast<void>(type);
+# elif (defined(__aarch64__) || defined(_M_ARM64)) && \
+       !((defined(LLVM_UWVM_AARCH64_CALLEE_POP_SP_FIXED) && LLVM_UWVM_AARCH64_CALLEE_POP_SP_FIXED == 1) || \
+         (defined(UWVM_LLVM_AARCH64_CALLEE_POP_SP_FIXED) && UWVM_LLVM_AARCH64_CALLEE_POP_SP_FIXED == 1))
+    // AArch64 callee-pop calls can otherwise reload caller spill slots before
+    // restoring SP. The generated repaired-provider capability or a separately
+    // qualified external backport is required; a version string is insufficient.
+    // ROS requires this capability at build time. Ordinary providers keep their
+    // established ABI until rebuilt, and the musttail guards remain authoritative.
+    static_cast<void>(type);
 # else
     if(!type.getReturnType()->isAggregateType())
     {

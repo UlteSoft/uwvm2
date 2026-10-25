@@ -481,6 +481,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::llvm_jit_cache
 #else
         details::append_cache_key_value(out, u8"x86-tailcc-aligned-frame-backport", u8"unqualified");
 #endif
+#if defined(__aarch64__) || defined(_M_ARM64)
+        // This calling-convention admission changes generated AArch64 code.
+        // Bind both the effective capability and explicit external opt-in to
+        // every object/checkpoint key; no unrelated host needs these fields.
+        details::append_cache_key_value(out, u8"aarch64-tailcc-admission", u8"callee-pop-sp-capability-v1");
+# if (defined(LLVM_UWVM_AARCH64_CALLEE_POP_SP_FIXED) && LLVM_UWVM_AARCH64_CALLEE_POP_SP_FIXED == 1) || \
+     (defined(UWVM_LLVM_AARCH64_CALLEE_POP_SP_FIXED) && UWVM_LLVM_AARCH64_CALLEE_POP_SP_FIXED == 1)
+        details::append_cache_key_value(out, u8"aarch64-tailcc-callee-pop-sp", u8"fixed");
+# else
+        details::append_cache_key_value(out, u8"aarch64-tailcc-callee-pop-sp", u8"unfixed");
+# endif
+# if defined(UWVM_LLVM_AARCH64_CALLEE_POP_SP_FIXED) && UWVM_LLVM_AARCH64_CALLEE_POP_SP_FIXED == 1
+        details::append_cache_key_value(out, u8"aarch64-tailcc-callee-pop-sp-backport", u8"qualified");
+# else
+        details::append_cache_key_value(out, u8"aarch64-tailcc-callee-pop-sp-backport", u8"unqualified");
+# endif
+#endif
 #if defined(UWVM_LLVM_X86_TAILCC_FIXED)
         details::append_cache_key_value(out, u8"x86-tailcc-backport", u8"qualified");
 #else
